@@ -49,7 +49,7 @@ const STEP: Record<string, readonly [number, number]> = {
 function FieldImpl({
   players, vis, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
 }: Props) {
-  const paneRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
   const [live, setLive] = useState<Live | null>(null);
   const [boingId, setBoingId] = useState<string | null>(null);
@@ -197,7 +197,7 @@ function FieldImpl({
   const dragging = live !== null;
 
   return (
-    <div ref={paneRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-[9px]">
+    <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-[9px]">
       <div className="relative flex-none" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         <svg
           ref={svgRef}
@@ -246,7 +246,7 @@ function FieldImpl({
           ))}
         </svg>
       </div>
-    </div>
+    </main>
   );
 }
 
