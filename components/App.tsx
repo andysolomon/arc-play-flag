@@ -109,7 +109,15 @@ export function App() {
           svgRef={svgRef}
         />
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette">
-          <RouteSidebar selected={sel} hint={hint} />
+          <RouteSidebar
+            selected={sel}
+            hint={hint}
+            onPick={(key) => { dispatch({ type: "pick", key }); }}
+            onDone={() => { dispatch({ type: "select", id: null }); }}
+            onPrimary={() => { dispatch({ type: "togglePrimary" }); }}
+            onMirror={() => { dispatch({ type: "mirror" }); }}
+            onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
+          />
         </Sidebar>
       </div>
       <Hint text={hint} />
