@@ -117,7 +117,7 @@ export function App() {
         onRedo={() => { dispatch({ type: "redo" }); }}
       />
       <div className="flex min-h-0 flex-1 items-stretch">
-        <Sidebar id="play-sidebar" side="left" open={leftOpen} label="Play tools">
+        <Sidebar id="play-sidebar" side="left" open={leftOpen} isOpen={isOpen(leftOpen, "left")} label="Play tools">
           <PlaySidebar
             name={s.name}
             vis={s.vis}
@@ -143,7 +143,7 @@ export function App() {
           onSelect={onSelect}
           svgRef={svgRef}
         />
-        <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette">
+        <Sidebar id="route-sidebar" side="right" open={rightOpen} isOpen={isOpen(rightOpen, "right")} label="Route palette">
           <RouteSidebar
             selected={sel}
             hint={hint}

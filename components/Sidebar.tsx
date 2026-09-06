@@ -6,6 +6,8 @@ interface Props {
   id: string;
   side: "left" | "right";
   open: Open;
+  /** resolved open state (auto → wide screens only) */
+  isOpen: boolean;
   label: string;
   children: ReactNode;
 }
@@ -15,7 +17,7 @@ interface Props {
  * pre-hydration state: open on wide screens, closed on narrow ones, decided in CSS
  * so the first paint never slides.
  */
-export function Sidebar({ id, side, open, label, children }: Props) {
+export function Sidebar({ id, side, open, isOpen, label, children }: Props) {
   const width =
     open === "auto"
       ? side === "left" ? "w-0 min-[900px]:w-[266px] min-[900px]:border-r-2" : "w-0"
@@ -24,10 +26,10 @@ export function Sidebar({ id, side, open, label, children }: Props) {
     <aside
       id={id}
       aria-label={label}
-      aria-hidden={open === false}
+      aria-hidden={!isOpen}
       className={`flex-none overflow-hidden border-ink bg-cream transition-[width] duration-[180ms] ease-in-out motion-reduce:transition-none ${width}`}
     >
-      <div className="flex h-full w-[264px] flex-col gap-[10px] overflow-y-auto px-3 py-3.5" inert={open === false}>
+      <div className="flex h-full w-[264px] flex-col gap-[10px] overflow-y-auto px-3 py-3.5" inert={!isOpen}>
         {children}
       </div>
     </aside>
