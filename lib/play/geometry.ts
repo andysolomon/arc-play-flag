@@ -36,13 +36,13 @@ export function clamp(x: number, y: number, team: Team | null, top: number): Pt 
  * Depth is derived on every read from the play plus the measured pane, never stored,
  * so it can never lag behind a route or position change.
  */
-export function depth(players: readonly Player[], pane: Pane | null): number {
+export function depth(players: readonly Player[], pane: Pane | null, minDepth = 24): number {
   const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
   const hasDeep = players.some((p) => p.route?.type === "zoneDeep");
   const need = hasDeep ? Math.min(deepest, Math.min(-12, deepest - 4) - 2.9) : deepest;
   const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : 45;
   const d = Math.max(aspect, 8 - need + 1.2);
-  return Math.round(Math.max(24, Math.min(45, d)) * 2) / 2;
+  return Math.round(Math.max(minDepth, Math.min(45, d)) * 2) / 2;
 }
 
 export function cardWidth(pane: Pane | null, depthYards: number): number | null {

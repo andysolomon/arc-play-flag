@@ -96,12 +96,22 @@ describe("reducer", () => {
   });
   test("load pushes history and renames; hydrate does not", () => {
     const players = defaults().map((p) => ({ ...p, x: 15 }));
-    let s = run({ type: "load", name: "Bunch", players });
+    let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players });
     expect(s.name).toBe("Bunch");
+    expect(s.id).toBe("abc");
+    expect(s.notes).toBe("hi");
     expect(s.past).toHaveLength(1);
     s = reducer(initialState(), { type: "hydrate", name: "Draft", players });
     expect(s.past).toHaveLength(0);
+    expect(s.id).toBeNull();
     expect(selected(s)).toBeNull();
+  });
+  test("notes and the saved id do not touch history", () => {
+    let s = run({ type: "setNotes", notes: "Sell the fake." });
+    s = reducer(s, { type: "saved", id: "xyz" });
+    expect(s.notes).toBe("Sell the fake.");
+    expect(s.id).toBe("xyz");
+    expect(s.past).toHaveLength(0);
   });
   test("rename commits once per session and caps at 3 uppercase letters", () => {
     let s = run({ type: "rename", id: "d1", label: "cbx", commit: true });

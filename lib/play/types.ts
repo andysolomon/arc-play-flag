@@ -59,3 +59,28 @@ export interface Draft {
   id: string;
   pts: Pair[];
 }
+
+/** A play in the on-device library. Keyed by a generated id, so it can be renamed freely. */
+export interface SavedPlay {
+  id: string;
+  name: string;
+  players: Player[];
+  /** the coach's notes, shown on detailed exports */
+  notes: string;
+}
+
+/** A named, ordered list of plays. Numbers on exports are positions in this list. */
+export interface Playbook {
+  id: string;
+  name: string;
+  plays: string[];
+}
+
+export interface TeamSettings {
+  name: string;
+  /** an accent colour for exports, as #rrggbb */
+  color: string;
+}
+
+/** How much an export shows: simple is diagram only, detailed adds names, the read and notes. */
+export type Level = "simple" | "detailed";

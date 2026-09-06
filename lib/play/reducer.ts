@@ -3,7 +3,10 @@ import { defaults, mirrorable, routeDef } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, Team, Vis } from "./types";
 
 export interface PlayState extends History {
+  /** the saved play this one came from, so Save updates it instead of adding another */
+  id: string | null;
   name: string;
+  notes: string;
   players: readonly Player[];
   selectedId: string | null;
   targeting: boolean;
@@ -28,14 +31,19 @@ export type Action =
   | { type: "resetFormation"; team: Team | null }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "load"; name: string; players: Player[] }
-  | { type: "hydrate"; name: string; players: Player[] }
+  | { type: "load"; id?: string | null; name: string; notes?: string; players: Player[] }
+  | { type: "hydrate"; id?: string | null; name: string; notes?: string; players: Player[] }
   | { type: "setName"; name: string }
+  | { type: "setNotes"; notes: string }
+  /** after a save: remember which record this play now is */
+  | { type: "saved"; id: string }
   | { type: "setVis"; vis: Vis };
 
 export function initialState(): PlayState {
   return {
+    id: null,
     name: "New play",
+    notes: "",
     players: defaults(),
     selectedId: null,
     targeting: false,
@@ -186,11 +194,15 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return step ? { ...s, ...step.history, players: step.players, ...cleared } : s;
     }
     case "load":
-      return { ...s, ...push(s, s.players), name: a.name, players: a.players, ...cleared };
+      return { ...s, ...push(s, s.players), id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players, ...cleared };
     case "hydrate":
-      return { ...s, name: a.name, players: a.players };
+      return { ...s, id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players };
     case "setName":
       return { ...s, name: a.name };
+    case "setNotes":
+      return { ...s, notes: a.notes };
+    case "saved":
+      return { ...s, id: a.id };
     case "setVis":
       return { ...s, vis: a.vis };
   }
