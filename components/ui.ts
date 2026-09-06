@@ -15,3 +15,5 @@ export const eyebrow = "flex-none text-eyebrow tracking-eyebrow text-ink-muted";
 export const divider = "my-1 h-0.5 flex-none bg-divider";
 export const input =
   "w-full rounded-pill border-2 border-ink bg-white px-3.5 py-1.5 text-input text-ink placeholder:text-ink-muted";
+export const select = "cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base";
+export const card = "rounded-tile border-2 border-ink bg-white p-3 shadow-tile";

@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { exportPng } from "@/lib/export";
 import { initialState, reducer, selected } from "@/lib/play/reducer";
-import { getNames, getServerNames, saveToLibrary, subscribe } from "@/lib/play/library";
+import { getPlays, getServerPlays, getTeam, playById, savePlay, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { readAll, readDraft, writeDraft } from "@/lib/play/storage";
+import { readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { Header } from "./Header";
 import { Hint } from "./Hint";
@@ -31,9 +30,16 @@ export function App() {
   const [leftOpen, setLeftOpen] = useState<Open>("auto");
   const [rightOpen, setRightOpen] = useState<Open>("auto");
   const svgRef = useRef<SVGSVGElement>(null);
-  const savedNames = useSyncExternalStore(subscribe, getNames, getServerNames);
+  const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const hydratedRef = useRef(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const toastTimer = useRef(0);
+  const say = useCallback((text: string, ms = 1600) => {
+    setToast(text);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => { setToast(null); }, ms);
+  }, []);
   const wide = useMedia("(min-width: 900px)");
   const narrow = useMedia("(max-width: 759px)");
   const narrowRef = useRef(narrow);
@@ -75,47 +81,55 @@ export function App() {
   // autosave on every commit — but not before the draft has been restored (the
   // restore effect below runs after this one on mount)
   useEffect(() => {
-    if (hydratedRef.current) writeDraft({ name: s.name, players: [...s.players] });
-  }, [s.name, s.players]);
+    if (hydratedRef.current) writeDraft({ id: s.id, name: s.name, notes: s.notes, players: [...s.players] });
+  }, [s.id, s.name, s.notes, s.players]);
   useEffect(() => {
     const d = readDraft();
-    if (d) dispatch({ type: "hydrate", name: d.name, players: d.players });
+    if (d) dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, players: d.players });
     hydratedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
     // "Open in designer" from a share page: /?p=<id> loads the play (undoable) and cleans the URL
-    const shared = new URLSearchParams(window.location.search).get("p");
+    const shared = params.get("p");
     const rec = shared ? decodeShare(shared) : null;
     if (rec) {
       dispatch({ type: "load", name: rec.name, players: rec.players });
       window.history.replaceState(null, "", "/");
     }
+    // "Open" from the playbook gallery: /?open=<play id>
+    const saved = playById(params.get("open"));
+    if (saved) {
+      dispatch({ type: "load", id: saved.id, name: saved.name, notes: saved.notes, players: saved.players });
+      window.history.replaceState(null, "", "/");
+    }
   }, []);
 
-  const save = useCallback((name: string) => { saveToLibrary(name, s.players); }, [s.players]);
-  const onSave = useCallback(() => { save(s.name || "Untitled play"); }, [save, s.name]);
+  const onSave = useCallback(() => {
+    const rec = savePlay({ id: s.id, name: s.name || "Untitled play", notes: s.notes, players: [...s.players] });
+    if (!s.id) dispatch({ type: "saved", id: rec.id });
+    say("Saved");
+  }, [say, s.id, s.name, s.notes, s.players]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
+    const rec = savePlay({ id: null, name: n, notes: s.notes, players: [...s.players] });
     dispatch({ type: "setName", name: n });
-    save(n);
-  }, [save, s.name]);
-  const onLoad = useCallback((name: string) => {
-    const rec = readAll()[name];
-    if (rec) dispatch({ type: "load", name, players: rec.players });
+    dispatch({ type: "saved", id: rec.id });
+    say("Saved a copy");
+  }, [say, s.name, s.notes, s.players]);
+  const onLoad = useCallback((id: string) => {
+    const rec = playById(id);
+    if (rec) dispatch({ type: "load", id: rec.id, name: rec.name, notes: rec.notes, players: rec.players });
   }, []);
   const onShare = useCallback(() => {
     const url = `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", players: [...s.players] })}`;
-    const done = () => {
-      setToast("Link copied");
-      window.setTimeout(() => { setToast(null); }, 1600);
-    };
-    navigator.clipboard.writeText(url).then(done, () => { window.prompt("Copy this link", url); });
-  }, [s.name, s.players]);
+    navigator.clipboard.writeText(url).then(() => { say("Link copied"); }, () => { window.prompt("Copy this link", url); });
+  }, [say, s.name, s.players]);
   const onExport = useCallback(() => {
     dispatch({ type: "select", id: null });
-    window.setTimeout(() => {
-      const svg = svgRef.current;
-      if (svg) void exportPng(svg, s.name || "play");
-    }, 60);
-  }, [s.name]);
+    say("Drawing the card…", 4000);
+    import("@/lib/export/card")
+      .then((m) => m.exportCardPng({ name: s.name || "Untitled play", players: s.players, team: getTeam() }))
+      .then(() => { say("Card saved"); }, () => { say("The card could not be drawn"); });
+  }, [say, s.name, s.players]);
 
   // offline on the sideline: a tiny service worker caches the shell and static assets
   useEffect(() => {
@@ -144,9 +158,13 @@ export function App() {
         <Sidebar id="play-sidebar" side="left" open={leftOpen} isOpen={isOpen(leftOpen, "left")} label="Play tools">
           <PlaySidebar
             name={s.name}
+            notes={s.notes}
+            notesOpen={notesOpen}
             vis={s.vis}
-            savedNames={savedNames}
+            plays={plays}
             onName={(name) => { dispatch({ type: "setName", name }); }}
+            onNotes={(notes) => { dispatch({ type: "setNotes", notes }); }}
+            onToggleNotes={() => { setNotesOpen((o) => !o); }}
             onSave={onSave}
             onDuplicate={onDuplicate}
             onExport={onExport}
