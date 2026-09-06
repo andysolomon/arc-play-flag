@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { exportPng } from "@/lib/export";
 import { initialState, reducer, selected } from "@/lib/play/reducer";
+import { getNames, getServerNames, saveToLibrary, subscribe } from "@/lib/play/library";
+import { readAll, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { Header } from "./Header";
 import { Hint } from "./Hint";
@@ -27,6 +30,8 @@ export function App() {
   const [leftOpen, setLeftOpen] = useState<Open>("auto");
   const [rightOpen, setRightOpen] = useState<Open>("auto");
   const svgRef = useRef<SVGSVGElement>(null);
+  const savedNames = useSyncExternalStore(subscribe, getNames, getServerNames);
+  const hydratedRef = useRef(false);
   const wide = useMedia("(min-width: 900px)");
   const narrow = useMedia("(max-width: 759px)");
   const narrowRef = useRef(narrow);
@@ -65,6 +70,36 @@ export function App() {
     return () => { window.removeEventListener("keydown", key); };
   }, []);
 
+  // autosave on every commit — but not before the draft has been restored (the
+  // restore effect below runs after this one on mount)
+  useEffect(() => {
+    if (hydratedRef.current) writeDraft({ name: s.name, players: [...s.players] });
+  }, [s.name, s.players]);
+  useEffect(() => {
+    const d = readDraft();
+    if (d) dispatch({ type: "hydrate", name: d.name, players: d.players });
+    hydratedRef.current = true;
+  }, []);
+
+  const save = useCallback((name: string) => { saveToLibrary(name, s.players); }, [s.players]);
+  const onSave = useCallback(() => { save(s.name || "Untitled play"); }, [save, s.name]);
+  const onDuplicate = useCallback(() => {
+    const n = (s.name || "Untitled play") + " copy";
+    dispatch({ type: "setName", name: n });
+    save(n);
+  }, [save, s.name]);
+  const onLoad = useCallback((name: string) => {
+    const rec = readAll()[name];
+    if (rec) dispatch({ type: "load", name, players: rec.players });
+  }, []);
+  const onExport = useCallback(() => {
+    dispatch({ type: "select", id: null });
+    window.setTimeout(() => {
+      const svg = svgRef.current;
+      if (svg) void exportPng(svg, s.name || "play");
+    }, 60);
+  }, [s.name]);
+
   const sel = selected(s);
   const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? "Tap waypoints on the field · double-tap to finish" : null;
 
@@ -86,12 +121,12 @@ export function App() {
           <PlaySidebar
             name={s.name}
             vis={s.vis}
-            savedNames={[]}
+            savedNames={savedNames}
             onName={(name) => { dispatch({ type: "setName", name }); }}
-            onSave={() => undefined}
-            onDuplicate={() => undefined}
-            onExport={() => undefined}
-            onLoad={() => undefined}
+            onSave={onSave}
+            onDuplicate={onDuplicate}
+            onExport={onExport}
+            onLoad={onLoad}
             onFlip={() => { dispatch({ type: "flip" }); }}
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}
             onReset={(team) => { dispatch({ type: "resetFormation", team }); }}
