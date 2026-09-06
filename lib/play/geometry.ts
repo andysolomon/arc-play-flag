@@ -50,6 +50,53 @@ export function cardWidth(pane: Pane | null, depthYards: number): number | null 
   return Math.min(pane.pw, (pane.ph * FIELD_YARDS) / depthYards, 1200);
 }
 
+/**
+ * A route's waypoints in absolute yards, starting at the player's spot. Shared by the
+ * drawn route and the playback simulation so they can never disagree. Zone routes are
+ * laid out as bubbles (see zoneLayout) and are not handled here.
+ */
+export function routeYards(p: Player, players: readonly Player[], top: number): Pair[] | null {
+  const rt = p.route;
+  if (!rt) return null;
+  const def = routeDef(p.team, rt.type);
+  if (!def) return null;
+  const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
+  if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
+  if (rt.type === "blitz") {
+    // drive past the line of scrimmage, angled at the quarterback
+    const qb = quarterback(players);
+    const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
+    const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
+    const reach = Math.max(1.5, L - 1.8);
+    return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
+  }
+  if (rt.type === "man") {
+    const t = players.find((q) => q.id === rt.target);
+    if (!t) return null;
+    const dx = t.x - p.x, dy = t.y - p.y, L = Math.hypot(dx, dy) || 1;
+    return [[p.x, p.y], [t.x - (dx / L) * 1.15, t.y - (dy / L) * 1.15]];
+  }
+  const defPts = def.pts ?? ROUTES.go.pts ?? [];
+  // shrink the whole route uniformly so nothing — including a zone bubble — leaves the card
+  const deep = top + 0.6;
+  let k = 1;
+  for (const q of defPts) {
+    const m = 0.6;
+    const dx = sign * q[0], dy = q[1];
+    if (dx > 0.001) k = Math.min(k, (29.4 - m - p.x) / dx);
+    if (dx < -0.001) k = Math.min(k, (p.x - 0.6 - m) / -dx);
+    if (dy > 0.001) k = Math.min(k, (7.6 - m - p.y) / dy);
+    if (dy < -0.001) k = Math.min(k, (p.y - deep - m) / -dy);
+  }
+  k = Math.max(0, Math.min(1, k));
+  return defPts.map((q) => [p.x + sign * q[0] * k, p.y + q[1] * k] as const);
+}
+
+/** The quarterback: the offensive player labelled QB, else the default QB slot. */
+export function quarterback(players: readonly Player[]): Player | undefined {
+  return players.find((q) => q.team === "offense" && q.label === "QB") ?? players.find((q) => q.id === "o2");
+}
+
 export interface RouteGeom {
   color: string;
   d: string;
@@ -75,7 +122,6 @@ export function geom(
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
   if (!def) return null;
-  const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
   const zone = def.end === "zone" ? zones[p.id] : undefined;
 
   if (zone) {
@@ -98,39 +144,8 @@ export function geom(
     };
   }
 
-  let abs: Pair[];
-  if (rt.type === "custom") {
-    abs = [[p.x, p.y], ...(rt.pts ?? [])];
-  } else if (rt.type === "blitz") {
-    // drive past the line of scrimmage, angled at the quarterback
-    const qb =
-      players.find((q) => q.team === "offense" && q.label === "QB") ??
-      players.find((q) => q.id === "o2");
-    const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
-    const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
-    const reach = Math.max(1.5, L - 1.8);
-    abs = [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
-  } else if (rt.type === "man") {
-    const t = players.find((q) => q.id === rt.target);
-    if (!t) return null;
-    const dx = t.x - p.x, dy = t.y - p.y, L = Math.hypot(dx, dy) || 1;
-    abs = [[p.x, p.y], [t.x - (dx / L) * 1.15, t.y - (dy / L) * 1.15]];
-  } else {
-    const defPts = def.pts ?? ROUTES.go.pts ?? [];
-    // shrink the whole route uniformly so nothing — including a zone bubble — leaves the card
-    const deep = top + 0.6;
-    let k = 1;
-    for (const q of defPts) {
-      const m = 0.6;
-      const dx = sign * q[0], dy = q[1];
-      if (dx > 0.001) k = Math.min(k, (29.4 - m - p.x) / dx);
-      if (dx < -0.001) k = Math.min(k, (p.x - 0.6 - m) / -dx);
-      if (dy > 0.001) k = Math.min(k, (7.6 - m - p.y) / dy);
-      if (dy < -0.001) k = Math.min(k, (p.y - deep - m) / -dy);
-    }
-    k = Math.max(0, Math.min(1, k));
-    abs = defPts.map((q) => [p.x + sign * q[0] * k, p.y + q[1] * k] as const);
-  }
+  const abs = routeYards(p, players, top);
+  if (!abs) return null;
 
   const pts: [number, number][] = [];
   for (const q of abs) {

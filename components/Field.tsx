@@ -5,10 +5,12 @@ import {
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
 import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
+import { ballAt, buildMotion, positionsAt, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { shown } from "@/lib/play/reducer";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
+import { Football, PlayButton } from "./Playback";
 import { PlayerToken } from "./PlayerToken";
 import { RouteLayer } from "./RouteLayer";
 
@@ -60,6 +62,9 @@ function FieldImpl({
   const [boingId, setBoingId] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const rafRef = useRef(0);
+  // playback: the plan plus seconds into it, or null when the whiteboard is still
+  const [run, setRun] = useState<{ motion: Motion; t: number } | null>(null);
+  const playRef = useRef(0);
 
   // measure only stores the pane; all field geometry derives from it
   useLayoutEffect(() => {
@@ -164,7 +169,7 @@ function FieldImpl({
   }, [applyDrag, endDrag]);
 
   const onDown = useCallback((id: string, e: PointerEvent<SVGGElement>) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || playRef.current) return;
     e.stopPropagation();
     const p = players.find((q) => q.id === id);
     if (!p) return;
@@ -177,7 +182,7 @@ function FieldImpl({
     const p = players.find((q) => q.id === id);
     if (!p) return;
     const step = STEP[e.key];
-    if (step) {
+    if (step && !playRef.current) {
       e.preventDefault();
       const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current);
       dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
@@ -200,6 +205,37 @@ function FieldImpl({
   };
 
   const dragging = live !== null;
+
+  // playback runs on its own rAF clock; the plan is built once, from the committed play
+  const playing = run !== null;
+  const played = run ? positionsAt(run.motion, players, run.t) : null;
+  const ball = run && played ? ballAt(run.motion, played, run.t) : null;
+  const stop = useCallback(() => {
+    if (playRef.current) { cancelAnimationFrame(playRef.current); playRef.current = 0; }
+    setRun(null);
+  }, []);
+  const play = useCallback(() => {
+    endDrag();
+    dispatch({ type: "select", id: null });
+    const motion = buildMotion(players, topRef.current);
+    let t0 = -1;
+    const tick = (now: number) => {
+      if (t0 < 0) t0 = now;
+      const t = (now - t0) / 1000;
+      if (t >= motion.dur) { playRef.current = 0; setRun(null); return; }
+      setRun({ motion, t });
+      playRef.current = requestAnimationFrame(tick);
+    };
+    setRun({ motion, t: 0 });
+    playRef.current = requestAnimationFrame(tick);
+  }, [dispatch, endDrag, players]);
+  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    if (!playing) return;
+    const key = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") stop(); };
+    window.addEventListener("keydown", key);
+    return () => { window.removeEventListener("keydown", key); };
+  }, [playing, stop]);
 
   return (
     <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden p-[9px] print:block print:overflow-visible print:p-0">
@@ -240,8 +276,8 @@ function FieldImpl({
             <PlayerToken
               key={p.id}
               player={p}
-              x={px(p.x)}
-              y={py(p.y, top)}
+              x={px(played?.[p.id]?.x ?? p.x)}
+              y={py(played?.[p.id]?.y ?? p.y, top)}
               selected={p.id === selectedId}
               target={targeting && p.team === "offense"}
               boing={boingId === p.id}
@@ -251,7 +287,9 @@ function FieldImpl({
               onKeyDown={onKey}
             />
           ))}
+          {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
+        <PlayButton playing={playing} onClick={playing ? stop : play} />
       </div>
     </main>
   );
