@@ -37,7 +37,7 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, boing, dragging, o
         <g style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : undefined}>
           <circle r={30} fill="transparent" stroke="none" />
           {/* keyboard focus shows the same yellow ring as selection */}
-          <circle r={33} fill="none" stroke="#f2b705" strokeWidth={5} className="opacity-0 group-focus-visible:opacity-100" />
+          <circle r={33} fill="none" stroke="#f2b705" strokeWidth={5} className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
           {ringR > 0 && (
             <circle
               r={ringR}
