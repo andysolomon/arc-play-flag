@@ -1,0 +1,23 @@
+{
+  "name": "arc-play-flag",
+  "version": "0.0.0-development",
+  "description": "Coming Soon",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "release": "semantic-release"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^11.0.1",
+    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "conventional-changelog-conventionalcommits": "^10.4.0",
+    "semantic-release": "^25.0.9"
+  }
+}
