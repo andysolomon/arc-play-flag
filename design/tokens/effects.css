@@ -1,0 +1,25 @@
+:root {
+  /* borders — always solid ink, never grey */
+  --border-w: 2px;
+  --border-w-field: 3px;
+  --border-w-token: 2.5px;
+  --border: var(--border-w) solid var(--ink);
+
+  /* radii */
+  --radius-pill: 999px;
+  --radius-tile: 14px;
+  --radius-note: 12px;
+  --radius-field: 7px;
+
+  /* shadows — hard offset, zero blur, like a sticker lifted off paper */
+  --shadow-tile: 0 3px 0 rgba(27, 26, 23, 0.14);
+  --shadow-toast: 0 4px 0 rgba(27, 26, 23, 0.15);
+  --shadow-field: 0 7px 0 rgba(27, 26, 23, 0.13);
+
+  /* motion */
+  --ease-boing: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 180ms;
+  --dur-draw: 320ms;
+  --dur-boing: 360ms;
+  --lift-hover: translateY(-2px);
+}

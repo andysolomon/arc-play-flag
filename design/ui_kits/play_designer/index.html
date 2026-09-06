@@ -1,0 +1,40 @@
+<!-- @dsCard group="Play Designer" viewport="1280x760" subtitle="The one screen: play tools, field, route palette" name="Designer" -->
+<!-- @startingPoint section="Screens" subtitle="Play designer with both sidebars open" viewport="1280x760" -->
+<html><head><meta charset="utf-8"><title>Play Designer</title>
+<link rel="stylesheet" href="../../styles.css">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="../../ds-load.js"></script>
+<style>*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-hand)}input,button,select{font-family:inherit;color:inherit}</style>
+</head><body><div id="root"></div>
+<script type="text/babel" data-presets="react" src="Header.jsx"></script>
+<script type="text/babel" data-presets="react" src="PlaySidebar.jsx"></script>
+<script type="text/babel" data-presets="react" src="RoutesSidebar.jsx"></script>
+<script type="text/babel" data-presets="react" src="Field.jsx"></script>
+<script type="text/babel" data-presets="react">
+dsLoad('../../').then(NS => {
+function App() {
+  const [leftOpen, setLeft] = React.useState(true);
+  const [rightOpen, setRight] = React.useState(true);
+  const [vis, setVis] = React.useState('both');
+  const [name, setName] = React.useState('New play');
+  const [selId, setSel] = React.useState('o5');
+  const [routes, setRoutes] = React.useState({ o5: 'wheel' });
+  const [primary, setPrimary] = React.useState(false);
+  const sel = window.PD_PLAYERS.find(p => p.id === selId) || null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <window.PDHeader NS={NS} leftOpen={leftOpen} rightOpen={rightOpen} onLeft={() => setLeft(!leftOpen)} onRight={() => setRight(!rightOpen)} name={name} />
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <window.PDPlaySidebar NS={NS} open={leftOpen} vis={vis} setVis={setVis} name={name} setName={setName} />
+        <window.PDField NS={NS} vis={vis} selId={selId} onSelect={id => { setSel(id); if (id) setRight(true); }} />
+        <window.PDRoutesSidebar NS={NS} open={rightOpen} sel={sel} route={sel ? routes[sel.id] || null : null}
+          setRoute={r => setRoutes({ ...routes, [sel.id]: r })} onDone={() => setSel(null)} primary={primary} setPrimary={setPrimary} />
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+});
+</script></body></html>

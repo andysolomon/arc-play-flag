@@ -1,0 +1,20 @@
+:root {
+  --font-hand: 'Patrick Hand', ui-rounded, 'Comic Sans MS', cursive, sans-serif;
+  --font-body: var(--font-hand);
+  --font-display: var(--font-hand);
+
+  /* one family, sized by role */
+  --text-eyebrow: 13px;      /* section labels, uppercase, 2px tracking */
+  --text-caption: 14px;      /* tile labels, helper copy */
+  --text-small: 15px;        /* compact pills */
+  --text-base: 16px;         /* buttons, body */
+  --text-input: 17px;        /* text fields */
+  --text-title: 18px;        /* panel titles */
+  --text-header: 20px;       /* play name in the header */
+  --text-field-label: 17px;  /* yard numbers on the field (SVG) */
+  --text-token: 18px;        /* player letter on a token (15px when 3 letters) */
+
+  --tracking-eyebrow: 2px;
+  --leading-tight: 1.1;
+  --leading-body: 1.35;
+}
