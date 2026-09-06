@@ -16,11 +16,10 @@ interface Props {
  * so the first paint never slides.
  */
 export function Sidebar({ id, side, open, label, children }: Props) {
-  const border = side === "left" ? "border-r-2" : "border-l-2";
   const width =
     open === "auto"
-      ? side === "left" ? `w-0 min-[900px]:w-[266px] min-[900px]:${border}` : "w-0"
-      : open ? `w-[266px] ${border}` : "w-0";
+      ? side === "left" ? "w-0 min-[900px]:w-[266px] min-[900px]:border-r-2" : "w-0"
+      : open ? side === "left" ? "w-[266px] border-r-2" : "w-[266px] border-l-2" : "w-0";
   return (
     <aside
       id={id}
