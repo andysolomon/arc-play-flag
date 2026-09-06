@@ -20,7 +20,7 @@ bun run icons    # re-encode design/assets/icons → public/icons (already commi
 
 ## Deploy
 
-Hosted on Vercel. Every push to `main` deploys production; pull requests get preview URLs. No environment variables are needed: the app has no backend, plays live in `localStorage`.
+Live at **https://arc-play-flag.vercel.app**. Hosted on Vercel: every push to `main` deploys production; pull requests get preview URLs. No environment variables are needed: the app has no backend, plays live in `localStorage`.
 
 Manual deploy from a machine with the Vercel CLI:
 
