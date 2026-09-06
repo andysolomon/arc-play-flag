@@ -1,35 +1,28 @@
 import type { ReactNode } from "react";
 
-export type Open = boolean | "auto";
-
 interface Props {
   id: string;
   side: "left" | "right";
-  open: Open;
-  /** resolved open state (auto → wide screens only) */
-  isOpen: boolean;
+  open: boolean;
   label: string;
   children: ReactNode;
 }
 
 /**
- * 264px panel that animates its width to 0 when closed. "auto" is the
- * pre-hydration state: open on wide screens, closed on narrow ones, decided in CSS
- * so the first paint never slides.
+ * 264px panel that animates its width to 0 when closed. Both sidebars start
+ * closed — on every screen size — so the app opens on an uncluttered field and
+ * the first paint never slides.
  */
-export function Sidebar({ id, side, open, isOpen, label, children }: Props) {
-  const width =
-    open === "auto"
-      ? side === "left" ? "w-0 min-[900px]:w-[266px] min-[900px]:border-r-2" : "w-0"
-      : open ? side === "left" ? "w-[266px] border-r-2" : "w-[266px] border-l-2" : "w-0";
+export function Sidebar({ id, side, open, label, children }: Props) {
+  const width = open ? (side === "left" ? "w-[266px] border-r-2" : "w-[266px] border-l-2") : "w-0";
   return (
     <aside
       id={id}
       aria-label={label}
-      aria-hidden={!isOpen}
+      aria-hidden={!open}
       className={`flex-none overflow-hidden border-ink bg-cream transition-[width] duration-[180ms] ease-in-out motion-reduce:transition-none ${width}`}
     >
-      <div className="flex h-full w-[264px] flex-col gap-[10px] overflow-y-auto px-3 py-3.5" inert={!isOpen}>
+      <div className="flex h-full w-[264px] flex-col gap-[10px] overflow-y-auto px-3 py-3.5" inert={!open}>
         {children}
       </div>
     </aside>

@@ -10,7 +10,7 @@ import { Header } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
 import { RouteSidebar } from "./RouteSidebar";
-import { Sidebar, type Open } from "./Sidebar";
+import { Sidebar } from "./Sidebar";
 
 const isEditable = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
@@ -27,8 +27,9 @@ function useMedia(query: string): boolean {
 
 export function App() {
   const [s, dispatch] = useReducer(reducer, undefined, initialState);
-  const [leftOpen, setLeftOpen] = useState<Open>("auto");
-  const [rightOpen, setRightOpen] = useState<Open>("auto");
+  // both sidebars start closed: the app opens on a clear field
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const hydratedRef = useRef(false);
@@ -40,7 +41,6 @@ export function App() {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => { setToast(null); }, ms);
   }, []);
-  const wide = useMedia("(min-width: 900px)");
   const narrow = useMedia("(max-width: 759px)");
   const narrowRef = useRef(narrow);
   useEffect(() => { narrowRef.current = narrow; }, [narrow]);
@@ -54,7 +54,6 @@ export function App() {
     setRightOpen(open);
     if (open && narrowRef.current) setLeftOpen(false);
   }, []);
-  const isOpen = (o: Open, side: "left" | "right"): boolean => (o === "auto" ? side === "left" && wide : o);
 
   const onSelect = useCallback((id: string) => {
     dispatch({ type: "select", id });
@@ -145,17 +144,17 @@ export function App() {
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
         name={s.name}
-        leftOpen={isOpen(leftOpen, "left")}
-        rightOpen={isOpen(rightOpen, "right")}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
         canUndo={s.past.length > 0}
         canRedo={s.future.length > 0}
-        onToggleLeft={() => { openLeft(!isOpen(leftOpen, "left")); }}
-        onToggleRight={() => { openRight(!isOpen(rightOpen, "right")); }}
+        onToggleLeft={() => { openLeft(!leftOpen); }}
+        onToggleRight={() => { openRight(!rightOpen); }}
         onUndo={() => { dispatch({ type: "undo" }); }}
         onRedo={() => { dispatch({ type: "redo" }); }}
       />
       <div className="flex min-h-0 flex-1 items-stretch">
-        <Sidebar id="play-sidebar" side="left" open={leftOpen} isOpen={isOpen(leftOpen, "left")} label="Play tools">
+        <Sidebar id="play-sidebar" side="left" open={leftOpen} label="Play tools">
           <PlaySidebar
             name={s.name}
             notes={s.notes}
@@ -187,7 +186,7 @@ export function App() {
           svgRef={svgRef}
           title={s.name}
         />
-        <Sidebar id="route-sidebar" side="right" open={rightOpen} isOpen={isOpen(rightOpen, "right")} label="Route palette">
+        <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette">
           <RouteSidebar
             selected={sel}
             hint={hint}
