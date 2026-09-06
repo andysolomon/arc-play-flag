@@ -26,7 +26,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 
 const ROUTE_TYPES = new Set<string>([
-  "go", "out", "in", "slant", "corner", "post", "curl", "flat", "cross", "wheel", "block", "handoff",
+  "go", "out", "in", "slant", "corner", "post", "curl", "flat", "cross", "wheel", "handoff",
   "dive", "stretch", "counter", "reverse", "delay",
   "custom", "man", "zoneDeep", "zoneFlat", "curlFlat", "midRead", "blitz", "spy",
 ]);

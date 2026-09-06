@@ -11,7 +11,7 @@ export type Pair = readonly [number, number];
 
 export type OffenseRouteType =
   | "go" | "out" | "in" | "slant" | "corner" | "post" | "curl" | "flat"
-  | "cross" | "wheel" | "block" | "custom"
+  | "cross" | "wheel" | "custom"
   | "handoff" | "dive" | "stretch" | "counter" | "reverse" | "delay";
 export type DefenseRouteType =
   | "man" | "zoneDeep" | "zoneFlat" | "curlFlat" | "midRead" | "blitz" | "spy" | "custom";
@@ -36,7 +36,7 @@ export interface Player {
   route: Route | null;
 }
 
-export type RouteEnd = "arrow" | "bar" | "zone";
+export type RouteEnd = "arrow" | "zone";
 
 export interface RouteDef {
   label: string;

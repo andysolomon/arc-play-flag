@@ -113,7 +113,6 @@ export interface RouteGeom {
   /** true when the path should play the draw-on animation */
   draw: boolean;
   arrow: string | null;
-  bar: { x1: number; y1: number; x2: number; y2: number } | null;
   zone: { cx: number; cy: number; rx: number; ry: number; fill: string } | null;
 }
 
@@ -147,7 +146,7 @@ export function geom(
       "M" + f1(sx + (ex - sx) * t0) + " " + f1(sy + (ey - sy) * t0) +
       "L" + f1(sx + (ex - sx) * t1) + " " + f1(sy + (ey - sy) * t1);
     return {
-      color: col0, d, width: 5, dash: def.dash ?? "900", draw: false, arrow: null, bar: null,
+      color: col0, d, width: 5, dash: def.dash ?? "900", draw: false, arrow: null,
       zone: { cx: ex, cy: ey, rx: zone.rx * S, ry: zone.ry * S, fill: col0 + "2e" },
     };
   }
@@ -170,25 +169,29 @@ export function geom(
 
   const b = pts[pts.length - 1], a = pts[pts.length - 2];
   if (!a || !b) return null;
+  const width = rt.primary ? 6.5 : 5;
   const out: RouteGeom = {
     color: inkFor(p, rt.type),
-    d: "M" + pts.map((q) => f1(q[0]) + " " + f1(q[1])).join("L"),
+    d: "",
     dash: def.dash ?? "900",
     draw: !def.dash,
-    width: rt.primary ? 6.5 : 5,
-    arrow: null, bar: null, zone: null,
+    width,
+    arrow: null, zone: null,
   };
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const nx = (b[0] - a[0]) / L, ny = (b[1] - a[1]) / L;
   if (def.end === "arrow") {
-    const s = 17, w = 9.5, bx = b[0] - nx * s, by = b[1] - ny * s;
+    // head length/half-width grow with the stroke; the stroke stops inside the head so its
+    // round cap never pokes out past the tip or the head's flanks
+    const s = width * 3.4, w = width * 1.7, bx = b[0] - nx * s, by = b[1] - ny * s;
     out.arrow =
       f1(b[0]) + "," + f1(b[1]) + " " +
       f1(bx - ny * w) + "," + f1(by + nx * w) + " " +
       f1(bx + ny * w) + "," + f1(by - nx * w);
-  } else if (def.end === "bar") {
-    out.bar = { x1: b[0] - ny * 17, y1: b[1] + nx * 17, x2: b[0] + ny * 17, y2: b[1] - nx * 17 };
+    const inset = Math.min(s * 0.8, L * 0.9);
+    pts[pts.length - 1] = [b[0] - nx * inset, b[1] - ny * inset];
   }
+  out.d = "M" + pts.map((q) => f1(q[0]) + " " + f1(q[1])).join("L");
   return out;
 }
 

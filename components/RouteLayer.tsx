@@ -23,9 +23,8 @@ function RouteLayerImpl({ routes, draftD }: Props) {
             strokeDasharray={r.dash}
             className={r.draw ? "animate-draw motion-reduce:animate-none" : undefined}
           />
-          {r.arrow && <polygon points={r.arrow} fill={r.color} />}
-          {r.bar && (
-            <line x1={r.bar.x1} y1={r.bar.y1} x2={r.bar.x2} y2={r.bar.y2} stroke={r.color} strokeWidth={5} strokeLinecap="round" />
+          {r.arrow && (
+            <polygon points={r.arrow} fill={r.color} stroke={r.color} strokeWidth={2.5} strokeLinejoin="round" />
           )}
           {r.zone && (
             <ellipse

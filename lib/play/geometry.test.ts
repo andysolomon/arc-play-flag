@@ -94,44 +94,43 @@ describe("geom", () => {
   test("draws a go route straight up the field", () => {
     const g = geom(at("o3", { type: "go" }), players, TOP, {});
     expect(g).not.toBeNull();
-    expect(g?.d).toBe("M66.0 655.0L66.0 352.0");
-    expect(g?.arrow).toBe("66.0,352.0 75.5,369.0 56.5,369.0");
+    expect(g?.d).toBe("M66.0 655.0L66.0 365.6");
+    expect(g?.arrow).toBe("66.0,352.0 74.5,369.0 57.5,369.0");
     expect(g?.draw).toBe(true);
-    expect(g?.color).toBe("#7a5a07");
+    expect(g?.color).toBe("#4a3728");
   });
   test("shrinks to fit when the route would leave the card", () => {
     const top = ybv(24); // -16
     const g = geom(at("o3", { type: "go" }), players, top, {});
     // 15 yards of route must fit into 1 - (-16 + 0.6) - 0.6 = 15.8 → k = 15.8/15 → clipped to 1
-    expect(g?.d).toBe("M66.0 347.0L66.0 44.0");
+    expect(g?.d).toBe("M66.0 347.0L66.0 57.6");
     // a right-side player's out route heads for the near sideline: k = (29.4 - 0.6 - 27)/6 = 0.3
     const out = geom(at("o4", { type: "out" }), players, TOP, {});
-    expect(out?.d).toBe("M594.0 668.1L594.0 649.0L633.6 649.0");
+    expect(out?.d).toBe("M594.0 668.1L594.0 649.0L620.0 649.0");
     // handedness: a left-side player's cross breaks toward the middle, nothing to shrink
     const cross = geom(at("o3", { type: "cross" }, { x: 2, y: 1 }), players, TOP, {});
-    expect(cross?.d).toBe("M44.0 655.0L44.0 594.0L330.0 528.0");
+    expect(cross?.d).toBe("M44.0 655.0L44.0 594.0L316.7 531.1");
   });
   test("honours mirror and the near sideline", () => {
     const left = geom(at("o3", { type: "out" }), players, TOP, {});
     const mirrored = geom(at("o3", { type: "out", mirror: true }), players, TOP, {});
-    expect(left?.d).toBe("M66.0 668.1L66.0 649.0L26.4 649.0");
-    expect(mirrored?.d).toBe("M66.0 655.0L66.0 572.0L198.0 572.0");
+    expect(left?.d).toBe("M66.0 668.1L66.0 649.0L40.0 649.0");
+    expect(mirrored?.d).toBe("M66.0 655.0L66.0 572.0L184.4 572.0");
   });
-  test("block ends in a bar, primary read is thicker and red", () => {
-    const g = geom(at("o1", { type: "block", primary: true }), players, TOP, {});
-    expect(g?.bar).toEqual({ x1: 347, y1: 620.4, x2: 313, y2: 620.4 });
+  test("primary read is thicker and red", () => {
+    const g = geom(at("o1", { type: "go", primary: true }), players, TOP, {});
     expect(g?.width).toBe(6.5);
     expect(g?.color).toBe("#c2261a");
   });
   test("blitz drives at the quarterback", () => {
     const g = geom(at("d5", { type: "blitz" }), players, TOP, {});
     // d5 (15,-11) → QB (15,5): L=16, reach 14.2 → ends at y=3.2
-    expect(g?.d).toBe("M330.0 445.0L330.0 730.4");
+    expect(g?.d).toBe("M330.0 445.0L330.0 716.8");
     expect(g?.color).toBe("#b3261e");
   });
   test("man stops short of its target and is dashed", () => {
     const g = geom(at("d1", { type: "man", target: "o3" }), players, TOP, {});
-    expect(g?.d).toBe("M66.0 574.0L66.0 656.7");
+    expect(g?.d).toBe("M66.0 574.0L66.0 643.1");
     expect(g?.dash).toBe("10 8");
     expect(g?.draw).toBe(false);
     expect(geom(at("d1", { type: "man", target: "nope" }), players, TOP, {})).toBeNull();
@@ -149,6 +148,6 @@ describe("geom", () => {
   });
   test("custom routes follow their waypoints", () => {
     const g = geom(at("o5", { type: "custom", pts: [[19, 2], [24, -3]] }), players, TOP, {});
-    expect(g?.d).toBe("M418.0 743.0L418.0 704.0L528.0 594.0");
+    expect(g?.d).toBe("M418.0 743.0L418.0 704.0L518.4 603.6");
   });
 });

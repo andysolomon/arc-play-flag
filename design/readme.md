@@ -37,7 +37,7 @@ Sources
 
 - Icons are **PNG stickers** with transparent backgrounds, 192×192px, shown at 40px in tiles, 26px in the header, 56px in the empty state. They were cut from owner-supplied sheets; there is no icon font, no SVG set, no emoji.
 - Style: thick black outlines, flat red/blue fills, light-blue zone blobs, hand-drawn feel — matching Patrick Hand.
-- Naming mirrors the app's route keys: `go out in slant corner post curl flat cross wheel block handoff customOff deselectOff` (offense), `man zoneDeep zoneFlat curlFlat midRead blitz spy customDef deselectDef` (defense), `football save duplicate export flip clear reset offOnly defOnly` (tools).
+- Naming mirrors the app's route keys: `go out in slant corner post curl flat cross wheel handoff customOff deselectOff` (offense), `man zoneDeep zoneFlat curlFlat midRead blitz spy customDef deselectDef` (defense), `football save duplicate export flip clear reset offOnly defOnly` (tools).
 - Missing glyphs: Undo/Redo, panel toggles and Mirror/Primary use unicode (↶ ↷ ‹ › ⇄ ★ ☆). Ask the owner for stickers if these need to match.
 - Never draw new icons by hand; request a sticker in the same style.
 
