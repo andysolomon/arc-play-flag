@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&amp;display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4efe2;color:#1b1a17;font-family:'Patrick Hand',ui-rounded,'Comic Sans MS',cursive,sans-serif}
+input,button,select{font-family:inherit;color:inherit}
+a{color:#c2513f;text-decoration:underline}
+a:hover{color:#8f3529}
+@keyframes pulse{0%,100%{opacity:.9;transform:scale(1)}50%{opacity:.3;transform:scale(1.16)}}
+@keyframes boing{0%{transform:scale(.84)}55%{transform:scale(1.13)}100%{transform:scale(1)}}
+@keyframes draw{from{stroke-dashoffset:900}to{stroke-dashoffset:0}}
+@keyframes sheet{from{transform:translateY(115%)}to{transform:translateY(0)}}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+
+<div style="flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 12px;background:#fffdf6;border-bottom:2px solid #1b1a17">
+<button onClick="{{ onToggleL }}" title="Play tools" style="padding:3px 11px;border:2px solid #1b1a17;border-radius:999px;background:{{ leftBg }};font-size:15px;cursor:pointer;white-space:nowrap" style-hover="background:#ffe9a8">{{ leftIcon }} Play</button>
+<img src="./icons/football.png" alt="" style="width:26px;height:26px;display:block;flex:none"/>
+<span style="font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ name }}</span>
+<span style="font-size:14px;color:#6f6c66;white-space:nowrap">5v5 flag</span>
+<span style="flex:1"></span>
+<div style="display:flex;gap:6px">
+<button onClick="{{ onUndo }}" disabled="{{ undoDisabled }}" title="Undo (⌘Z)" aria-label="Undo" style="padding:3px 13px;border:2px solid #1b1a17;border-radius:999px;background:{{ undoBg }};color:{{ undoColor }};font-size:16px;cursor:pointer" style-hover="background:#ffe9a8">↶ Undo</button>
+<button onClick="{{ onRedo }}" disabled="{{ redoDisabled }}" title="Redo (⇧⌘Z)" aria-label="Redo" style="padding:3px 13px;border:2px solid #1b1a17;border-radius:999px;background:{{ redoBg }};color:{{ redoColor }};font-size:16px;cursor:pointer" style-hover="background:#ffe9a8">Redo ↷</button>
+</div>
+<button onClick="{{ onToggleR }}" title="Route palette" style="padding:3px 11px;border:2px solid #1b1a17;border-radius:999px;background:{{ rightBg }};font-size:15px;cursor:pointer;white-space:nowrap" style-hover="background:#ffe9a8">Routes {{ rightIcon }}</button>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;align-items:stretch">
+
+<div style="flex:0 0 auto;width:{{ leftW }};overflow:hidden;background:#fffdf6;border-right:{{ leftBorder }};transition:width .18s ease">
+<div style="width:264px;height:100%;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px">
+<span style="flex:none;font-size:13px;letter-spacing:2px;color:#6f6c66">PLAY</span>
+<input value="{{ name }}" onChange="{{ onName }}" placeholder="Play name" style="flex:none;padding:6px 14px;border:2px solid #1b1a17;border-radius:999px;background:#fff;font-size:17px;width:100%;outline:none"/>
+<div style="flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<button onClick="{{ onSave }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/save.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Save</span></button>
+<button onClick="{{ onDup }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/duplicate.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Duplicate</span></button>
+<button onClick="{{ onExport }}" title="Download the field as a PNG" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/export.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Export</span></button>
+</div>
+<sc-if value="{{ hasSaved }}" hint-placeholder-val="{{ false }}">
+<select value="{{ loadSel }}" onChange="{{ onLoad }}" style="flex:none;width:100%;padding:6px 12px;border:2px solid #1b1a17;border-radius:999px;background:#fff;font-size:16px;cursor:pointer">
+<option value="">Open a saved play…</option>
+<sc-for list="{{ savedNames }}" as="n" hint-placeholder-count="0"><option value="{{ n }}">{{ n }}</option></sc-for>
+</select>
+</sc-if>
+<span style="flex:none;height:2px;background:#1b1a17;opacity:.14;margin:4px 0"></span>
+<span style="flex:none;font-size:13px;letter-spacing:2px;color:#6f6c66">FIELD</span>
+<div style="flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<button onClick="{{ onFlip }}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/flip.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Flip play</span></button>
+<button onClick="{{ onClear }}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/clear.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Clear routes</span></button>
+<button onClick="{{ onReset }}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/reset.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Reset spots</span></button>
+</div>
+<span style="flex:none;height:2px;background:#1b1a17;opacity:.14;margin:4px 0"></span>
+<span style="flex:none;font-size:13px;letter-spacing:2px;color:#6f6c66">SHOW</span>
+<div style="flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<button onClick="{{ onVisBoth }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:{{ visBothBg }};cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/football.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Both</span></button>
+<button onClick="{{ onVisOff }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:{{ visOffBg }};cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/offOnly.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Offense</span></button>
+<button onClick="{{ onVisDef }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:{{ visDefBg }};cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="./icons/defOnly.png" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">Defense</span></button>
+</div>
+<span style="flex:none;font-size:14px;color:#6f6c66;line-height:1.3">Clear and reset only touch the team you're showing.</span>
+</div>
+</div>
+
+<div ref="{{ fieldRef }}" style="flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:9px">
+<div style="position:relative;flex:0 0 auto;width:{{ fieldW }}">
+<svg viewBox="{{ viewBox }}" ref="{{ svgRef }}" onClick="{{ onField }}" onDoubleClick="{{ onFieldDbl }}" style="width:100%;height:auto;display:block;touch-action:pan-y;background:#c1f0c1;border:3px solid #1b1a17;border-radius:7px;box-shadow:0 7px 0 rgba(27,26,23,.13)">
+<defs>
+<pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+<line x1="0" y1="0" x2="0" y2="11" stroke="#1b1a17" stroke-width="1.6" opacity="0.19"/>
+</pattern>
+</defs>
+
+<g>
+<rect x="0" y="{{ ezY }}" width="660" height="{{ ezH }}" fill="#a7e5a7"/>
+<sc-for list="{{ bands }}" as="b" hint-placeholder-count="0">
+<rect x="0" y="{{ b.y }}" width="660" height="{{ b.h }}" fill="url(#ffhatch)"/>
+</sc-for>
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="0">
+<line x1="0" y1="{{ l.y }}" x2="660" y2="{{ l.y }}" stroke="#1b1a17" stroke-width="{{ l.w }}" opacity="{{ l.o }}"/>
+</sc-for>
+{{ fieldTextEl }}
+</g>
+
+<g>
+<sc-for list="{{ routes }}" as="r" hint-placeholder-count="0">
+<g>
+<path d="{{ r.d }}" fill="none" stroke="{{ r.color }}" stroke-width="{{ r.width }}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="{{ r.dash }}" style="animation:{{ r.anim }}"/>
+<polygon points="{{ r.arrow }}" fill="{{ r.color }}"/>
+<line x1="{{ r.bx1 }}" y1="{{ r.by1 }}" x2="{{ r.bx2 }}" y2="{{ r.by2 }}" stroke="{{ r.color }}" stroke-width="5" stroke-linecap="round"/>
+<ellipse cx="{{ r.zcx }}" cy="{{ r.zcy }}" rx="{{ r.zrx }}" ry="{{ r.zry }}" fill="{{ r.zfill }}" stroke="{{ r.color }}" stroke-width="2.5" stroke-dasharray="9 7"/>
+</g>
+</sc-for>
+<path d="{{ draftD }}" fill="none" stroke="#1b1a17" stroke-width="3" stroke-dasharray="7 7" stroke-linejoin="round" opacity=".65"/>
+</g>
+
+<sc-for list="{{ players }}" as="p" hint-placeholder-count="0">
+<g transform="{{ p.transform }}" tabIndex="0" role="button" aria-label="{{ p.aria }}" onPointerDown="{{ p.onDown }}" onClick="{{ p.onClick }}" onKeyDown="{{ p.onKey }}" style="cursor:{{ p.cursor }};outline:none;touch-action:none">
+<g style="transform:{{ p.selScale }};transform-box:fill-box;transform-origin:center">
+<g style="animation:{{ p.anim }};transform-box:fill-box;transform-origin:center">
+<circle r="30" fill="transparent" stroke="none"/>
+<circle r="{{ p.ringR }}" fill="none" stroke="#f2b705" stroke-width="5" stroke-dasharray="{{ p.ringDash }}" style="animation:{{ p.ringAnim }};transform-box:fill-box;transform-origin:center"/>
+<circle r="23" fill="{{ p.fill }}" stroke="#1b1a17" stroke-width="2.5"/>
+{{ p.labelEl }}
+</g>
+</g>
+</g>
+</sc-for>
+</svg>
+
+<sc-if value="{{ hasHint }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;left:50%;top:58px;transform:translateX(-50%);background:#1b1a17;color:#fffdf6;padding:6px 16px;border-radius:999px;font-size:16px;white-space:nowrap;z-index:15;box-shadow:0 4px 0 rgba(27,26,23,.15)">{{ hintText }}</div>
+</sc-if>
+
+</div>
+</div>
+
+<div style="flex:0 0 auto;width:{{ rightW }};overflow:hidden;background:#fffdf6;border-left:{{ rightBorder }};transition:width .18s ease">
+<div style="width:264px;height:100%;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px">
+<span style="flex:none;font-size:13px;letter-spacing:2px;color:#6f6c66">ROUTES</span>
+<sc-if value="{{ noSel }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 10px;border:2px dashed #1b1a17;border-radius:14px;opacity:.75">
+<img src="./icons/football.png" alt="" style="width:56px;height:56px;display:block"/>
+<span style="font-size:16px;color:#6f6c66;line-height:1.35;text-align:center">Tap a player to give them a route.<br/>Drag to move them.</span>
+</div>
+</sc-if>
+<sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+<div style="flex:none;display:flex;align-items:center;gap:10px">
+<span style="flex:none;width:34px;height:34px;border-radius:50%;background:{{ selFill }};border:2.5px solid #1b1a17;display:flex;align-items:center;justify-content:center;font-size:15px">{{ selLabel }}</span>
+<span style="flex:1;font-size:18px;line-height:1.1">{{ palTitle }}</span>
+<input value="{{ selLabel }}" onChange="{{ onSelLabel }}" onFocus="{{ onSelLabelFocus }}" onBlur="{{ onSelLabelFocus }}" maxLength="3" placeholder="Tag" aria-label="Player tag" title="Player tag (up to 3 letters)" style="flex:none;width:58px;padding:4px 8px;border:2px solid #1b1a17;border-radius:999px;background:#fff;font-size:15px;text-align:center;color:#1b1a17;outline:none"/>
+</div>
+<div style="flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="6">
+<button onClick="{{ c.onPick }}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:8px 4px 6px;border:2px solid #1b1a17;border-radius:14px;background:{{ c.bg }};cursor:pointer;box-shadow:0 3px 0 rgba(27,26,23,.14)" style-hover="transform:translateY(-2px)"><img src="{{ c.icon }}" alt="" style="width:40px;height:40px;display:block"/><span style="font-size:14px;line-height:1.1;text-align:center">{{ c.label }}</span></button>
+</sc-for>
+</div>
+<sc-if value="{{ hasExtras }}" hint-placeholder-val="{{ false }}">
+<div style="flex:none;display:flex;flex-wrap:wrap;gap:6px">
+<sc-if value="{{ canPrimary }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ onPrimary }}" title="Colour this as the primary read" style="padding:4px 12px;border:2px solid #1b1a17;border-radius:999px;background:{{ primaryBg }};font-size:15px;cursor:pointer" style-hover="background:#ffe9a8">{{ primaryText }}</button>
+</sc-if>
+<sc-if value="{{ canMirror }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ onMirror }}" title="Mirror this route left/right" style="padding:4px 12px;border:2px solid #1b1a17;border-radius:999px;background:#fff;font-size:15px;cursor:pointer" style-hover="background:#ffe9a8">⇄ Mirror route</button>
+</sc-if>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{ hasHint }}" hint-placeholder-val="{{ false }}">
+<span style="flex:none;font-size:16px;background:#f2b705;border:2px solid #1b1a17;border-radius:12px;padding:6px 10px;line-height:1.3">{{ hintText }}</span>
+</sc-if>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;snap&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;half&quot;, &quot;one&quot;, &quot;free&quot;], &quot;default&quot;: &quot;half&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Feel&quot; },
+  &quot;showYardNumbers&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Field&quot; }
+}">
+class Component extends DCLogic {
+  S = 22; VW = 660;
+  OFF = '#e5675e'; DEF = '#4a8fe0';
+  // ink colours chosen for contrast on the #c1f0c1 field (all ≥4.5:1)
+  C = {
+    deep:    '#1d4fbe',
+    mid:     '#7a5a07',
+    curl:    '#6a34b8',
+    flat:    '#0e7175',
+    blitz:   '#b3261e',
+    man:     '#1d4fbe',
+    route:   '#7a5a07',
+    primary: '#c2261a'
+  };
+  inkFor(p, type) {
+    if (p.team === 'offense') return p.route && p.route.primary ? this.C.primary : this.C.route;
+    return ({ zoneDeep:this.C.deep, zoneFlat:this.C.flat, curlFlat:this.C.curl,
+      midRead:this.C.mid, spy:this.C.mid, blitz:this.C.blitz, man:this.C.man })[type] || this.DEF;
+  }
+  KEY = 'ffpd.plays.v1';
+
+  ROUTES = {
+    go:      { label:'Go',      pts:[[0,0],[0,-15]],                end:'arrow' },
+    out:     { label:'Out',     pts:[[0,0],[0,-5],[6,-5]],          end:'arrow' },
+    in:      { label:'In',      pts:[[0,0],[0,-5],[-6,-5]],         end:'arrow' },
+    slant:   { label:'Slant',   pts:[[0,0],[0,-2],[-6,-8]],         end:'arrow' },
+    corner:  { label:'Corner',  pts:[[0,0],[0,-8],[5,-14]],         end:'arrow' },
+    post:    { label:'Post',    pts:[[0,0],[0,-8],[-5,-14]],        end:'arrow' },
+    curl:    { label:'Curl',    pts:[[0,0],[0,-9],[-1.4,-6.6]],     end:'arrow' },
+    flat:    { label:'Flat',    pts:[[0,0],[1,-1],[6,-2]],          end:'arrow' },
+    cross:   { label:'Cross',   pts:[[0,0],[0,-4],[-13,-7]],        end:'arrow' },
+    wheel:   { label:'Wheel',   pts:[[0,0],[5,-1],[7,-5],[7,-15]],  end:'arrow' },
+    block:   { label:'Block',   pts:[[0,0],[0,-2.8]],               end:'bar' },
+    handoff: { label:'Handoff', pts:[[0,0],[-3,1.4],[-3.4,-1],[-2,-5]], end:'arrow' },
+    custom:  { label:'Custom',  pts:null,                           end:'arrow' }
+  };
+  DROUTES = {
+    man:      { label:'Man',       pts:null,                 end:'arrow', dash:'10 8' },
+    zoneDeep: { label:'Zone deep', pts:[[0,0],[0,-8.5]],     end:'zone', dash:'14 8' },
+    zoneFlat: { label:'Zone flat', pts:[[0,0],[3.6,-4.5]],   end:'zone', dash:'14 8' },
+    curlFlat: { label:'Curl-flat', pts:[[0,0],[2.6,-5]],     end:'zone', dash:'14 8' },
+    midRead:  { label:'Mid-read',  pts:[[0,0],[0,-6]],       end:'zone', dash:'14 8' },
+    blitz:    { label:'Blitz',     pts:[[0,0],[0,4.5]],      end:'arrow', free:true },
+    spy:      { label:'Spy',       pts:[[0,0],[0,2.6]],      end:'zone', dash:'7 6' },
+    custom:   { label:'Custom',    pts:null,                 end:'arrow' }
+  };
+
+  defaults() {
+    return [
+      { id:'o1', team:'offense', label:'C',  x:15,   y:1,   route:null },
+      { id:'o2', team:'offense', label:'QB', x:15,   y:5,   route:null },
+      { id:'o3', team:'offense', label:'X',  x:3,    y:1,   route:null },
+      { id:'o4', team:'offense', label:'Y',  x:27,   y:1,   route:null },
+      { id:'o5', team:'offense', label:'Z',  x:19,   y:5,   route:null },
+      { id:'d1', team:'defense', label:'',   x:3,    y:-5,  route:null },
+      { id:'d2', team:'defense', label:'',   x:11,   y:-4,  route:null },
+      { id:'d3', team:'defense', label:'',   x:18,   y:-4,  route:null },
+      { id:'d4', team:'defense', label:'',   x:27,   y:-5,  route:null },
+      { id:'d5', team:'defense', label:'',   x:15,   y:-11, route:null }
+    ];
+  }
+
+  state = {
+    name: 'New play',
+    players: this.defaults(),
+    selectedId: null, targeting: false, draft: null,
+    past: [], future: [],
+    vis: 'both', boingId: null, savedNames: [], loadSel: '', narrow: false, pw: 0, ph: 0,
+    leftOpen: true, rightOpen: true
+  };
+
+  componentDidMount() {
+    this._move = (e) => {
+      if (!this.drag) return;
+      e.preventDefault();
+      this._pt = { x: e.clientX, y: e.clientY };
+      // throttle by clock, not by rAF: rAF is paused in background/offscreen frames
+      const now = (performance && performance.now) ? performance.now() : Date.now();
+      if (now - (this._last || 0) >= 11) { this._last = now; this.applyDrag(); }
+      else if (!this._t) this._t = setTimeout(() => { this._t = 0; this.applyDrag(); }, 12);
+    };
+    this._up = () => this.endDrag();
+    this._key = (e) => {
+      if (e.key === 'Escape') return this.setState({ selectedId:null, targeting:false, draft:null });
+      const k = e.key.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && k === 'z') {
+        e.preventDefault();
+        return e.shiftKey ? this.redo() : this.undo();
+      }
+      if ((e.metaKey || e.ctrlKey) && k === 'y') { e.preventDefault(); return this.redo(); }
+    };
+    this._resize = () => { this.setState({ narrow: window.innerWidth < 760 }); this.measure(); };
+    window.addEventListener('pointermove', this._move, { passive:false });
+    window.addEventListener('pointerup', this._up);
+    window.addEventListener('pointercancel', this._up);
+    window.addEventListener('keydown', this._key);
+    window.addEventListener('resize', this._resize);
+    const wide = window.innerWidth >= 900;
+    this.setState({
+      narrow: window.innerWidth < 760, savedNames: Object.keys(this.readAll()),
+      leftOpen: wide, rightOpen: false
+    });
+  }
+  componentWillUnmount() {
+    window.removeEventListener('pointermove', this._move);
+    window.removeEventListener('pointerup', this._up);
+    window.removeEventListener('pointercancel', this._up);
+    window.removeEventListener('keydown', this._key);
+    window.removeEventListener('resize', this._resize);
+  }
+
+  px(x) { return x * this.S; }
+  // Depth is DERIVED on every read from the play plus the measured pane, never stored,
+  // so it can never lag behind a route or position change.
+  depth() {
+    const st = this.state;
+    const deepest = st.players.reduce((m, p) => Math.min(m, p.y), 8);
+    const hasDeep = st.players.some(p => p.route && p.route.type === 'zoneDeep');
+    const need = hasDeep ? Math.min(deepest, Math.min(-12, deepest - 4) - 2.9) : deepest;
+    const aspect = (st.pw && st.ph) ? st.ph / st.pw * 30 : 45;
+    const D = Math.max(aspect, 8 - need + 1.2);
+    return Math.round(Math.max(24, Math.min(45, D)) * 2) / 2;
+  }
+  cardWidth() {
+    const st = this.state;
+    if (!st.pw || !st.ph) return null;
+    return Math.min(st.pw, st.ph * 30 / this.depth(), 1200);
+  }
+  ybv() { return 8 - this.depth(); }
+  py(y) { return (y - this.ybv()) * this.S; }
+  sel() { return this.state.players.find(p => p.id === this.state.selectedId) || null; }
+
+  toYards(cx, cy) {
+    const r = this.svg.getBoundingClientRect();
+    return { x: (cx - r.left) / r.width * 30, y: this.ybv() + (cy - r.top) / r.height * this.depth() };
+  }
+  // the pane may be found via its ref or by walking up from the svg
+  pane() {
+    if (this.box && this.box.isConnected) return this.box;
+    if (this.svg) {
+      const el = this.svg.parentElement && this.svg.parentElement.parentElement;
+      if (el) { this.box = el; this.observe(el); }
+    }
+    return this.box;
+  }
+  observe(el) {
+    if (!window.ResizeObserver || this._obs === el) return;
+    this._obs = el;
+    if (this._ro) this._ro.disconnect();
+    this._ro = new ResizeObserver(() => this.measure());
+    this._ro.observe(el);
+  }
+  measure() {
+    if (!this.pane()) return;
+    clearTimeout(this._mt);
+    this._mt = setTimeout(() => {
+      if (!this.pane()) return;
+      // measure only stores the pane; all field geometry derives from it
+      const pw = Math.max(240, this.box.clientWidth - 18);
+      const ph = Math.max(220, this.box.clientHeight - 18);
+      const st = this.state;
+      if (Math.abs((st.pw || 0) - pw) < 0.5 && Math.abs((st.ph || 0) - ph) < 0.5) return;
+      this.setState({ pw: pw, ph: ph });
+    }, 16);
+  }
+  snap(v) {
+    const m = this.props.snap || 'half';
+    if (m === 'free') return v;
+    return m === 'one' ? Math.round(v) : Math.round(v * 2) / 2;
+  }
+  // the line of scrimmage is a hard boundary: offense stays at/below it, defense at/above
+  clamp(x, y, team) {
+    const lo = this.ybv() + 1.2;
+    let y2 = Math.max(lo, Math.min(7.4, y));
+    if (team === 'offense') y2 = Math.max(0.9, y2);
+    else if (team === 'defense') y2 = Math.min(-0.9, y2);
+    return { x: Math.max(1.2, Math.min(28.8, x)), y: y2 };
+  }
+  patch(id, upd) {
+    this.setState(s => ({ players: s.players.map(p => p.id === id ? Object.assign({}, p, upd) : p) }));
+  }
+  setRoute(id, route) { this.commit(); this.patch(id, { route:route }); }
+  setRouteQuiet(id, route) { this.patch(id, { route:route }); }
+  clearRoutes(team) {
+    if (!this.state.players.some(p => p.route && (!team || p.team === team))) return;
+    this.commit();
+    this.setState(s => ({
+      players: s.players.map(p => (!team || p.team === team) ? Object.assign({}, p, { route:null }) : p),
+      draft:null, targeting:false
+    }), () => this.measure());
+  }
+  resetFormation(team) {
+    const d = this.defaults();
+    const scope = this.state.players.filter(p => !team || p.team === team);
+    // nothing to do if every player in scope already sits at its default spot
+    const moved = scope.some(p => {
+      const base = d.find(q => q.id === p.id);
+      return base && (base.x !== p.x || base.y !== p.y);
+    });
+    if (!moved) return;
+    this.commit();
+    this.setState(s => ({
+      players: s.players.map(p => {
+        if (team && p.team !== team) return p;
+        const base = d.find(q => q.id === p.id);
+        return base ? Object.assign({}, p, { x: base.x, y: base.y }) : p;
+      })
+    }), () => this.measure());
+  }
+  // only routes whose geometry is actually handed can be flipped: zone bubbles are
+  // laid out by slice/side, and man/blitz track a target
+  mirrorable(p) {
+    if (!p || !p.route) return false;
+    const t = p.route.type;
+    if (t === 'custom') return (p.route.pts || []).length > 0;
+    const def = (p.team === 'offense' ? this.ROUTES : this.DROUTES)[t];
+    if (!def || !def.pts || def.end === 'zone') return false;
+    return def.pts.some(q => Math.abs(q[0]) > 0.01);
+  }
+
+  // history: snapshots of the player array, pushed before any mutation
+  commit() {
+    const snap = JSON.stringify(this.state.players);
+    this.setState(s => {
+      const past = s.past.concat([snap]);
+      return { past: past.length > 60 ? past.slice(-60) : past, future: [] };
+    });
+  }
+  undo() {
+    this.setState(s => {
+      if (!s.past.length) return null;
+      const prev = s.past[s.past.length - 1];
+      return {
+        players: JSON.parse(prev),
+        past: s.past.slice(0, -1),
+        future: [JSON.stringify(s.players)].concat(s.future),
+        selectedId: null, targeting: false, draft: null
+      };
+    }, () => this.measure());
+  }
+  redo() {
+    this.setState(s => {
+      if (!s.future.length) return null;
+      return {
+        players: JSON.parse(s.future[0]),
+        past: s.past.concat([JSON.stringify(s.players)]),
+        future: s.future.slice(1),
+        selectedId: null, targeting: false, draft: null
+      };
+    }, () => this.measure());
+  }
+
+  onDown(id, e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.stopPropagation();
+    if (!this.svg) return;
+    const p = this.state.players.find(q => q.id === id);
+    const pt = this.toYards(e.clientX, e.clientY);
+    this.drag = { id:id, ox:p.x - pt.x, oy:p.y - pt.y, x0:p.x, y0:p.y, moved:false, team:p.team, snap:JSON.stringify(this.state.players) };
+    this._pt = null;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    this.setState({ dragging:true });
+  }
+  applyDrag() {
+    const d = this.drag, pt = this._pt; if (!d || !pt) return;
+    const y = this.toYards(pt.x, pt.y);
+    const c = this.clamp(y.x + d.ox, y.y + d.oy, d.team);
+    if (Math.abs(c.x - d.x0) > 0.25 || Math.abs(c.y - d.y0) > 0.25) d.moved = true;
+    this.patch(d.id, c);
+  }
+  endDrag() {
+    const d = this.drag; if (!d) return;
+    this.drag = null;
+    if (this._t) { clearTimeout(this._t); this._t = 0; }
+    this.setState({ dragging:false });
+    if (d.moved) {
+      this.setState(s => ({ past: (s.past.concat([d.snap])).slice(-60), future: [] }));
+      const pt = this._pt;
+      if (pt) {
+        const y = this.toYards(pt.x, pt.y);
+        const c = this.clamp(y.x + d.ox, y.y + d.oy, d.team);
+        this.patch(d.id, this.clamp(this.snap(c.x), this.snap(c.y), d.team));
+      }
+      this.setState({ boingId: d.id });
+      setTimeout(() => this.setState(s => (s.boingId === d.id ? { boingId:null } : null)), 380);
+      return;
+    }
+    const p = this.state.players.find(q => q.id === d.id);
+    if (this.state.targeting && p.team === 'offense') {
+      const def = this.sel();
+      if (def) this.setRoute(def.id, { type:'man', target:p.id });
+      this.setState({ targeting:false });
+      return;
+    }
+    this._renaming = null;
+    this.setState({ selectedId: p.id, targeting:false, draft:null, rightOpen:true });
+  }
+  onKey(id, e) {
+    const p = this.state.players.find(q => q.id === id);
+    const step = { ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0] }[e.key];
+    if (step) {
+      e.preventDefault();
+      this.commit();
+      this.patch(id, this.clamp(p.x + step[0], p.y + step[1], p.team));
+      this.setState({ selectedId:id });
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      this.setState({ selectedId:id, rightOpen:true });
+    }
+  }
+
+  pick(k) {
+    const p = this.sel(); if (!p) return;
+    if (p.route && p.route.type === k && k !== 'custom') return this.setRoute(p.id, null);
+    if (k === 'man') return this.setState({ targeting:true, draft:null });
+    if (k === 'custom') return this.setState({ draft:{ id:p.id, pts:[] }, targeting:false });
+    this.setRoute(p.id, { type:k });
+  }
+
+  // Zone bubbles are laid out as a set, not per player: deep zones split the field
+  // into halves/thirds by how many are called, so the shell reads as cover 1/2/3.
+  zoneLayout() {
+    const top = this.ybv(), map = {};
+    const cl = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+    const of = (t) => this.state.players
+      .filter(p => p.team === 'defense' && p.route && p.route.type === t)
+      .sort((a, b) => a.x - b.x);
+
+    const deep = of('zoneDeep');
+    if (deep.length) {
+      const n = deep.length, slice = 30 / n;
+      const rx = Math.min(slice / 2 - 0.35, 7.4), ry = 2.3;
+      // anchored to a football depth: 4 yards behind the deepest zone defender,
+      // never shallower than 12 yards, and only pulled in by the card as a fallback
+      const deepest = deep.reduce((m, p) => Math.min(m, p.y), 0);
+      const cy = cl(Math.min(-12, deepest - 4), top + ry + 0.6, -8);
+      deep.forEach((p, i) => {
+        map[p.id] = { cx: (i + 0.5) * slice, cy: cy, rx: rx, ry: ry };
+      });
+    }
+
+    const flat = of('zoneFlat');
+    if (flat.length) {
+      const rx = Math.min(4.6, 30 / (2 * flat.length) - 0.35), ry = 1.9;
+      const lo = top + ry + 0.5;
+      flat.forEach((p, i) => {
+        const toward = p.x < 15 ? -1 : 1;
+        map[p.id] = {
+          cx: cl(p.x + toward * 2.6, 0.4 + rx, 29.6 - rx),
+          cy: cl(p.y - 3.4, lo, -1.2 - ry * 0.2), rx: rx, ry: ry
+        };
+      });
+      // keep neighbouring flats from stacking on one another
+      for (let i = 1; i < flat.length; i++) {
+        const a = map[flat[i - 1].id], b = map[flat[i].id];
+        const need = a.rx + b.rx - 0.6;
+        if (b.cx - a.cx < need) b.cx = Math.min(29.6 - b.rx, a.cx + need);
+      }
+    }
+
+    // curl-flat: intermediate and outside, one bubble per hook/curl defender
+    const cf = of('curlFlat');
+    if (cf.length) {
+      const rx = Math.min(4.9, 30 / (2 * cf.length) - 0.3), ry = 2.1;
+      const lo = top + ry + 0.5;
+      cf.forEach(p => {
+        const toward = p.x < 15 ? -1 : 1;
+        map[p.id] = {
+          cx: cl(p.x + toward * 2.2, 0.4 + rx, 29.6 - rx),
+          cy: cl(Math.min(p.y - 3.5, -6.5), lo, -4), rx: rx, ry: ry
+        };
+      });
+      for (let i = 1; i < cf.length; i++) {
+        const a = map[cf[i - 1].id], b = map[cf[i].id], need = a.rx + b.rx - 0.5;
+        if (b.cx - a.cx < need) b.cx = Math.min(29.6 - b.rx, a.cx + need);
+      }
+    }
+
+    // mid-read: middle of the field at intermediate depth, splitting the middle third
+    const mid = of('midRead');
+    if (mid.length) {
+      const n = mid.length, span = Math.min(18, 6 + 6 * n), slice = span / n;
+      const rx = Math.min(slice / 2 - 0.3, 5.4), ry = 2.1;
+      const lo = top + ry + 0.5;
+      mid.forEach((p, i) => {
+        map[p.id] = {
+          cx: 15 - span / 2 + (i + 0.5) * slice,
+          cy: cl(Math.min(p.y - 3.5, -7.5), lo, -5), rx: rx, ry: ry
+        };
+      });
+    }
+
+    of('spy').forEach(p => {
+      map[p.id] = { cx: p.x, cy: cl(p.y + 2.4, top + 2.2, -1.4), rx: 2.1, ry: 1.9 };
+    });
+    return map;
+  }
+  geom(p) {
+    const rt = p.route; if (!rt) return null;
+    const def = (p.team === 'offense' ? this.ROUTES : this.DROUTES)[rt.type];
+    if (!def) return null;
+    const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
+    const zone = def.end === 'zone' ? (this._zl || {})[p.id] : null;
+    let abs, zrEff = def.zr;
+    if (zone) {
+      const col0 = this.inkFor(p, rt.type);
+      const ex = this.px(zone.cx), ey = this.py(zone.cy);
+      const sx = this.px(p.x), sy = this.py(p.y);
+      const L = Math.hypot(ex - sx, ey - sy) || 1;
+      let t0 = Math.min(0.55, 27 / L), t1 = 1 - Math.min(0.5, (zone.ry * this.S * 0.55) / L);
+      if (t1 - t0 < 0.12) { t0 = Math.min(0.34, 27 / L); t1 = Math.max(t0 + 0.14, 0.9); }
+      const d = 'M' + (sx + (ex - sx) * t0).toFixed(1) + ' ' + (sy + (ey - sy) * t0).toFixed(1) +
+        'L' + (sx + (ex - sx) * t1).toFixed(1) + ' ' + (sy + (ey - sy) * t1).toFixed(1);
+      return { color:col0, d:d, width:5, dash:def.dash || '900', anim:'none', arrow:'',
+        bx1:0, by1:0, bx2:0, by2:0,
+        zcx:ex, zcy:ey, zrx:(zone.rx * this.S).toFixed(1), zry:(zone.ry * this.S).toFixed(1),
+        zfill:col0 + '2e' };
+    }
+    if (rt.type === 'custom') abs = [[p.x, p.y]].concat(rt.pts || []);
+
+    else if (rt.type === 'blitz') {
+      // drive past the line of scrimmage, angled at the quarterback
+      const qb = this.state.players.find(q => q.team === 'offense' && q.label === 'QB')
+        || this.state.players.find(q => q.id === 'o2');
+      const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
+      const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
+      const reach = Math.max(1.5, L - 1.8);
+      abs = [[p.x, p.y], [p.x + dx / L * reach, p.y + dy / L * reach]];
+    }
+    else if (rt.type === 'man') {
+      const t = this.state.players.find(q => q.id === rt.target); if (!t) return null;
+      const dx = t.x - p.x, dy = t.y - p.y, L = Math.hypot(dx, dy) || 1;
+      abs = [[p.x, p.y], [t.x - dx / L * 1.15, t.y - dy / L * 1.15]];
+    } else {
+      // shrink the whole route uniformly so nothing — including a zone bubble — leaves the card
+      const deep = this.ybv() + 0.6, last = def.pts.length - 1;
+      let k = 1;
+      def.pts.forEach((q, i) => {
+        const m = 0.6;
+        const dx = sign * q[0], dy = q[1];
+        if (dx > 0.001) k = Math.min(k, (29.4 - m - p.x) / dx);
+        if (dx < -0.001) k = Math.min(k, (p.x - 0.6 - m) / -dx);
+        if (dy > 0.001) k = Math.min(k, (7.6 - m - p.y) / dy);
+        if (dy < -0.001) k = Math.min(k, (p.y - deep - m) / -dy);
+      });
+      k = Math.max(0, Math.min(1, k));
+      abs = def.pts.map(q => [p.x + sign * q[0] * k, p.y + q[1] * k]);
+    }
+
+    const pts = [];
+    abs.forEach(q => {
+      const X = this.px(q[0]), Y = this.py(q[1]), l = pts[pts.length - 1];
+      if (!l || Math.abs(l[0] - X) > 1 || Math.abs(l[1] - Y) > 1) pts.push([X, Y]);
+    });
+    if (pts.length < 2) return null;
+
+    const a0 = pts[0], a1 = pts[1], L0 = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]) || 1;
+    const off = Math.min(rt.type === 'man' ? 24 : 27, L0 * 0.42);
+    pts[0] = [a0[0] + (a1[0] - a0[0]) / L0 * off, a0[1] + (a1[1] - a0[1]) / L0 * off];
+
+    const color = this.inkFor(p, rt.type);
+    const out = {
+      color:color, d:'M' + pts.map(q => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L'),
+      dash: def.dash || '900', anim: def.dash ? 'none' : 'draw .32s ease-out',
+      width: (p.route && p.route.primary) ? 6.5 : 5,
+      arrow:'', bx1:0, by1:0, bx2:0, by2:0, zcx:0, zcy:0, zrx:0, zry:0, zfill:'none'
+    };
+    const b = pts[pts.length - 1], a = pts[pts.length - 2];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const nx = (b[0] - a[0]) / L, ny = (b[1] - a[1]) / L;
+    if (def.end === 'arrow') {
+      const s = 17, w = 9.5, bx = b[0] - nx * s, by = b[1] - ny * s;
+      out.arrow = b[0].toFixed(1) + ',' + b[1].toFixed(1) + ' ' +
+        (bx - ny * w).toFixed(1) + ',' + (by + nx * w).toFixed(1) + ' ' +
+        (bx + ny * w).toFixed(1) + ',' + (by - nx * w).toFixed(1);
+    } else if (def.end === 'bar') {
+      out.bx1 = b[0] - ny * 17; out.by1 = b[1] + nx * 17;
+      out.bx2 = b[0] + ny * 17; out.by2 = b[1] - nx * 17;
+    }
+    return out;
+  }
+
+  readAll() { try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { return {}; } }
+  store(name, players) {
+    const all = this.readAll();
+    all[name] = { players:players };
+    try { localStorage.setItem(this.KEY, JSON.stringify(all)); } catch (e) {}
+    this.setState({ savedNames: Object.keys(all) });
+  }
+
+  exportPng() {
+    this.setState({ selectedId:null, targeting:false, draft:null });
+    setTimeout(() => {
+      const svg = this.svg; if (!svg) return;
+      const vh = this.depth() * this.S;
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', this.VW * 2); clone.setAttribute('height', vh * 2);
+      const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = this.VW * 2; c.height = vh * 2;
+        const g = c.getContext('2d');
+        g.fillStyle = '#c1f0c1'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        const a = document.createElement('a');
+        a.href = c.toDataURL('image/png');
+        a.download = (this.state.name || 'play').replace(/\s+/g, '-') + '.png';
+        a.click();
+      };
+      img.src = src;
+    }, 60);
+  }
+
+  renderVals() {
+    const st = this.state, sel = this.sel();
+    const vis = st.vis;
+    const shown = st.players.filter(p => vis === 'both' || (vis === 'offense' ? p.team === 'offense' : p.team === 'defense'));
+
+    const players = shown.map(p => {
+      const isSel = p.id === st.selectedId;
+      const isTarget = st.targeting && p.team === 'offense';
+      return {
+        transform: 'translate(' + this.px(p.x).toFixed(1) + ',' + this.py(p.y).toFixed(1) + ')',
+        fill: p.team === 'offense' ? this.OFF : this.DEF,
+        aria: (p.team === 'offense' ? 'Offense ' : 'Defense ') + (p.label || p.id),
+        labelEl: p.label ? React.createElement('text', {
+          y: 1, textAnchor: 'middle', dominantBaseline: 'central',
+          fontSize: p.label.length > 2 ? 15 : 18, fill: '#1b1a17', style: { pointerEvents: 'none' }
+        }, p.label) : null,
+        ringR: isSel ? 33 : (isTarget ? 31 : 0),
+        ringDash: isTarget && !isSel ? '6 6' : '900',
+        ringAnim: isSel ? 'pulse 1.25s ease-in-out infinite' : 'none',
+        selScale: isSel ? 'scale(1.1)' : 'none',
+        anim: st.boingId === p.id ? 'boing 360ms cubic-bezier(.34,1.56,.64,1)' : 'none',
+        cursor: st.dragging ? 'grabbing' : 'grab',
+        onDown: (e) => this.onDown(p.id, e),
+        onClick: (e) => e.stopPropagation(),
+        onKey: (e) => this.onKey(p.id, e)
+      };
+    });
+
+    this._zl = this.zoneLayout();
+    const routes = shown.map(p => this.geom(p)).filter(Boolean);
+
+    let draftD = '';
+    if (st.draft) {
+      const p = st.players.find(q => q.id === st.draft.id);
+      if (p) draftD = 'M' + [[p.x, p.y]].concat(st.draft.pts)
+        .map(q => this.px(q[0]).toFixed(1) + ' ' + this.py(q[1]).toFixed(1)).join('L');
+    }
+
+    const suffix = sel && sel.team === 'offense' ? 'Off' : 'Def';
+    const chips = sel ? Object.keys(sel.team === 'offense' ? this.ROUTES : this.DROUTES).map(k => {
+      const tbl = sel.team === 'offense' ? this.ROUTES : this.DROUTES;
+      const active = !!(sel.route && sel.route.type === k);
+      return { label: tbl[k].label, bg: active ? '#f2b705' : '#fff', onPick: () => this.pick(k),
+        icon: './icons/' + (k === 'custom' ? 'custom' + suffix : k) + '.png' };
+    }).concat([{ label: 'Done', bg: '#fff', icon: './icons/deselect' + suffix + '.png',
+      onPick: () => this.setState({ selectedId:null, targeting:false, draft:null }) }]) : [];
+    const scope = vis === 'both' ? null : vis;
+
+    const top = this.ybv(), VH = this.depth() * this.S;
+    const clipRect = (y1, y2) => {
+      const a = Math.max(y1, top), b2 = Math.min(y2, 8);
+      if (b2 - a <= 0.05) return null;
+      return { y: this.py(a).toFixed(1), h: ((b2 - a) * this.S).toFixed(1) };
+    };
+    const bands = [clipRect(-20, -15), clipRect(-35, -30)].filter(Boolean);
+    const ez = clipRect(-37, -35);
+    const lines = [];
+    for (let y = 5; y >= -35; y -= 5) {
+      if (y < top - 0.01 || y > 8) continue;
+      lines.push({
+        y: this.py(y).toFixed(1),
+        w: y === 0 ? 4.5 : (y === -35 ? 3 : 1.6),
+        o: y === 0 ? 1 : (y === -35 ? 0.55 : 0.22)
+      });
+    }
+    const texts = [];
+    const T = (x, y, t, extra) => texts.push(React.createElement('text',
+      Object.assign({ key: t + y, x: x, y: y, fill: '#1b1a17', fillOpacity: 0.5, fontSize: 17 }, extra || {}), t));
+    if (this.props.showYardNumbers !== false) {
+      for (let y = 0; y >= -35; y -= 5) {
+        if (y < top - 0.01) continue;
+        T(12, this.py(y) - 7, y === 0 ? 'LOS' : String(-y));
+      }
+      bands.forEach(b => {
+        if (+b.h > 46) T(286, +b.y + +b.h / 2 + 6, 'NO-RUN', { letterSpacing: 1.5 });
+      });
+      if (ez && +ez.h > 30) T(266, +ez.y + +ez.h / 2 + 6, 'END ZONE', { letterSpacing: 2.5 });
+    }
+
+    const bg = (k) => vis === k ? '#f2b705' : '#fff';
+
+    return {
+      name: st.name || '', savedNames: st.savedNames, loadSel: st.loadSel,
+      hasSaved: st.savedNames.length > 0,
+      showNums: this.props.showYardNumbers !== false,
+      players:players, routes:routes, draftD:draftD, chips:chips,
+      viewBox: '0 0 660 ' + VH.toFixed(0),
+      bands: bands, lines: lines,
+      ezY: ez ? ez.y : 0, ezH: ez ? ez.h : 0,
+      fieldTextEl: texts.length ? React.createElement('g', { fontFamily: "'Patrick Hand',cursive" }, texts) : null,
+      hasSel: !!sel, noSel: !sel,
+      leftW: st.leftOpen ? '266px' : '0px', rightW: st.rightOpen ? '266px' : '0px',
+      selFill: sel ? (sel.team === 'offense' ? this.OFF : this.DEF) : '#fff',
+      hasExtras: !!(sel && sel.team === 'offense' && sel.route) || this.mirrorable(sel),
+      leftBorder: st.leftOpen ? '2px solid #1b1a17' : 'none',
+      rightBorder: st.rightOpen ? '2px solid #1b1a17' : 'none',
+      leftBg: st.leftOpen ? '#f2b705' : '#fff', rightBg: st.rightOpen ? '#f2b705' : '#fff',
+      leftIcon: st.leftOpen ? '‹' : '›', rightIcon: st.rightOpen ? '›' : '‹',
+      onToggleL: () => this.setState(s => ({ leftOpen: !s.leftOpen }), () => setTimeout(() => this.measure(), 200)),
+      onToggleR: () => this.setState(s => ({ rightOpen: !s.rightOpen }), () => setTimeout(() => this.measure(), 200)),
+      palTitle: sel ? (sel.team === 'offense' ? 'Pick a route' : 'Pick a coverage') : '',
+      selLabel: sel ? sel.label : '',
+      canMirror: this.mirrorable(sel),
+      canPrimary: !!(sel && sel.team === 'offense' && sel.route),
+      primaryOn: !!(sel && sel.route && sel.route.primary),
+      primaryBg: sel && sel.route && sel.route.primary ? '#f5c9c3' : '#fff',
+      primaryText: sel && sel.route && sel.route.primary ? '★ Primary read' : '☆ Mark primary',
+      onPrimary: () => {
+        if (!sel || sel.team !== 'offense' || !sel.route) return;
+        const on = !sel.route.primary;
+        this.commit();
+        this.setState(s => ({ players: s.players.map(p => {
+          if (!p.route) return p;
+          if (p.id === sel.id) return Object.assign({}, p, { route: Object.assign({}, p.route, { primary: on }) });
+          if (!p.route.primary) return p;
+          return Object.assign({}, p, { route: Object.assign({}, p.route, { primary: false }) });
+        }) }));
+      },
+      onMirror: () => {
+        if (!this.mirrorable(sel)) return;
+        const r = sel.route;
+        this.commit();
+        this.setRouteQuiet(sel.id, r.type === 'custom'
+          ? { type:'custom', pts: (r.pts || []).map(q => [2 * sel.x - q[0], q[1]]) }
+          : Object.assign({}, r, { mirror: !r.mirror }));
+      },
+      onSelLabelFocus: () => { this._renaming = null; },
+      onSelLabel: (e) => {
+        const v = e.target.value.slice(0, 3).toUpperCase();
+        if (!sel) return;
+        // one history entry per rename session, not per keystroke
+        if (this._renaming !== sel.id) { this._renaming = sel.id; this.commit(); }
+        this.patch(sel.id, { label: v });
+      },
+      hasHint: !!(st.targeting || st.draft),
+      hintText: st.targeting ? 'Cover who? Tap a red player.' : 'Tap waypoints on the field · double-tap to finish',
+      visBothBg: bg('both'), visOffBg: bg('offense'), visDefBg: bg('defense'),
+      fieldW: this.cardWidth() ? this.cardWidth() + 'px' : 'min(100%, 430px)',
+      svgRef: (el) => { this.svg = el; },
+      fieldRef: (el) => {
+        if (!el || el === this.box) return;
+        this.box = el;
+        this.observe(el);
+        this.measure();
+      },
+      onName: (e) => this.setState({ name: e.target.value }),
+      onSave: () => this.store(st.name || 'Untitled play', st.players),
+      onDup: () => {
+        const n = (st.name || 'Untitled play') + ' copy';
+        this.setState({ name:n }); this.store(n, st.players);
+      },
+      onLoad: (e) => {
+        const n = e.target.value; if (!n) return;
+        const rec = this.readAll()[n];
+        if (rec) this.setState(s2 => ({
+          name:n, selectedId:null, draft:null, targeting:false, loadSel:'',
+          past: s2.past.concat([JSON.stringify(s2.players)]).slice(-60), future: [],
+          players: rec.players.map(p => Object.assign({}, p, {
+            x: Math.max(1.2, Math.min(28.8, p.x)),
+            y: p.team === 'offense' ? Math.max(0.9, Math.min(7.4, p.y)) : Math.min(-0.9, Math.max(-36, p.y))
+          }))
+        }), () => this.measure());
+      },
+      onFlip: () => { this.commit(); this.setState(s => ({ players: s.players.map(p => {
+        const r = p.route && p.route.pts
+          ? { type:p.route.type, pts: p.route.pts.map(q => [30 - q[0], q[1]]) }
+          : p.route;
+        return Object.assign({}, p, { x: 30 - p.x, route: r });
+      }) })); },
+      onClear: () => this.clearRoutes(scope),
+      onReset: () => this.resetFormation(scope),
+      onExport: () => this.exportPng(),
+      undoDisabled: st.past.length === 0, redoDisabled: st.future.length === 0,
+      undoBg: st.past.length ? '#fff' : '#f0ece0',
+      redoBg: st.future.length ? '#fff' : '#f0ece0',
+      undoColor: st.past.length ? '#1b1a17' : '#a8a49a',
+      redoColor: st.future.length ? '#1b1a17' : '#a8a49a',
+      onUndo: () => this.undo(), onRedo: () => this.redo(),
+      onVisBoth: () => this.setState({ vis:'both' }),
+      onVisOff: () => this.setState({ vis:'offense' }),
+      onVisDef: () => this.setState({ vis:'defense' }),
+      onDeselect: () => this.setState({ selectedId:null, targeting:false, draft:null }),
+      onField: (e) => {
+        if (st.draft) {
+          const pt = this.toYards(e.clientX, e.clientY);
+          const c = this.clamp(this.snap(pt.x), this.snap(pt.y));
+          return this.setState(s => ({ draft: { id: s.draft.id, pts: s.draft.pts.concat([[c.x, c.y]]) } }));
+        }
+        if (st.targeting) return this.setState({ targeting:false });
+        this.setState({ selectedId:null });
+      },
+      onFieldDbl: () => {
+        const d = st.draft; if (!d) return;
+        const pts = d.pts.slice(0, Math.max(1, d.pts.length - 1));
+        if (pts.length) this.setRoute(d.id, { type:'custom', pts:pts });
+        this.setState({ draft:null });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

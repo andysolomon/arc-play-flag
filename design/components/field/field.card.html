@@ -1,0 +1,28 @@
+<!-- @dsCard group="Components" viewport="700x260" name="Field — PlayerToken, FieldCard" subtitle="Players and turf" -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="../../ds-load.js"></script>
+<style>body{margin:0;padding:16px;background:var(--paper);font-family:var(--font-hand);color:var(--ink)}</style></head>
+<body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+dsLoad('../../').then(NS => {
+const { PlayerToken, FieldCard } = NS;
+const P = (team, label, l, t, extra) => <PlayerToken team={team} label={label} size={34} {...extra} style={{ position: 'absolute', left: l, top: t, transform: 'translate(-50%,-50%)' }} />;
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
+      <PlayerToken team="offense" label="QB" />
+      <PlayerToken team="offense" label="X" selected />
+      <PlayerToken team="defense" />
+      <PlayerToken team="offense" label="Z" target />
+    </div>
+    <FieldCard width={330} aspect="30 / 18">
+      {P('defense', '', '12%', '30%')}{P('defense', '', '38%', '36%')}{P('defense', '', '62%', '36%')}{P('defense', '', '88%', '30%')}{P('defense', '', '50%', '10%')}
+      {P('offense', 'X', '12%', '80%')}{P('offense', 'C', '50%', '80%')}{P('offense', 'Y', '88%', '80%')}{P('offense', 'QB', '50%', '94%')}{P('offense', 'Z', '64%', '94%', { selected: true })}
+    </FieldCard>
+  </div>
+);
+});
+</script></body></html>

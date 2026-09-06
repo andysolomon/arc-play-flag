@@ -1,0 +1,50 @@
+:root {
+  /* base palette */
+  --paper: #f4efe2;          /* page background, warm parchment */
+  --cream: #fffdf6;          /* panels, header */
+  --white: #ffffff;          /* controls at rest */
+  --ink: #1b1a17;            /* text, borders, dark buttons */
+  --ink-2: #3a372f;          /* dark button hover */
+  --ink-muted: #6f6c66;      /* captions, section labels */
+  --ink-faint: #a8a49a;      /* disabled text */
+  --paper-2: #f0ece0;        /* disabled control fill */
+  --yellow: #f2b705;         /* selected / active */
+  --yellow-soft: #ffe9a8;    /* pill hover */
+  --rose-soft: #f5c9c3;      /* "primary read" toggle on */
+
+  /* teams */
+  --offense: #e5675e;
+  --defense: #4a8fe0;
+
+  /* field */
+  --turf: #c1f0c1;
+  --turf-endzone: #a7e5a7;
+
+  /* route inks (all ≥4.5:1 on turf) */
+  --ink-route: #7a5a07;
+  --ink-primary-read: #c2261a;
+  --ink-zone-deep: #1d4fbe;
+  --ink-zone-flat: #0e7175;
+  --ink-curl-flat: #6a34b8;
+  --ink-mid-read: #7a5a07;
+  --ink-blitz: #b3261e;
+  --ink-man: #1d4fbe;
+
+  /* links */
+  --link: #c2513f;
+  --link-hover: #8f3529;
+
+  /* semantic aliases */
+  --bg-page: var(--paper);
+  --surface-panel: var(--cream);
+  --surface-control: var(--white);
+  --surface-active: var(--yellow);
+  --surface-hover: var(--yellow-soft);
+  --surface-disabled: var(--paper-2);
+  --text-body: var(--ink);
+  --text-muted: var(--ink-muted);
+  --text-disabled: var(--ink-faint);
+  --text-on-dark: var(--cream);
+  --border-strong: var(--ink);
+  --divider: rgba(27, 26, 23, 0.14);
+}

@@ -1,0 +1,25 @@
+<!-- @dsCard group="Components" viewport="700x150" name="Forms — TextInput, Select" subtitle="Pill fields" -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="../../ds-load.js"></script>
+<style>body{margin:0;padding:16px;background:var(--paper);font-family:var(--font-hand);color:var(--ink)}</style></head>
+<body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+dsLoad('../../').then(NS => {
+const { TextInput, Select } = NS;
+function Demo() {
+  const [n, setN] = React.useState('New play');
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '240px 240px', gap: 10 }}>
+      <TextInput value={n} onChange={e => setN(e.target.value)} placeholder="Play name" />
+      <Select defaultValue=""><option value="">Open a saved play…</option><option>Trips right</option><option>Mesh</option></Select>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 18 }}>Pick a route <TextInput compact maxLength={3} defaultValue="QB" style={{ width: 58 }} /></div>
+      <TextInput placeholder="Play name" />
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+});
+</script></body></html>

@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/* Every value here comes from design/tokens/*.css or the prototype's inline styles. */
+@theme {
+  --color-*: initial;
+  --color-paper: #f4efe2;
+  --color-paper-2: #f0ece0;
+  --color-cream: #fffdf6;
+  --color-white: #ffffff;
+  --color-ink: #1b1a17;
+  --color-ink-2: #3a372f;
+  --color-ink-muted: #6f6c66;
+  --color-ink-faint: #a8a49a;
+  --color-yellow: #f2b705;
+  --color-yellow-soft: #ffe9a8;
+  --color-rose-soft: #f5c9c3;
+  --color-offense: #e5675e;
+  --color-defense: #4a8fe0;
+  --color-turf: #c1f0c1;
+  --color-turf-endzone: #a7e5a7;
+  --color-divider: rgb(27 26 23 / 0.14);
+  --color-transparent: transparent;
+
+  --radius-*: initial;
+  --radius-pill: 999px;
+  --radius-tile: 14px;
+  --radius-note: 12px;
+  --radius-field: 7px;
+  --radius-full: 50%;
+
+  --shadow-*: initial;
+  --shadow-tile: 0 3px 0 rgb(27 26 23 / 0.14);
+  --shadow-toast: 0 4px 0 rgb(27 26 23 / 0.15);
+  --shadow-field: 0 7px 0 rgb(27 26 23 / 0.13);
+
+  --font-*: initial;
+  --font-hand: var(--font-patrick-hand), ui-rounded, "Comic Sans MS", cursive, sans-serif;
+
+  --text-*: initial;
+  --text-eyebrow: 13px;
+  --text-caption: 14px;
+  --text-small: 15px;
+  --text-base: 16px;
+  --text-input: 17px;
+  --text-title: 18px;
+  --text-header: 20px;
+
+  --tracking-*: initial;
+  --tracking-eyebrow: 2px;
+
+  --leading-*: initial;
+  --leading-tight: 1.1;
+  --leading-body: 1.35;
+  --leading-note: 1.3;
+  --leading-pill: 1.25;
+
+  --ease-boing: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-pulse-ring: pulse-ring 1.25s ease-in-out infinite;
+  --animate-boing: boing 360ms var(--ease-boing);
+  --animate-draw: draw 320ms ease-out;
+
+  @keyframes pulse-ring {
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(1.16); }
+  }
+  @keyframes boing {
+    0% { transform: scale(0.84); }
+    55% { transform: scale(1.13); }
+    100% { transform: scale(1); }
+  }
+  @keyframes draw {
+    from { stroke-dashoffset: 900; }
+    to { stroke-dashoffset: 0; }
+  }
+}
+
+@layer base {
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-hand);
+    overflow: hidden;
+  }
+  input, button, select { font-family: inherit; color: inherit; }
+  a { color: #c2513f; text-decoration: underline; }
+  a:hover { color: #8f3529; }
+  :focus-visible { outline: 3px solid var(--color-yellow); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .motion-loop { animation: none !important; }
+  }
+}
