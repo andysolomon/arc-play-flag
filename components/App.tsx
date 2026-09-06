@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalSt
 import { exportPng } from "@/lib/export";
 import { initialState, reducer, selected } from "@/lib/play/reducer";
 import { getNames, getServerNames, saveToLibrary, subscribe } from "@/lib/play/library";
+import { decodeShare, encodeShare } from "@/lib/play/share";
 import { readAll, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { Header } from "./Header";
@@ -32,6 +33,7 @@ export function App() {
   const svgRef = useRef<SVGSVGElement>(null);
   const savedNames = useSyncExternalStore(subscribe, getNames, getServerNames);
   const hydratedRef = useRef(false);
+  const [toast, setToast] = useState<string | null>(null);
   const wide = useMedia("(min-width: 900px)");
   const narrow = useMedia("(max-width: 759px)");
   const narrowRef = useRef(narrow);
@@ -79,6 +81,13 @@ export function App() {
     const d = readDraft();
     if (d) dispatch({ type: "hydrate", name: d.name, players: d.players });
     hydratedRef.current = true;
+    // "Open in designer" from a share page: /?p=<id> loads the play (undoable) and cleans the URL
+    const shared = new URLSearchParams(window.location.search).get("p");
+    const rec = shared ? decodeShare(shared) : null;
+    if (rec) {
+      dispatch({ type: "load", name: rec.name, players: rec.players });
+      window.history.replaceState(null, "", "/");
+    }
   }, []);
 
   const save = useCallback((name: string) => { saveToLibrary(name, s.players); }, [s.players]);
@@ -92,6 +101,14 @@ export function App() {
     const rec = readAll()[name];
     if (rec) dispatch({ type: "load", name, players: rec.players });
   }, []);
+  const onShare = useCallback(() => {
+    const url = `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", players: [...s.players] })}`;
+    const done = () => {
+      setToast("Link copied");
+      window.setTimeout(() => { setToast(null); }, 1600);
+    };
+    navigator.clipboard.writeText(url).then(done, () => { window.prompt("Copy this link", url); });
+  }, [s.name, s.players]);
   const onExport = useCallback(() => {
     dispatch({ type: "select", id: null });
     window.setTimeout(() => {
@@ -100,11 +117,18 @@ export function App() {
     }, 60);
   }, [s.name]);
 
+  // offline on the sideline: a tiny service worker caches the shell and static assets
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    }
+  }, []);
+
   const sel = selected(s);
   const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? "Tap waypoints on the field · double-tap to finish" : null;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
         name={s.name}
         leftOpen={isOpen(leftOpen, "left")}
@@ -127,6 +151,7 @@ export function App() {
             onDuplicate={onDuplicate}
             onExport={onExport}
             onLoad={onLoad}
+            onShare={onShare}
             onFlip={() => { dispatch({ type: "flip" }); }}
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}
             onReset={(team) => { dispatch({ type: "resetFormation", team }); }}
@@ -142,6 +167,7 @@ export function App() {
           dispatch={dispatch}
           onSelect={onSelect}
           svgRef={svgRef}
+          title={s.name}
         />
         <Sidebar id="route-sidebar" side="right" open={rightOpen} isOpen={isOpen(rightOpen, "right")} label="Route palette">
           <RouteSidebar
@@ -155,7 +181,7 @@ export function App() {
           />
         </Sidebar>
       </div>
-      <Hint text={hint} />
+      <Hint text={toast ?? hint} />
     </div>
   );
 }

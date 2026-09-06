@@ -23,6 +23,10 @@ interface Props {
   svgRef: RefObject<SVGSVGElement | null>;
   snapMode?: SnapMode;
   showYardNumbers?: boolean;
+  /** share page: draw only, no interaction */
+  readOnly?: boolean;
+  /** printed above the field (print stylesheet only) */
+  title?: string;
 }
 
 interface Drag {
@@ -48,6 +52,7 @@ const STEP: Record<string, readonly [number, number]> = {
 
 function FieldImpl({
   players, vis, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
+  readOnly = false, title,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -197,13 +202,14 @@ function FieldImpl({
   const dragging = live !== null;
 
   return (
-    <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-[9px]">
-      <div className="relative flex-none" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
+    <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden p-[9px] print:block print:overflow-visible print:p-0">
+      {title !== undefined && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
+      <div className="relative flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         <svg
           ref={svgRef}
           viewBox={layout.viewBox}
-          onClick={onFieldClick}
-          onDoubleClick={() => { if (draft) dispatch({ type: "draftFinish" }); }}
+          onClick={readOnly ? undefined : onFieldClick}
+          onDoubleClick={readOnly ? undefined : () => { if (draft) dispatch({ type: "draftFinish" }); }}
           className="block h-auto w-full touch-pan-y rounded-field border-[3px] border-ink bg-turf shadow-field"
           role="img"
           aria-label="Play diagram"
@@ -240,6 +246,7 @@ function FieldImpl({
               target={targeting && p.team === "offense"}
               boing={boingId === p.id}
               dragging={dragging}
+              readOnly={readOnly}
               onPointerDown={onDown}
               onKeyDown={onKey}
             />

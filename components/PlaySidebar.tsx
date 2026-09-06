@@ -3,7 +3,7 @@
 import { memo, type ChangeEvent } from "react";
 import type { Team, Vis } from "@/lib/play/types";
 import { IconTile } from "./IconTile";
-import { divider, eyebrow, input, tileGrid } from "./ui";
+import { divider, eyebrow, input, pill, tileGrid } from "./ui";
 
 interface Props {
   name: string;
@@ -14,6 +14,7 @@ interface Props {
   onDuplicate: () => void;
   onExport: () => void;
   onLoad: (name: string) => void;
+  onShare: () => void;
   onFlip: () => void;
   onClear: (team: Team | null) => void;
   onReset: (team: Team | null) => void;
@@ -21,7 +22,7 @@ interface Props {
 }
 
 function PlaySidebarImpl({
-  name, vis, savedNames, onName, onSave, onDuplicate, onExport, onLoad, onFlip, onClear, onReset, onVis,
+  name, vis, savedNames, onName, onSave, onDuplicate, onExport, onLoad, onShare, onFlip, onClear, onReset, onVis,
 }: Props) {
   const scope: Team | null = vis === "both" ? null : vis;
   return (
@@ -52,6 +53,9 @@ function PlaySidebarImpl({
           ))}
         </select>
       )}
+      <button type="button" onClick={onShare} title="Copy a link that opens this play read-only" className={`${pill} flex-none self-start px-3 py-1 text-small`}>
+        Copy share link
+      </button>
       <span className={divider} />
       <span className={eyebrow}>FIELD</span>
       <div className={tileGrid}>
