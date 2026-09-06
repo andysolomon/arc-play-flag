@@ -13,25 +13,27 @@ interface Props {
   target: boolean;
   boing: boolean;
   dragging: boolean;
+  /** read-only rendering (share page): no handlers, not focusable */
+  readOnly?: boolean;
   onPointerDown: (id: string, e: PointerEvent<SVGGElement>) => void;
   onKeyDown: (id: string, e: KeyboardEvent<SVGGElement>) => void;
 }
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
 
-function PlayerTokenImpl({ player: p, x, y, selected, target, boing, dragging, onPointerDown, onKeyDown }: Props) {
+function PlayerTokenImpl({ player: p, x, y, selected, target, boing, dragging, readOnly = false, onPointerDown, onKeyDown }: Props) {
   const ringR = selected ? 33 : target ? 31 : 0;
   return (
     <g
       transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
-      tabIndex={0}
-      role="button"
+      tabIndex={readOnly ? undefined : 0}
+      role={readOnly ? "img" : "button"}
       aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id)}
-      aria-pressed={selected}
-      onPointerDown={(e) => { onPointerDown(p.id, e); }}
-      onClick={(e) => { e.stopPropagation(); }}
-      onKeyDown={(e) => { onKeyDown(p.id, e); }}
-      className={`group touch-none outline-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+      aria-pressed={readOnly ? undefined : selected}
+      onPointerDown={readOnly ? undefined : (e) => { onPointerDown(p.id, e); }}
+      onClick={readOnly ? undefined : (e) => { e.stopPropagation(); }}
+      onKeyDown={readOnly ? undefined : (e) => { onKeyDown(p.id, e); }}
+      className={readOnly ? undefined : `group touch-none outline-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
     >
       <g style={{ ...centred, transform: selected ? "scale(1.1)" : "none" }}>
         <g style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : undefined}>

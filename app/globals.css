@@ -91,3 +91,11 @@
     .motion-loop { animation: none !important; }
   }
 }
+
+/* Print: the field fills a letter page, play name as the title. */
+@media print {
+  @page { size: letter; margin: 0.5in; }
+  html, body { height: auto; overflow: visible; background: #fff; }
+  header, aside, [role="status"] { display: none !important; }
+  .app-root { height: auto; overflow: visible; display: block; }
+}
