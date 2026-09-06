@@ -1,6 +1,6 @@
 import { S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { routeDef } from "@/lib/play/routes";
-import type { Level, Pane, Player } from "@/lib/play/types";
+import type { Level, Pane, Player, Pt } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 
 /**
@@ -10,6 +10,11 @@ import { zoneLayout } from "@/lib/play/zones";
  * weight plus a fade, never hue alone.
  */
 export interface ArtOptions {
+  /** Animated tokens over the original, stationary field and routes. */
+  positions?: Record<string, Pt>;
+  ball?: { x: number; y: number; lift: number } | null;
+  /** Embedded sticker for standalone SVG images (external assets cannot load there). */
+  footballHref?: string;
   level?: Level;
   /** an offensive player whose route is drawn bold while every other route fades */
   highlight?: string | null;
@@ -104,7 +109,8 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
   }
 
   for (const p of shown) {
-    const x = px(p.x), y = py(p.y, top);
+    const spot = opts.positions?.[p.id] ?? p;
+    const x = px(spot.x), y = py(spot.y, top);
     out.push(`<g transform="translate(${f1(x)},${f1(y)})">`);
     if (highlight === p.id) out.push(`<circle r="33" fill="none" stroke="${YELLOW}" stroke-width="5"/>`);
     out.push(`<circle r="23" fill="${teamFill(p.team)}" stroke="${INK}" stroke-width="2.5"/>`);
@@ -117,6 +123,11 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
       out.push(`<text x="26" y="-22" font-size="26" fill="#c2261a" paint-order="stroke" stroke="${TURF}" stroke-width="4">★</text>`);
     }
     out.push("</g>");
+  }
+
+  if (opts.ball && opts.footballHref) {
+    const b = opts.ball;
+    out.push(`<image href="${esc(opts.footballHref)}" x="-16" y="-16" width="32" height="32" transform="translate(${f1(px(b.x))},${f1(py(b.y, top) - b.lift * 16)}) scale(${(1 + b.lift * 0.6).toFixed(2)})"/>`);
   }
 
   return { viewBox: layout.viewBox, width: VW, height: layout.vh, body: out.join("") };

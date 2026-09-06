@@ -1,6 +1,8 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
 import { kebab } from "@/lib/play/storage";
 import type { Level, Player, TeamSettings } from "@/lib/play/types";
+import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
+import { ybv } from "@/lib/play/geometry";
 import { fitField } from "./binder";
 import { INK, MUTED, appMark, badge, field, page, pill, text, type SvgPage } from "./pages";
 import { download, ensureFont, measure, rasterise } from "./raster";
@@ -19,7 +21,13 @@ export interface CardOptions {
   level?: Level;
 }
 
-export function cardSvg(o: CardOptions): SvgPage {
+/** Shared viewport: animation must use exactly the same yards as the card art. */
+export function cardField(players: readonly Player[]): { w: number; h: number; top: number } {
+  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40);
+  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h })) };
+}
+
+export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): SvgPage {
   const W = CARD_W, H = CARD_H, m = 60;
   const out: string[] = [];
   out.push(`<rect width="${String(W)}" height="${String(H)}" fill="#f4efe2"/>`);
@@ -45,8 +53,8 @@ export function cardSvg(o: CardOptions): SvgPage {
   out.push(text(x, titleY + 20, 56, fit(o.name, right - x, 56)));
 
   const top = titleY + r + 36;
-  const f = fitField(o.players, W - 2 * m, H - top - m - 40);
-  out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, { level: o.level ?? "simple" }, 5));
+  const f = cardField(o.players);
+  out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, { level: o.level ?? "simple", ...frame }, 5));
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));
   return page(W, H, out.join(""));

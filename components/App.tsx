@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { initialState, reducer, selected } from "@/lib/play/reducer";
-import { getPlays, getServerPlays, getTeam, playById, savePlay, subscribe } from "@/lib/play/library";
+import { getPlays, getServerPlays, playById, savePlay, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { Header } from "./Header";
 import { Hint } from "./Hint";
+import { PlayExport } from "./PlayExport";
 import { PlaySidebar } from "./PlaySidebar";
 import { RouteSidebar } from "./RouteSidebar";
 import { Sidebar } from "./Sidebar";
@@ -34,6 +35,7 @@ export function App() {
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const hydratedRef = useRef(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const toastTimer = useRef(0);
   const say = useCallback((text: string, ms = 1600) => {
@@ -122,14 +124,6 @@ export function App() {
     const url = `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", players: [...s.players] })}`;
     navigator.clipboard.writeText(url).then(() => { say("Link copied"); }, () => { window.prompt("Copy this link", url); });
   }, [say, s.name, s.players]);
-  const onExport = useCallback(() => {
-    dispatch({ type: "select", id: null });
-    say("Drawing the card…", 4000);
-    import("@/lib/export/card")
-      .then((m) => m.exportCardPng({ name: s.name || "Untitled play", players: s.players, team: getTeam() }))
-      .then(() => { say("Card saved"); }, () => { say("The card could not be drawn"); });
-  }, [say, s.name, s.players]);
-
   // offline on the sideline: a tiny service worker caches the shell and static assets
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
@@ -166,7 +160,9 @@ export function App() {
             onToggleNotes={() => { setNotesOpen((o) => !o); }}
             onSave={onSave}
             onDuplicate={onDuplicate}
-            onExport={onExport}
+            onExport={() => { setExportOpen((open) => !open); }}
+            exportOpen={exportOpen}
+            exportPanel={exportOpen ? <PlayExport id={s.id} name={s.name} players={s.players} /> : null}
             onLoad={onLoad}
             onShare={onShare}
             onFlip={() => { dispatch({ type: "flip" }); }}
