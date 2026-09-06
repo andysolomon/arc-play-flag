@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type ChangeEvent } from "react";
+import { memo, type ReactNode, type ChangeEvent } from "react";
 import { MAX_NOTES } from "@/lib/play/storage";
 import type { SavedPlay, Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
@@ -18,6 +18,8 @@ interface Props {
   onSave: () => void;
   onDuplicate: () => void;
   onExport: () => void;
+  exportOpen: boolean;
+  exportPanel: ReactNode;
   onLoad: (id: string) => void;
   onShare: () => void;
   onFlip: () => void;
@@ -28,7 +30,7 @@ interface Props {
 
 function PlaySidebarImpl({
   name, notes, notesOpen, vis, plays, onName, onNotes, onToggleNotes, onSave, onDuplicate, onExport, onLoad, onShare,
-  onFlip, onClear, onReset, onVis,
+  exportOpen, exportPanel, onFlip, onClear, onReset, onVis,
 }: Props) {
   const scope: Team | null = vis === "both" ? null : vis;
   return (
@@ -44,10 +46,11 @@ function PlaySidebarImpl({
       <div className={tileGrid}>
         <IconTile icon="save" label="Save" onClick={onSave} />
         <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
-        <IconTile icon="export" label="Export" title="Save this play as a picture card" onClick={onExport} />
+        <IconTile icon="export" label="Export" title="Save a picture card or video clip" active={exportOpen} onClick={onExport} />
         <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
         <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
       </div>
+      {exportPanel}
       {notesOpen && (
         <textarea
           value={notes}
