@@ -1,4 +1,4 @@
-// Re-encodes the 32 design stickers into small palette PNGs for /public/icons.
+// Re-encodes the design stickers into small palette PNGs for /public/icons.
 // Run once with `bun run icons`; the output is committed.
 import { readdir, mkdir, stat } from "node:fs/promises";
 import path from "node:path";

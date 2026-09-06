@@ -11,7 +11,7 @@ export const INK = {
   flat: "#0e7175",
   blitz: "#b3261e",
   man: "#1d4fbe",
-  route: "#7a5a07",
+  route: "#4a3728",
   primary: "#c2261a",
 } as const;
 
@@ -26,7 +26,6 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   flat:    { label: "Flat",    pts: [[0, 0], [1, -1], [6, -2]],               end: "arrow" },
   cross:   { label: "Cross",   pts: [[0, 0], [0, -4], [-13, -7]],             end: "arrow" },
   wheel:   { label: "Wheel",   pts: [[0, 0], [5, -1], [7, -5], [7, -15]],     end: "arrow" },
-  block:   { label: "Block",   pts: [[0, 0], [0, -2.8]],                      end: "bar" },
   custom:  { label: "Custom",  pts: null,                                     end: "arrow" },
   handoff: { label: "Handoff", pts: [[0, 0], [-3, 1.4], [-3.4, -1], [-2, -5]], end: "arrow", run: true },
   dive:    { label: "Dive",    pts: null, end: "arrow", run: true },

@@ -160,7 +160,7 @@ export function buildMotion(players: readonly Player[], top: number, rand: () =>
 
   const offense = players.filter((p) => p.team === "offense" && p.route && tracks[p.id]);
   const runners = offense.filter((p) => p.route && isRun(p.route.type));
-  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && p.route.type !== "block" && p.id !== qb.id);
+  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && p.id !== qb.id);
   const primary = offense.find((p) => p.route?.primary);
   const primaryRun = primary?.route ? isRun(primary.route.type) : false;
 
