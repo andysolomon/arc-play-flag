@@ -1,4 +1,4 @@
-import { DEF, ROUTES, inkFor, routeDef } from "./routes";
+import { DEF, ROUTES, inkFor, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -75,6 +75,14 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     if (!t) return null;
     const dx = t.x - p.x, dy = t.y - p.y, L = Math.hypot(dx, dy) || 1;
     return [[p.x, p.y], [t.x - (dx / L) * 1.15, t.y - (dy / L) * 1.15]];
+  }
+  if (def.run && !def.pts && p.team === "offense") {
+    // through the mesh point beside the quarterback, or from their own spot on a keeper
+    const qb = quarterback(players);
+    const mesh = qb && qb.id !== p.id ? qb : p;
+    const side = (p.x < mesh.x - 0.01 ? -1 : 1) * (rt.mirror ? -1 : 1);
+    const legs = runLegs(rt.type, mesh.x, mesh.y, side);
+    return [[p.x, p.y], ...legs.map((q) => [Math.max(0.8, Math.min(29.2, q[0])), Math.max(top + 0.6, q[1])] as const)];
   }
   const defPts = def.pts ?? ROUTES.go.pts ?? [];
   // shrink the whole route uniformly so nothing — including a zone bubble — leaves the card

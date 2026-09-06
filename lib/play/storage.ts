@@ -27,6 +27,7 @@ const num = (v: unknown, fallback: number): number => (typeof v === "number" && 
 
 const ROUTE_TYPES = new Set<string>([
   "go", "out", "in", "slant", "corner", "post", "curl", "flat", "cross", "wheel", "block", "handoff",
+  "dive", "stretch", "counter", "reverse", "delay",
   "custom", "man", "zoneDeep", "zoneFlat", "curlFlat", "midRead", "blitz", "spy",
 ]);
 

@@ -11,7 +11,8 @@ export type Pair = readonly [number, number];
 
 export type OffenseRouteType =
   | "go" | "out" | "in" | "slant" | "corner" | "post" | "curl" | "flat"
-  | "cross" | "wheel" | "block" | "handoff" | "custom";
+  | "cross" | "wheel" | "block" | "custom"
+  | "handoff" | "dive" | "stretch" | "counter" | "reverse" | "delay";
 export type DefenseRouteType =
   | "man" | "zoneDeep" | "zoneFlat" | "curlFlat" | "midRead" | "blitz" | "spy" | "custom";
 export type RouteType = OffenseRouteType | DefenseRouteType;
@@ -44,6 +45,8 @@ export interface RouteDef {
   end: RouteEnd;
   dash?: string;
   free?: boolean;
+  /** the ball carrier's path on a run: laid out through the mesh point beside the QB */
+  run?: boolean;
 }
 
 /** Measured size of the centre pane, minus its padding. */
