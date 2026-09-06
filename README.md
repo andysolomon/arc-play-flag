@@ -1,6 +1,6 @@
 # Flag Football Play Designer
 
-A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give it a route (offense) or a coverage (defense), save plays, export a PNG, and press ▶ to watch the play run.
+A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give it a route or a run (offense) or a coverage (defense), save plays, export a PNG, and press ▶ to watch the play run: the centre snaps, the QB hands off or throws, and the primary read gets the ball most of the time.
 
 The design system and functional prototype live in [`design/`](design/readme.md); the app is a faithful port of `design/Flag Football Play Designer.dc.html`.
 

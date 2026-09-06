@@ -43,16 +43,17 @@ interface BallProps {
   lift: number;
 }
 
-/** A little hand-drawn football that rides with whoever has it. */
+/** The football sticker rides with whoever has it, and grows as a throw comes up towards you. */
 function FootballImpl({ x, y, lift }: BallProps) {
-  const k = 1 + lift * 0.55;
+  const k = 1 + lift * 0.6;
   return (
-    <g transform={`translate(${x.toFixed(1)},${(y - lift * 14).toFixed(1)}) scale(${k.toFixed(2)}) rotate(-30)`} className="pointer-events-none" data-export="skip">
-      <ellipse rx={11} ry={7} fill="#a15d2c" stroke="#1b1a17" strokeWidth={2} />
-      <line x1={-4} y1={0} x2={4} y2={0} stroke="#fffdf6" strokeWidth={1.6} strokeLinecap="round" />
-      <line x1={-2} y1={-2} x2={-2} y2={2} stroke="#fffdf6" strokeWidth={1.4} strokeLinecap="round" />
-      <line x1={2} y1={-2} x2={2} y2={2} stroke="#fffdf6" strokeWidth={1.4} strokeLinecap="round" />
-    </g>
+    <image
+      href="/icons/football.png"
+      x={-16} y={-16} width={32} height={32}
+      transform={`translate(${x.toFixed(1)},${(y - lift * 16).toFixed(1)}) scale(${k.toFixed(2)})`}
+      className="pointer-events-none"
+      data-export="skip"
+    />
   );
 }
 
