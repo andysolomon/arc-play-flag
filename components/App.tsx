@@ -122,6 +122,10 @@ export function App() {
     if (!s.id) dispatch({ type: "saved", id: rec.id });
     say("Saved");
   }, [say, s.id, s.name, s.notes, s.players]);
+  const onNew = useCallback(() => {
+    dispatch({ type: "newPlay" });
+    say("New play · undo brings the last one back", 2400);
+  }, [say]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
     const rec = savePlay({ id: null, name: n, notes: s.notes, players: [...s.players] });
@@ -172,6 +176,7 @@ export function App() {
             onName={(name) => { dispatch({ type: "setName", name }); }}
             onNotes={(notes) => { dispatch({ type: "setNotes", notes }); }}
             onToggleNotes={() => { setNotesOpen((o) => !o); }}
+            onNew={onNew}
             onSave={onSave}
             onDuplicate={onDuplicate}
             onExport={() => { setExportOpen((open) => !open); }}

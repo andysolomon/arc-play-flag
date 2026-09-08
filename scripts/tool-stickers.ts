@@ -1,4 +1,4 @@
-// Draws the notes and playbook tool stickers in the style of the design's icons, into
+// Draws the new, notes and playbook tool stickers in the style of the design's icons, into
 // design/assets/icons. Then run `bun run icons`.
 // Run with `node scripts/tool-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
 import path from "node:path";
@@ -12,6 +12,15 @@ const line = (x1: number, y1: number, x2: number, y2: number, w = 26): string =>
   `<line x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}" stroke="${INK}" stroke-width="${String(w)}" stroke-linecap="round"/>`;
 
 const stickers: Record<string, string> = {
+  // a fresh sheet, corner turned up, with a bold yellow plus
+  new: svg(
+    `<g transform="rotate(4 256 256)">` +
+    `<path d="M112 72 H352 L400 120 V440 H112 Z" fill="${CREAM}" stroke="${INK}" stroke-width="26" stroke-linejoin="round"/>` +
+    `<path d="M352 72 V120 H400 Z" fill="${YELLOW}" stroke="${INK}" stroke-width="26" stroke-linejoin="round"/>` +
+    `<path d="M256 170 V346 M168 258 H344" stroke="${YELLOW}" stroke-width="72" stroke-linecap="round"/>` +
+    `<path d="M256 170 V346 M168 258 H344" stroke="${INK}" stroke-width="30" stroke-linecap="round"/>` +
+    `</g>`,
+  ),
   // a yellow sticky note, corner turned up, three lines of marker
   notes: svg(
     `<g transform="rotate(-6 256 256)">` +

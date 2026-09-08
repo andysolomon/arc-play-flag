@@ -112,6 +112,17 @@ describe("reducer", () => {
     for (let i = 0; i < 70; i++) s = reducer(s, { type: "move", id: "o3", x: 2 + (i % 20), y: 1, commit: true });
     expect(s.past).toHaveLength(60);
   });
+  test("newPlay starts a fresh unsaved play and undo brings the old one back", () => {
+    let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() }, { type: "select", id: "o3" }, { type: "pick", key: "go" });
+    s = reducer(s, { type: "newPlay" });
+    expect(s.id).toBeNull();
+    expect(s.name).toBe("New play");
+    expect(s.notes).toBe("");
+    expect(s.selectedId).toBeNull();
+    expect(find(s, "o3")?.route).toBeNull();
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "go" });
+  });
   test("load pushes history and renames; hydrate does not", () => {
     const players = defaults().map((p) => ({ ...p, x: 15 }));
     let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players });
