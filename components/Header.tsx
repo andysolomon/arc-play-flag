@@ -25,12 +25,13 @@ function HeaderImpl({ leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleL
         type="button"
         onClick={onToggleLeft}
         title="Play tools"
+        aria-label="Play tools"
         aria-expanded={leftOpen}
         aria-controls="play-sidebar"
         data-active={leftOpen}
         className={`${pillSm} data-[active=true]:bg-yellow`}
       >
-        {leftOpen ? "‹" : "›"} Play
+        {leftOpen ? "‹" : "›"}<span className="max-[479px]:hidden"> Play</span>
       </button>
       <h1 className="whitespace-nowrap text-caption font-normal text-ink-muted max-[479px]:hidden">5v5 flag</h1>
       <span className="flex-1" />
@@ -57,12 +58,13 @@ function HeaderImpl({ leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleL
         type="button"
         onClick={onToggleRight}
         title="Route palette"
+        aria-label="Route palette"
         aria-expanded={rightOpen}
         aria-controls="route-sidebar"
         data-active={rightOpen}
         className={`${pillSm} data-[active=true]:bg-yellow`}
       >
-        Routes {rightOpen ? "›" : "‹"}
+        <span className="max-[479px]:hidden">Routes </span>{rightOpen ? "›" : "‹"}
       </button>
     </header>
   );
