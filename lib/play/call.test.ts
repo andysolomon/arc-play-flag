@@ -17,6 +17,12 @@ describe("callOf", () => {
     expect(callOf(withRoutes({ o3: { type: "go" }, o5: { type: "dive" } }))).toBe("play-action");
     expect(callOf(withRoutes({ o3: { type: "go" }, o5: { type: "dive", primary: true } }))).toBe("run");
   });
+  test("a pitch beside receivers is an option unless the runner is the read", () => {
+    expect(callOf(withRoutes({ o3: { type: "go" }, o5: { type: "pitch" } }))).toBe("option");
+    expect(callOf(withRoutes({ o3: { type: "go", primary: true }, o5: { type: "pitch" } }))).toBe("option");
+    expect(callOf(withRoutes({ o3: { type: "go" }, o5: { type: "pitch", primary: true } }))).toBe("run");
+    expect(callOf(withRoutes({ o5: { type: "pitch" } }))).toBe("run");
+  });
   test("a runner with nobody to throw to is a run", () => {
     expect(callOf(withRoutes({ o5: { type: "stretch" } }))).toBe("run");
   });

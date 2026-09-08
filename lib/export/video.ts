@@ -10,7 +10,7 @@ const FPS = 24;
 const VIDEO_W = CARD_W * 2 / 3;
 const VIDEO_H = CARD_H * 2 / 3;
 
-/** 0.5 chooses play-action for an unmarked mixed call and always selects a primary pass. */
+/** 0.5 chooses play-action (or the throw on an option) for an unmarked mixed call and always selects a primary pass. */
 export function clipMotion(o: CardOptions): Motion {
   const call = callOf(o.players);
   const m = buildMotion(o.players, cardField(o.players).top, () => call === "run" ? 0 : 0.5);
