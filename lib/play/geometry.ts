@@ -23,12 +23,15 @@ export function snap(v: number, mode: SnapMode = "half"): number {
   return mode === "one" ? Math.round(v) : Math.round(v * 2) / 2;
 }
 
-/** The line of scrimmage is a hard boundary: offense stays at/below it, defense at/above. */
-export function clamp(x: number, y: number, team: Team | null, top: number): Pt {
+/**
+ * The line of scrimmage is a hard boundary: offense stays at/below it, defense at/above.
+ * `gap` is how close to it the player may sit (see losGap): a blitzer keeps 7 yards back.
+ */
+export function clamp(x: number, y: number, team: Team | null, top: number, gap = 0.9): Pt {
   const lo = top + 1.2;
   let y2 = Math.max(lo, Math.min(7.4, y));
-  if (team === "offense") y2 = Math.max(0.9, y2);
-  else if (team === "defense") y2 = Math.min(-0.9, y2);
+  if (team === "offense") y2 = Math.max(gap, y2);
+  else if (team === "defense") y2 = Math.min(-gap, y2);
   return { x: Math.max(1.2, Math.min(28.8, x)), y: y2 };
 }
 

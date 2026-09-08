@@ -1,5 +1,5 @@
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type History } from "./history";
-import { defaults, mirrorable, routeDef } from "./routes";
+import { defaults, legalSpot, mirrorable, routeDef } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, Team, Vis } from "./types";
 
 export interface PlayState extends History {
@@ -70,9 +70,10 @@ function commit(s: PlayState): PlayState {
   return { ...s, ...push(s, s.players) };
 }
 
+/** Sets a route, and backs a new blitzer off to the blitz line if they were lined up closer. */
 function setRoute(s: PlayState, id: string, route: Route | null): PlayState {
   const c = commit(s);
-  return { ...c, players: patch(c.players, id, { route }) };
+  return { ...c, players: c.players.map((p) => (p.id === id ? legalSpot({ ...p, route }) : p)) };
 }
 
 const cleared = { selectedId: null, targeting: false, draft: null } as const;
@@ -168,22 +169,20 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "resetFormation": {
       const d = defaults();
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
-      // nothing to do if every player in scope already sits at its default spot
+      // the default spot, except that a blitzer stays back on the blitz line
+      const home = (p: Player): Player => {
+        const base = d.find((q) => q.id === p.id);
+        return base ? legalSpot({ ...p, x: base.x, y: base.y }) : p;
+      };
+      // nothing to do if every player in scope already sits at its home spot
       const moved = s.players.some((p) => {
         if (!inScope(p)) return false;
-        const base = d.find((q) => q.id === p.id);
-        return base !== undefined && (base.x !== p.x || base.y !== p.y);
+        const h = home(p);
+        return h.x !== p.x || h.y !== p.y;
       });
       if (!moved) return s;
       const c = commit(s);
-      return {
-        ...c,
-        players: c.players.map((p) => {
-          if (!inScope(p)) return p;
-          const base = d.find((q) => q.id === p.id);
-          return base ? { ...p, x: base.x, y: base.y } : p;
-        }),
-      };
+      return { ...c, players: c.players.map((p) => (inScope(p) ? home(p) : p)) };
     }
     case "undo": {
       const step = undoStep(s, s.players);
