@@ -5,7 +5,6 @@ import { memo } from "react";
 import { pillMd, pillSm } from "./ui";
 
 interface Props {
-  name: string;
   leftOpen: boolean;
   rightOpen: boolean;
   canUndo: boolean;
@@ -19,7 +18,7 @@ interface Props {
   onClear: () => void;
 }
 
-function HeaderImpl({ name, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
+function HeaderImpl({ leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
       <button
@@ -33,9 +32,7 @@ function HeaderImpl({ name, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
       >
         {leftOpen ? "‹" : "›"} Play
       </button>
-      <Image src="/icons/football.png" alt="" width={26} height={26} sizes="26px" className="block flex-none" priority />
-      <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
-      <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">5v5 flag</span>
+      <h1 className="whitespace-nowrap text-caption font-normal text-ink-muted max-[479px]:hidden">5v5 flag</h1>
       <span className="flex-1" />
       <div className="flex gap-1.5">
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={pillMd}>
@@ -53,7 +50,7 @@ function HeaderImpl({ name, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           className={`${pillMd} flex shrink-0 items-center gap-1`}
         >
           <Image src="/icons/clear.png" alt="" width={18} height={18} sizes="18px" className={`block shrink-0 ${canClear ? "" : "opacity-40"}`} />
-          <span className="max-[479px]:hidden">Clear</span>
+          Clear
         </button>
       </div>
       <button

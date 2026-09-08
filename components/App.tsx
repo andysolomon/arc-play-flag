@@ -146,7 +146,6 @@ export function App() {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
-        name={s.name}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         canUndo={s.past.length > 0}
