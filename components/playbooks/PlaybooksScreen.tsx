@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import type { Vis } from "@/lib/play/types";
 import { Hint } from "../Hint";
 import { pillSm } from "../ui";
 import { BookEditor } from "./BookEditor";
@@ -18,6 +19,8 @@ export function PlaybooksScreen() {
   const bookId = useSearchParams().get("book");
   // the page is prerendered without a query string, so which screen shows is decided after mount
   const mounted = useSyncExternalStore(noSubscribe, () => true, () => false);
+  // which team the thumbnails draw; shared by both screens so it survives opening a book
+  const [show, setShow] = useState<Vis>("both");
   const [toast, setToast] = useState<string | null>(null);
   const timer = useRef(0);
   const say = useCallback<Say>((text, ms = 1800) => {
@@ -36,7 +39,7 @@ export function PlaybooksScreen() {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[920px] flex-col gap-3 px-3 py-4">
-          {mounted && (bookId ? <BookEditor id={bookId} say={say} /> : <Home say={say} />)}
+          {mounted && (bookId ? <BookEditor id={bookId} say={say} show={show} onShow={setShow} /> : <Home say={say} show={show} onShow={setShow} />)}
         </div>
       </div>
       <Hint text={toast} />

@@ -7,13 +7,15 @@ import { numbered } from "@/lib/export/numbered";
 import {
   deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, subscribe, updatePlaybook,
 } from "@/lib/play/library";
+import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
 import { card, divider, eyebrow, input, pill, pillSm } from "../ui";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
+import { ShowToggle } from "./ShowToggle";
 import { TwoStep } from "./TwoStep";
 
-export function BookEditor({ id, say }: { id: string; say: Say }) {
+export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; show: Vis; onShow: (v: Vis) => void }) {
   const router = useRouter();
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
@@ -65,7 +67,11 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
       <span className="text-caption leading-note text-ink-muted">Plays are numbered by their order here. Deleting a playbook keeps the plays.</span>
 
       <span className={divider} />
-      <span className={eyebrow}>PLAYS IN THIS PLAYBOOK</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={eyebrow}>PLAYS IN THIS PLAYBOOK</span>
+        <span className="flex-1" />
+        {plays.length > 0 && <ShowToggle value={show} onChange={onShow} />}
+      </div>
       {items.length === 0 ? (
         <div className="rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base leading-body text-ink-muted">
           Empty. Add plays from the list below.
@@ -77,7 +83,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
               <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow text-base" aria-label={`Play ${String(it.n)}`}>
                 {it.n}
               </span>
-              <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} /></div>
+              <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} show={show} /></div>
               <span className="min-w-0 flex-1 truncate text-base" title={it.play.name}>{it.play.name}</span>
               <div className="flex flex-none flex-col gap-1">
                 <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} px-2 py-0 text-small`}>↑</button>
@@ -105,7 +111,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
               title={`Add ${p.name}`}
               className={`${card} flex cursor-pointer flex-col gap-2 text-left transition-transform duration-[120ms] hover:-translate-y-0.5 hover:bg-yellow-soft motion-reduce:transition-none`}
             >
-              <PlayThumb players={p.players} name={p.name} />
+              <PlayThumb players={p.players} name={p.name} show={show} />
               <span className="truncate text-base">{p.name}</span>
               <span className="text-caption text-ink-muted">+ Add</span>
             </button>

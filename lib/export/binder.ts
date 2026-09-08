@@ -1,5 +1,5 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
-import type { Player, TeamSettings } from "@/lib/play/types";
+import type { Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth } from "@/lib/render/play-svg";
 import type { Numbered } from "./numbered";
 import { IN, MUTED, PAPERS, appMark, badge, cutLine, field, page, pill, text, type PaperKey, type SvgPage } from "./pages";
@@ -16,8 +16,8 @@ export interface BinderOptions {
 }
 
 /** The largest field that fits a box without letterboxing, given how deep the play needs to be. */
-export function fitField(players: readonly Player[], w: number, h: number, showDefense = true): { w: number; h: number } {
-  const ratio = (artDepth(players, { pw: w, ph: h }, showDefense) * 22) / 660;
+export function fitField(players: readonly Player[], w: number, h: number, show: Vis = "both"): { w: number; h: number } {
+  const ratio = (artDepth(players, { pw: w, ph: h }, show) * 22) / 660;
   const fh = Math.min(h, w * ratio);
   return { w: fh / ratio, h: fh };
 }
