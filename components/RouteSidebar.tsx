@@ -59,7 +59,8 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
                 renaming.current = sel.id;
                 onRename(sel.id, e.target.value, commit);
               }}
-              className="h-[42px] w-[42px] flex-none rounded-full border-[2.5px] border-ink p-0 text-center text-small text-ink placeholder:text-ink/60"
+              // 16px is the smallest text a phone browser will focus without zooming the page
+              className="h-[42px] w-[42px] flex-none rounded-full border-[2.5px] border-ink p-0 text-center text-base text-ink placeholder:text-ink/60"
               style={{ background: teamFill(sel.team) }}
             />
             <h2 className="flex-1 text-title font-normal leading-tight">
