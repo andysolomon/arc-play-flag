@@ -1,5 +1,5 @@
 import { quarterback, routeYards } from "./geometry";
-import { isRun } from "./routes";
+import { isPitch, isRun } from "./routes";
 import type { Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
 
@@ -15,6 +15,8 @@ export const DELAY = 0.8;
 export const PRIMARY_ODDS = 0.8;
 /** A play-action fake takes this long to sell. */
 const FAKE = 0.25;
+/** How long a pitch runner takes to set their feet before throwing. */
+const SET_UP = 0.2;
 
 interface Track {
   pts: Pt[];
@@ -45,6 +47,8 @@ export interface Motion {
   /** when the runner meets the quarterback, and how long the exchange takes */
   handAt: number;
   handFor: number;
+  /** pass: who throws it — the quarterback, or the runner after a pitch */
+  passer: string | null;
   /** pass: who the ball is thrown to */
   receiver: string | null;
   throwAt: number;
@@ -113,6 +117,7 @@ const pickOne = <T>(list: readonly T[], rand: () => number): T | undefined =>
  * The centre snaps to the quarterback; a run route makes it a run (the ball is handed
  * or tossed at the mesh point), otherwise it's a pass to one of the receivers — the
  * primary read most of the time — with a play-action fake when a runner is in the mix.
+ * A pitch runner who doesn't keep it stops at their set point and throws from there.
  * `rand` decides the coin flips, so tests can pin them.
  */
 export function buildMotion(players: readonly Player[], top: number, rand: () => number = Math.random): Motion {
@@ -154,7 +159,7 @@ export function buildMotion(players: readonly Player[], top: number, rand: () =>
     snapAt: cl(snapGap / 10, 0.12, 0.45),
     shotgun: snapGap > 2,
     runner: null, handAt: Infinity, handFor: 0,
-    receiver: null, throwAt: Infinity, catchAt: Infinity,
+    passer: qb?.id ?? null, receiver: null, throwAt: Infinity, catchAt: Infinity,
   };
   if (!qb) return m;
 
@@ -186,6 +191,16 @@ export function buildMotion(players: readonly Player[], top: number, rand: () =>
   }
   if (receivers.length === 0) return m;
 
+  // a pitch runner who isn't keeping it pulls up at the set point and becomes the passer
+  let setAt = 0;
+  const pitchTrack = runner && runner.route && isPitch(runner.route.type) ? tracks[runner.id] : undefined;
+  if (runner && pitchTrack && pitchTrack.pts.length > 2) {
+    const set = track(pitchTrack.pts.slice(0, -1).map((q) => [q.x, q.y] as const), pitchTrack.wait);
+    tracks[runner.id] = set;
+    m.passer = runner.id;
+    setAt = set.wait + set.len / SPEED + SET_UP;
+  }
+
   // the throw: the primary read most of the time, otherwise anyone who's out in a route
   m.kind = "pass";
   const others = receivers.filter((p) => p.id !== primary?.id);
@@ -195,10 +210,11 @@ export function buildMotion(players: readonly Player[], top: number, rand: () =>
   m.receiver = receiver.id;
   const rt = tracks[receiver.id];
   const arrive = rt ? rt.wait + rt.len / SPEED : 0;
-  m.throwAt = Math.max(m.snapAt + 0.15, Math.min(arrive * 0.7, run), runner ? m.handAt + FAKE + 0.1 : 0);
+  m.throwAt = Math.max(m.snapAt + 0.15, Math.min(arrive * 0.7, run), runner ? m.handAt + FAKE + 0.1 : 0, setAt);
   // lead the receiver: aim where they'll be when the ball gets there
   const guess = positionsAt(m, players, m.throwAt + 0.6)[receiver.id] ?? receiver;
-  const flight = cl(dist(guess, qb) / 16, 0.35, 1.1);
+  const from = (m.passer ? positionsAt(m, players, m.throwAt)[m.passer] : undefined) ?? qb;
+  const flight = cl(dist(guess, from) / 16, 0.35, 1.1);
   m.catchAt = m.throwAt + flight;
   m.dur = Math.max(run, m.catchAt + 0.5) + HOLD;
   return m;
@@ -231,7 +247,10 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
   return pos;
 }
 
-/** Where the ball is `t` seconds in: snapped, handed or faked, thrown in an arc, then caught. */
+/**
+ * Where the ball is `t` seconds in: snapped, handed or faked, thrown in an arc, then
+ * caught. On a pitch the ball is tossed to the runner first and thrown from their hands.
+ */
 export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | null {
   const qb = m.qb ? pos[m.qb] : undefined;
   const c = m.center ? pos[m.center] : undefined;
@@ -241,20 +260,23 @@ export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | nu
     return { ...lerp(c, qb, k), lift: m.shotgun ? 0.45 * Math.sin(Math.PI * k) : 0 };
   }
   const runner = m.runner ? pos[m.runner] : undefined;
-  if (m.kind === "run" && runner) {
+  const pitched = m.runner !== null && m.passer === m.runner;
+  if (runner && (m.kind === "run" || pitched)) {
     if (t < m.handAt) return { ...qb, lift: 0 };
-    if (t >= m.handAt + m.handFor) return { ...runner, lift: 0 };
-    const k = (t - m.handAt) / m.handFor;
-    return { ...lerp(qb, runner, k), lift: m.handFor > 0.15 ? 0.4 * Math.sin(Math.PI * k) : 0 };
-  }
-  if (runner && Math.abs(t - m.handAt) < FAKE) {
+    if (t < m.handAt + m.handFor) {
+      const k = (t - m.handAt) / m.handFor;
+      return { ...lerp(qb, runner, k), lift: m.handFor > 0.15 ? 0.4 * Math.sin(Math.PI * k) : 0 };
+    }
+    if (m.kind === "run") return { ...runner, lift: 0 };
+  } else if (runner && Math.abs(t - m.handAt) < FAKE) {
     // play-action: the ball dips toward the runner and comes right back
     const k = 1 - Math.abs(t - m.handAt) / FAKE;
     return { ...lerp(qb, runner, 0.6 * k), lift: 0 };
   }
+  const from = (m.passer ? pos[m.passer] : undefined) ?? qb;
   const rcv = m.receiver ? pos[m.receiver] : undefined;
-  if (!rcv || t < m.throwAt) return { ...qb, lift: 0 };
+  if (!rcv || t < m.throwAt) return { ...from, lift: 0 };
   if (t >= m.catchAt) return { ...rcv, lift: 0 };
   const k = (t - m.throwAt) / (m.catchAt - m.throwAt);
-  return { ...lerp(qb, rcv, k), lift: Math.sin(Math.PI * k) };
+  return { ...lerp(from, rcv, k), lift: Math.sin(Math.PI * k) };
 }

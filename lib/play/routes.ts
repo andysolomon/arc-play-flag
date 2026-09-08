@@ -33,15 +33,18 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   counter: { label: "Counter", pts: null, end: "arrow", run: true },
   reverse: { label: "Reverse", pts: null, end: "arrow", run: true },
   delay:   { label: "Delay",   pts: null, end: "arrow", run: true, dash: "7 6" },
+  pitch:   { label: "Pitch",   pts: null, end: "arrow", run: true, pitch: true },
 };
 
 /**
  * Run-route legs after the player's own spot, relative to the mesh point beside the
  * quarterback (qx, qy). `side` is +1 when the runner lines up to the QB's right.
- * Every leg ends 5 yards past the line of scrimmage.
+ * Every leg ends 5 yards past the line of scrimmage. A pitch takes the toss wide of the
+ * quarterback, sets up behind the line (the leg before last) and only then turns upfield.
  */
 export function runLegs(type: RouteType, qx: number, qy: number, side: number): Pair[] {
   switch (type) {
+    case "pitch":   return [[qx + side * 3.5, qy + 1.2], [qx + side * 7, PITCH_SET], [qx + side * 8, -5]];
     case "stretch": return [[qx + side * 1, qy - 0.2], [qx + side * 8, qy - 2.5], [qx + side * 11, -5]];
     case "counter": return [[qx - side * 1.6, qy + 0.2], [qx + side * 3.5, qy - 2.5], [qx + side * 4.5, -5]];
     case "reverse": return [[qx + side * 0.4, qy + 1], [qx - side * 9, qy - 0.5], [qx - side * 12, -5]];
@@ -63,6 +66,14 @@ export const DROUTES: Record<DefenseRouteType, RouteDef> = {
 export const OFFENSE_KEYS = Object.keys(ROUTES) as OffenseRouteType[];
 export const RUN_KEYS = OFFENSE_KEYS.filter((k) => ROUTES[k].run);
 export const PASS_KEYS = OFFENSE_KEYS.filter((k) => !ROUTES[k].run);
+
+/** How far behind the line of scrimmage a pitch runner sets up to throw. */
+export const PITCH_SET = 2.6;
+
+/** True for a route where the runner takes a pitch and can throw from the set point. */
+export function isPitch(type: RouteType): boolean {
+  return ROUTES[type as OffenseRouteType]?.pitch === true;
+}
 
 /** True for a route that carries the ball on the ground. */
 export function isRun(type: RouteType): boolean {

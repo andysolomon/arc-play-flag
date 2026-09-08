@@ -144,6 +144,58 @@ describe("the call", () => {
     const pre = positionsAt(m, ps, m.throwAt - 0.01);
     expect(ballAt(m, pre, m.throwAt - 0.01)).toEqual({ ...at(pre, "o2"), lift: 0 });
   });
+  test("a pitch with nobody to throw to is a toss and a run", () => {
+    const ps = defaults().map(withRoute("o5", { type: "pitch" }));
+    const m = buildMotion(ps, TOP);
+    expect(m.kind).toBe("run");
+    expect(m.runner).toBe("o5");
+    expect(m.passer).toBe("o2");
+    // the toss is in the air
+    const mid = m.handAt + m.handFor / 2;
+    expect(ballAt(m, positionsAt(m, ps, mid), mid)?.lift).toBeGreaterThan(0);
+    const late = positionsAt(m, ps, m.dur);
+    expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o5"), lift: 0 });
+    expect(at(late, "o5").y).toBeCloseTo(-5, 5);
+  });
+  test("a pitch beside a primary receiver: the runner takes the toss, sets up behind the line and throws", () => {
+    const ps = defaults().map(withRoute("o5", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
+    const m = buildMotion(ps, TOP, flips(0.1, 0.1));
+    expect(m.kind).toBe("pass");
+    expect(m.runner).toBe("o5");
+    expect(m.passer).toBe("o5");
+    expect(m.receiver).toBe("o3");
+    // the ball rides with the runner between the toss and the throw
+    const held = m.handAt + m.handFor + 0.05;
+    const pos = positionsAt(m, ps, held);
+    expect(ballAt(m, pos, held)).toEqual({ ...at(pos, "o5"), lift: 0 });
+    // and leaves from their set point, still behind the line
+    const pre = positionsAt(m, ps, m.throwAt);
+    const o5 = at(pre, "o5");
+    expect(o5.y).toBeGreaterThan(0.9);
+    expect(ballAt(m, pre, m.throwAt)).toEqual({ ...o5, lift: 0 });
+    expect(m.throwAt).toBeGreaterThan(m.handAt + m.handFor);
+    const late = positionsAt(m, ps, m.dur);
+    expect(at(late, "o5")).toEqual(o5);
+    expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o3"), lift: 0 });
+  });
+  test("a primary pitch runner keeps it", () => {
+    const ps = defaults().map(withRoute("o5", { type: "pitch", primary: true })).map(withRoute("o3", { type: "go" }));
+    const m = buildMotion(ps, TOP, flips(0.99));
+    expect(m.kind).toBe("run");
+    expect(m.passer).toBe("o2");
+    expect(at(positionsAt(m, ps, m.dur), "o5").y).toBeCloseTo(-5, 5);
+  });
+  test("a quarterback on a pitch route rolls out and throws from the edge", () => {
+    const ps = defaults().map(withRoute("o2", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
+    const m = buildMotion(ps, TOP, flips(0.1, 0.1));
+    expect(m.kind).toBe("pass");
+    expect(m.passer).toBe("o2");
+    expect(m.handAt).toBe(m.snapAt);
+    const pre = positionsAt(m, ps, m.throwAt);
+    expect(at(pre, "o2").x).not.toBe(15);
+    expect(at(pre, "o2").y).toBeGreaterThan(0.9);
+    expect(ballAt(m, pre, m.throwAt)).toEqual({ ...at(pre, "o2"), lift: 0 });
+  });
   test("runner and receivers with nothing marked is a coin flip", () => {
     const ps = defaults().map(withRoute("o5", { type: "counter" })).map(withRoute("o3", { type: "go" }));
     expect(buildMotion(ps, TOP, flips(0.2)).kind).toBe("run");

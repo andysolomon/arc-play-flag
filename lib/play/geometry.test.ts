@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { cardWidth, clamp, depth, fieldLayout, geom, snap, ybv } from "./geometry";
-import { defaults } from "./routes";
+import { cardWidth, clamp, depth, fieldLayout, geom, routeYards, snap, ybv } from "./geometry";
+import { PITCH_SET, defaults } from "./routes";
 import type { Player } from "./types";
 import { zoneLayout } from "./zones";
 
@@ -122,6 +122,14 @@ describe("geom", () => {
     const mirrored = geom(at("o3", { type: "out", mirror: true }), players, TOP, {});
     expect(left?.d).toBe("M66.0 668.1L66.0 649.0L40.0 649.0");
     expect(mirrored?.d).toBe("M66.0 655.0L66.0 572.0L184.4 572.0");
+  });
+  test("a pitch runs wide of the quarterback, sets up behind the line, then turns upfield", () => {
+    const pts = routeYards(at("o5", { type: "pitch" }), players, TOP);
+    expect(pts).toEqual([[19, 5], [18.5, 6.2], [22, PITCH_SET], [23, -5]]);
+    const mirrored = routeYards(at("o5", { type: "pitch", mirror: true }), players, TOP);
+    expect(mirrored).toEqual([[19, 5], [11.5, 6.2], [8, PITCH_SET], [7, -5]]);
+    // a quarterback's pitch route is a rollout from their own spot
+    expect(routeYards(at("o2", { type: "pitch" }), players, TOP)).toEqual([[15, 5], [18.5, 6.2], [22, PITCH_SET], [23, -5]]);
   });
   test("primary read is thicker and red", () => {
     const g = geom(at("o1", { type: "go", primary: true }), players, TOP, {});

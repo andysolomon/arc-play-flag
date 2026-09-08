@@ -37,7 +37,7 @@ Sources
 
 - Icons are **PNG stickers** with transparent backgrounds, 192×192px, shown at 40px in tiles, 26px in the header, 56px in the empty state. They were cut from owner-supplied sheets; there is no icon font, no SVG set, no emoji.
 - Style: thick black outlines, flat red/blue fills, light-blue zone blobs, hand-drawn feel — matching Patrick Hand.
-- Naming mirrors the app's route keys: `go out in slant corner post curl flat cross wheel handoff dive stretch counter reverse delay customOff deselectOff` (offense), `man zoneDeep zoneFlat curlFlat midRead blitz spy customDef deselectDef` (defense), `football save duplicate export flip clear reset offOnly defOnly notes playbook` (tools).
+- Naming mirrors the app's route keys: `go out in slant corner post curl flat cross wheel handoff dive stretch counter reverse delay pitch customOff deselectOff` (offense), `man zoneDeep zoneFlat curlFlat midRead blitz spy customDef deselectDef` (defense), `football save duplicate export flip clear reset offOnly defOnly notes playbook` (tools).
 - Printed output (wristband inserts, binder pages, cards) uses no stickers: number badges are yellow discs, the field is the same SVG as the app, and every route must still read on a mono printer (weight and dash, never hue alone). Cut lines are faint dashes for scissors.
 - Missing glyphs: Undo/Redo, panel toggles and Mirror/Primary use unicode (↶ ↷ ‹ › ⇄ ★ ☆). Ask the owner for stickers if these need to match.
 - Never draw new icons by hand; request a sticker in the same style.

@@ -1,4 +1,4 @@
-// Draws the run-route stickers (dive, stretch, counter, reverse, delay) in the style of
+// Draws the run-route stickers (dive, stretch, counter, reverse, delay, pitch) in the style of
 // the design's route icons, into design/assets/icons. Then run `bun run icons`.
 // Run with `node scripts/run-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
 import path from "node:path";
@@ -40,6 +40,12 @@ const stickers: Record<string, string> = {
   reverse: svg(token(410, 400) + line("M340 420 Q200 470 130 400 Q80 340 100 96") + head(100, 60, 0, -1) + ball(410, 290, -40)),
   // a pause on the spot, then go
   delay: svg(token(256, 400) + line("M256 320 L256 240", "1 62") + line("M256 200 Q252 150 256 96") + head(256, 60, 0, -1) + ball(150, 420)),
+  // the toss comes in from the quarterback's side; the runner sets up wide, then runs or throws
+  pitch: svg(
+    token(370, 400) + line("M60 330 Q170 300 260 370", "1 62") +
+    line("M330 330 Q300 260 250 210") + line("M250 210 L250 96") + head(250, 60, 0, -1) +
+    line("M250 210 L120 140") + head(84, 120, -1, -0.55) + ball(470, 300, -40),
+  ),
 };
 
 const out = path.resolve("design/assets/icons");
