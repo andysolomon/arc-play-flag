@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { initialState, reducer, selected, type Action, type PlayState } from "./reducer";
+import { initialState, reducer, selected, unsaved, type Action, type PlayState } from "./reducer";
 import { defaults } from "./routes";
 
 const run = (...actions: Action[]): PlayState => actions.reduce(reducer, initialState());
@@ -122,6 +122,81 @@ describe("reducer", () => {
     expect(find(s, "o3")?.route).toBeNull();
     s = reducer(s, { type: "undo" });
     expect(find(s, "o3")?.route).toEqual({ type: "go" });
+    // the whole play comes back, not just its diagram: the toast promised as much
+    expect(s.id).toBe("abc");
+    expect(s.name).toBe("Bunch");
+    expect(s.notes).toBe("hi");
+    s = reducer(s, { type: "redo" });
+    expect(s.id).toBeNull();
+    expect(s.name).toBe("New play");
+    expect(find(s, "o3")?.route).toBeNull();
+  });
+  test("A → B → undo leaves A's diagram under A's identity, so Save can't overwrite B", () => {
+    const aPlayers = defaults().map((p) => (p.id === "o3" ? { ...p, route: { type: "go" as const } } : p));
+    const bPlayers = defaults().map((p) => (p.id === "o4" ? { ...p, route: { type: "post" as const } } : p));
+    let s = run(
+      { type: "load", id: "play-a", name: "Play A", notes: "A notes", players: aPlayers },
+      { type: "load", id: "play-b", name: "Play B", notes: "B notes", players: bPlayers },
+    );
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "go" });
+    expect(find(s, "o4")?.route).toBeNull();
+    expect(s.id).toBe("play-a");
+    expect(s.name).toBe("Play A");
+    expect(s.notes).toBe("A notes");
+    // redo is the mirror image
+    s = reducer(s, { type: "redo" });
+    expect(find(s, "o4")?.route).toEqual({ type: "post" });
+    expect(s.id).toBe("play-b");
+    expect(s.name).toBe("Play B");
+    expect(s.notes).toBe("B notes");
+    // and undoing past both loads lands on the blank new play
+    s = reducer(reducer(s, { type: "undo" }), { type: "undo" });
+    expect(s.id).toBeNull();
+    expect(s.name).toBe("New play");
+    expect(s.players).toEqual(defaults());
+  });
+  test("edits made in B stay in B after undoing back through the switch", () => {
+    let s = run(
+      { type: "load", id: "play-a", name: "Play A", notes: "", players: defaults() },
+      { type: "load", id: "play-b", name: "Play B", notes: "", players: defaults() },
+      { type: "setName", name: "Play B v2" },
+      { type: "setNotes", notes: "B notes" },
+      { type: "setRoute", id: "o4", route: { type: "post" } },
+    );
+    // undoing the route edit keeps B's identity and everything typed into it
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o4")?.route).toBeNull();
+    expect(s.id).toBe("play-b");
+    expect(s.name).toBe("Play B v2");
+    expect(s.notes).toBe("B notes");
+    // the next undo crosses the switch and restores A whole
+    s = reducer(s, { type: "undo" });
+    expect(s.id).toBe("play-a");
+    expect(s.name).toBe("Play A");
+    // redo brings back B as it was when we left: edited name and notes included
+    s = reducer(s, { type: "redo" });
+    expect(s.id).toBe("play-b");
+    expect(s.name).toBe("Play B v2");
+    expect(s.notes).toBe("B notes");
+  });
+  test("undoing a move keeps a name typed after the move", () => {
+    let s = run({ type: "move", id: "o3", x: 9, y: 2, commit: true }, { type: "setName", name: "Sprint" }, { type: "setNotes", notes: "go" });
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o3")?.x).toBe(3);
+    expect(s.name).toBe("Sprint");
+    expect(s.notes).toBe("go");
+  });
+  test("unsaved knows when a play has work its record doesn't", () => {
+    const saved = { id: "abc", name: "Bunch", notes: "hi", players: defaults() };
+    let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() });
+    expect(unsaved(s, saved)).toBe(false);
+    expect(unsaved(reducer(s, { type: "setNotes", notes: "changed" }), saved)).toBe(true);
+    expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2, commit: true }), saved)).toBe(true);
+    s = initialState();
+    expect(unsaved(s, null)).toBe(false);
+    expect(unsaved(reducer(s, { type: "setName", name: "Mine" }), null)).toBe(true);
+    expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2, commit: true }), null)).toBe(true);
   });
   test("load pushes history and renames; hydrate does not", () => {
     const players = defaults().map((p) => ({ ...p, x: 15 }));

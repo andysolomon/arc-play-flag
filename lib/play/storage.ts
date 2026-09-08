@@ -22,6 +22,29 @@ export interface StorageLike {
   setItem(key: string, value: string): void;
 }
 
+export type StorageFailure = "unavailable" | "quota" | "write";
+
+/** A write that did not land. Nothing is reported saved until the record reads back. */
+export class StorageError extends Error {
+  readonly reason: StorageFailure;
+  readonly key: string;
+  constructor(reason: StorageFailure, key: string, cause?: unknown) {
+    super(`storage ${reason}: ${key}`, cause === undefined ? undefined : { cause });
+    this.name = "StorageError";
+    this.reason = reason;
+    this.key = key;
+  }
+}
+
+/** One line a coach can act on. */
+export function failureMessage(e: StorageError): string {
+  switch (e.reason) {
+    case "quota": return "Couldn't save: this browser's storage is full.";
+    case "unavailable": return "Couldn't save: this browser isn't keeping storage (private window?).";
+    case "write": return "Couldn't save: the browser refused the write.";
+  }
+}
+
 export const DEFAULT_TEAM: TeamSettings = { name: "", color: "#f2b705" };
 export const MAX_NOTES = 600;
 
@@ -119,12 +142,28 @@ function parse(storage: StorageLike | null, key: string): unknown {
   }
 }
 
+const isQuota = (e: unknown): boolean =>
+  isRecord(e) && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014);
+
+/**
+ * Writes and reads back, throwing a StorageError when either fails, so no caller can
+ * report a save that isn't there (a full quota, a private window, a storage that drops writes).
+ */
 function write(storage: StorageLike | null, key: string, value: unknown): void {
+  if (!storage) throw new StorageError("unavailable", key);
+  const json = JSON.stringify(value);
   try {
-    storage?.setItem(key, JSON.stringify(value));
-  } catch {
-    /* quota or private mode: the in-memory copy still updates */
+    storage.setItem(key, json);
+  } catch (e) {
+    throw new StorageError(isQuota(e) ? "quota" : "write", key, e);
   }
+  let back: string | null;
+  try {
+    back = storage.getItem(key);
+  } catch (e) {
+    throw new StorageError("write", key, e);
+  }
+  if (back !== json) throw new StorageError("write", key);
 }
 
 /** The prototype's library (name → players) as v2 records. */
@@ -155,7 +194,11 @@ export function readAll(storage: StorageLike | null = browserStorage()): Library
   }
   const migrated = migrateLegacy(storage);
   if (!migrated) return {};
-  write(storage, PLAYS_KEY, migrated);
+  try {
+    write(storage, PLAYS_KEY, migrated);
+  } catch {
+    /* still readable this session; the next successful save writes it through */
+  }
   return migrated;
 }
 
@@ -163,7 +206,7 @@ function writeAll(lib: Library, storage: StorageLike | null): void {
   write(storage, PLAYS_KEY, lib);
 }
 
-/** Upserts one play and returns the whole library. */
+/** Upserts one play and returns the whole library. Throws a StorageError when the write doesn't land. */
 export function store(play: SavedPlay, storage: StorageLike | null = browserStorage()): Library {
   const all = readAll(storage);
   all[play.id] = { ...play, players: [...play.players], notes: cleanNotes(play.notes) };
@@ -171,7 +214,7 @@ export function store(play: SavedPlay, storage: StorageLike | null = browserStor
   return all;
 }
 
-/** Removes a play and every reference to it in a playbook. */
+/** Removes a play and every reference to it in a playbook. Throws a StorageError when a write doesn't land. */
 export function remove(id: string, storage: StorageLike | null = browserStorage()): { plays: Library; playbooks: Playbooks } {
   const plays = readAll(storage);
   if (id in plays) {
@@ -211,6 +254,7 @@ export function readPlaybooks(storage: StorageLike | null = browserStorage()): P
   return out;
 }
 
+/** Throws a StorageError when the write doesn't land. */
 export function writePlaybooks(books: Playbooks, storage: StorageLike | null = browserStorage()): void {
   write(storage, PLAYBOOKS_KEY, books);
 }
@@ -245,6 +289,7 @@ export function hasTeam(storage: StorageLike | null = browserStorage()): boolean
   return normalizeTeam(parse(storage, TEAM_KEY)) !== null;
 }
 
+/** Throws a StorageError when the write doesn't land. */
 export function writeTeam(team: TeamSettings, storage: StorageLike | null = browserStorage()): void {
   write(storage, TEAM_KEY, normalizeTeam(team) ?? DEFAULT_TEAM);
 }
@@ -262,6 +307,7 @@ export function readDraft(storage: StorageLike | null = browserStorage()): Draft
   };
 }
 
+/** Throws a StorageError when the write doesn't land. */
 export function writeDraft(draft: DraftRecord, storage: StorageLike | null = browserStorage()): void {
   write(storage, DRAFT_KEY, draft);
 }

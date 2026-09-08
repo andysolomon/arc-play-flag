@@ -7,6 +7,7 @@ import {
   applyImport, booksHolding, createPlaybook, deletePlay, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
   getServerTeam, getTeam, setTeam, subscribe,
 } from "@/lib/play/library";
+import { failureMessage } from "@/lib/play/storage";
 import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
 import { card, divider, eyebrow, input, pill } from "../ui";
@@ -24,8 +25,9 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
   const fileRef = useRef<HTMLInputElement>(null);
 
   const onNew = () => {
-    const book = createPlaybook(`Playbook ${String(books.length + 1)}`);
-    router.push(`/playbooks?book=${book.id}`);
+    const r = createPlaybook(`Playbook ${String(books.length + 1)}`);
+    if (!r.ok) { say(failureMessage(r.error), 3200); return; }
+    router.push(`/playbooks?book=${r.value.id}`);
   };
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -36,7 +38,8 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
     const file = decodePlaybookFile(await f.text());
     if (!file) { say("That file isn't a playbook."); return; }
     const plan = planImport(file, getPlays(), getPlaybooks());
-    applyImport(plan, file.team);
+    const r = applyImport(plan, file.team);
+    if (!r.ok) { say(`Import didn't finish · ${failureMessage(r.error)}`, 3200); return; }
     const bits = [
       plan.added ? `${plural(plan.added, "play")} added` : "",
       plan.copied ? `${plural(plan.copied, "play")} copied` : "",
@@ -79,13 +82,13 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
           maxLength={40}
           placeholder="Team name"
           aria-label="Team name"
-          onChange={(e) => { setTeam({ ...team, name: e.target.value }); }}
+          onChange={(e) => { const r = setTeam({ ...team, name: e.target.value }); if (!r.ok) say(failureMessage(r.error), 3200); }}
           className={`${input} max-w-[280px]`}
         />
         <label className={`${pill} flex cursor-pointer items-center gap-2 px-3 py-1 text-small`}>
           <span className="h-5 w-5 rounded-full border-2 border-ink" style={{ background: team.color }} aria-hidden />
           Team colour
-          <input type="color" value={team.color} aria-label="Team colour" onChange={(e) => { setTeam({ ...team, color: e.target.value }); }} className="h-0 w-0 opacity-0" />
+          <input type="color" value={team.color} aria-label="Team colour" onChange={(e) => { const r = setTeam({ ...team, color: e.target.value }); if (!r.ok) say(failureMessage(r.error), 3200); }} className="h-0 w-0 opacity-0" />
         </label>
       </div>
       <span className="text-caption leading-note text-ink-muted">Shown on cards and printed pages. Nothing else changes.</span>
@@ -111,7 +114,7 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
                   <TwoStep
                     label="Delete"
                     confirm={holding ? `Delete? It's in ${plural(holding, "playbook")}` : "Delete?"}
-                    onConfirm={() => { deletePlay(p.id); say(`Deleted “${p.name}”`); }}
+                    onConfirm={() => { const r = deletePlay(p.id); say(r.ok ? `Deleted “${p.name}”` : failureMessage(r.error), r.ok ? undefined : 3200); }}
                   />
                 </div>
               </div>

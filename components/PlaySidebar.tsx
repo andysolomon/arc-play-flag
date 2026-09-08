@@ -21,6 +21,8 @@ interface Props {
   onExport: () => void;
   exportOpen: boolean;
   exportPanel: ReactNode;
+  /** what to do about a save that didn't land, while it hasn't */
+  savePanel: ReactNode;
   onLoad: (id: string) => void;
   onShare: () => void;
   onFlip: () => void;
@@ -31,7 +33,7 @@ interface Props {
 
 function PlaySidebarImpl({
   name, notes, notesOpen, vis, plays, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, onExport, onLoad, onShare,
-  exportOpen, exportPanel, onFlip, onClear, onReset, onVis,
+  exportOpen, exportPanel, savePanel, onFlip, onClear, onReset, onVis,
 }: Props) {
   const scope: Team | null = vis === "both" ? null : vis;
   return (
@@ -53,6 +55,7 @@ function PlaySidebarImpl({
         <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
         <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
       </div>
+      {savePanel}
       {exportPanel}
       {notesOpen && (
         <textarea
