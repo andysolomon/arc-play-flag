@@ -10,13 +10,16 @@ interface Props {
   rightOpen: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  /** something is drawn on the team being shown */
+  canClear: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onClear: () => void;
 }
 
-function HeaderImpl({ name, leftOpen, rightOpen, canUndo, canRedo, onToggleLeft, onToggleRight, onUndo, onRedo }: Props) {
+function HeaderImpl({ name, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
       <button
@@ -40,6 +43,17 @@ function HeaderImpl({ name, leftOpen, rightOpen, canUndo, canRedo, onToggleLeft,
         </button>
         <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={pillMd}>
           <span className="max-[479px]:hidden">Redo </span>↷
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={!canClear}
+          title="Clear routes (undoable)"
+          aria-label="Clear routes"
+          className={`${pillMd} flex shrink-0 items-center gap-1`}
+        >
+          <Image src="/icons/clear.png" alt="" width={18} height={18} sizes="18px" className={`block shrink-0 ${canClear ? "" : "opacity-40"}`} />
+          <span className="max-[479px]:hidden">Clear</span>
         </button>
       </div>
       <button

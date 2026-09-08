@@ -48,7 +48,7 @@ export function initialState(): PlayState {
     selectedId: null,
     targeting: false,
     draft: null,
-    vis: "both",
+    vis: "offense",
     ...emptyHistory,
   };
 }

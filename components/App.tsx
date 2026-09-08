@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { initialState, reducer, selected } from "@/lib/play/reducer";
+import { initialState, reducer, selected, shown } from "@/lib/play/reducer";
+import type { RouteType } from "@/lib/play/types";
 import { getPlays, getServerPlays, playById, savePlay, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { readDraft, writeDraft } from "@/lib/play/storage";
@@ -61,6 +62,14 @@ export function App() {
     dispatch({ type: "select", id });
     openRight(true);
   }, [openRight]);
+  // on a phone the palette covers the field, so it folds away once a route is chosen
+  const onPick = useCallback((key: RouteType) => {
+    dispatch({ type: "pick", key });
+    if (narrowRef.current) setRightOpen(false);
+  }, []);
+  const onClear = useCallback(() => {
+    dispatch({ type: "clearRoutes", team: s.vis === "both" ? null : s.vis });
+  }, [s.vis]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -142,6 +151,8 @@ export function App() {
         rightOpen={rightOpen}
         canUndo={s.past.length > 0}
         canRedo={s.future.length > 0}
+        canClear={s.players.some((p) => p.route && shown(p, s.vis))}
+        onClear={onClear}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
         onUndo={() => { dispatch({ type: "undo" }); }}
@@ -186,7 +197,7 @@ export function App() {
           <RouteSidebar
             selected={sel}
             hint={hint}
-            onPick={(key) => { dispatch({ type: "pick", key }); }}
+            onPick={onPick}
             onDone={() => { dispatch({ type: "select", id: null }); }}
             onPrimary={() => { dispatch({ type: "togglePrimary" }); }}
             onMirror={() => { dispatch({ type: "mirror" }); }}
