@@ -1,6 +1,6 @@
 /* Offline shell for the sideline: cache the pages and their static assets. No dependencies. */
-const VERSION = "ffpd-v2";
-const SHELL = ["/", "/playbooks"];
+const VERSION = "ffpd-v3";
+const SHELL = ["/", "/playbooks", "/demo"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -13,10 +13,12 @@ self.addEventListener("activate", (event) => {
 });
 
 const isStatic = (url) =>
-  url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/_next/image") || url.pathname.startsWith("/icons/");
+  url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/_next/image") ||
+  url.pathname.startsWith("/icons/") || url.pathname.startsWith("/demos/");
 
 /** Which cached shell answers a navigation: the playbooks page for /playbooks, the designer otherwise. */
-const shellFor = (url) => (url.pathname.startsWith("/playbooks") ? "/playbooks" : "/");
+const shellFor = (url) =>
+  url.pathname.startsWith("/playbooks") ? "/playbooks" : url.pathname.startsWith("/demo") ? "/demo" : "/";
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
