@@ -8,6 +8,7 @@ import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } f
 import { ballAt, buildMotion, positionsAt, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { shown } from "@/lib/play/reducer";
+import { losGap } from "@/lib/play/routes";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 import { Football, PlayButton } from "./Playback";
@@ -34,6 +35,8 @@ interface Props {
 interface Drag {
   id: string;
   team: Team;
+  /** how close to the line of scrimmage this player may be dropped (see losGap) */
+  gap: number;
   ox: number;
   oy: number;
   x0: number;
@@ -122,7 +125,7 @@ function FieldImpl({
     const dr = dragRef.current;
     if (!dr?.last) return;
     const y = toYards(dr.last.x, dr.last.y);
-    const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current);
+    const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
     if (Math.abs(c.x - dr.x0) > 0.25 || Math.abs(c.y - dr.y0) > 0.25) dr.moved = true;
     if (dr.moved) setLive({ id: dr.id, x: c.x, y: c.y });
   }, [toYards]);
@@ -134,8 +137,8 @@ function FieldImpl({
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
     if (dr.moved && dr.last) {
       const y = toYards(dr.last.x, dr.last.y);
-      const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current);
-      const s = clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current);
+      const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
+      const s = clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap);
       setLive(null);
       dispatch({ type: "move", id: dr.id, x: s.x, y: s.y, commit: true });
       setBoingId(dr.id);
@@ -174,7 +177,7 @@ function FieldImpl({
     const p = players.find((q) => q.id === id);
     if (!p) return;
     const pt = toYards(e.clientX, e.clientY);
-    dragRef.current = { id, team: p.team, ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null };
+    dragRef.current = { id, team: p.team, gap: losGap(p.route), ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   }, [players, toYards]);
 
@@ -184,7 +187,7 @@ function FieldImpl({
     const step = STEP[e.key];
     if (step && !playRef.current) {
       e.preventDefault();
-      const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current);
+      const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
       dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
       if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {

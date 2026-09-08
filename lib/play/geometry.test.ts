@@ -13,6 +13,10 @@ describe("clamp", () => {
   test("defense cannot cross the LOS", () => {
     expect(clamp(15, 3, "defense", TOP).y).toBe(-0.9);
   });
+  test("a blitzer stays at least 7 yards off the LOS", () => {
+    expect(clamp(15, -3, "defense", TOP, 7).y).toBe(-7);
+    expect(clamp(15, -9, "defense", TOP, 7).y).toBe(-9);
+  });
   test("keeps players inside the sidelines and the card", () => {
     expect(clamp(-4, 40, null, TOP)).toEqual({ x: 1.2, y: 7.4 });
     expect(clamp(40, -99, null, TOP)).toEqual({ x: 28.8, y: TOP + 1.2 });

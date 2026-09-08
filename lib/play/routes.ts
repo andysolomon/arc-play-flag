@@ -1,4 +1,4 @@
-import type { DefenseRouteType, OffenseRouteType, Pair, Player, RouteDef, RouteType, Team } from "./types";
+import type { DefenseRouteType, OffenseRouteType, Pair, Player, Route, RouteDef, RouteType, Team } from "./types";
 
 export const OFF = "#e5675e";
 export const DEF = "#4a8fe0";
@@ -69,6 +69,20 @@ export function isRun(type: RouteType): boolean {
   return ROUTES[type as OffenseRouteType]?.run === true;
 }
 export const DEFENSE_KEYS = Object.keys(DROUTES) as DefenseRouteType[];
+
+/** A blitzer must line up at least this many yards off the line of scrimmage. */
+export const BLITZ_DEPTH = 7;
+
+/** The closest a player may sit to the line of scrimmage, in yards, given their route. */
+export function losGap(route: Route | null | undefined): number {
+  return route?.type === "blitz" ? BLITZ_DEPTH : 0.9;
+}
+
+/** The player's spot, pushed back to the blitz line when a blitz would start too close to it. */
+export function legalSpot(p: Player): Player {
+  if (p.team !== "defense" || p.route?.type !== "blitz" || p.y <= -BLITZ_DEPTH) return p;
+  return { ...p, y: -BLITZ_DEPTH };
+}
 
 export function tableFor(team: Team): Record<string, RouteDef> {
   return team === "offense" ? ROUTES : DROUTES;

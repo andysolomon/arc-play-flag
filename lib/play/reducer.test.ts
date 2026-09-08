@@ -14,6 +14,24 @@ describe("reducer", () => {
     expect(find(s, "o3")?.route).toBeNull();
     expect(s.past).toHaveLength(2);
   });
+  test("a blitz backs a shallow defender off to 7 yards, and leaves a deeper one alone", () => {
+    let s = run({ type: "select", id: "d2" }, { type: "pick", key: "blitz" });
+    expect(find(s, "d2")?.route).toEqual({ type: "blitz" });
+    expect(find(s, "d2")?.y).toBe(-7);
+    expect(s.past).toHaveLength(1);
+    s = run({ type: "select", id: "d5" }, { type: "pick", key: "blitz" });
+    expect(find(s, "d5")?.y).toBe(-11);
+    s = run({ type: "setRoute", id: "d1", route: { type: "blitz" } });
+    expect(find(s, "d1")?.y).toBe(-7);
+  });
+  test("reset formation keeps a blitzer on the blitz line", () => {
+    let s = run({ type: "select", id: "d2" }, { type: "pick", key: "blitz" }, { type: "move", id: "d2", x: 11, y: -9, commit: true });
+    s = reducer(s, { type: "resetFormation", team: "defense" });
+    expect(find(s, "d2")?.y).toBe(-7);
+    expect(find(s, "d1")?.y).toBe(-5);
+    // already home: nothing to commit
+    expect(reducer(s, { type: "resetFormation", team: "defense" })).toBe(s);
+  });
   test("man enters targeting and the next red player becomes the target", () => {
     let s = run({ type: "select", id: "d1" }, { type: "pick", key: "man" });
     expect(s.targeting).toBe(true);
@@ -65,7 +83,7 @@ describe("reducer", () => {
     expect(find(s, "d5")?.x).toBe(15);
   });
   test("clear and reset are scoped and skip no-ops", () => {
-    let s = run({ type: "setRoute", id: "o3", route: { type: "go" } }, { type: "setRoute", id: "d1", route: { type: "blitz" } });
+    let s = run({ type: "setRoute", id: "o3", route: { type: "go" } }, { type: "setRoute", id: "d1", route: { type: "spy" } });
     s = reducer(s, { type: "clearRoutes", team: "defense" });
     expect(find(s, "o3")?.route).toEqual({ type: "go" });
     expect(find(s, "d1")?.route).toBeNull();
