@@ -51,6 +51,7 @@ function PlaySidebarImpl({
         <IconTile icon="export" label="Export" title="Save a picture card or video clip" active={exportOpen} onClick={onExport} />
         <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
         <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
+        <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
       </div>
       {exportPanel}
       {notesOpen && (
