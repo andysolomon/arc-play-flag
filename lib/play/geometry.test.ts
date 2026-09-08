@@ -76,7 +76,7 @@ describe("fieldLayout", () => {
     expect(f.bands).toHaveLength(1);
     expect(f.endZone).toBeNull();
     expect(f.lines.map((l) => l.y)).toEqual([462, 352, 242, 132, 22]);
-    expect(f.texts.map((t) => t.t)).toEqual(["LOS", "5", "10", "15"]);
+    expect(f.texts.map((t) => t.t)).toEqual(["LOS", "10", "15", "20"]);
     // the clipped band is only 1 yard tall, too short for its label
     expect(fieldLayout(30).texts.map((t) => t.t)).toContain("NO-RUN");
   });

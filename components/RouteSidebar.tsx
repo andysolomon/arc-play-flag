@@ -46,16 +46,7 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
       {sel && (
         <>
           <div className="flex flex-none items-center gap-[10px]">
-            <span
-              aria-hidden
-              className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full border-[2.5px] border-ink text-small"
-              style={{ background: teamFill(sel.team) }}
-            >
-              {sel.label}
-            </span>
-            <h2 className="flex-1 text-title font-normal leading-tight">
-              {sel.team === "offense" ? "Pick a route" : "Pick a coverage"}
-            </h2>
+            {/* the coloured token is the tag field: tap it to rename the player */}
             <input
               value={sel.label}
               maxLength={3}
@@ -68,8 +59,12 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
                 renaming.current = sel.id;
                 onRename(sel.id, e.target.value, commit);
               }}
-              className="w-[58px] flex-none rounded-pill border-2 border-ink bg-white px-2 py-1 text-center text-small text-ink"
+              className="h-[42px] w-[42px] flex-none rounded-full border-[2.5px] border-ink p-0 text-center text-small text-ink placeholder:text-ink/60"
+              style={{ background: teamFill(sel.team) }}
             />
+            <h2 className="flex-1 text-title font-normal leading-tight">
+              {sel.team === "offense" ? "Pick a route" : "Pick a coverage"}
+            </h2>
           </div>
           <div className={tileGrid} role="group" aria-label={sel.team === "offense" ? "Routes" : "Coverages"}>
             {keys.map((k) => (

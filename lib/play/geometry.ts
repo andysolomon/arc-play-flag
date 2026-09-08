@@ -6,6 +6,8 @@ import type { ZoneMap } from "./zones";
 export const S = 22;
 export const VW = 660;
 export const FIELD_YARDS = 30;
+/** The yard line the line of scrimmage sits on: every drive starts on the 5. */
+export const LOS_YARD = 5;
 
 export function px(x: number): number {
   return x * S;
@@ -236,9 +238,10 @@ export function fieldLayout(depthYards: number, showYardNumbers = true): FieldLa
   }
   const texts: FieldText[] = [];
   if (showYardNumbers) {
+    // the drive starts on the 5-yard line, so the LOS is the 5 and the goal line the 40
     for (let y = 0; y >= -35; y -= 5) {
       if (y < top - 0.01) continue;
-      const t = y === 0 ? "LOS" : String(-y);
+      const t = y === 0 ? "LOS" : String(LOS_YARD - y);
       texts.push({ key: t + String(y), x: 12, y: py(y, top) - 7, t });
     }
     bands.forEach((b, i) => {
