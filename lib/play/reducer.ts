@@ -32,6 +32,8 @@ export type Action =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "load"; id?: string | null; name: string; notes?: string; players: Player[] }
+  /** a fresh, unsaved play on the default formation; undoable */
+  | { type: "newPlay" }
   | { type: "hydrate"; id?: string | null; name: string; notes?: string; players: Player[] }
   | { type: "setName"; name: string }
   | { type: "setNotes"; notes: string }
@@ -192,6 +194,8 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const step = redoStep(s, s.players);
       return step ? { ...s, ...step.history, players: step.players, ...cleared } : s;
     }
+    case "newPlay":
+      return { ...s, ...push(s, s.players), id: null, name: "New play", notes: "", players: defaults(), ...cleared };
     case "load":
       return { ...s, ...push(s, s.players), id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players, ...cleared };
     case "hydrate":

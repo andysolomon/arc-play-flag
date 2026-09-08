@@ -15,6 +15,7 @@ interface Props {
   onName: (name: string) => void;
   onNotes: (notes: string) => void;
   onToggleNotes: () => void;
+  onNew: () => void;
   onSave: () => void;
   onDuplicate: () => void;
   onExport: () => void;
@@ -29,7 +30,7 @@ interface Props {
 }
 
 function PlaySidebarImpl({
-  name, notes, notesOpen, vis, plays, onName, onNotes, onToggleNotes, onSave, onDuplicate, onExport, onLoad, onShare,
+  name, notes, notesOpen, vis, plays, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, onExport, onLoad, onShare,
   exportOpen, exportPanel, onFlip, onClear, onReset, onVis,
 }: Props) {
   const scope: Team | null = vis === "both" ? null : vis;
@@ -44,6 +45,7 @@ function PlaySidebarImpl({
         className={`flex-none ${input}`}
       />
       <div className={tileGrid}>
+        <IconTile icon="new" label="New play" title="Start a fresh play on the default formation" onClick={onNew} />
         <IconTile icon="save" label="Save" onClick={onSave} />
         <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
         <IconTile icon="export" label="Export" title="Save a picture card or video clip" active={exportOpen} onClick={onExport} />
