@@ -1,13 +1,10 @@
-import { emptyHistory, push, redo as redoStep, undo as undoStep, type History } from "./history";
+import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import { defaults, legalSpot, mirrorable, routeDef } from "./routes";
-import type { Draft, Pair, Player, Route, RouteType, Team, Vis } from "./types";
+import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
-export interface PlayState extends History {
+export interface PlayState extends Doc, History {
   /** the saved play this one came from, so Save updates it instead of adding another */
   id: string | null;
-  name: string;
-  notes: string;
-  players: readonly Player[];
   selectedId: string | null;
   targeting: boolean;
   draft: Draft | null;
@@ -59,6 +56,12 @@ export function selected(s: PlayState): Player | null {
   return s.players.find((p) => p.id === s.selectedId) ?? null;
 }
 
+/** Whether the document holds work its saved record doesn't (or, never saved, anything past a blank new play). */
+export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
+  if (saved) return s.name !== saved.name || s.notes !== saved.notes || JSON.stringify(s.players) !== JSON.stringify(saved.players);
+  return s.past.length > 0 || s.notes !== "" || (s.name !== "New play" && s.name !== "");
+}
+
 /** Whether a player is drawn under the current Show filter. */
 export function shown(p: Player, vis: Vis): boolean {
   return vis === "both" || p.team === vis;
@@ -69,7 +72,16 @@ function patch(players: readonly Player[], id: string, upd: Partial<Player>): re
 }
 
 function commit(s: PlayState): PlayState {
-  return { ...s, ...push(s, s.players) };
+  return { ...s, ...push(s, s) };
+}
+
+/** Replaces the whole document, leaving the one before it one undo away. */
+function swap(s: PlayState, doc: Doc): PlayState {
+  return { ...s, ...push(s, s, true), ...doc, ...cleared };
+}
+
+function step(s: PlayState, st: HistoryStep | null): PlayState {
+  return st ? { ...s, ...st.history, ...st.doc, ...cleared } : s;
 }
 
 /** Sets a route, and backs a new blitzer off to the blitz line if they were lined up closer. */
@@ -186,18 +198,14 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const c = commit(s);
       return { ...c, players: c.players.map((p) => (inScope(p) ? home(p) : p)) };
     }
-    case "undo": {
-      const step = undoStep(s, s.players);
-      return step ? { ...s, ...step.history, players: step.players, ...cleared } : s;
-    }
-    case "redo": {
-      const step = redoStep(s, s.players);
-      return step ? { ...s, ...step.history, players: step.players, ...cleared } : s;
-    }
+    case "undo":
+      return step(s, undoStep(s, s));
+    case "redo":
+      return step(s, redoStep(s, s));
     case "newPlay":
-      return { ...s, ...push(s, s.players), id: null, name: "New play", notes: "", players: defaults(), ...cleared };
+      return swap(s, { id: null, name: "New play", notes: "", players: defaults() });
     case "load":
-      return { ...s, ...push(s, s.players), id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players, ...cleared };
+      return swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players });
     case "hydrate":
       return { ...s, id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players };
     case "setName":

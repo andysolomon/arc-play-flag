@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { defaults } from "./routes";
 import {
-  DRAFT_KEY, LEGACY_PLAYS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, kebab, newId, normalizePlayers, readAll,
-  readDraft, readPlaybooks, readTeam, remove, store, storePlaybook, writeDraft, writeTeam, type StorageLike,
+  DRAFT_KEY, LEGACY_PLAYS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, StorageError, TEAM_KEY, failureMessage, kebab, newId,
+  normalizePlayers, readAll, readDraft, readPlaybooks, readTeam, remove, store, storePlaybook, writeDraft, writeTeam,
+  type StorageLike,
 } from "./storage";
 
 function memory(): StorageLike & { data: Map<string, string> } {
@@ -101,6 +102,63 @@ describe("storage", () => {
     const ids = new Set(Array.from({ length: 200 }, newId));
     expect(ids.size).toBe(200);
     for (const id of ids) expect(id).toMatch(/^[a-z0-9]{10,12}$/);
+  });
+  test("a write that throws on quota is a typed quota failure, and nothing is reported stored", () => {
+    const s = memory();
+    const quota = Object.assign(new Error("full"), { name: "QuotaExceededError", code: 22 });
+    const failing: StorageLike = { getItem: (k) => s.getItem(k), setItem: () => { throw quota; } };
+    const play = { id: "abc", name: "Trips right", players: defaults(), notes: "" };
+    let caught: unknown;
+    try { store(play, failing); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(StorageError);
+    const err = caught as StorageError;
+    expect(err.reason).toBe("quota");
+    expect(err.key).toBe(PLAYS_KEY);
+    expect(err.cause).toBe(quota);
+    expect(readAll(failing)).toEqual({});
+    expect(failureMessage(err)).toBe("Couldn't save: this browser's storage is full.");
+    // every writer reports the same way
+    expect(() => storePlaybook({ id: "wk1", name: "Week 1", plays: [] }, failing)).toThrow(StorageError);
+    expect(() => { writeTeam({ name: "Sharks", color: "#123abc" }, failing); }).toThrow(StorageError);
+    expect(() => { writeDraft({ name: "d", players: defaults() }, failing); }).toThrow(StorageError);
+    expect(() => remove("abc", failing)).not.toThrow();
+  });
+  test("no storage at all is an unavailable failure, and reads still answer empty", () => {
+    expect(() => store({ id: "abc", name: "A", players: defaults(), notes: "" }, null)).toThrow(StorageError);
+    try { writeDraft({ name: "d", players: defaults() }, null); } catch (e) { expect((e as StorageError).reason).toBe("unavailable"); }
+    expect(readAll(null)).toEqual({});
+    expect(readDraft(null)).toBeNull();
+  });
+  test("a storage that drops writes on the floor is caught by the read-back", () => {
+    const dropping: StorageLike = { getItem: () => null, setItem: () => { /* dropped */ } };
+    try { store({ id: "abc", name: "A", players: defaults(), notes: "" }, dropping); throw new Error("stored"); }
+    catch (e) { expect((e as StorageError).reason).toBe("write"); }
+    const other = Object.assign(new Error("nope"), { name: "SecurityError" });
+    const refusing: StorageLike = { getItem: () => null, setItem: () => { throw other; } };
+    try { store({ id: "abc", name: "A", players: defaults(), notes: "" }, refusing); throw new Error("stored"); }
+    catch (e) { expect((e as StorageError).reason).toBe("write"); }
+  });
+  test("a failed update leaves the existing record as it was, and a retry lands", () => {
+    const s = memory();
+    const before = { id: "abc", name: "Trips right", players: defaults(), notes: "v1" };
+    store(before, s);
+    let full = true;
+    const flaky: StorageLike = {
+      getItem: (k) => s.getItem(k),
+      setItem: (k, v) => { if (full) throw Object.assign(new Error("full"), { name: "QuotaExceededError" }); s.setItem(k, v); },
+    };
+    const after = { ...before, notes: "v2" };
+    expect(() => store(after, flaky)).toThrow(StorageError);
+    expect(readAll(flaky)).toEqual({ abc: before });
+    full = false;
+    expect(store(after, flaky)).toEqual({ abc: after });
+    expect(readAll(s)).toEqual({ abc: after });
+  });
+  test("the legacy migration never throws on the read path when it can't write through", () => {
+    const legacy = JSON.stringify({ Old: { players: defaults() } });
+    const readOnly: StorageLike = { getItem: (k) => (k === LEGACY_PLAYS_KEY ? legacy : null), setItem: () => { throw new Error("read only"); } };
+    const lib = readAll(readOnly);
+    expect(Object.values(lib).map((p) => p.name)).toEqual(["Old"]);
   });
   test("kebab-cases export filenames", () => {
     expect(kebab("Trips Right — Go!")).toBe("trips-right-go");

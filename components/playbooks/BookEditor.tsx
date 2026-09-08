@@ -7,6 +7,7 @@ import { numbered } from "@/lib/export/numbered";
 import {
   deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, subscribe, updatePlaybook,
 } from "@/lib/play/library";
+import { failureMessage } from "@/lib/play/storage";
 import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
 import { card, divider, eyebrow, input, pill, pillSm } from "../ui";
@@ -34,7 +35,11 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
     );
   }
 
-  const setPlays = (ids: string[]) => { updatePlaybook({ ...book, plays: ids }); };
+  const update = (next: typeof book) => {
+    const r = updatePlaybook(next);
+    if (!r.ok) say(failureMessage(r.error), 3200);
+  };
+  const setPlays = (ids: string[]) => { update({ ...book, plays: ids }); };
   const move = (i: number, d: number) => {
     const ids = items.map((it) => it.play.id);
     const j = i + d;
@@ -55,13 +60,18 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
           maxLength={80}
           placeholder="Playbook name"
           aria-label="Playbook name"
-          onChange={(e) => { updatePlaybook({ ...book, name: e.target.value }); }}
+          onChange={(e) => { update({ ...book, name: e.target.value }); }}
           className={`${input} min-w-[200px] flex-1`}
         />
         <TwoStep
           label="Delete playbook"
           confirm="Delete this playbook?"
-          onConfirm={() => { deletePlaybook(book.id); say(`Deleted “${book.name}”`); router.push("/playbooks"); }}
+          onConfirm={() => {
+            const r = deletePlaybook(book.id);
+            if (!r.ok) { say(failureMessage(r.error), 3200); return; }
+            say(`Deleted “${book.name}”`);
+            router.push("/playbooks");
+          }}
         />
       </div>
       <span className="text-caption leading-note text-ink-muted">Plays are numbered by their order here. Deleting a playbook keeps the plays.</span>
