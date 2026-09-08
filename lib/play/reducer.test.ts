@@ -72,9 +72,56 @@ describe("reducer", () => {
     let s = run({ type: "select", id: "o3" }, { type: "pick", key: "out" }, { type: "mirror" });
     expect(find(s, "o3")?.route).toEqual({ type: "out", mirror: true });
     s = run({ type: "select", id: "o3" }, { type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, 0]] } }, { type: "mirror" });
-    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[1, 0]] });
+    // 2·3 − 5 = 1 sits off the field: the waypoint is pulled back to the sideline
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[1.2, 0]] });
     s = run({ type: "select", id: "o3" }, { type: "pick", key: "go" }, { type: "mirror" });
     expect(find(s, "o3")?.route).toEqual({ type: "go" });
+  });
+  test("mirror and flip keep the primary read and every other flag", () => {
+    let s = run(
+      { type: "select", id: "o5" },
+      { type: "setRoute", id: "o5", route: { type: "custom", pts: [[21, 0], [24, -6]] } },
+      { type: "togglePrimary" },
+      { type: "mirror" },
+    );
+    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[17, 0], [14, -6]], primary: true });
+    s = reducer(s, { type: "flip" });
+    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[13, 0], [16, -6]], primary: true });
+    // presets keep their primary and mirror flags across a flip; man keeps its target
+    s = run(
+      { type: "select", id: "o3" }, { type: "pick", key: "out" }, { type: "togglePrimary" }, { type: "mirror" },
+      { type: "setRoute", id: "d1", route: { type: "man", target: "o3" } },
+      { type: "flip" },
+    );
+    expect(find(s, "o3")?.route).toEqual({ type: "out", primary: true, mirror: true });
+    expect(find(s, "d1")?.route).toEqual({ type: "man", target: "o3" });
+    expect(find(s, "d1")?.x).toBe(27);
+  });
+  test("mirror twice and flip twice bring a custom route back where it was, with its read", () => {
+    const route = { type: "custom" as const, pts: [[21, 0], [24, -6]] as [number, number][], primary: true };
+    const start = run({ type: "select", id: "o5" }, { type: "setRoute", id: "o5", route });
+    const back = reducer(reducer(start, { type: "mirror" }), { type: "mirror" });
+    expect(find(back, "o5")?.route).toEqual(route);
+    const flipped = reducer(reducer(start, { type: "flip" }), { type: "flip" });
+    expect(find(flipped, "o5")?.route).toEqual(route);
+    expect(find(flipped, "o5")?.x).toBe(19);
+  });
+  test("undo restores the geometry and the read a transform touched", () => {
+    let s = run(
+      { type: "select", id: "o3" },
+      { type: "setRoute", id: "o3", route: { type: "custom", pts: [[8, -5]], primary: true } },
+      { type: "mirror" },
+    );
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[1.2, -5]], primary: true });
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[8, -5]], primary: true });
+    s = reducer(s, { type: "redo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[1.2, -5]], primary: true });
+  });
+  test("a custom draft stops taking waypoints at the cap", () => {
+    let s = run({ type: "select", id: "o5" }, { type: "pick", key: "custom" });
+    for (let i = 0; i < 70; i++) s = reducer(s, { type: "draftPoint", pt: [10 + (i % 10), -i / 4] });
+    expect(s.draft?.pts).toHaveLength(60);
   });
   test("flip mirrors every spot and custom waypoints", () => {
     const s = run({ type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, 0]] } }, { type: "flip" });

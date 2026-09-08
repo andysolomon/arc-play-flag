@@ -129,6 +129,42 @@ export function inkFor(p: Player, type: RouteType): string {
 }
 
 /**
+ * Where a custom waypoint may sit: the box the field lets you draw in (x across the
+ * 30-yard width, y from the deepest defender the card can show to the backfield).
+ */
+export const X_MIN = 1.2, X_MAX = 28.8, Y_MIN = -36, Y_MAX = 7.4;
+/** Waypoints a custom route may carry: more than a coach could tap out in one drawing. */
+export const MAX_ROUTE_POINTS = 60;
+
+export const clampPoint = (q: Pair): Pair => [Math.max(X_MIN, Math.min(X_MAX, q[0])), Math.max(Y_MIN, Math.min(Y_MAX, q[1]))];
+
+/**
+ * The route mirrored left/right about x, keeping everything but its geometry: the
+ * primary read, a man target, the mirror flag. Custom waypoints that would land off
+ * the field are pulled back to its edge, and `clamped` says whether any were.
+ */
+export function mirrorRoute(route: Route, x: number): { route: Route; clamped: boolean } {
+  if (route.type !== "custom") return { route: { ...route, mirror: !route.mirror }, clamped: false };
+  let clamped = false;
+  const pts = (route.pts ?? []).map((q): Pair => {
+    const raw: Pair = [2 * x - q[0], q[1]];
+    const c = clampPoint(raw);
+    if (c[0] !== raw[0]) clamped = true;
+    return c;
+  });
+  return { route: { ...route, pts }, clamped };
+}
+
+/**
+ * The route as it reads after the whole play is flipped (x → 30 - x), keeping every
+ * flag. Handed presets need nothing: their side is read from the player's new spot.
+ */
+export function flipRoute(route: Route): Route {
+  return route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
+}
+const FIELD_W = 30;
+
+/**
  * Only routes whose geometry is actually handed can be flipped: zone bubbles are
  * laid out by slice/side, and man/blitz track a target.
  */

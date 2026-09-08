@@ -1,5 +1,5 @@
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { defaults, legalSpot, mirrorable, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 export interface PlayState extends Doc, History {
@@ -120,7 +120,8 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "setRoute":
       return setRoute(s, a.id, a.route);
     case "draftPoint":
-      return s.draft ? { ...s, draft: { id: s.draft.id, pts: [...s.draft.pts, a.pt] } } : s;
+      if (!s.draft || s.draft.pts.length >= MAX_ROUTE_POINTS) return s;
+      return { ...s, draft: { id: s.draft.id, pts: [...s.draft.pts, a.pt] } };
     case "draftFinish": {
       const d = s.draft;
       if (!d) return s;
@@ -146,13 +147,8 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "mirror": {
       const sel = selected(s);
       if (!sel?.route || !mirrorable(sel)) return s;
-      const r = sel.route;
-      const route: Route =
-        r.type === "custom"
-          ? { type: "custom", pts: (r.pts ?? []).map((q) => [2 * sel.x - q[0], q[1]] as const) }
-          : { ...r, mirror: !r.mirror };
       const c = commit(s);
-      return { ...c, players: patch(c.players, sel.id, { route }) };
+      return { ...c, players: patch(c.players, sel.id, { route: mirrorRoute(sel.route, sel.x).route }) };
     }
     case "rename": {
       const base = a.commit ? commit(s) : s;
@@ -162,11 +158,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const c = commit(s);
       return {
         ...c,
-        players: c.players.map((p) => {
-          const r: Route | null =
-            p.route?.pts ? { type: p.route.type, pts: p.route.pts.map((q) => [30 - q[0], q[1]] as const) } : p.route;
-          return { ...p, x: 30 - p.x, route: r };
-        }),
+        players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null })),
       };
     }
     case "clearRoutes": {

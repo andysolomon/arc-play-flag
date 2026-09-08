@@ -1,5 +1,5 @@
 import {
-  StorageError, hasTeam, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
+  StorageError, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
 } from "./storage";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
 
@@ -138,17 +138,16 @@ export function refresh(): void {
 }
 
 /**
- * Stores an import plan's plays and book in one go, then rebuilds every snapshot. The
- * book is written last, so a failure part-way leaves extra plays but never a book that
- * points at plays which aren't there.
+ * Stores an import plan's plays and book as one change, then rebuilds every snapshot.
+ * A write that fails part-way is rolled back, so the library is either fully imported
+ * or exactly as it was. The team is a courtesy on a fresh device and never blocks.
  */
 export function applyImport(plan: { plays: readonly SavedPlay[]; book: Playbook | null }, importedTeam: TeamSettings | null): Written {
   const r = attempt(() => {
-    for (const p of plan.plays) store(p);
-    if (plan.book) storePlaybook(plan.book);
-    if (importedTeam && !hasTeam()) writeTeam(importedTeam);
+    importAll(plan.plays, plan.book);
     return null;
   });
+  if (r.ok && importedTeam && !hasTeam()) attempt(() => { writeTeam(importedTeam); });
   refresh();
   return r;
 }

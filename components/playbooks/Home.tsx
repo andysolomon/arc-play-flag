@@ -34,16 +34,19 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    const { decodePlaybookFile, planImport } = await import("@/lib/export/playbook-file");
-    const file = decodePlaybookFile(await f.text());
-    if (!file) { say("That file isn't a playbook."); return; }
+    const { MAX_FILE_BYTES, importMessage, planImport, readPlaybookFile } = await import("@/lib/export/playbook-file");
+    // the whole file is checked before anything is written; a refused file changes nothing
+    const read = f.size > MAX_FILE_BYTES ? { ok: false as const, error: "tooLarge" as const } : readPlaybookFile(await f.text());
+    if (!read.ok) { say(importMessage(read.error), 3200); return; }
+    const file = read.file;
     const plan = planImport(file, getPlays(), getPlaybooks());
     const r = applyImport(plan, file.team);
-    if (!r.ok) { say(`Import didn't finish · ${failureMessage(r.error)}`, 3200); return; }
+    if (!r.ok) { say(`Nothing was imported · ${failureMessage(r.error)}`, 3200); return; }
     const bits = [
       plan.added ? `${plural(plan.added, "play")} added` : "",
       plan.copied ? `${plural(plan.copied, "play")} copied` : "",
       plan.reused ? `${plural(plan.reused, "play")} already here` : "",
+      read.skipped ? `${plural(read.skipped, "unreadable play")} left out` : "",
     ].filter(Boolean);
     say(plan.book ? `Imported “${plan.book.name}”${bits.length ? " · " + bits.join(" · ") : ""}` : "That playbook is already here.", 3200);
     if (plan.book) router.push(`/playbooks?book=${plan.book.id}`);

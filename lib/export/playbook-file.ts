@@ -16,12 +16,35 @@ export interface PlaybookFile {
   team: TeamSettings | null;
 }
 
+/** The only schema this build reads. A higher number is a file from a newer app. */
+export const FILE_VERSION = 1;
+/** Bigger than any playbook this app writes (500 full plays is about 1 MB). */
+export const MAX_FILE_BYTES = 4_000_000;
+export const MAX_FILE_PLAYS = 500;
+
+export type ImportError = "tooLarge" | "notJson" | "notPlaybook" | "newerVersion" | "unknownVersion" | "tooManyPlays" | "duplicatePlays";
+/** `skipped` counts plays in the file that could not be read (no players) and were left out. */
+export type ImportRead = { ok: true; file: PlaybookFile; skipped: number } | { ok: false; error: ImportError };
+
+/** What to tell the coach, in one line. */
+export function importMessage(e: ImportError): string {
+  switch (e) {
+    case "tooLarge": return "That file is too big to be a playbook.";
+    case "notJson": return "That file isn't readable. Was it edited?";
+    case "notPlaybook": return "That file isn't a playbook.";
+    case "newerVersion": return "That playbook was made by a newer version of this app. Update, then try again.";
+    case "unknownVersion": return "That playbook's version isn't one this app can read.";
+    case "tooManyPlays": return `That file has more than ${String(MAX_FILE_PLAYS)} plays.`;
+    case "duplicatePlays": return "That file lists the same play twice. Export it again.";
+  }
+}
+
 export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[], team: TeamSettings | null): string {
   const byId = new Map(library.map((p) => [p.id, p]));
   const plays = book.plays.flatMap((id) => { const p = byId.get(id); return p ? [p] : []; });
   const file: PlaybookFile = {
     kind: FILE_KIND,
-    version: 1,
+    version: FILE_VERSION,
     exported: new Date().toISOString(),
     playbook: { id: book.id, name: book.name, plays: plays.map((p) => p.id) },
     plays,
@@ -30,29 +53,49 @@ export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[]
   return JSON.stringify(file, null, 2);
 }
 
-export function decodePlaybookFile(json: string): PlaybookFile | null {
+/**
+ * Reads a file all the way through before anything is stored: the size, the schema
+ * version, the play count, and every play and its routes are checked here, so a bad
+ * file is refused with a reason and never touches the library.
+ */
+export function readPlaybookFile(json: string): ImportRead {
+  if (json.length > MAX_FILE_BYTES) return { ok: false, error: "tooLarge" };
   let raw: unknown;
   try {
     raw = JSON.parse(json);
   } catch {
-    return null;
+    return { ok: false, error: "notJson" };
   }
-  if (typeof raw !== "object" || raw === null) return null;
+  if (typeof raw !== "object" || raw === null) return { ok: false, error: "notPlaybook" };
   const r = raw as Record<string, unknown>;
-  if (r.kind !== FILE_KIND || !Array.isArray(r.plays)) return null;
+  if (r.kind !== FILE_KIND || !Array.isArray(r.plays)) return { ok: false, error: "notPlaybook" };
+  if (typeof r.version !== "number" || !Number.isInteger(r.version) || r.version < 1) return { ok: false, error: "unknownVersion" };
+  if (r.version > FILE_VERSION) return { ok: false, error: "newerVersion" };
+  if (r.plays.length > MAX_FILE_PLAYS) return { ok: false, error: "tooManyPlays" };
   const plays = r.plays.map((p) => normalizeSavedPlay(p)).filter((p): p is SavedPlay => p !== null);
+  if (new Set(plays.map((p) => p.id)).size !== plays.length) return { ok: false, error: "duplicatePlays" };
   const book = normalizePlaybook(r.playbook);
-  if (!book) return null;
+  if (!book) return { ok: false, error: "notPlaybook" };
   const known = new Set(plays.map((p) => p.id));
   book.plays = book.plays.filter((id) => known.has(id));
   return {
-    kind: FILE_KIND,
-    version: 1,
-    exported: typeof r.exported === "string" ? r.exported : "",
-    playbook: book,
-    plays,
-    team: normalizeTeam(r.team),
+    ok: true,
+    file: {
+      kind: FILE_KIND,
+      version: 1,
+      exported: typeof r.exported === "string" ? r.exported : "",
+      playbook: book,
+      plays,
+      team: normalizeTeam(r.team),
+    },
+    skipped: r.plays.length - plays.length,
   };
+}
+
+/** The file, or null for any reason: readPlaybookFile says which. */
+export function decodePlaybookFile(json: string): PlaybookFile | null {
+  const r = readPlaybookFile(json);
+  return r.ok ? r.file : null;
 }
 
 export interface ImportPlan {

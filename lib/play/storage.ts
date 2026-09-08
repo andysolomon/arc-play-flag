@@ -1,3 +1,4 @@
+import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, routeDef } from "./routes";
 import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
@@ -47,6 +48,8 @@ export function failureMessage(e: StorageError): string {
 
 export const DEFAULT_TEAM: TeamSettings = { name: "", color: "#f2b705" };
 export const MAX_NOTES = 600;
+/** Players a play may carry: 5v5 plus a couple of spares for a coach who draws extras. */
+export const MAX_PLAYERS = 12;
 
 function browserStorage(): StorageLike | null {
   try {
@@ -58,12 +61,6 @@ function browserStorage(): StorageLike | null {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
-
-const ROUTE_TYPES = new Set<string>([
-  "go", "out", "in", "slant", "corner", "post", "curl", "flat", "cross", "wheel", "handoff",
-  "dive", "stretch", "counter", "reverse", "delay", "pitch",
-  "custom", "man", "zoneDeep", "zoneFlat", "curlFlat", "midRead", "blitz", "spy",
-]);
 
 /** A short random id: 10 base36 chars from crypto when it's there, Math.random otherwise. */
 export function newId(): string {
@@ -77,17 +74,20 @@ export function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-2);
 }
 
+/** A finite waypoint pulled back onto the field; anything else (a string, 1e400, a lone number) is dropped. */
 function toPair(v: unknown): Pair | null {
   if (!Array.isArray(v) || v.length < 2) return null;
   const x: unknown = v[0], y: unknown = v[1];
-  return typeof x === "number" && typeof y === "number" ? [x, y] : null;
+  if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return clampPoint([x, y]);
 }
 
-function normalizeRoute(v: unknown): Route | null {
-  if (!isRecord(v) || typeof v.type !== "string" || !ROUTE_TYPES.has(v.type)) return null;
+/** A route this team can run, or null: an offensive type on a defender (or the reverse) is no route at all. */
+function normalizeRoute(v: unknown, team: Team): Route | null {
+  if (!isRecord(v) || typeof v.type !== "string" || !routeDef(team, v.type as RouteType)) return null;
   const r: Route = { type: v.type as RouteType };
-  if (Array.isArray(v.pts)) r.pts = v.pts.map(toPair).filter((q): q is Pair => q !== null);
-  if (typeof v.target === "string") r.target = v.target;
+  if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
+  if (typeof v.target === "string") r.target = v.target.slice(0, 40);
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;
@@ -96,25 +96,35 @@ function normalizeRoute(v: unknown): Route | null {
 /**
  * Accepts the prototype's stored shape (and anything older that looks like it) and
  * returns players clamped back onto the field, exactly as the prototype's load does.
+ * Ids are made unique, the roster is capped, and a man target that names nobody on
+ * the offense drops the route rather than drawing nothing.
  */
 export function normalizePlayers(raw: unknown): Player[] {
   if (!Array.isArray(raw)) return [];
   const out: Player[] = [];
-  raw.forEach((v: unknown, i) => {
+  const ids = new Set<string>();
+  raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
     const team: Team = v.team === "defense" ? "defense" : "offense";
-    const x = Math.max(1.2, Math.min(28.8, num(v.x, 15)));
+    const x = Math.max(X_MIN, Math.min(X_MAX, num(v.x, 15)));
     const y0 = num(v.y, team === "offense" ? 1 : -5);
     const y = team === "offense" ? Math.max(0.9, Math.min(7.4, y0)) : Math.min(-0.9, Math.max(-36, y0));
+    let id = typeof v.id === "string" && v.id ? v.id.slice(0, 40) : `p${String(i)}`;
+    while (ids.has(id)) id = `${id}-${String(i)}`;
+    ids.add(id);
     out.push({
-      id: typeof v.id === "string" ? v.id : `p${String(i)}`,
+      id,
       team,
       label: typeof v.label === "string" ? v.label.slice(0, 3) : "",
       x, y,
-      route: normalizeRoute(v.route),
+      route: normalizeRoute(v.route, team),
     });
   });
-  return out;
+  const offense = new Set(out.filter((p) => p.team === "offense").map((p) => p.id));
+  return out.map((p) => {
+    if (p.route?.type !== "man") return p;
+    return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
+  });
 }
 
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");
@@ -231,6 +241,31 @@ export function remove(id: string, storage: StorageLike | null = browserStorage(
   }
   if (touched) writePlaybooks(books, storage);
   return { plays, playbooks: books };
+}
+
+/**
+ * Stores several plays and a book as one change: each key is written once, and if the
+ * book can't be written the plays are put back the way they were, so a failure never
+ * leaves the library half imported. Throws the StorageError that stopped it.
+ */
+export function importAll(plays: readonly SavedPlay[], book: Playbook | null, storage: StorageLike | null = browserStorage()): void {
+  if (!storage) throw new StorageError("unavailable", PLAYS_KEY);
+  const before = storage.getItem(PLAYS_KEY);
+  const lib = readAll(storage);
+  for (const p of plays) lib[p.id] = { ...p, players: [...p.players], notes: cleanNotes(p.notes) };
+  writeAll(lib, storage);
+  if (!book) return;
+  try {
+    storePlaybook(book, storage);
+  } catch (e) {
+    try {
+      if (before === null) storage.setItem(PLAYS_KEY, "null");
+      else storage.setItem(PLAYS_KEY, before);
+    } catch {
+      /* the old value was smaller than what we just wrote, so this is not expected to fail */
+    }
+    throw e;
+  }
 }
 
 export function normalizePlaybook(raw: unknown, fallbackId = newId()): Playbook | null {
