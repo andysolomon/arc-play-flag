@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { defaults } from "./routes";
 import {
-  DRAFT_KEY, LEGACY_PLAYS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, StorageError, TEAM_KEY, failureMessage, kebab, newId,
+  DRAFT_KEY, LEGACY_PLAYS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, StorageError, TEAM_KEY, failureMessage, importAll, kebab, newId,
   normalizePlayers, readAll, readDraft, readPlaybooks, readTeam, remove, store, storePlaybook, writeDraft, writeTeam,
   type StorageLike,
 } from "./storage";
@@ -72,6 +72,52 @@ describe("storage", () => {
   test("normalizes custom waypoints and drops bad ones", () => {
     const [p] = normalizePlayers([{ id: "o5", team: "offense", x: 19, y: 5, route: { type: "custom", pts: [[19, 2], "x", [1]] } }]);
     expect(p?.route).toEqual({ type: "custom", pts: [[19, 2]] });
+  });
+  test("routes must be finite, on the field, the right team's, and aimed at someone", () => {
+    const players = normalizePlayers(JSON.parse(`[
+      {"id":"o1","team":"offense","x":3,"y":1,"route":{"type":"custom","pts":[[1e400,2],[40,-99],[5,-5],[NaN]]}},
+      {"id":"o2","team":"offense","x":15,"y":5,"route":{"type":"blitz"}},
+      {"id":"d1","team":"defense","x":15,"y":-5,"route":{"type":"go"}},
+      {"id":"d2","team":"defense","x":3,"y":-5,"route":{"type":"man","target":"nobody"}},
+      {"id":"d3","team":"defense","x":27,"y":-5,"route":{"type":"man","target":"d1"}},
+      {"id":"d4","team":"defense","x":20,"y":-5,"route":{"type":"man","target":"o1"}}
+    ]`.replace("1e400", "1e400").replace("NaN", "null")));
+    expect(players[0]?.route).toEqual({ type: "custom", pts: [[28.8, -36], [5, -5]] });
+    expect(players[1]?.route).toBeNull();
+    expect(players[2]?.route).toBeNull();
+    expect(players[3]?.route).toBeNull();
+    expect(players[4]?.route).toBeNull();
+    expect(players[5]?.route).toEqual({ type: "man", target: "o1" });
+  });
+  test("player ids are unique, the roster is capped, and waypoints are capped", () => {
+    const raw = Array.from({ length: 20 }, () => ({ id: "same", team: "offense", x: 5, y: 2 }));
+    const players = normalizePlayers(raw);
+    expect(players).toHaveLength(12);
+    expect(new Set(players.map((p) => p.id)).size).toBe(12);
+    expect(players[0]?.id).toBe("same");
+    const pts = Array.from({ length: 100 }, (_, i) => [i % 28 + 1, -i % 30]);
+    const [p] = normalizePlayers([{ id: "o1", team: "offense", x: 5, y: 2, route: { type: "custom", pts } }]);
+    expect(p?.route?.pts).toHaveLength(60);
+  });
+  test("importAll writes plays and the book as one change and rolls back when the book can't be written", () => {
+    const s = memory();
+    store({ id: "keep", name: "Keep", players: defaults(), notes: "" }, s);
+    const beforePlays = s.data.get(PLAYS_KEY);
+    let writes = 0;
+    const flaky: StorageLike = {
+      getItem: (k) => s.getItem(k),
+      setItem: (k, v) => { writes++; if (k === PLAYBOOKS_KEY) throw Object.assign(new Error("full"), { name: "QuotaExceededError" }); s.setItem(k, v); },
+    };
+    const plays = [{ id: "a", name: "A", players: defaults(), notes: "" }, { id: "b", name: "B", players: defaults(), notes: "" }];
+    expect(() => { importAll(plays, { id: "wk1", name: "Week 1", plays: ["a", "b"] }, flaky); }).toThrow(StorageError);
+    expect(s.data.get(PLAYS_KEY)).toBe(beforePlays);
+    expect(Object.keys(readAll(s))).toEqual(["keep"]);
+    expect(readPlaybooks(s)).toEqual({});
+    // plays went in with one write, the book with one, the rollback with one
+    expect(writes).toBe(3);
+    importAll(plays, { id: "wk1", name: "Week 1", plays: ["a", "b"] }, s);
+    expect(Object.keys(readAll(s))).toEqual(["keep", "a", "b"]);
+    expect(readPlaybooks(s).wk1?.plays).toEqual(["a", "b"]);
   });
   test("draft autosave round-trips under ffpd.draft.v1 with its id and notes", () => {
     const s = memory();

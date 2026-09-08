@@ -5,6 +5,7 @@ import { initialState, reducer, selected, shown, unsaved } from "@/lib/play/redu
 import type { RouteType } from "@/lib/play/types";
 import { getPlays, getServerPlays, playById, savePlay, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
+import { mirrorRoute } from "@/lib/play/routes";
 import { StorageError, failureMessage, kebab, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { Header } from "./Header";
@@ -87,6 +88,12 @@ export function App() {
     dispatch({ type: "togglePrimary" });
     if (narrowRef.current) setRightOpen(false);
   }, []);
+  // a custom route mirrored off the field is pulled back to the edge: say so, since the shape changes
+  const onMirror = useCallback(() => {
+    const p = selected(s);
+    dispatch({ type: "mirror" });
+    if (p?.route && mirrorRoute(p.route, p.x).clamped) say("Mirrored · pulled back inside the field", 2200);
+  }, [s, say]);
   const onClear = useCallback(() => {
     dispatch({ type: "clearRoutes", team: s.vis === "both" ? null : s.vis });
   }, [s.vis]);
@@ -254,7 +261,7 @@ export function App() {
             onPick={onPick}
             onDone={() => { dispatch({ type: "select", id: null }); }}
             onPrimary={onPrimary}
-            onMirror={() => { dispatch({ type: "mirror" }); }}
+            onMirror={onMirror}
             onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
           />
         </Sidebar>

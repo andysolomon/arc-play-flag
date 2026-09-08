@@ -5,7 +5,7 @@ import { binderPages } from "./binder";
 import { cardSvg } from "./card";
 import { numbered, positionsOf } from "./numbered";
 import { defaultPaper } from "./pages";
-import { decodePlaybookFile, encodePlaybookFile, planImport } from "./playbook-file";
+import { MAX_FILE_BYTES, decodePlaybookFile, encodePlaybookFile, importMessage, planImport, readPlaybookFile } from "./playbook-file";
 import { planCards, tile, wristbandPages } from "./wristband";
 
 const play = (id: string, name: string, notes = ""): SavedPlay => ({
@@ -96,6 +96,43 @@ describe("playbook file", () => {
     expect(file?.team).toEqual(team);
     expect(decodePlaybookFile("{}")).toBeNull();
     expect(decodePlaybookFile("nope")).toBeNull();
+  });
+  test("refuses files it can't vouch for, each with a reason", () => {
+    const good = JSON.parse(encodePlaybookFile(book, library, team)) as Record<string, unknown>;
+    const read = (patch: Record<string, unknown>) => readPlaybookFile(JSON.stringify({ ...good, ...patch }));
+    expect(readPlaybookFile("{not json")).toEqual({ ok: false, error: "notJson" });
+    expect(readPlaybookFile("[]")).toEqual({ ok: false, error: "notPlaybook" });
+    expect(read({ kind: "other" })).toEqual({ ok: false, error: "notPlaybook" });
+    expect(read({ version: 999 })).toEqual({ ok: false, error: "newerVersion" });
+    expect(read({ version: "1" })).toEqual({ ok: false, error: "unknownVersion" });
+    expect(read({ version: 0 })).toEqual({ ok: false, error: "unknownVersion" });
+    expect(read({ playbook: null })).toEqual({ ok: false, error: "notPlaybook" });
+    const dup = (good.plays as unknown[])[0];
+    expect(read({ plays: Array.from({ length: 501 }, () => dup) })).toEqual({ ok: false, error: "tooManyPlays" });
+    expect(read({ plays: [dup, dup] })).toEqual({ ok: false, error: "duplicatePlays" });
+    expect(readPlaybookFile("x".repeat(MAX_FILE_BYTES + 1))).toEqual({ ok: false, error: "tooLarge" });
+    for (const e of ["tooLarge", "notJson", "notPlaybook", "newerVersion", "unknownVersion", "tooManyPlays", "duplicatePlays"] as const) {
+      expect(importMessage(e).length).toBeGreaterThan(10);
+    }
+  });
+  test("extreme values are tamed and unreadable plays are counted, not imported", () => {
+    const good = JSON.parse(encodePlaybookFile(book, library, team)) as { plays: Record<string, unknown>[] };
+    const json = JSON.stringify({
+      kind: "ffpd.playbook", version: 1, playbook: { id: "b", name: "B", plays: ["p0", "ghost", "empty"] },
+      plays: [
+        { ...good.plays[0], players: [{ id: "o1", team: "offense", x: 3, y: 1, route: { type: "custom", pts: [[1, 2]] } }] },
+        { id: "empty", name: "Empty", players: [] },
+        "junk",
+      ],
+    }).replace("[1,2]", "[1e400,-1e400]");
+    const r = readPlaybookFile(json);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.skipped).toBe(2);
+    expect(r.file.plays).toHaveLength(1);
+    expect(r.file.playbook.plays).toEqual(["p0"]);
+    // an infinite waypoint is dropped, not clamped: it was never a place on the field
+    expect(r.file.plays[0]?.players[0]?.route?.pts).toEqual([]);
+    expect(r.file.plays[0]?.players[0]?.x).toBe(3);
   });
   test("import reuses identical plays, copies changed ones, and never duplicates a book", () => {
     const file = decodePlaybookFile(encodePlaybookFile(book, library, team));
