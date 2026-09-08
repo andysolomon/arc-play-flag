@@ -66,6 +66,28 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
               {sel.team === "offense" ? "Pick a route" : "Pick a coverage"}
             </h2>
           </div>
+          {/* the read and mirror sit under the heading so they are never scrolled out of reach */}
+          {(canPrimary || canMirror) && (
+            <div className="flex flex-none flex-wrap gap-1.5">
+              {canPrimary && (
+                <button
+                  type="button"
+                  onClick={onPrimary}
+                  title="Colour this as the primary read"
+                  aria-pressed={primaryOn}
+                  data-active={primaryOn}
+                  className={`${pill} px-3 py-1 text-small data-[active=true]:bg-rose-soft`}
+                >
+                  {primaryOn ? "★ Primary read" : "☆ Mark primary"}
+                </button>
+              )}
+              {canMirror && (
+                <button type="button" onClick={onMirror} title="Mirror this route left/right" className={`${pill} px-3 py-1 text-small`}>
+                  ⇄ Mirror route
+                </button>
+              )}
+            </div>
+          )}
           <div className={tileGrid} role="group" aria-label={sel.team === "offense" ? "Routes" : "Coverages"}>
             {keys.map((k) => (
               <IconTile
@@ -94,27 +116,6 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
                 <IconTile icon={`deselect${suffix}`} label="Done" onClick={onDone} />
               </div>
             </>
-          )}
-          {(canPrimary || canMirror) && (
-            <div className="flex flex-none flex-wrap gap-1.5">
-              {canPrimary && (
-                <button
-                  type="button"
-                  onClick={onPrimary}
-                  title="Colour this as the primary read"
-                  aria-pressed={primaryOn}
-                  data-active={primaryOn}
-                  className={`${pill} px-3 py-1 text-small data-[active=true]:bg-rose-soft`}
-                >
-                  {primaryOn ? "★ Primary read" : "☆ Mark primary"}
-                </button>
-              )}
-              {canMirror && (
-                <button type="button" onClick={onMirror} title="Mirror this route left/right" className={`${pill} px-3 py-1 text-small`}>
-                  ⇄ Mirror route
-                </button>
-              )}
-            </div>
           )}
         </>
       )}
