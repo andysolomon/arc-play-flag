@@ -67,6 +67,10 @@ export function App() {
     dispatch({ type: "pick", key });
     if (narrowRef.current) setRightOpen(false);
   }, []);
+  const onPrimary = useCallback(() => {
+    dispatch({ type: "togglePrimary" });
+    if (narrowRef.current) setRightOpen(false);
+  }, []);
   const onClear = useCallback(() => {
     dispatch({ type: "clearRoutes", team: s.vis === "both" ? null : s.vis });
   }, [s.vis]);
@@ -198,7 +202,7 @@ export function App() {
             hint={hint}
             onPick={onPick}
             onDone={() => { dispatch({ type: "select", id: null }); }}
-            onPrimary={() => { dispatch({ type: "togglePrimary" }); }}
+            onPrimary={onPrimary}
             onMirror={() => { dispatch({ type: "mirror" }); }}
             onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
           />
