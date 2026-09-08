@@ -1,0 +1,427 @@
+# Source of truth for the production-readiness plan (tracker #41), in the
+# arc-pi-gantt-workflow schema: https://github.com/andysolomon/arc-pi-gantt-workflow
+# Groups are the tracker's sections; leaves are its issues. Dependencies come from the
+# tracker's stated sequencing, and a leaf is `ready` only when every dependency is
+# completed. The projections under docs/workflows/production-readiness/ are generated
+# from this file: edit here, then regenerate (see docs/workflows/README.md).
+schema_version: "1"
+slug: production-readiness
+repository:
+  id: arc-play-flag
+  path: .
+items:
+  # ── 0. The review everything else hangs off ───────────────────────────────
+  # The activation gate needs every leaf to name at least one dependency, so the
+  # review that produced the tracker is the completed root the first wave depends on.
+  - id: "0.0"
+    kind: group
+    title: Application review and tracker
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "0.review"
+    kind: leaf
+    title: "#41 Review the app at baseline 4a9d33c and file the prioritized tracker"
+    parent_id: "0.0"
+    nesting_depth: 1
+    outcome: Sixteen prioritized issues and the production-readiness tracker exist with reproduction steps, acceptance criteria, source references and annotated screenshots.
+    scope: GitHub issues #12, #13 and #25 to #41; evidence on the docs/review-evidence-20260908 branch
+    acceptance_criteria:
+      - Every issue carries reproduction steps, acceptance criteria and source references
+      - The tracker states priorities, dependencies and go or no-go criteria
+    dependencies: []
+    preserved_behavior: No application code changed as part of the review.
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T00:00:00.000Z"
+      evidence_ref: "issue #41"
+
+  # ── 1. Fix data integrity first ────────────────────────────────────────────
+  - id: "1.0"
+    kind: group
+    title: Fix data integrity first
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T21:55:00.000Z"
+  - id: "1.25"
+    kind: leaf
+    title: "#25 Prevent silent save failures and false success messages"
+    parent_id: "1.0"
+    nesting_depth: 1
+    outcome: Every storage write returns or throws a typed failure; Save, Duplicate, playbook, team, draft and import never report success before the write lands; a failed save keeps the play and offers retry and a recoverable download.
+    scope: lib/play/storage.ts, lib/play/library.ts, components/App.tsx, components/playbooks/*
+    acceptance_criteria:
+      - Storage APIs return or throw a typed failure and callers handle it
+      - No success message before a durable write; failed saves offer retry and a download
+      - No new persisted identity is adopted after a failed create
+      - Regression tests cover quota, unavailable storage, existing-record updates and retry
+    dependencies: ["0.review"]
+    preserved_behavior: Existing saved plays, playbooks and drafts load unchanged; storage keys and formats are unchanged.
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T21:49:23.000Z"
+      evidence_ref: "PR #42"
+  - id: "1.26"
+    kind: leaf
+    title: "#26 Keep document identity and contents consistent across Undo and play switching"
+    parent_id: "1.0"
+    nesting_depth: 1
+    outcome: History entries are whole documents; undoing Open or New play restores the previous play's id, name, notes and diagram together, so Save can never write one play's diagram under another play's id.
+    scope: lib/play/history.ts, lib/play/reducer.ts, components/App.tsx
+    acceptance_criteria:
+      - A diagram can never be saved under another document's identity because of undo or redo
+      - New play's undo behaviour and its toast agree
+      - Dirty document switching is handled explicitly without silently losing edits
+      - Tests cover A to B to undo to save, redo, New play then undo, and name and notes restoration
+    dependencies: ["0.review"]
+    preserved_behavior: Ordinary edits still restore only the players, so a name or notes typed after a move survive undoing that move.
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T21:49:23.000Z"
+      evidence_ref: "PR #42"
+  - id: "1.27"
+    kind: leaf
+    title: "#27 Preserve primary-read metadata when mirroring or flipping custom routes"
+    parent_id: "1.0"
+    nesting_depth: 1
+    outcome: Mirror and Flip rebuild only a route's geometry and keep the primary read, mirror flag and man target; off-field mirrored waypoints are pulled back to the sideline with feedback.
+    scope: lib/play/routes.ts, lib/play/reducer.ts, components/App.tsx
+    acceptance_criteria:
+      - Mirror and Flip preserve primary and all non-geometric route metadata
+      - Playback and exports identify the same primary after transforms
+      - Out-of-bounds custom points are clamped to the field with a toast
+      - Tests cover custom and preset routes, repeated transforms and field-edge cases
+    dependencies: ["0.review"]
+    preserved_behavior: Handed preset routes still flip by the player's new side; zone bubbles and man/blitz remain non-mirrorable.
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T22:31:00.000Z"
+      evidence_ref: "PR #43"
+  - id: "1.29"
+    kind: leaf
+    title: "#29 Validate imported playbooks before changing stored data"
+    parent_id: "1.0"
+    nesting_depth: 1
+    outcome: A playbook file is fully validated (size, schema version, play count, duplicate ids, finite clamped geometry, team-correct route types, valid man targets) before anything is written, and a failed write rolls back so the library is untouched.
+    scope: lib/export/playbook-file.ts, lib/play/storage.ts, lib/play/library.ts, components/playbooks/Home.tsx
+    acceptance_criteria:
+      - Only supported schema versions are accepted, each refusal with an actionable reason
+      - Coordinates must be finite; geometry, file-size, play-count and route-point limits are enforced
+      - Player and play ids, team values, route types and target references are validated
+      - Failed validation or persistence leaves the previous library intact; tests cover each case
+    dependencies: ["0.review"]
+    preserved_behavior: Files this app exports still import unchanged; identical plays are reused and changed ones copied as before.
+    checkpoint:
+      state: completed
+      updated_at: "2026-09-08T22:31:00.000Z"
+      evidence_ref: "PR #43"
+
+  # ── 2. Make local use and recovery dependable ─────────────────────────────
+  - id: "2.0"
+    kind: group
+    title: Make local use and recovery dependable
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "2.28"
+    kind: leaf
+    title: "#28 Make offline readiness, shared plays, and cached demos reliable"
+    parent_id: "2.0"
+    nesting_depth: 1
+    outcome: The service worker precaches everything an offline route needs before claiming readiness, reports honest ready/unavailable/updating status, and an offline shared URL renders the right snapshot or an explicit unavailable state.
+    scope: public/sw.js, components/App.tsx, offline status UI, DEMO_WORKFLOW.md
+    acceptance_criteria:
+      - All assets for supported offline routes are precached or verified before readiness is claimed
+      - Honest offline-ready, unavailable and updating status is shown
+      - Offline shared URLs never silently substitute another play
+      - Next navigation requests, failed refreshes, worker lifetime, video ranges and cache updates are handled
+      - Watched demos replay offline when advertised; fresh, repeat, direct-link, reload and upgrade paths are tested in real browsers
+    dependencies: ["0.review"]
+    preserved_behavior: Online behaviour, share links and existing caches keep working across the worker upgrade.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "2.30"
+    kind: leaf
+    title: "#30 Add full-library backup and clear local-save status"
+    parent_id: "2.0"
+    nesting_depth: 1
+    outcome: A coach can see where work lives and its saved/unsaved/draft/failed state, export a versioned backup of every play, playbook, team setting and draft, and restore it with a validated merge-or-replace preview.
+    scope: lib/play/storage.ts, lib/export/playbook-file.ts (or a backup sibling), components/App.tsx, components/Header.tsx, components/playbooks/Home.tsx
+    acceptance_criteria:
+      - Stored-on-this-device explanation near library and save controls, with no account setup
+      - Saved, unsaved, autosaved-draft and failed-persistence states are distinguished; play name stays visible
+      - Versioned full backup of plays, playbook order, team settings and draft
+      - Restore validates first and offers explicit merge or replace with a preview
+      - Round-trip tests preserve unbooked plays, references, notes, primary flags and custom geometry
+    dependencies: ["1.25", "1.29"]
+    preserved_behavior: Playbook files stay importable; local-only storage limits are documented and cloud sync stays a separate decision.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "2.32"
+    kind: leaf
+    title: "#32 Make custom-route completion and coverage assignment accessible"
+    parent_id: "2.0"
+    nesting_depth: 1
+    outcome: Custom routes finish and cancel through explicit actions with keyboard shortcuts, waypoints can be edited with undo, and man-target assignment works by keyboard with announced state.
+    scope: components/Field.tsx, components/PlayerToken.tsx, components/RouteSidebar.tsx, lib/play/reducer.ts
+    acceptance_criteria:
+      - Explicit Finish route and Cancel actions with disabled states and shortcuts
+      - Finishing by button keeps the last genuine waypoint
+      - Selected custom waypoints can be moved, added and removed with undo and redo
+      - Man-target assignment by keyboard with clear focus and announced targeting state
+      - SVG semantics, focus order, touch targets and screen-reader operation are audited and verified
+    dependencies: ["0.review"]
+    preserved_behavior: Double-tap to finish and pointer targeting keep working; no product playback scrubber is added.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+
+  # ── 3. Improve the coaching experience ───────────────────────────────────
+  - id: "3.0"
+    kind: group
+    title: Improve the coaching experience
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "3.31"
+    kind: leaf
+    title: "#31 Make the first drawing session and Demo entry discoverable"
+    parent_id: "3.0"
+    nesting_depth: 1
+    outcome: A first-time coach sees a short dismissible path (select a player, choose a route, press Play), can open a fictional example without losing a draft, and can find Demo from the collapsed layout.
+    scope: components/App.tsx, components/Header.tsx, components/PlaySidebar.tsx
+    acceptance_criteria:
+      - Dismissible first-use path with no blocking wizard
+      - Editable fictional example that never replaces an existing draft
+      - Demo is discoverable from the initial collapsed layout
+      - Field space and touch usability are preserved
+      - A first-time coach creates and runs a play without assistance
+    dependencies: ["0.review"]
+    preserved_behavior: The app still opens on a clear field with both sidebars closed; returning coaches are not re-onboarded.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "3.33"
+    kind: leaf
+    title: "#33 Improve saved-play discovery and reuse as a season's library grows"
+    parent_id: "3.0"
+    nesting_depth: 1
+    outcome: Plays can be searched, sorted and filtered, opened straight from a playbook entry and added to a book from the designer, and new plays can start from reusable formation templates.
+    scope: components/playbooks/Home.tsx, components/playbooks/BookEditor.tsx, components/PlaySidebar.tsx, lib/play/library.ts
+    acceptance_criteria:
+      - Search by name and notes, sort by recent or name, filter by run, pass and defense
+      - Open a play from a playbook entry; Add to playbook from the designer
+      - Playbook order and references survive editing and tagging
+      - Formation templates create a new play without mutating the source
+      - Obvious empty state; responsive with a 100-play, 20-book fixture
+    dependencies: ["0.review"]
+    preserved_behavior: Existing playbooks, numbering and exports are unchanged; formation templates may be split into a child issue.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "3.34"
+    kind: leaf
+    title: "#34 Add explicit offense/defense visibility choices for sharing and exports"
+    parent_id: "3.0"
+    nesting_depth: 1
+    outcome: Coaches choose offense, defense or both before sharing or exporting, see the actual composition, and the choice is carried in the shared snapshot and image, PDF and video outputs.
+    scope: components/App.tsx, components/SharedPlay.tsx, lib/play/share.ts, lib/export/card.ts and siblings
+    acceptance_criteria:
+      - Visibility choice before sharing and exporting, with an obvious default and preview
+      - Chosen visibility is preserved in the shared snapshot and applicable outputs
+      - Copy explains that a share link is a snapshot, not a live view
+      - Existing shared links keep working; all visibility choices are tested
+    dependencies: ["0.review"]
+    preserved_behavior: Links already shared decode as before, showing both teams.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "3.35"
+    kind: leaf
+    title: "#35 Make teaching playback deterministic by default"
+    parent_id: "3.0"
+    nesting_depth: 1
+    outcome: Designer playback follows the marked primary read every time by default, matches exported clips, and any probabilistic mode is a clearly named option.
+    scope: lib/play/motion.ts, lib/export/video.ts, components/Playback.tsx
+    acceptance_criteria:
+      - Default playback consistently follows the configured primary for the same play
+      - Any probabilistic simulation is a named option with an explanation
+      - Designer playback and exported clips agree in teaching mode
+      - Run, pass and play-action behaviour is preserved; repeated playback and multiple receivers are tested
+    dependencies: ["0.review"]
+    preserved_behavior: Run and play-action choreography is unchanged; no product scrubber is added.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+
+  # ── 4. Refresh and make Demo reproducible ─────────────────────────────────
+  - id: "4.0"
+    kind: group
+    title: Refresh and make Demo reproducible
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "4.37"
+    kind: leaf
+    title: "#37 Commit executable Demo recording workflow and deterministic fixtures"
+    parent_id: "4.0"
+    nesting_depth: 1
+    outcome: A committed development-only recorder with fictional fixtures regenerates every demo chapter from a clean checkout with one command, in a disposable browser profile, failing clearly when a beat does not match.
+    scope: scripts/ (recorder), DEMO_WORKFLOW.md, components/demo/demos.ts, package.json
+    acceptance_criteria:
+      - Recording script, fixtures, chapter actions and timing are committed; tool versions pinned
+      - One-chapter and all-chapters commands with an explicit output directory
+      - Disposable browser profile; a coach's real data is never touched
+      - Clear failure on a missing selector, wrong state, export or recording beat
+      - Regeneration verified from a clean checkout; manifest and size checks retained
+    dependencies: ["3.35"]
+    preserved_behavior: Existing clips, manifest checks and WebM/MP4 delivery keep working until regenerated.
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "4.36"
+    kind: leaf
+    title: "#36 Make Demo chapters readable and accurately demonstrate their coverage"
+    parent_id: "4.0"
+    nesting_depth: 1
+    outcome: Every advertised feature is shown as a completed action in a focused, legible chapter, regenerated with the committed recorder against the current interface.
+    scope: components/demo/demos.ts, components/demo/DemoClip.tsx, public demo assets, DEMO_WORKFLOW.md
+    acceptance_criteria:
+      - Every covers entry matches a completed action in its clip
+      - Overloaded chapters are split; budgets revised deliberately
+      - Active controls are framed or zoomed with readable captions
+      - Movement, run, pass, play-action, coverage, saving, exports, playbooks, team and import are shown
+      - Clips reviewed at phone width with refreshed interface visuals
+    dependencies: ["4.37", "3.31"]
+    preserved_behavior: Lazy loading, one active clip and efficient delivery are retained; the playback chapter just shows a play running.
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
+
+  # ── 5. Establish the release gate ─────────────────────────────────────────
+  - id: "5.0"
+    kind: group
+    title: Establish the release gate
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "5.38"
+    kind: leaf
+    title: "#38 Add browser journey regression tests to pull-request CI"
+    parent_id: "5.0"
+    nesting_depth: 1
+    outcome: Isolated browser tests against a production build run on every pull request, covering the saving, history, playbook, import, sharing and export journeys, with traces on failure and a concise summary.
+    scope: .github/workflows/pr.yml, package.json, a browser test directory with fictional fixtures
+    acceptance_criteria:
+      - Browser tests run against a production build in CI with fictional per-test fixtures
+      - Create, edit, save, reload, reopen, A to B to undo to save, New play, duplicate and custom primary mirror or flip are covered
+      - Playbook create, add, reorder, validated import, backup round-trip, sharing visibility and export states are covered
+      - Offline and deterministic playback coverage is added as those fixes land
+      - Traces and screenshots upload on failure; lint, typecheck, unit tests and build remain gates
+    dependencies: ["1.25", "1.26", "1.27", "1.29"]
+    preserved_behavior: The existing Merge Gate and commitlint checks are unchanged; no real browser data is touched.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "5.39"
+    kind: leaf
+    title: "#39 Add production error recovery, diagnostics, and a release rollback runbook"
+    parent_id: "5.0"
+    nesting_depth: 1
+    outcome: Unexpected failures land on a recoverable error UI that protects unsaved work, actionable errors are captured without play contents or personal data, and release verification, monitoring and rollback are documented and rehearsed.
+    scope: app/layout.tsx and route error boundaries, components/App.tsx, a diagnostics module, .github/workflows/release.yml, a runbook document
+    acceptance_criteria:
+      - Recoverable route and global error UI with safe retry or reload and an unsaved-work warning
+      - Errors captured with release and browser context, excluding play contents, notes, share payloads and personal data
+      - Report-a-problem entry and concise storage and privacy information
+      - Release verification, monitoring ownership and rollback documented; a rollback verified safely
+      - Reporting failure never blocks drawing or saving and degrades gracefully offline
+    dependencies: ["1.25"]
+    preserved_behavior: Drawing, saving and the failed-save download keep working when reporting is unavailable.
+    checkpoint:
+      state: ready
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "5.40"
+    kind: leaf
+    title: "#40 Complete real-device, print, offline, and coach-pilot release validation"
+    parent_id: "5.0"
+    nesting_depth: 1
+    outcome: The critical journeys pass on iPad Safari, iPhone Safari, Android Chrome and desktop keyboard; wristbands and binders print at actual size; offline paths work on devices; and a 3 to 5 coach pilot completes a practice workflow with recorded outcomes against a defined go or no-go.
+    scope: a validation record under docs/, physical devices and printers, pilot coaches
+    acceptance_criteria:
+      - Device, browser and version recorded for each platform with results
+      - Create, draw, coverage, playback, save, reload, book, share and export exercised on each
+      - Touch targets, scrolling, orientation, focus, screen-reader basics and downloads verified
+      - Offline fresh and repeat visits, deep links, watched demos and post-deploy updates tested
+      - Actual-size Letter and A4 wristbands and binders verified; season-sized library exercised; pilot friction recorded
+    dependencies: ["2.28", "2.30", "2.32", "5.38", "5.39"]
+    preserved_behavior: Coaches' private plays are never published; postcards and flyers stay outside this gate.
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
+
+  # ── 6. After the reliability gate ─────────────────────────────────────────
+  - id: "6.0"
+    kind: group
+    title: Export enhancements after the reliability gate
+    parent_id: null
+    nesting_depth: 0
+    dependencies: []
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "6.12"
+    kind: leaf
+    title: "#12 Postcards: two-sided play cards, two-up with cut lines"
+    parent_id: "6.0"
+    nesting_depth: 1
+    outcome: A two-sided postcard PDF (card front, coaching points and name line on the back) exports two-up with cut lines or one per 4 by 6 sheet, for one play or a whole book.
+    scope: lib/export/card.ts, a postcard layout in lib/export/, components/playbooks/ExportPanel.tsx
+    acceptance_criteria:
+      - Front reuses the card composition; back carries notes, team name and a name line
+      - Two-up on Letter or A4 with dashed cut lines and a mirrored back page for duplex
+      - 4 by 6 stock option, one card per sheet
+      - Exported for one play or every play in the book through the existing PDF runner
+      - Legible on a mono printer with the small app mark
+    dependencies: ["5.40"]
+    preserved_behavior: Existing wristband and binder exports are unchanged.
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
+  - id: "6.13"
+    kind: leaf
+    title: "#13 Flyer: one page of six featured plays for parents and players"
+    parent_id: "6.0"
+    nesting_depth: 1
+    outcome: A one-page Letter or A4 flyer of six chosen plays at the simple level, with the team band, play numbers and names, exported from the playbook screen.
+    scope: lib/export/binder.ts (four-up layout reuse), a flyer layout in lib/export/, components/playbooks/ExportPanel.tsx
+    acceptance_criteria:
+      - Fixed six-slot template reusing the four-up layout code and fitField
+      - Team name and colour band at the top, numbers and names per play, app mark at the bottom
+      - Coach picks the six plays, defaulting to the first six
+      - Loaded on demand through the existing PDF writer; mono-printer legible
+    dependencies: ["5.40"]
+    preserved_behavior: Existing wristband and binder exports are unchanged.
+    checkpoint:
+      state: planned
+      updated_at: "2026-09-08T00:00:00.000Z"
