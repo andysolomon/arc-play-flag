@@ -58,6 +58,18 @@ export function App() {
     if (open && narrowRef.current) setLeftOpen(false);
   }, []);
 
+  // a tap anywhere but a sidebar or the header folds both sidebars away
+  useEffect(() => {
+    if (!leftOpen && !rightOpen) return;
+    const outside = (e: PointerEvent) => {
+      if (e.target instanceof Element && e.target.closest("aside, header")) return;
+      setLeftOpen(false);
+      setRightOpen(false);
+    };
+    document.addEventListener("pointerdown", outside, true);
+    return () => { document.removeEventListener("pointerdown", outside, true); };
+  }, [leftOpen, rightOpen]);
+
   const onSelect = useCallback((id: string) => {
     dispatch({ type: "select", id });
     openRight(true);
