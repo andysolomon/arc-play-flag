@@ -76,9 +76,11 @@ describe("fieldLayout", () => {
     expect(f.bands).toHaveLength(1);
     expect(f.endZone).toBeNull();
     expect(f.lines.map((l) => l.y)).toEqual([462, 352, 242, 132, 22]);
-    expect(f.texts.map((t) => t.t)).toEqual(["LOS", "10", "15", "20"]);
-    // the clipped band is only 1 yard tall, too short for its label
-    expect(fieldLayout(30).texts.map((t) => t.t)).toContain("NO-RUN");
+    expect(f.texts.map((t) => t.t)).toEqual(["LOS", "10", "15", "20", "NO-RUN"]);
+    // at 19 yards the band is clipped to 1 yard, too short for its label
+    const g = fieldLayout(19);
+    expect(g.bands).toHaveLength(1);
+    expect(g.texts.map((t) => t.t)).not.toContain("NO-RUN");
   });
   test("shows the end zone at full depth", () => {
     const f = fieldLayout(45);

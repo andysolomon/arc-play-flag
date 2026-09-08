@@ -225,7 +225,8 @@ export function fieldLayout(depthYards: number, showYardNumbers = true): FieldLa
     if (b2 - a <= 0.05) return null;
     return { y: py(a, top), h: (b2 - a) * S };
   };
-  const bands = [clipRect(-20, -15), clipRect(-35, -30)].filter((b): b is Band => b !== null);
+  // the 5 yards before midfield (the 20) and before the goal line (the 40)
+  const bands = [clipRect(-15, -10), clipRect(-35, -30)].filter((b): b is Band => b !== null);
   const endZone = clipRect(-37, -35);
   const lines: YardLine[] = [];
   for (let y = 5; y >= -35; y -= 5) {
