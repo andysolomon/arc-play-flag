@@ -93,7 +93,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   out.push(
     field(item.play.players, x + pad, fy, w - 2 * pad, y + h - pad - fy, {
       highlight: playerWithLabel(item.play, position),
-      showDefense: false,
+      show: "offense",
       showYardNumbers: false,
       // a landscape cell: show only as much field as the cell's shape needs, so the play fills it
       minDepth: 14,

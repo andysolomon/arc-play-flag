@@ -1,6 +1,6 @@
 import { S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { routeDef } from "@/lib/play/routes";
-import type { Level, Pane, Player, Pt } from "@/lib/play/types";
+import type { Level, Pane, Player, Pt, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 
 /**
@@ -18,7 +18,8 @@ export interface ArtOptions {
   level?: Level;
   /** an offensive player whose route is drawn bold while every other route fades */
   highlight?: string | null;
-  showDefense?: boolean;
+  /** which team is drawn; routes are still laid out against the whole play, as on the live field */
+  show?: Vis;
   showYardNumbers?: boolean;
   /**
    * The box the field will be fitted into: its aspect decides how much depth shows.
@@ -44,13 +45,16 @@ export const YELLOW = "#f2b705";
 export const FONT = "'Patrick Hand', 'Comic Sans MS', cursive";
 const TIGHT: Pane = { pw: 1000, ph: 1 };
 
+const visible = (players: readonly Player[], show: Vis): readonly Player[] =>
+  show === "both" ? players : players.filter((p) => p.team === show);
+
 export const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const f1 = (n: number): string => n.toFixed(1);
 
 export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art {
-  const { level = "simple", highlight = null, showDefense = true, showYardNumbers = true, box = null, minDepth = 24 } = opts;
-  const shown = showDefense ? players : players.filter((p) => p.team === "offense");
+  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, box = null, minDepth = 24 } = opts;
+  const shown = visible(players, show);
   const d = depth(shown, box ?? TIGHT, minDepth);
   const layout = fieldLayout(d, showYardNumbers);
   const top = layout.top;
@@ -177,9 +181,8 @@ export function playSvg(players: readonly Player[], opts: ArtOptions = {}): stri
 }
 
 /** Yards of depth the art shows, for callers sizing a box around it. */
-export function artDepth(players: readonly Player[], box: Pane | null, showDefense = true, minDepth = 24): number {
-  const shown = showDefense ? players : players.filter((p) => p.team === "offense");
-  return depth(shown, box ?? TIGHT, minDepth);
+export function artDepth(players: readonly Player[], box: Pane | null, show: Vis = "both", minDepth = 24): number {
+  return depth(visible(players, show), box ?? TIGHT, minDepth);
 }
 
 export { S };
