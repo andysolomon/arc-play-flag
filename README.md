@@ -14,6 +14,7 @@ Requires [Bun](https://bun.sh) 1.4+.
 bun install
 bun dev          # http://localhost:3000
 bun test         # unit tests for lib/play
+bun run build && bun run test:e2e   # browser journeys against the production build (Playwright; see e2e/README.md)
 bun run lint     # eslint (typescript-eslint strict)
 bun run typecheck
 bun run build
@@ -35,6 +36,7 @@ bunx vercel --prod
 - `app/` — Next.js App Router: the designer (`/`), the playbooks screen (`/playbooks`, one static shell that also shows a single book via `?book=<id>` so it opens offline), the video tour (`/demo`), shared plays (`/p/[id]`), root layout, `globals.css` with the design tokens in `@theme`.
 - `components/` — Header, PlaySidebar, RouteSidebar, Field, PlayerToken, RouteLayer, Hint, PlayThumb; `components/playbooks/` holds the playbook list, book editor and export panel, while `components/demo/` defines the tour chapters and player cards.
 - `lib/play/` — pure domain code (routes, geometry, zones, history, storage, library, the derived call) with `bun test` coverage. Plays are keyed by a generated id (`ffpd.plays.v2`); the prototype's name-keyed `ffpd.plays.v1` is migrated on first read.
+- `e2e/` — Playwright browser journeys (`*.journey.ts`) that drive the production build through the saving, history, playbook, import, sharing and export flows with fictional fixtures; they run on every pull request.
 - `lib/render/` — the play as static SVG markup, drawn from the same geometry as the live field (thumbnails, cards, printed pages).
 - `lib/export/` — page composition in points, the zero-dependency PDF writer, the rasteriser, and the wristband, binder, card and playbook-file formats. Export code is loaded on demand. `video.ts` records a 4:5 clip from the designer with a 1.5-second formation still, deterministic completed run, and 1.5-second final hold. The play name and selected playbook number stay visible; the browser records WebM or MP4. Keep the tab visible during recording; exports can be cancelled.
 - `public/icons/` — the sticker PNGs, pre-optimised (≤ 8 KB each). New tool stickers are drawn by `scripts/tool-stickers.ts` (run with `node`).
