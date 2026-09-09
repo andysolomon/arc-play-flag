@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { record } from "@/lib/diagnostics";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getTeam, subscribe } from "@/lib/play/library";
 import { numbered } from "@/lib/export/numbered";
 import type { Player } from "@/lib/play/types";
@@ -32,6 +33,7 @@ export function PlayExport({ id, name, players }: Props) {
       else await (await import("@/lib/export/card")).exportCardPng(options);
       setStatus(video ? "Clip saved" : "Card saved");
     } catch (error) {
+      if (!abort.signal.aborted) record("export", error);
       setStatus(abort.signal.aborted ? "Export cancelled" : error instanceof Error ? error.message : "Export failed. Please try again.");
     } finally {
       controller.current = null;

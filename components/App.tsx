@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { install, record } from "@/lib/diagnostics";
 import { initialState, reducer, selected, shown, unsaved } from "@/lib/play/reducer";
 import type { RouteType } from "@/lib/play/types";
 import { getPlays, getServerPlays, playById, savePlay, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute } from "@/lib/play/routes";
-import { StorageError, failureMessage, kebab, newId, readDraft, writeDraft } from "@/lib/play/storage";
+import { StorageError, failureMessage, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { Header } from "./Header";
 import { Hint } from "./Hint";
@@ -125,7 +126,7 @@ export function App() {
       draftBroken.current = false;
     } catch (e) {
       if (!(e instanceof StorageError)) throw e;
-      if (!draftBroken.current) say(`Autosave is off · ${failureMessage(e)}`, 3200);
+      if (!draftBroken.current) { say(`Autosave is off · ${failureMessage(e)}`, 3200); record("storage", e); }
       draftBroken.current = true;
     }
   }, [say, s.id, s.name, s.notes, s.players]);
@@ -151,7 +152,7 @@ export function App() {
 
   const onSave = useCallback(() => {
     const r = savePlay({ id: s.id, name: s.name || "Untitled play", notes: s.notes, players: [...s.players] });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); return; }
+    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
@@ -160,7 +161,7 @@ export function App() {
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
     const r = savePlay({ id: null, name: n, notes: s.notes, players: [...s.players] });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); return; }
+    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
     dispatch({ type: "setName", name: n });
     dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
@@ -168,11 +169,10 @@ export function App() {
   }, [say, s.name, s.notes, s.players]);
   // the way out when the device won't keep the play: a one-play playbook file that "Import a file…" takes back
   const onDownload = useCallback(() => {
-    const name = s.name || "Untitled play";
-    const play = { id: s.id ?? newId(), name, notes: s.notes, players: [...s.players] };
-    void Promise.all([import("@/lib/export/playbook-file"), import("@/lib/export/raster")]).then(([{ encodePlaybookFile }, { download }]) => {
-      const json = encodePlaybookFile({ id: newId(), name: `${name} (recovered)`, plays: [play.id] }, [play], null);
-      download(new Blob([json], { type: "application/json" }), `${kebab(name)}.playbook.json`);
+    const play = { id: s.id ?? newId(), name: s.name, notes: s.notes, players: [...s.players] };
+    void Promise.all([import("@/lib/export/playbook-file"), import("@/lib/export/raster")]).then(([{ encodeRecoveryFile }, { download }]) => {
+      const file = encodeRecoveryFile(play);
+      download(new Blob([file.json], { type: "application/json" }), file.filename);
     });
   }, [s.id, s.name, s.notes, s.players]);
   // opening another play (or a fresh one) over unsaved work is undoable as a whole:
@@ -193,6 +193,8 @@ export function App() {
     const url = `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", players: [...s.players] })}`;
     navigator.clipboard.writeText(url).then(() => { say("Link copied"); }, () => { window.prompt("Copy this link", url); });
   }, [say, s.name, s.players]);
+  // errors nobody caught are remembered (scrubbed, on this device only) for "Report a problem"
+  useEffect(() => install(), []);
   // offline on the sideline: a tiny service worker caches the shell and static assets
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {

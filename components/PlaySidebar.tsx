@@ -4,6 +4,7 @@ import { memo, type ReactNode, type ChangeEvent } from "react";
 import { MAX_NOTES } from "@/lib/play/storage";
 import type { SavedPlay, Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
+import { Support } from "./Support";
 import { divider, eyebrow, input, pill, tileGrid } from "./ui";
 
 interface Props {
@@ -99,6 +100,8 @@ function PlaySidebarImpl({
         <IconTile icon="defOnly" label="Defense" active={vis === "defense"} onClick={() => { onVis("defense"); }} />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">Clear and reset only touch the team you&apos;re showing.</span>
+      <span className={divider} />
+      <Support />
     </>
   );
 }

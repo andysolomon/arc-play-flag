@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { record } from "@/lib/diagnostics";
 import type { Numbered } from "@/lib/export/numbered";
 import { PAPERS, defaultPaper, type PaperKey } from "@/lib/export/pages";
 import { BAND_PRESETS, type BandSize } from "@/lib/export/wristband";
@@ -42,7 +43,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
     setBusy(true);
     say(`${label}…`, 0);
     job((done, total) => { say(`${label}… page ${String(Math.min(done + 1, total))} of ${String(total)}`, 0); })
-      .then(() => { say("Saved"); }, () => { say("That export failed. Try again on a bigger screen."); })
+      .then(() => { say("Saved"); }, (e: unknown) => { record("export", e); say("That export failed. Try again on a bigger screen."); })
       .finally(() => { setBusy(false); });
   };
 
