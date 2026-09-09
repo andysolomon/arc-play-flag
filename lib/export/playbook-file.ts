@@ -1,4 +1,4 @@
-import { newId, normalizePlaybook, normalizeSavedPlay, normalizeTeam } from "@/lib/play/storage";
+import { kebab, newId, normalizePlaybook, normalizeSavedPlay, normalizeTeam } from "@/lib/play/storage";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 
 /**
@@ -136,4 +136,16 @@ export function planImport(file: PlaybookFile, library: readonly SavedPlay[], bo
   else if (existing.name === file.playbook.name && existing.plays.join() === ids.join()) book = null;
   else book = { id: newId(), name: file.playbook.name + " (imported)", plays: ids };
   return { plays, book, reused, copied, added };
+}
+
+/**
+ * A one-play playbook file for a play the device won't keep: the way out of a failed
+ * save or a broken screen. "Import a file…" on the playbooks page takes it back.
+ */
+export function encodeRecoveryFile(play: SavedPlay): { json: string; filename: string } {
+  const name = play.name || "Untitled play";
+  return {
+    json: encodePlaybookFile({ id: newId(), name: `${name} (recovered)`, plays: [play.id] }, [{ ...play, name }], null),
+    filename: `${kebab(name)}.playbook.json`,
+  };
 }
