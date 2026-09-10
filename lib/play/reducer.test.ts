@@ -41,7 +41,7 @@ describe("reducer", () => {
     expect(s.targeting).toBe(false);
     expect(find(s, "d1")?.route).toEqual({ type: "man", target: "o3" });
   });
-  test("custom routes: waypoints then double-tap drops the duplicate click", () => {
+  test("custom routes: double-tap drops only its duplicate click", () => {
     let s = run(
       { type: "select", id: "o5" },
       { type: "pick", key: "custom" },
@@ -50,7 +50,7 @@ describe("reducer", () => {
       { type: "draftPoint", pt: [24, -3] },
     );
     expect(s.draft?.pts).toHaveLength(3);
-    s = reducer(s, { type: "draftFinish" });
+    s = reducer(s, { type: "draftFinishDoubleTap" });
     expect(s.draft).toBeNull();
     expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[19, 2], [24, -3]] });
   });
@@ -58,6 +58,45 @@ describe("reducer", () => {
     const s = run({ type: "select", id: "o5" }, { type: "pick", key: "custom" }, { type: "draftFinish" });
     expect(find(s, "o5")?.route).toBeNull();
     expect(s.past).toHaveLength(0);
+  });
+  test("the explicit finish keeps the last genuine waypoint and cancel preserves the prior route", () => {
+    let s = run(
+      { type: "select", id: "o5" },
+      { type: "pick", key: "custom" },
+      { type: "draftPoint", pt: [19, 2] },
+      { type: "draftPoint", pt: [24, -3] },
+      { type: "draftFinish" },
+    );
+    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[19, 2], [24, -3]] });
+    expect(s.past).toHaveLength(1);
+    s = reducer(s, { type: "pick", key: "custom" });
+    s = reducer(s, { type: "draftPoint", pt: [10, -8] });
+    s = reducer(s, { type: "draftCancel" });
+    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[19, 2], [24, -3]] });
+    expect(s.past).toHaveLength(1);
+  });
+  test("custom waypoint add, move, and remove are each undoable and redoable", () => {
+    let s = run({ type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, -3], [8, -6]] } });
+    s = reducer(s, { type: "customPointAdd", id: "o3", pt: [11, -9] });
+    s = reducer(s, { type: "customPointMove", id: "o3", index: 1, pt: [9, -7] });
+    s = reducer(s, { type: "customPointRemove", id: "o3", index: 0 });
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[9, -7], [11, -9]] });
+    expect(s.past).toHaveLength(4);
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[5, -3], [9, -7], [11, -9]] });
+    s = reducer(s, { type: "undo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[5, -3], [8, -6], [11, -9]] });
+    s = reducer(s, { type: "redo" });
+    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[5, -3], [9, -7], [11, -9]] });
+  });
+  test("draft and custom waypoint removal respect disabled-state invariants", () => {
+    let s = run({ type: "select", id: "o5" }, { type: "pick", key: "custom" });
+    expect(reducer(s, { type: "draftPointRemove" })).toBe(s);
+    s = reducer(s, { type: "draftPoint", pt: [19, 2] });
+    s = reducer(s, { type: "draftPointRemove" });
+    expect(s.draft?.pts).toEqual([]);
+    s = run({ type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, -3]] } });
+    expect(reducer(s, { type: "customPointRemove", id: "o3", index: 0 })).toBe(s);
   });
   test("only one primary read at a time", () => {
     let s = run({ type: "select", id: "o3" }, { type: "pick", key: "go" }, { type: "togglePrimary" });

@@ -7,7 +7,9 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-// share ids are generated client-side, so pages render on first request and are then cached
+// Share ids are generated client-side. Render each request instead of asking Next to
+// persist an arbitrarily long base64 id as a filesystem cache path.
+export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 export function generateStaticParams(): { id: string }[] {
   return [];
@@ -23,5 +25,5 @@ export default async function SharedPlayPage({ params }: Props) {
   const { id } = await params;
   const rec = decodeShare(id);
   if (!rec) notFound();
-  return <SharedPlay id={id} name={rec.name} players={rec.players} />;
+  return <SharedPlay id={id} name={rec.name} players={rec.players} vis={rec.vis} />;
 }

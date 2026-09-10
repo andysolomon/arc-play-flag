@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ballAt, HOLD, positionsAt } from "@/lib/play/motion";
+import { ballAt, buildMotion, HOLD, positionsAt, type Motion } from "@/lib/play/motion";
 import { defaults } from "@/lib/play/routes";
 import type { Player } from "@/lib/play/types";
 import { cardField, cardSvg, type CardOptions } from "./card";
@@ -37,6 +37,36 @@ describe("clip playback", () => {
     if (!pos.o5) throw new Error("Missing runner");
     expect(ballAt(m, pos, t)).toEqual({ ...pos.o5, lift: 0 });
   });
+  test("designer and export choose the same teaching path for pass, run, play-action, and pitch", () => {
+    const scenarios: Array<{
+      players: Player[];
+      expected: Pick<Motion, "kind" | "runner" | "passer" | "receiver">;
+    }> = [
+      {
+        players: defaults().map((p) => {
+          if (p.id === "o3") return { ...p, route: { type: "go" as const, primary: true } };
+          if (p.id === "o4") return { ...p, route: { type: "slant" as const } };
+          return p;
+        }),
+        expected: { kind: "pass", runner: null, passer: "o2", receiver: "o3" },
+      },
+      { players: mixed("run"), expected: { kind: "run", runner: "o5", passer: "o2", receiver: null } },
+      { players: mixed("pass"), expected: { kind: "pass", runner: "o5", passer: "o2", receiver: "o3" } },
+      {
+        players: mixed("pass").map((p) => p.id === "o5" ? { ...p, route: { type: "pitch" as const } } : p),
+        expected: { kind: "pass", runner: "o5", passer: "o5", receiver: "o3" },
+      },
+    ];
+    for (const { players, expected } of scenarios) {
+      const o = options(players);
+      const designer = buildMotion(players, cardField(players).top);
+      const clip = clipMotion(o);
+      const teachingPath = { kind: clip.kind, runner: clip.runner, passer: clip.passer, receiver: clip.receiver };
+      expect(teachingPath).toEqual(expected);
+      expect(teachingPath)
+        .toEqual({ kind: designer.kind, runner: designer.runner, passer: designer.passer, receiver: designer.receiver });
+    }
+  });
   test("long routes finish before the final still; formation and final holds freeze time", () => {
     const o = options(defaults().map((p) => p.id === "o3" ? { ...p, route: { type: "custom", pts: [[3, 1], [27, 1], [3, -10], [27, -10]], primary: true } } : p));
     const m = clipMotion(o);
@@ -65,6 +95,15 @@ describe("clip playback", () => {
     expect(after).not.toContain('href="/icons/football.png"');
     expect(after).not.toBe(before);
     expect(after).toContain(`viewBox="0 0 660 ${String((8 - cardField(o.players).top) * 22)}"`);
+  });
+  test("defense-only clip frames omit offense and its football", () => {
+    const o = { ...options(mixed("pass")), vis: "defense" as const };
+    const m = clipMotion(o);
+    const positions = positionsAt(m, o.players, 1);
+    const svg = cardSvg(o, { positions, ball: ballAt(m, positions, 1), footballHref: "data:image/png;base64,AA==" }).svg;
+    expect(svg).toContain("#4a8fe0");
+    expect(svg).not.toContain("#e5675e");
+    expect(svg).not.toContain("data:image/png;base64,AA==");
   });
 });
 

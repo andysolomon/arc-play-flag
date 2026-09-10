@@ -62,6 +62,11 @@ test("exports are disabled for an empty book, download as real files for a full 
   expect(parsed.plays.map((p) => p.id)).toEqual(["fx-wheel-right", "fx-cover-two"]);
   expect(parsed.team?.name).toBe("Riverside Otters");
 
+  await expect(page.getByRole("radio", { name: "Both teams" })).toBeChecked();
+  await page.getByRole("radio", { name: "Defense" }).check();
+  const preview = page.getByRole("img", { name: "Defense PDF preview" });
+  await expect(preview.locator('circle[fill="#4a8fe0"]')).toHaveCount(5);
+  await expect(preview.locator('circle[fill="#e5675e"]')).toHaveCount(0);
   await page.getByRole("combobox", { name: "Binder layout" }).selectOption("four");
   const [pdf] = await Promise.all([page.waitForEvent("download", { timeout: 40_000 }), page.getByRole("button", { name: "Download binder PDF" }).click()]);
   await expect(toast(page)).toHaveText("Saved", { timeout: 40_000 });

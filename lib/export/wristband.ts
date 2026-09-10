@@ -1,4 +1,4 @@
-import type { TeamSettings } from "@/lib/play/types";
+import type { TeamSettings, Vis } from "@/lib/play/types";
 import { playerWithLabel, positionsOf, type Numbered } from "./numbered";
 import { IN, MUTED, PAPERS, badge, cutRect, field, page, text, type PaperKey, type SvgPage } from "./pages";
 import { measure } from "./raster";
@@ -29,6 +29,7 @@ export interface WristbandOptions {
   paper: PaperKey;
   bookName: string;
   team: TeamSettings;
+  vis?: Vis;
 }
 
 export interface BandCard {
@@ -79,7 +80,7 @@ export function fit(s: string, maxWidth: number, size: number): string {
   return t.trimEnd() + "…";
 }
 
-function cell(x: number, y: number, w: number, h: number, item: Numbered | null, position: string | null): string {
+function cell(x: number, y: number, w: number, h: number, item: Numbered | null, position: string | null, vis: Vis): string {
   if (!item) return "";
   const pad = Math.min(3, w * 0.03);
   const head = Math.min(0.2 * IN, h * 0.22);
@@ -93,7 +94,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   out.push(
     field(item.play.players, x + pad, fy, w - 2 * pad, y + h - pad - fy, {
       highlight: playerWithLabel(item.play, position),
-      show: "offense",
+      show: vis,
       showYardNumbers: false,
       // a landscape cell: show only as much field as the cell's shape needs, so the play fills it
       minDepth: 14,
@@ -102,7 +103,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   return out.join("");
 }
 
-function card(x: number, y: number, size: BandSize, c: BandCard, bookName: string): string {
+function card(x: number, y: number, size: BandSize, c: BandCard, bookName: string, vis: Vis): string {
   const cw = size.w * IN, ch = size.h * IN;
   const out: string[] = [];
   const who = c.position ?? "Everyone";
@@ -113,7 +114,7 @@ function card(x: number, y: number, size: BandSize, c: BandCard, bookName: strin
   const gw = (cw - 2 * SAFE) / size.cols, gh = (ch - 2 * SAFE) / size.rows;
   c.cells.forEach((item, i) => {
     const col = i % size.cols, row = Math.floor(i / size.cols);
-    out.push(cell(x + SAFE + col * gw, top + SAFE + row * gh, gw, gh, item, c.position));
+    out.push(cell(x + SAFE + col * gw, top + SAFE + row * gh, gw, gh, item, c.position, vis));
   });
   return out.join("");
 }
@@ -122,12 +123,13 @@ export function wristbandPages(plays: readonly Numbered[], o: WristbandOptions):
   const p = PAPERS[o.paper];
   const t = tile(o.paper, o.size);
   const cards = planCards(plays, o.size.rows * o.size.cols);
+  const vis = o.vis ?? "offense";
   const pages: SvgPage[] = [];
   for (let i = 0; i < cards.length; i += t.perPage) {
     const body: string[] = [];
     cards.slice(i, i + t.perPage).forEach((c, k) => {
       const col = k % t.cols, row = Math.floor(k / t.cols);
-      body.push(card(MARGIN + col * (t.cw + GAP), MARGIN + row * (t.ch + CAPTION + GAP), o.size, c, o.bookName));
+      body.push(card(MARGIN + col * (t.cw + GAP), MARGIN + row * (t.ch + CAPTION + GAP), o.size, c, o.bookName, vis));
     });
     const who = o.team.name ? `${o.team.name} · ` : "";
     body.push(text(p.w - MARGIN, p.h - MARGIN + 14, 7, `${who}${o.bookName} · wristbands`, { anchor: "end", fill: MUTED }));

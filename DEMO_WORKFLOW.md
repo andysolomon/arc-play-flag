@@ -113,6 +113,8 @@ Then check the production build in a desktop and 390×844 mobile viewport:
 - Confirm a second clip pauses the first.
 - Confirm WebM and MP4 URLs return successfully; test Safari when changing codec settings.
 - Confirm no horizontal overflow on mobile.
-- Turn the network off after one visit and confirm `/demo` still opens; previously played clips should be available from the service-worker cache.
+- Wait for **Offline ready**, then turn the network off and confirm `/`, `/playbooks`, and `/demo` still open. All advertised clips (including ones not yet played) must load and seek from the service-worker cache.
+- While offline, reopen a shared URL that was visited online and confirm the exact play returns. A different, unvisited shared URL must show **Shared play unavailable offline** rather than the designer or another play.
+- During a worker update, confirm the indicator reads **Offline updating…** and does not return to **Offline ready** until every shell dependency and demo asset has been verified. A failed update must leave the prior worker and its cached shared URLs usable.
 
 In the pull request, name the chapters added or refreshed, report the aggregate media size, include the verification commands, and call out any workflow coverage that remains for a later clip.

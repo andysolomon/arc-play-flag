@@ -8,12 +8,13 @@ import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } f
 import { ballAt, buildMotion, positionsAt, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { shown } from "@/lib/play/reducer";
-import { losGap } from "@/lib/play/routes";
+import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 import { Football, PlayButton } from "./Playback";
 import { PlayerToken } from "./PlayerToken";
 import { RouteLayer } from "./RouteLayer";
+import { pillMd } from "./ui";
 
 interface Props {
   players: readonly Player[];
@@ -51,6 +52,15 @@ interface Live {
   y: number;
 }
 
+interface WaypointDrag {
+  id: string;
+  index: number;
+  x0: number;
+  y0: number;
+  moved: boolean;
+  last: { x: number; y: number } | null;
+}
+
 const STEP: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
 };
@@ -62,8 +72,13 @@ function FieldImpl({
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
   const [live, setLive] = useState<Live | null>(null);
+  const [liveWaypoint, setLiveWaypoint] = useState<{ id: string; index: number; x: number; y: number } | null>(null);
+  const [selectedWaypoint, setSelectedWaypoint] = useState<{ id: string; index: number } | null>(null);
   const [boingId, setBoingId] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
+  const waypointDragRef = useRef<WaypointDrag | null>(null);
+  const waypointRefs = useRef(new Map<number, SVGGElement>());
+  const pendingWaypointFocus = useRef<number | null>(null);
   const rafRef = useRef(0);
   // playback: the plan plus seconds into it, or null when the whiteboard is still
   const [run, setRun] = useState<{ motion: Motion; t: number } | null>(null);
@@ -89,10 +104,17 @@ function FieldImpl({
   }, []);
 
   // the dragged player's live spot overrides its committed spot until pointer-up
-  const effective = useMemo(
-    () => (live ? players.map((p) => (p.id === live.id ? { ...p, x: live.x, y: live.y } : p)) : players),
-    [players, live],
-  );
+  const effective = useMemo(() => players.map((p) => {
+    const moved = live?.id === p.id ? { ...p, x: live.x, y: live.y } : p;
+    if (liveWaypoint?.id !== p.id || moved.route?.type !== "custom" || !moved.route.pts) return moved;
+    return {
+      ...moved,
+      route: {
+        ...moved.route,
+        pts: moved.route.pts.map((q, i) => (i === liveWaypoint.index ? [liveWaypoint.x, liveWaypoint.y] as const : q)),
+      },
+    };
+  }), [players, live, liveWaypoint]);
   const d = depth(effective, pane);
   const layout = useMemo(() => fieldLayout(d, showYardNumbers), [d, showYardNumbers]);
   const top = layout.top;
@@ -101,7 +123,12 @@ function FieldImpl({
   useLayoutEffect(() => { topRef.current = top; }, [top]);
 
   const zones = useMemo(() => zoneLayout(effective, top), [effective, top]);
-  const visible = useMemo(() => effective.filter((p) => shown(p, vis)), [effective, vis]);
+  // Man coverage always exposes its valid offense targets, even when the coach is
+  // working in Defense-only view. They disappear again as soon as targeting ends.
+  const visible = useMemo(
+    () => effective.filter((p) => shown(p, vis) || (targeting && p.team === "offense")),
+    [effective, targeting, vis],
+  );
   const routes = useMemo(
     () => visible.flatMap((p) => { const g = geom(p, effective, top, zones); return g ? [{ ...g, id: p.id }] : []; }),
     [visible, effective, top, zones],
@@ -111,6 +138,18 @@ function FieldImpl({
     const p = effective.find((q) => q.id === draft.id);
     return p ? draftPath(p, draft.pts, top) : "";
   }, [draft, effective, top]);
+  const editableCustom = useMemo(() => {
+    const p = effective.find((q) => q.id === selectedId);
+    return p?.route?.type === "custom" ? p : null;
+  }, [effective, selectedId]);
+  const customPoints = editableCustom?.route?.pts ?? [];
+
+  useEffect(() => {
+    const index = pendingWaypointFocus.current;
+    if (index === null || !waypointRefs.current.get(index)) return;
+    pendingWaypointFocus.current = null;
+    waypointRefs.current.get(index)?.focus();
+  }, [customPoints.length]);
 
   const toYards = useCallback((cx: number, cy: number) => {
     const svg = svgRef.current;
@@ -129,6 +168,15 @@ function FieldImpl({
     if (Math.abs(c.x - dr.x0) > 0.25 || Math.abs(c.y - dr.y0) > 0.25) dr.moved = true;
     if (dr.moved) setLive({ id: dr.id, x: c.x, y: c.y });
   }, [toYards]);
+
+  const applyWaypointDrag = useCallback(() => {
+    const dr = waypointDragRef.current;
+    if (!dr?.last) return;
+    const pt = toYards(dr.last.x, dr.last.y);
+    const c = clamp(snap(pt.x, snapMode), snap(pt.y, snapMode), null, topRef.current);
+    if (Math.abs(c.x - dr.x0) > 0.1 || Math.abs(c.y - dr.y0) > 0.1) dr.moved = true;
+    if (dr.moved) setLiveWaypoint({ id: dr.id, index: dr.index, x: c.x, y: c.y });
+  }, [snapMode, toYards]);
 
   const endDrag = useCallback(() => {
     const dr = dragRef.current;
@@ -152,15 +200,34 @@ function FieldImpl({
     onSelect(p.id);
   }, [dispatch, onSelect, players, snapMode, targeting, toYards]);
 
+  const endWaypointDrag = useCallback(() => {
+    const dr = waypointDragRef.current;
+    if (!dr) return;
+    waypointDragRef.current = null;
+    if (dr.moved && dr.last) {
+      const pt = toYards(dr.last.x, dr.last.y);
+      const c = clamp(snap(pt.x, snapMode), snap(pt.y, snapMode), null, topRef.current);
+      dispatch({ type: "customPointMove", id: dr.id, index: dr.index, pt: [c.x, c.y] });
+    }
+    setLiveWaypoint(null);
+  }, [dispatch, snapMode, toYards]);
+
   useEffect(() => {
     const move = (e: globalThis.PointerEvent) => {
       const dr = dragRef.current;
-      if (!dr) return;
+      const waypoint = waypointDragRef.current;
+      if (!dr && !waypoint) return;
       e.preventDefault();
-      dr.last = { x: e.clientX, y: e.clientY };
-      if (!rafRef.current) rafRef.current = requestAnimationFrame(applyDrag);
+      if (dr) {
+        dr.last = { x: e.clientX, y: e.clientY };
+        if (!rafRef.current) rafRef.current = requestAnimationFrame(applyDrag);
+      }
+      if (waypoint) {
+        waypoint.last = { x: e.clientX, y: e.clientY };
+        applyWaypointDrag();
+      }
     };
-    const up = () => { endDrag(); };
+    const up = () => { endDrag(); endWaypointDrag(); };
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
@@ -169,7 +236,7 @@ function FieldImpl({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [applyDrag, endDrag]);
+  }, [applyDrag, applyWaypointDrag, endDrag, endWaypointDrag]);
 
   const onDown = useCallback((id: string, e: PointerEvent<SVGGElement>) => {
     if (e.button !== 0 || playRef.current) return;
@@ -180,6 +247,15 @@ function FieldImpl({
     dragRef.current = { id, team: p.team, gap: losGap(p.route), ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   }, [players, toYards]);
+
+  const onWaypointDown = useCallback((id: string, index: number, point: readonly [number, number], e: PointerEvent<SVGGElement>) => {
+    if (e.button !== 0 || playRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedWaypoint({ id, index });
+    waypointDragRef.current = { id, index, x0: point[0], y0: point[1], moved: false, last: null };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+  }, []);
 
   const onKey = useCallback((id: string, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);
@@ -192,22 +268,104 @@ function FieldImpl({
       if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onSelect(id);
+      if (targeting && p.team === "offense") dispatch({ type: "target", id });
+      else onSelect(id);
     }
-  }, [dispatch, onSelect, players, selectedId]);
+  }, [dispatch, onSelect, players, selectedId, targeting]);
+
+  const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
+    const p = players.find((q) => q.id === id);
+    const point = p?.route?.type === "custom" ? p.route.pts?.[index] : undefined;
+    const pointCount = p?.route?.type === "custom" ? (p.route.pts?.length ?? 0) : 0;
+    if (!point) return;
+    const step = STEP[e.key];
+    if (step && !playRef.current) {
+      e.preventDefault();
+      const distance = e.shiftKey ? 1 : 0.5;
+      const c = clamp(point[0] + step[0] * distance, point[1] + step[1] * distance, null, topRef.current);
+      dispatch({ type: "customPointMove", id, index, pt: [c.x, c.y] });
+      setSelectedWaypoint({ id, index });
+    } else if ((e.key === "Delete" || e.key === "Backspace") && pointCount > 1) {
+      e.preventDefault();
+      dispatch({ type: "customPointRemove", id, index });
+      const nextIndex = Math.max(0, Math.min(index, pointCount - 2));
+      setSelectedWaypoint({ id, index: nextIndex });
+      pendingWaypointFocus.current = nextIndex;
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setSelectedWaypoint({ id, index });
+    }
+  }, [dispatch, players]);
 
   const onFieldClick = (e: MouseEvent<SVGSVGElement>) => {
     if (draft) {
       const pt = toYards(e.clientX, e.clientY);
       const c = clamp(snap(pt.x, snapMode), snap(pt.y, snapMode), null, top);
       dispatch({ type: "draftPoint", pt: [c.x, c.y] });
+      e.currentTarget.focus();
       return;
     }
     if (targeting) { dispatch({ type: "cancelTargeting" }); return; }
     dispatch({ type: "select", id: null });
   };
 
+  const finishDraft = useCallback(() => { dispatch({ type: "draftFinish" }); }, [dispatch]);
+  const cancelDraft = useCallback(() => { dispatch({ type: "draftCancel" }); }, [dispatch]);
+  const addWaypoint = useCallback(() => {
+    if (!editableCustom?.route?.pts || editableCustom.route.pts.length >= MAX_ROUTE_POINTS) return;
+    const pts = editableCustom.route.pts;
+    const last = pts.at(-1) ?? [editableCustom.x, editableCustom.y];
+    const prev = pts.at(-2) ?? [editableCustom.x, editableCustom.y];
+    const dx = last[0] - prev[0], dy = last[1] - prev[1];
+    const length = Math.hypot(dx, dy);
+    const raw = length > 0.01
+      ? [last[0] + (dx / length) * 2, last[1] + (dy / length) * 2] as const
+      : [last[0], last[1] - 2] as const;
+    const c = clamp(snap(raw[0], snapMode), snap(raw[1], snapMode), null, topRef.current);
+    const index = pts.length;
+    pendingWaypointFocus.current = index;
+    setSelectedWaypoint({ id: editableCustom.id, index });
+    dispatch({ type: "customPointAdd", id: editableCustom.id, pt: [c.x, c.y] });
+  }, [dispatch, editableCustom, snapMode]);
+  const removeWaypoint = useCallback(() => {
+    if (!editableCustom?.route?.pts || !selectedWaypoint || selectedWaypoint.id !== editableCustom.id || editableCustom.route.pts.length <= 1) return;
+    const index = selectedWaypoint.index;
+    const nextIndex = Math.max(0, Math.min(index, editableCustom.route.pts.length - 2));
+    pendingWaypointFocus.current = nextIndex;
+    setSelectedWaypoint({ id: editableCustom.id, index: nextIndex });
+    dispatch({ type: "customPointRemove", id: editableCustom.id, index });
+  }, [dispatch, editableCustom, selectedWaypoint]);
+
+  useEffect(() => {
+    if (!draft) return;
+    const key = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        dispatch({ type: "draftCancel" });
+      } else if ((e.key === "Delete" || e.key === "Backspace") && draft.pts.length > 0) {
+        const target = e.target instanceof Element ? e.target : null;
+        if (target?.closest("button, input, select, textarea, [role='button']")) return;
+        e.preventDefault();
+        dispatch({ type: "draftPointRemove" });
+      } else if (e.key === "Enter" && draft.pts.length > 0) {
+        const target = e.target instanceof Element ? e.target : null;
+        if (target?.closest("button, input, select, textarea, [role='button']")) return;
+        e.preventDefault();
+        dispatch({ type: "draftFinish" });
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => { window.removeEventListener("keydown", key); };
+  }, [dispatch, draft]);
+
   const dragging = live !== null;
+  const selectedWaypointIndex = selectedWaypoint?.index;
+  const activeWaypoint = selectedWaypoint?.id === editableCustom?.id && selectedWaypointIndex !== undefined && selectedWaypointIndex < customPoints.length
+    ? selectedWaypointIndex
+    : null;
+  const selectedPoint = activeWaypoint === null ? null : customPoints[activeWaypoint];
+  const targetOwner = targeting ? players.find((p) => p.id === selectedId) : null;
+  const targetOwnerName = targetOwner ? `${targetOwner.team === "offense" ? "Offense" : "Defense"} ${targetOwner.label || targetOwner.id}` : null;
 
   // playback runs on its own rAF clock; the plan is built once, from the committed play
   const playing = run !== null;
@@ -244,15 +402,48 @@ function FieldImpl({
     <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden p-[9px] print:block print:overflow-visible print:p-0">
       {title !== undefined && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
       <div className="relative flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
+        {draft && !readOnly && (
+          <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
+            <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow`}>
+              Finish
+            </button>
+            <button type="button" onClick={() => { dispatch({ type: "draftPointRemove" }); }} disabled={draft.pts.length === 0} title="Remove last waypoint (Delete)" aria-keyshortcuts="Delete Backspace" className={`${pillMd} min-h-11`}>
+              Remove last
+            </button>
+            <button type="button" onClick={cancelDraft} title="Cancel route (Esc)" aria-keyshortcuts="Escape" className={`${pillMd} min-h-11`}>
+              Cancel
+            </button>
+          </div>
+        )}
+        {editableCustom && !draft && !readOnly && (
+          <div role="toolbar" aria-label="Waypoint controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
+            <button type="button" onClick={addWaypoint} disabled={customPoints.length >= MAX_ROUTE_POINTS} title="Add a waypoint (undoable)" className={`${pillMd} min-h-11 bg-white`}>
+              Add waypoint
+            </button>
+            <button type="button" onClick={removeWaypoint} disabled={activeWaypoint === null || customPoints.length <= 1} title="Remove selected waypoint (Delete, undoable)" aria-keyshortcuts="Delete Backspace" className={`${pillMd} min-h-11 bg-white`}>
+              Remove waypoint
+            </button>
+          </div>
+        )}
+        <span className="sr-only" aria-live="polite">
+          {targeting && targetOwnerName
+            ? `Targeting for ${targetOwnerName}. Focus an offense player and press Enter or Space. Escape cancels.`
+            : selectedPoint
+              ? `Waypoint ${String((activeWaypoint ?? 0) + 1)} selected at ${selectedPoint[0].toFixed(1)}, ${selectedPoint[1].toFixed(1)} yards. Arrow keys move it; Delete removes it.`
+              : ""}
+        </span>
         <svg
           ref={svgRef}
           viewBox={layout.viewBox}
           onClick={readOnly ? undefined : onFieldClick}
-          onDoubleClick={readOnly ? undefined : () => { if (draft) dispatch({ type: "draftFinish" }); }}
+          onDoubleClick={readOnly ? undefined : () => { if (draft) dispatch({ type: "draftFinishDoubleTap" }); }}
           className="block h-auto w-full touch-pan-y rounded-field border-[3px] border-ink bg-turf shadow-field"
-          role="img"
+          role={readOnly ? "img" : "group"}
+          tabIndex={!readOnly && draft ? 0 : undefined}
+          aria-keyshortcuts={!readOnly && draft ? "Enter Escape Delete Backspace" : undefined}
           aria-label="Play diagram"
         >
+          <desc>{readOnly ? "Flag football play diagram" : "Interactive flag football play diagram. Tab to players and custom waypoints."}</desc>
           <defs>
             <pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="11" stroke="#1b1a17" strokeWidth="1.6" opacity="0.19" />
@@ -275,6 +466,34 @@ function FieldImpl({
             )}
           </g>
           <RouteLayer routes={routes} draftD={draftD} />
+          {editableCustom && !draft && customPoints.map((point, index) => {
+            const active = activeWaypoint === index;
+            return (
+              <g
+                key={`${editableCustom.id}-${String(index)}`}
+                ref={(node) => {
+                  if (node) waypointRefs.current.set(index, node);
+                  else waypointRefs.current.delete(index);
+                }}
+                transform={`translate(${px(point[0]).toFixed(1)},${py(point[1], top).toFixed(1)})`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={active}
+                aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Delete Backspace"
+                aria-label={`Waypoint ${String(index + 1)} of ${String(customPoints.length)} for ${editableCustom.team === "offense" ? "Offense" : "Defense"} ${editableCustom.label || editableCustom.id}. Arrow keys move; Delete removes.`}
+                onFocus={() => { setSelectedWaypoint({ id: editableCustom.id, index }); }}
+                onPointerDown={(e) => { onWaypointDown(editableCustom.id, index, point, e); }}
+                onClick={(e) => { e.stopPropagation(); setSelectedWaypoint({ id: editableCustom.id, index }); }}
+                onKeyDown={(e) => { onWaypointKey(editableCustom.id, index, e); }}
+                className="group cursor-grab touch-none outline-none"
+                data-export="skip"
+              >
+                <circle r={34} fill="transparent" />
+                <circle r={active ? 11 : 9} fill="#fffdf6" stroke="#1b1a17" strokeWidth={3} />
+                <circle r={15} fill="none" stroke="#f2b705" strokeWidth={4} className="opacity-0 group-focus-visible:opacity-100" />
+              </g>
+            );
+          })}
           {visible.map((p) => (
             <PlayerToken
               key={p.id}
@@ -283,6 +502,7 @@ function FieldImpl({
               y={py(played?.[p.id]?.y ?? p.y, top)}
               selected={p.id === selectedId}
               target={targeting && p.team === "offense"}
+              focusOnTarget={targeting && p.team === "offense" && p.id === visible.find((q) => q.team === "offense")?.id}
               boing={boingId === p.id}
               dragging={dragging}
               readOnly={readOnly}

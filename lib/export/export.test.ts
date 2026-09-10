@@ -15,6 +15,10 @@ const play = (id: string, name: string, notes = ""): SavedPlay => ({
 const team = { name: "Sharks", color: "#123abc" };
 const library = Array.from({ length: 7 }, (_, i) => play(`p${String(i)}`, `Play ${String(i + 1)}`, i === 0 ? "Sell the fake.\nThen go." : ""));
 const book: Playbook = { id: "wk1", name: "Week 1", plays: ["p0", "p1", "missing", "p2", "p3", "p4", "p5", "p6"] };
+const expectVisibility = (svg: string, vis: "offense" | "defense" | "both") => {
+  expect(svg.includes("#e5675e")).toBe(vis !== "defense");
+  expect(svg.includes("#4a8fe0")).toBe(vis !== "offense");
+};
 
 describe("numbering", () => {
   test("skips plays that no longer exist and numbers from 1", () => {
@@ -76,6 +80,23 @@ describe("card", () => {
     expect(c.svg).toContain('fill="#123abc"');
     expect(c.svg).toContain(">3<");
     expect(c.svg).toContain(">Sharks<");
+  });
+  test("draws the selected team composition", () => {
+    for (const vis of ["offense", "defense", "both"] as const) {
+      expectVisibility(cardSvg({ name: "Trips right", players: library[0]?.players ?? [], team, vis }).svg, vis);
+    }
+  });
+});
+
+describe("export visibility", () => {
+  test("carries offense, defense and both through binder and wristband PDFs", () => {
+    const items = numbered(book, library).slice(0, 1);
+    for (const vis of ["offense", "defense", "both"] as const) {
+      const binder = binderPages(items, { layout: "one", paper: "letter", bookName: "Week 1", team, vis });
+      const bands = wristbandPages(items, { size: { w: 4.5, h: 2.25, rows: 2, cols: 3 }, paper: "letter", bookName: "Week 1", team, vis });
+      expectVisibility(binder[0]?.svg ?? "", vis);
+      expectVisibility(bands[0]?.svg ?? "", vis);
+    }
   });
 });
 

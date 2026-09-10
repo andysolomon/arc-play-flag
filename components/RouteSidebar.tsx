@@ -29,6 +29,13 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
   const canPrimary = !!(sel && sel.team === "offense" && sel.route);
   const canMirror = mirrorable(sel);
   const primaryOn = !!sel?.route?.primary;
+  const guidance = hint
+    ? hint.startsWith("Cover who?")
+      ? "Choose a red offense player · Tab then Enter or Space · Esc cancels."
+      : "Tap waypoints on the field · double-tap to finish · Finish (Enter) or Cancel (Esc)."
+    : sel?.route?.type === "custom"
+      ? "Select a waypoint to edit it · arrow keys move · Delete removes · undo/redo supported."
+      : null;
 
   return (
     <>
@@ -120,7 +127,7 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
           )}
         </>
       )}
-      {hint && <Note text={hint} />}
+      {guidance && <Note text={guidance} />}
     </>
   );
 }

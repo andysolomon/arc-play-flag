@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { memo } from "react";
 import { pillMd, pillSm } from "./ui";
 
 interface Props {
+  name: string;
+  persistence: "saved" | "unsaved" | "autosaved" | "failed";
   leftOpen: boolean;
   rightOpen: boolean;
   canUndo: boolean;
@@ -18,7 +21,14 @@ interface Props {
   onClear: () => void;
 }
 
-function HeaderImpl({ leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
+const persistenceLabel: Record<Props["persistence"], string> = {
+  saved: "Saved",
+  unsaved: "Unsaved",
+  autosaved: "Draft autosaved",
+  failed: "Saving failed",
+};
+
+function HeaderImpl({ name, persistence, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
       <button
@@ -33,9 +43,22 @@ function HeaderImpl({ leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleL
       >
         {leftOpen ? "‹" : "›"}<span className="max-[479px]:hidden"> Play</span>
       </button>
-      <h1 className="whitespace-nowrap text-caption font-normal text-ink-muted max-[479px]:hidden">5v5 flag</h1>
-      <span className="flex-1" />
+      <div className="min-w-0 flex-1 leading-none">
+        <h1 className="truncate text-base font-normal text-ink" title={name}>{name}</h1>
+        <span className={`whitespace-nowrap text-caption ${persistence === "failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
+          {persistenceLabel[persistence]}
+        </span>
+      </div>
       <div className="flex gap-1.5">
+        <Link
+          href="/demo"
+          title="Demo: watch the feature tour"
+          aria-label="Demo"
+          className={`${pillMd} flex shrink-0 items-center gap-1 !text-ink no-underline`}
+        >
+          <Image src="/icons/demo.png" alt="" width={18} height={18} sizes="18px" className="block shrink-0" />
+          <span className="max-[479px]:hidden">Demo</span>
+        </Link>
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={pillMd}>
           ↶<span className="max-[479px]:hidden"> Undo</span>
         </button>
@@ -51,7 +74,7 @@ function HeaderImpl({ leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleL
           className={`${pillMd} flex shrink-0 items-center gap-1`}
         >
           <Image src="/icons/clear.png" alt="" width={18} height={18} sizes="18px" className={`block shrink-0 ${canClear ? "" : "opacity-40"}`} />
-          Clear
+          <span className="max-[479px]:hidden">Clear</span>
         </button>
       </div>
       <button

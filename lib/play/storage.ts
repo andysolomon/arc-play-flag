@@ -21,6 +21,7 @@ export interface DraftRecord {
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 }
 
 export type StorageFailure = "unavailable" | "quota" | "write";
@@ -176,6 +177,35 @@ function write(storage: StorageLike | null, key: string, value: unknown): void {
   if (back !== json) throw new StorageError("write", key);
 }
 
+/**
+ * Writes several keys as one change: every key's prior value is captured first, and if
+ * any write fails, every key touched so far is put back before the StorageError is
+ * rethrown, so a restore either lands whole or leaves the device exactly as it was.
+ */
+export function writeMany(entries: ReadonlyArray<readonly [string, unknown]>, storage: StorageLike | null = browserStorage()): void {
+  if (!storage) throw new StorageError("unavailable", entries[0]?.[0] ?? PLAYS_KEY);
+  let before: ReadonlyArray<readonly [string, string | null]>;
+  try {
+    before = entries.map(([k]) => [k, storage.getItem(k)] as const);
+  } catch (e) {
+    throw new StorageError("write", entries[0]?.[0] ?? PLAYS_KEY, e);
+  }
+  try {
+    for (const [k, v] of entries) write(storage, k, v);
+  } catch (e) {
+    // every captured key goes back, including one whose write landed but didn't read back
+    for (const [k, prev] of [...before].reverse()) {
+      try {
+        if (prev === null && storage.removeItem) storage.removeItem(k);
+        else storage.setItem(k, prev ?? "null");
+      } catch {
+        /* the old value fit before, so this is not expected to fail */
+      }
+    }
+    throw e;
+  }
+}
+
 /** The prototype's library (name → players) as v2 records. */
 function migrateLegacy(storage: StorageLike | null): Library | null {
   const parsed = parse(storage, LEGACY_PLAYS_KEY);
@@ -329,17 +359,21 @@ export function writeTeam(team: TeamSettings, storage: StorageLike | null = brow
   write(storage, TEAM_KEY, normalizeTeam(team) ?? DEFAULT_TEAM);
 }
 
-export function readDraft(storage: StorageLike | null = browserStorage()): DraftRecord | null {
-  const parsed = parse(storage, DRAFT_KEY);
-  if (!isRecord(parsed) || !Array.isArray(parsed.players)) return null;
-  const players = normalizePlayers(parsed.players);
+/** One draft from any JSON-ish value, or null when there are no players in it. */
+export function normalizeDraft(raw: unknown): DraftRecord | null {
+  if (!isRecord(raw) || !Array.isArray(raw.players)) return null;
+  const players = normalizePlayers(raw.players);
   if (!players.length) return null;
   return {
-    name: typeof parsed.name === "string" ? parsed.name : "New play",
+    name: typeof raw.name === "string" ? raw.name : "New play",
     players,
-    id: typeof parsed.id === "string" ? parsed.id : null,
-    notes: cleanNotes(parsed.notes),
+    id: typeof raw.id === "string" ? raw.id : null,
+    notes: cleanNotes(raw.notes),
   };
+}
+
+export function readDraft(storage: StorageLike | null = browserStorage()): DraftRecord | null {
+  return normalizeDraft(parse(storage, DRAFT_KEY));
 }
 
 /** Throws a StorageError when the write doesn't land. */

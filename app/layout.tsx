@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { Patrick_Hand } from "next/font/google";
+import { OfflineStatus } from "@/components/OfflineStatus";
 import "./globals.css";
 
 const patrickHand = Patrick_Hand({
@@ -25,7 +26,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${patrickHand.variable} h-full`}>
-      <body className="h-full">{children}</body>
+      <body className="h-full">
+        {children}
+        {process.env.NODE_ENV === "production" ? <OfflineStatus /> : null}
+      </body>
     </html>
   );
 }

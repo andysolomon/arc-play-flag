@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { numbered } from "@/lib/export/numbered";
 import {
-  deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, subscribe, updatePlaybook,
+  addPlayToPlaybook, deletePlaybook, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam,
+  subscribe, swapPlaybookReferences, updatePlaybook,
 } from "@/lib/play/library";
+import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { failureMessage } from "@/lib/play/storage";
 import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
@@ -25,6 +27,10 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
   const items = useMemo(() => (book ? numbered(book, plays) : []), [book, plays]);
   const inBook = useMemo(() => new Set(items.map((i) => i.play.id)), [items]);
   const others = plays.filter((p) => !inBook.has(p.id));
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<PlayFilter>("all");
+  const [sort, setSort] = useState<PlaySort>("recent");
+  const visibleOthers = useMemo(() => discoverPlays(others, { query, filter, sort }), [filter, others, query, sort]);
 
   if (!book) {
     return (
@@ -41,14 +47,11 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
   };
   const setPlays = (ids: string[]) => { update({ ...book, plays: ids }); };
   const move = (i: number, d: number) => {
-    const ids = items.map((it) => it.play.id);
     const j = i + d;
-    if (j < 0 || j >= ids.length) return;
-    const a = ids[i], b = ids[j];
+    if (j < 0 || j >= items.length) return;
+    const a = items[i]?.play.id, b = items[j]?.play.id;
     if (a === undefined || b === undefined) return;
-    ids[i] = b;
-    ids[j] = a;
-    setPlays(ids);
+    update(swapPlaybookReferences(book, a, b));
   };
 
   return (
@@ -94,12 +97,15 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
                 {it.n}
               </span>
               <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} show={show} /></div>
-              <span className="min-w-0 flex-1 truncate text-base" title={it.play.name}>{it.play.name}</span>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-base" title={it.play.name}>{it.play.name}</span>
+                <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
+              </div>
               <div className="flex flex-none flex-col gap-1">
                 <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} px-2 py-0 text-small`}>↑</button>
                 <button type="button" onClick={() => { move(i, 1); }} disabled={i === items.length - 1} aria-label="Move down" className={`${pill} px-2 py-0 text-small`}>↓</button>
               </div>
-              <button type="button" onClick={() => { setPlays(items.filter((x) => x.play.id !== it.play.id).map((x) => x.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} px-2 py-0 text-small`}>✕</button>
+              <button type="button" onClick={() => { setPlays(book.plays.filter((playId) => playId !== it.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} px-2 py-0 text-small`}>✕</button>
             </li>
           ))}
         </ol>
@@ -111,13 +117,24 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
         <span className="text-base text-ink-muted">
           {plays.length === 0 ? "Save a play in the designer first." : "Every saved play is already in this playbook."}
         </span>
-      ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-          {others.map((p) => (
+      ) : (<>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
+          <input value={query} onChange={(e) => { setQuery(e.target.value); }} placeholder="Search names and notes" aria-label="Search plays to add" className={input} />
+          <select value={filter} onChange={(e) => { setFilter(e.target.value as PlayFilter); }} aria-label="Filter plays to add" className={input}>
+            <option value="all">All types</option><option value="run">Run</option><option value="pass">Pass</option><option value="defense">Defense</option>
+          </select>
+          <select value={sort} onChange={(e) => { setSort(e.target.value as PlaySort); }} aria-label="Sort plays to add" className={input}>
+            <option value="recent">Recent</option><option value="name">Name</option>
+          </select>
+        </div>
+        {visibleOthers.length === 0 ? (
+          <div className="rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base text-ink-muted">No plays match. Try another search or filter.</div>
+        ) : <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+          {visibleOthers.map((p) => (
             <button
               key={p.id}
               type="button"
-              onClick={() => { setPlays([...book.plays, p.id]); }}
+              onClick={() => { const r = addPlayToPlaybook(book.id, p.id); if (!r.ok) say(failureMessage(r.error), 3200); }}
               title={`Add ${p.name}`}
               className={`${card} flex cursor-pointer flex-col gap-2 text-left transition-transform duration-[120ms] hover:-translate-y-0.5 hover:bg-yellow-soft motion-reduce:transition-none`}
             >
@@ -126,8 +143,8 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
               <span className="text-caption text-ink-muted">+ Add</span>
             </button>
           ))}
-        </div>
-      )}
+        </div>}
+      </>)}
 
       <span className={divider} />
       <span className={eyebrow}>EXPORT</span>

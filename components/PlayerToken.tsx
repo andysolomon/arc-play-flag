@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type KeyboardEvent, type PointerEvent } from "react";
+import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { teamFill } from "@/lib/play/geometry";
 import type { Player } from "@/lib/play/types";
 
@@ -11,6 +11,8 @@ interface Props {
   selected: boolean;
   /** dashed ring while "Man" is waiting for a red player */
   target: boolean;
+  /** move focus to the first eligible player when man-target selection begins */
+  focusOnTarget: boolean;
   boing: boolean;
   dragging: boolean;
   /** read-only rendering (share page): no handlers, not focusable */
@@ -21,15 +23,21 @@ interface Props {
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
 
-function PlayerTokenImpl({ player: p, x, y, selected, target, boing, dragging, readOnly = false, onPointerDown, onKeyDown }: Props) {
+function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, onPointerDown, onKeyDown }: Props) {
+  const tokenRef = useRef<SVGGElement>(null);
+  useEffect(() => {
+    if (focusOnTarget) tokenRef.current?.focus();
+  }, [focusOnTarget]);
   const ringR = selected ? 33 : target ? 31 : 0;
   return (
     <g
+      ref={tokenRef}
       transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
       tabIndex={readOnly ? undefined : 0}
       role={readOnly ? "img" : "button"}
-      aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id)}
+      aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id) + (target ? ", man coverage target" : "")}
       aria-pressed={readOnly ? undefined : selected}
+      aria-keyshortcuts={readOnly ? undefined : "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"}
       onPointerDown={readOnly ? undefined : (e) => { onPointerDown(p.id, e); }}
       onClick={readOnly ? undefined : (e) => { e.stopPropagation(); }}
       onKeyDown={readOnly ? undefined : (e) => { onKeyDown(p.id, e); }}
@@ -37,7 +45,8 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, boing, dragging, r
     >
       <g style={{ ...centred, transform: selected ? "scale(1.1)" : "none" }}>
         <g style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : undefined}>
-          <circle r={30} fill="transparent" stroke="none" />
+          {/* 68 SVG units gives the token an approximately 44px target at the common phone field width. */}
+          <circle r={34} fill="transparent" stroke="none" />
           {/* keyboard focus shows the same yellow ring as selection */}
           <circle r={33} fill="none" stroke="#f2b705" strokeWidth={5} className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
           {ringR > 0 && (

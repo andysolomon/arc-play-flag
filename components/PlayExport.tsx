@@ -2,17 +2,27 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { record } from "@/lib/diagnostics";
+import { exportCardPng } from "@/lib/export/card";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getTeam, subscribe } from "@/lib/play/library";
 import { numbered } from "@/lib/export/numbered";
-import type { Player } from "@/lib/play/types";
+import { exportVideo } from "@/lib/export/video";
+import type { Player, Vis } from "@/lib/play/types";
+import { playSvg } from "@/lib/render/play-svg";
 import { pill, select } from "./ui";
 
 interface Props { id: string | null; name: string; players: readonly Player[] }
+
+const visibilityChoices: readonly { value: Vis; label: string }[] = [
+  { value: "offense", label: "Offense" },
+  { value: "defense", label: "Defense" },
+  { value: "both", label: "Both teams" },
+];
 
 export function PlayExport({ id, name, players }: Props) {
   const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const [bookId, setBookId] = useState("");
+  const [vis, setVis] = useState<Vis>("both");
   const [busy, setBusy] = useState<"video" | "card" | null>(null);
   const [status, setStatus] = useState("");
   const controller = useRef<AbortController | null>(null);
@@ -27,10 +37,10 @@ export function PlayExport({ id, name, players }: Props) {
     controller.current = abort;
     setBusy(video ? "video" : "card");
     setStatus(video ? "Recording… keep this tab visible." : "Drawing the card…");
-    const options = { name: name || "Untitled play", players, team: getTeam(), n };
+    const options = { name: name || "Untitled play", players, team: getTeam(), n, vis };
     try {
-      if (video) await (await import("@/lib/export/video")).exportVideo(options, abort.signal);
-      else await (await import("@/lib/export/card")).exportCardPng(options);
+      if (video) await exportVideo(options, abort.signal);
+      else await exportCardPng(options);
       setStatus(video ? "Clip saved" : "Card saved");
     } catch (error) {
       if (!abort.signal.aborted) record("export", error);
@@ -50,6 +60,28 @@ export function PlayExport({ id, name, players }: Props) {
           </select>
         </label>
       ) : book ? <span className="text-small">{book.name} · Play {n}</span> : null}
+      <fieldset className="flex flex-wrap gap-2" aria-label="Teams visible in picture and video exports">
+        <legend className="mb-1 w-full text-small">Visible teams</legend>
+        {visibilityChoices.map((choice) => (
+          <label key={choice.value} className={`${pill} flex cursor-pointer items-center gap-1.5 px-2 py-0.5 text-small has-[:checked]:bg-yellow`}>
+            <input
+              type="radio"
+              name="play-export-visibility"
+              value={choice.value}
+              checked={vis === choice.value}
+              disabled={busy !== null}
+              onChange={() => { setVis(choice.value); }}
+            />
+            {choice.label}
+          </label>
+        ))}
+      </fieldset>
+      <div
+        role="img"
+        aria-label={`${visibilityChoices.find((choice) => choice.value === vis)?.label ?? "Both teams"} export preview`}
+        className="mx-auto w-full max-w-[250px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+        dangerouslySetInnerHTML={{ __html: playSvg(players, { show: vis, box: { pw: 660, ph: 300 } }) }}
+      />
       <button type="button" className={pill} disabled={busy !== null} onClick={() => { void save(false); }}>Save picture card</button>
       <button type="button" className={pill} disabled={busy !== null} onClick={() => { void save(true); }}>Save video clip</button>
       {busy === "video" && <button type="button" className={pill} onClick={() => { controller.current?.abort(); }}>Cancel export</button>}
