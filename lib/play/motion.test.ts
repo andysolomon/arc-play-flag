@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DELAY, PRIMARY_ODDS, SHADOW, SPEED, ballAt, buildMotion, positionsAt } from "./motion";
+import { DELAY, PRIMARY_ODDS, SHADOW, SPEED, ballAt, buildMotion, positionsAt, simulationPlayback } from "./motion";
 import { defaults } from "./routes";
 import type { Player, Route } from "./types";
 
@@ -102,25 +102,34 @@ describe("the call", () => {
     const late = positionsAt(m, ps, m.dur);
     expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o4"), lift: 0 });
   });
-  test("the primary read gets the ball 80% of the time, someone else otherwise", () => {
+  test("repeated teaching playback always throws to the primary among multiple receivers", () => {
     const ps = defaults()
       .map(withRoute("o3", { type: "go", primary: true }))
       .map(withRoute("o4", { type: "slant" }))
       .map(withRoute("o5", { type: "out" }));
-    expect(buildMotion(ps, TOP, flips(PRIMARY_ODDS - 0.01)).receiver).toBe("o3");
-    expect(buildMotion(ps, TOP, flips(PRIMARY_ODDS + 0.01, 0.1)).receiver).toBe("o4");
-    expect(buildMotion(ps, TOP, flips(PRIMARY_ODDS + 0.01, 0.9)).receiver).toBe("o5");
+    for (let i = 0; i < 20; i++) expect(buildMotion(ps, TOP).receiver).toBe("o3");
   });
-  test("with nothing marked, any receiver can get the ball", () => {
+  test("explicit simulation playback can explore receivers other than the primary", () => {
+    const ps = defaults()
+      .map(withRoute("o3", { type: "go", primary: true }))
+      .map(withRoute("o4", { type: "slant" }))
+      .map(withRoute("o5", { type: "out" }));
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(PRIMARY_ODDS - 0.01))).receiver).toBe("o3");
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(PRIMARY_ODDS + 0.01, 0.1))).receiver).toBe("o4");
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(PRIMARY_ODDS + 0.01, 0.9))).receiver).toBe("o5");
+  });
+  test("with nothing marked, teaching uses the first drawn receiver and simulation may vary it", () => {
     const ps = defaults().map(withRoute("o4", { type: "slant" })).map(withRoute("o5", { type: "out" }));
-    expect(buildMotion(ps, TOP, flips(0.1)).receiver).toBe("o4");
-    expect(buildMotion(ps, TOP, flips(0.9)).receiver).toBe("o5");
+    expect(buildMotion(ps, TOP).receiver).toBe("o4");
+    expect(buildMotion(ps, TOP)).toEqual(buildMotion(ps, TOP));
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(0.1))).receiver).toBe("o4");
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(0.9))).receiver).toBe("o5");
   });
   test("a primary runner beside receivers is still a run", () => {
     const ps = defaults()
       .map(withRoute("o5", { type: "stretch", primary: true }))
       .map(withRoute("o3", { type: "go" }));
-    const m = buildMotion(ps, TOP, flips(0.99));
+    const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("run");
     expect(m.runner).toBe("o5");
   });
@@ -128,7 +137,7 @@ describe("the call", () => {
     const ps = defaults()
       .map(withRoute("o5", { type: "dive" }))
       .map(withRoute("o3", { type: "go", primary: true }));
-    const m = buildMotion(ps, TOP, flips(0.1, 0.1));
+    const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("pass");
     expect(m.runner).toBe("o5");
     expect(m.receiver).toBe("o3");
@@ -159,7 +168,7 @@ describe("the call", () => {
   });
   test("a pitch beside a primary receiver: the runner takes the toss, sets up behind the line and throws", () => {
     const ps = defaults().map(withRoute("o5", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
-    const m = buildMotion(ps, TOP, flips(0.1, 0.1));
+    const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("pass");
     expect(m.runner).toBe("o5");
     expect(m.passer).toBe("o5");
@@ -180,14 +189,14 @@ describe("the call", () => {
   });
   test("a primary pitch runner keeps it", () => {
     const ps = defaults().map(withRoute("o5", { type: "pitch", primary: true })).map(withRoute("o3", { type: "go" }));
-    const m = buildMotion(ps, TOP, flips(0.99));
+    const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("run");
     expect(m.passer).toBe("o2");
     expect(at(positionsAt(m, ps, m.dur), "o5").y).toBeCloseTo(-5, 5);
   });
   test("a quarterback on a pitch route rolls out and throws from the edge", () => {
     const ps = defaults().map(withRoute("o2", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
-    const m = buildMotion(ps, TOP, flips(0.1, 0.1));
+    const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("pass");
     expect(m.passer).toBe("o2");
     expect(m.handAt).toBe(m.snapAt);
@@ -196,9 +205,10 @@ describe("the call", () => {
     expect(at(pre, "o2").y).toBeGreaterThan(0.9);
     expect(ballAt(m, pre, m.throwAt)).toEqual({ ...at(pre, "o2"), lift: 0 });
   });
-  test("runner and receivers with nothing marked is a coin flip", () => {
+  test("an unmarked mixed call is teaching play-action, while simulation may choose the run", () => {
     const ps = defaults().map(withRoute("o5", { type: "counter" })).map(withRoute("o3", { type: "go" }));
-    expect(buildMotion(ps, TOP, flips(0.2)).kind).toBe("run");
-    expect(buildMotion(ps, TOP, flips(0.8)).kind).toBe("pass");
+    expect(buildMotion(ps, TOP).kind).toBe("pass");
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(0.2, 0.1))).kind).toBe("run");
+    expect(buildMotion(ps, TOP, simulationPlayback(flips(0.8, 0.1, 0.1))).kind).toBe("pass");
   });
 });

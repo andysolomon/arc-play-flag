@@ -1,5 +1,5 @@
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { MAX_ROUTE_POINTS, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 export interface PlayState extends Doc, History {
@@ -19,7 +19,13 @@ export type Action =
   | { type: "target"; id: string }
   | { type: "setRoute"; id: string; route: Route | null }
   | { type: "draftPoint"; pt: Pair }
+  | { type: "draftPointRemove" }
   | { type: "draftFinish" }
+  | { type: "draftFinishDoubleTap" }
+  | { type: "draftCancel" }
+  | { type: "customPointAdd"; id: string; pt: Pair }
+  | { type: "customPointMove"; id: string; index: number; pt: Pair }
+  | { type: "customPointRemove"; id: string; index: number }
   | { type: "togglePrimary" }
   | { type: "mirror" }
   | { type: "rename"; id: string; label: string; commit: boolean }
@@ -90,6 +96,23 @@ function setRoute(s: PlayState, id: string, route: Route | null): PlayState {
   return { ...c, players: c.players.map((p) => (p.id === id ? legalSpot({ ...p, route }) : p)) };
 }
 
+function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
+  const d = s.draft;
+  if (!d) return s;
+  let pts = d.pts;
+  if (dropDuplicate && pts.length > 1) {
+    const a = pts[pts.length - 2], b = pts[pts.length - 1];
+    if (a && b && a[0] === b[0] && a[1] === b[1]) pts = pts.slice(0, -1);
+  }
+  const next = pts.length ? setRoute(s, d.id, { type: "custom", pts: [...pts] }) : s;
+  return { ...next, draft: null };
+}
+
+function customRoute(s: PlayState, id: string): Route | null {
+  const route = s.players.find((p) => p.id === id)?.route;
+  return route?.type === "custom" ? route : null;
+}
+
 const cleared = { selectedId: null, targeting: false, draft: null } as const;
 
 export function reducer(s: PlayState, a: Action): PlayState {
@@ -121,13 +144,40 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return setRoute(s, a.id, a.route);
     case "draftPoint":
       if (!s.draft || s.draft.pts.length >= MAX_ROUTE_POINTS) return s;
-      return { ...s, draft: { id: s.draft.id, pts: [...s.draft.pts, a.pt] } };
-    case "draftFinish": {
-      const d = s.draft;
-      if (!d) return s;
-      const pts = d.pts.slice(0, Math.max(1, d.pts.length - 1));
-      const next = pts.length ? setRoute(s, d.id, { type: "custom", pts }) : s;
-      return { ...next, draft: null };
+      return { ...s, draft: { id: s.draft.id, pts: [...s.draft.pts, clampPoint(a.pt)] } };
+    case "draftPointRemove":
+      if (!s.draft?.pts.length) return s;
+      return { ...s, draft: { id: s.draft.id, pts: s.draft.pts.slice(0, -1) } };
+    case "draftFinish":
+      return finishDraft(s, false);
+    case "draftFinishDoubleTap":
+      return finishDraft(s, true);
+    case "draftCancel":
+      return s.draft ? { ...s, draft: null } : s;
+    case "customPointAdd": {
+      const route = customRoute(s, a.id);
+      if (!route || (route.pts?.length ?? 0) >= MAX_ROUTE_POINTS) return s;
+      const c = commit(s);
+      return { ...c, players: patch(c.players, a.id, { route: { ...route, pts: [...(route.pts ?? []), clampPoint(a.pt)] } }) };
+    }
+    case "customPointMove": {
+      const route = customRoute(s, a.id);
+      const pts = route?.pts;
+      if (!route || !pts?.[a.index]) return s;
+      const pt = clampPoint(a.pt);
+      if (pts[a.index]?.[0] === pt[0] && pts[a.index]?.[1] === pt[1]) return s;
+      const c = commit(s);
+      return {
+        ...c,
+        players: patch(c.players, a.id, { route: { ...route, pts: pts.map((q, i) => (i === a.index ? pt : q)) } }),
+      };
+    }
+    case "customPointRemove": {
+      const route = customRoute(s, a.id);
+      const pts = route?.pts;
+      if (!route || !pts?.[a.index] || pts.length <= 1) return s;
+      const c = commit(s);
+      return { ...c, players: patch(c.players, a.id, { route: { ...route, pts: pts.filter((_, i) => i !== a.index) } }) };
     }
     case "togglePrimary": {
       const sel = selected(s);

@@ -11,7 +11,7 @@ export const HOLD = 0.8;
 export const SHADOW = 2.2;
 /** How long a delay runner waits at the snap before going. */
 export const DELAY = 0.8;
-/** How often the quarterback throws to the primary read when one is marked. */
+/** How often simulation playback throws to the primary read when one is marked. */
 export const PRIMARY_ODDS = 0.8;
 /** A play-action fake takes this long to sell. */
 const FAKE = 0.25;
@@ -61,6 +61,20 @@ export interface Ball {
   /** 0 on the ground, 1 at the top of the arc */
   lift: number;
 }
+
+/**
+ * Teaching playback demonstrates the drawn read consistently. Simulation playback is
+ * explicitly opt-in and may explore another valid outcome using the supplied random
+ * source; product playback and exported teaching clips use the teaching default.
+ */
+export type PlaybackMode =
+  | { kind: "teaching" }
+  | { kind: "simulation"; random: () => number };
+
+const TEACHING_PLAYBACK: PlaybackMode = { kind: "teaching" };
+
+/** Opt into probabilistic outcomes, with an injectable source for reproducible tests. */
+export const simulationPlayback = (random: () => number): PlaybackMode => ({ kind: "simulation", random });
 
 const cl = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
@@ -115,12 +129,17 @@ const pickOne = <T>(list: readonly T[], rand: () => number): T | undefined =>
 /**
  * Plan a playback from the committed play. Every routed player gets a track in yards.
  * The centre snaps to the quarterback; a run route makes it a run (the ball is handed
- * or tossed at the mesh point), otherwise it's a pass to one of the receivers — the
- * primary read most of the time — with a play-action fake when a runner is in the mix.
+ * or tossed at the mesh point), otherwise it's a pass to one of the receivers — always
+ * the primary read when one is marked — with a play-action fake when a runner is in the mix.
  * A pitch runner who doesn't keep it stops at their set point and throws from there.
- * `rand` decides the coin flips, so tests can pin them.
+ * The teaching default is deterministic. Simulation mode explicitly enables coin flips.
  */
-export function buildMotion(players: readonly Player[], top: number, rand: () => number = Math.random): Motion {
+export function buildMotion(
+  players: readonly Player[],
+  top: number,
+  mode: PlaybackMode = TEACHING_PLAYBACK,
+): Motion {
+  const random = mode.kind === "simulation" ? mode.random : null;
   const zones = zoneLayout(players, top);
   const tracks: Record<string, Track> = {};
   for (const p of players) {
@@ -169,11 +188,15 @@ export function buildMotion(players: readonly Player[], top: number, rand: () =>
   const primary = offense.find((p) => p.route?.primary);
   const primaryRun = primary?.route ? isRun(primary.route.type) : false;
 
-  // the call: a run when the run is the read or there's nobody to throw to; a coin flip
-  // when both are on the board and nothing is marked
+  // The teaching call follows the marked read. An unmarked mixed call demonstrates the
+  // pass with its run action; only explicitly requested simulation flips between outcomes.
   const isRunPlay =
-    runners.length > 0 && (primaryRun || receivers.length === 0 || (!primary && rand() < 0.5));
-  const runner = isRunPlay && primaryRun ? primary : runners.length > 0 ? pickOne(runners, rand) : undefined;
+    runners.length > 0 && (primaryRun || receivers.length === 0 || (!primary && random !== null && random() < 0.5));
+  const runner = isRunPlay && primaryRun
+    ? primary
+    : runners.length > 0
+      ? random ? pickOne(runners, random) : runners[0]
+      : undefined;
   if (runner) {
     m.runner = runner.id;
     const tr = tracks[runner.id];
@@ -201,11 +224,13 @@ export function buildMotion(players: readonly Player[], top: number, rand: () =>
     setAt = set.wait + set.len / SPEED + SET_UP;
   }
 
-  // the throw: the primary read most of the time, otherwise anyone who's out in a route
+  // Teaching always throws to the configured read, or the first drawn receiver when no
+  // read is marked. Simulation can explore the other drawn receivers.
   m.kind = "pass";
   const others = receivers.filter((p) => p.id !== primary?.id);
-  const receiver =
-    primary && !primaryRun && (others.length === 0 || rand() < PRIMARY_ODDS) ? primary : pickOne(others, rand);
+  const receiver = primary && !primaryRun
+    ? !random || others.length === 0 || random() < PRIMARY_ODDS ? primary : pickOne(others, random)
+    : random ? pickOne(receivers, random) : receivers[0];
   if (!receiver) return m;
   m.receiver = receiver.id;
   const rt = tracks[receiver.id];

@@ -1,6 +1,6 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
 import { kebab } from "@/lib/play/storage";
-import type { Level, Player, TeamSettings } from "@/lib/play/types";
+import type { Level, Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
 import { ybv } from "@/lib/play/geometry";
 import { fitField } from "./binder";
@@ -19,12 +19,14 @@ export interface CardOptions {
   n?: number | null;
   team: TeamSettings;
   level?: Level;
+  /** which side is present in the saved picture or clip */
+  vis?: Vis;
 }
 
 /** Shared viewport: animation must use exactly the same yards as the card art. */
-export function cardField(players: readonly Player[]): { w: number; h: number; top: number } {
-  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40);
-  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h })) };
+export function cardField(players: readonly Player[], vis: Vis = "both"): { w: number; h: number; top: number } {
+  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40, vis);
+  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis)) };
 }
 
 export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): SvgPage {
@@ -53,8 +55,14 @@ export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "b
   out.push(text(x, titleY + 20, 56, fit(o.name, right - x, 56)));
 
   const top = titleY + r + 36;
-  const f = cardField(o.players);
-  out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, { level: o.level ?? "simple", ...frame }, 5));
+  const vis = o.vis ?? "both";
+  const f = cardField(o.players, vis);
+  out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, {
+    level: o.level ?? "simple",
+    ...frame,
+    ball: vis === "defense" ? null : frame.ball,
+    show: vis,
+  }, 5));
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));
   return page(W, H, out.join(""));

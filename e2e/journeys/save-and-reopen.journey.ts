@@ -6,6 +6,8 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
   const d = new Designer(page);
   await d.goto();
   await d.setName("Otter Post Corner");
+  await expect(page.getByRole("heading", { name: "Otter Post Corner" })).toBeVisible();
+  await expect(page.getByText("Draft autosaved", { exact: true })).toBeVisible();
   await d.select("X");
   await d.pick("Post");
   await expect(d.routes).toHaveCount(1);
@@ -17,6 +19,7 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
 
   await d.save();
   await expect(d.toast).toHaveText("Saved");
+  await expect(page.locator("header").getByText("Saved", { exact: true })).toBeVisible();
 
   // the draft survives a reload exactly as it was left
   await page.reload();
@@ -53,6 +56,7 @@ test("a save that does not land says so, keeps the play on the field, and offers
 
   await sabotage(page, "quota", true);
   await d.save();
+  await expect(page.getByText("Saving failed", { exact: true })).toBeVisible();
   const alert = page.locator("#play-sidebar").getByRole("alert");
   await expect(alert).toContainText("Couldn't save: this browser's storage is full.");
   await expect(alert).toContainText("Your play is still here.");

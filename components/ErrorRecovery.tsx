@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { RELEASE, record, scrubText } from "@/lib/diagnostics";
+import { encodeRecoveryFile } from "@/lib/export/playbook-file";
+import { download } from "@/lib/export/raster";
 import { DRAFT_KEY, newId, readDraft, type DraftRecord } from "@/lib/play/storage";
 import { ReportLink, StorageNote } from "./Support";
 import { card, eyebrow, pill } from "./ui";
@@ -63,8 +65,8 @@ export function ErrorRecovery({ error, retry }: Props) {
     const d = draft ?? safeDraft();
     if (!d) { setStatus("Nothing to download: no play was in progress."); return; }
     const play = { id: d.id ?? newId(), name: d.name, notes: d.notes ?? "", players: [...d.players] };
-    Promise.all([import("@/lib/export/playbook-file"), import("@/lib/export/raster")])
-      .then(([{ encodeRecoveryFile }, { download }]) => {
+    Promise.resolve()
+      .then(() => {
         const file = encodeRecoveryFile(play);
         download(new Blob([file.json], { type: "application/json" }), file.filename);
         setStatus(`Downloaded ${file.filename}. Import it from Playbooks when you're back.`);

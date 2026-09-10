@@ -13,7 +13,7 @@ function PlayButtonImpl({ playing, onClick }: ButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      title={playing ? "Stop (Esc)" : "Run the play"}
+      title={playing ? "Stop (Esc)" : "Run the teaching path (follows the primary read)"}
       aria-label={playing ? "Stop the play" : "Run the play"}
       aria-pressed={playing}
       data-active={playing}

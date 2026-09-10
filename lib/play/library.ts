@@ -1,6 +1,7 @@
 import {
   StorageError, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
 } from "./storage";
+import { isRun } from "./routes";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
 
 /**
@@ -13,6 +14,47 @@ import type { Playbook, SavedPlay, TeamSettings } from "./types";
  * that was dropped, and never adopts an id the device doesn't know.
  */
 export type Written<T = null> = { ok: true; value: T } | { ok: false; error: StorageError };
+export type PlayFilter = "all" | "run" | "pass" | "defense";
+export type PlaySort = "recent" | "name";
+
+export interface PlayDiscovery {
+  query?: string;
+  filter?: PlayFilter;
+  sort?: PlaySort;
+}
+
+/** A play may match more than one route filter; blank diagrams remain under All. */
+export function playMatchesFilter(play: SavedPlay, filter: Exclude<PlayFilter, "all">): boolean {
+  if (filter === "defense") return play.players.some((p) => p.team === "defense" && p.route);
+  if (filter === "run") return play.players.some((p) => p.team === "offense" && p.route && isRun(p.route.type));
+  return play.players.some((p) => p.team === "offense" && p.route && !isRun(p.route.type));
+}
+
+/** Search name + notes, then return a stable name or newest-insertion-first view. */
+export function discoverPlays(source: readonly SavedPlay[], options: PlayDiscovery = {}): SavedPlay[] {
+  const query = options.query?.trim().toLocaleLowerCase() ?? "";
+  const filter = options.filter ?? "all";
+  const found = source.filter((play) => {
+    if (filter !== "all" && !playMatchesFilter(play, filter)) return false;
+    return !query || `${play.name}\n${play.notes}`.toLocaleLowerCase().includes(query);
+  });
+  if ((options.sort ?? "recent") === "name") {
+    return found.map((play, index) => ({ play, index })).sort((a, b) =>
+      a.play.name.localeCompare(b.play.name, undefined, { sensitivity: "base" }) || a.index - b.index,
+    ).map(({ play }) => play);
+  }
+  return found.reverse();
+}
+
+/** A route-free, deeply detached formation that callers can safely edit and reuse. */
+export function formationTemplate(play: SavedPlay): SavedPlay {
+  return {
+    id: play.id,
+    name: play.name,
+    notes: "",
+    players: play.players.map((player) => ({ ...player, route: null })),
+  };
+}
 
 const NO_PLAYS: readonly SavedPlay[] = [];
 const NO_BOOKS: readonly Playbook[] = [];
@@ -106,6 +148,27 @@ export function updatePlaybook(book: Playbook): Written {
     emit();
     return null;
   });
+}
+
+/** Adds one durable reference once, preserving every existing reference and its order. */
+export function addPlayToPlaybook(bookId: string, playId: string): Written<Playbook> {
+  const book = playbookById(bookId);
+  if (!book || !playById(playId)) return { ok: false, error: new StorageError("write", "playbook reference") };
+  if (book.plays.includes(playId)) return { ok: true, value: book };
+  const next = { ...book, plays: [...book.plays, playId] };
+  const written = updatePlaybook(next);
+  return written.ok ? { ok: true, value: next } : written;
+}
+
+/** Swaps two known references without rebuilding the list, so unknown references survive. */
+export function swapPlaybookReferences(book: Playbook, first: string, second: string): Playbook {
+  const a = book.plays.indexOf(first);
+  const b = book.plays.indexOf(second);
+  if (a < 0 || b < 0 || a === b) return book;
+  const plays = [...book.plays];
+  plays[a] = second;
+  plays[b] = first;
+  return { ...book, plays };
 }
 
 export function deletePlaybook(id: string): Written {

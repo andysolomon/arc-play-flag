@@ -1,6 +1,11 @@
 "use client";
 
-import { memo, type ReactNode, type ChangeEvent } from "react";
+import { memo, useMemo, useState, useSyncExternalStore, type ReactNode, type ChangeEvent } from "react";
+import {
+  addPlayToPlaybook, discoverPlays, formationTemplate, getPlaybooks, getServerPlaybooks, subscribe,
+} from "@/lib/play/library";
+import { encodeShare } from "@/lib/play/share";
+import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { MAX_NOTES } from "@/lib/play/storage";
 import type { SavedPlay, Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
@@ -37,6 +42,16 @@ function PlaySidebarImpl({
   exportOpen, exportPanel, savePanel, onFlip, onClear, onReset, onVis,
 }: Props) {
   const scope: Team | null = vis === "both" ? null : vis;
+  const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<PlayFilter>("all");
+  const [sort, setSort] = useState<PlaySort>("name");
+  const [chosenId, setChosenId] = useState("");
+  const [reuseStatus, setReuseStatus] = useState("");
+  const visiblePlays = useMemo(() => discoverPlays(plays, { query, filter, sort }), [filter, plays, query, sort]);
+  const chosenPlay = plays.find((play) => play.id === chosenId);
+  const template = chosenPlay ? formationTemplate(chosenPlay) : null;
+  const templatePayload = template ? encodeShare({ name: `${template.name} formation`, players: template.players }) : "";
   return (
     <>
       <span className={eyebrow}>PLAY</span>
@@ -69,19 +84,68 @@ function PlaySidebarImpl({
           className="w-full flex-none resize-y rounded-note border-2 border-ink bg-white px-3 py-2 text-base leading-note text-ink placeholder:text-ink-muted"
         />
       )}
-      {plays.length > 0 && (
-        <select
-          value=""
-          onChange={(e: ChangeEvent<HTMLSelectElement>) => { if (e.target.value) onLoad(e.target.value); }}
-          aria-label="Open a saved play"
-          className="w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
-        >
-          <option value="">Open a saved play…</option>
-          {plays.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-      )}
+      {plays.length > 0 && <div className="flex w-full flex-none flex-col gap-2" aria-label="Saved play library">
+        <input
+          value={query}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => { setQuery(e.target.value); }}
+          placeholder="Search names and notes"
+          aria-label="Search saved plays"
+          className={input}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <select value={filter} onChange={(e) => { setFilter(e.target.value as PlayFilter); }} aria-label="Filter saved plays" className={input}>
+            <option value="all">All types</option><option value="run">Run</option><option value="pass">Pass</option><option value="defense">Defense</option>
+          </select>
+          <select value={sort} onChange={(e) => { setSort(e.target.value as PlaySort); }} aria-label="Sort saved plays" className={input}>
+            <option value="recent">Recent</option><option value="name">Name</option>
+          </select>
+        </div>
+        {visiblePlays.length === 0 ? (
+          <span className="rounded-note border-2 border-dashed border-ink px-3 py-3 text-center text-small text-ink-muted">No plays match.</span>
+        ) : <>
+          <select
+            value=""
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+              if (!e.target.value) return;
+              setChosenId(e.target.value);
+              setReuseStatus("");
+              onLoad(e.target.value);
+            }}
+            aria-label="Open a saved play"
+            className="w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
+          >
+            <option value="">Open a saved play…</option>
+            {visiblePlays.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <form action="/" method="get">
+            <input type="hidden" name="p" value={templatePayload} />
+            <button
+              type="submit"
+              disabled={!template}
+              title="Start a new unsaved play from these positions, with every route removed"
+              className={`${pill} self-start px-3 py-1 text-small`}
+            >
+              New from formation
+            </button>
+          </form>
+          {books.length > 0 && chosenId && <select
+            value=""
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+              const book = books.find((candidate) => candidate.id === e.target.value);
+              if (!book) return;
+              const alreadyThere = book.plays.includes(chosenId);
+              const result = addPlayToPlaybook(book.id, chosenId);
+              setReuseStatus(result.ok ? (alreadyThere ? `Already in ${book.name}` : `Added to ${book.name}`) : "Couldn’t add that play");
+            }}
+            aria-label="Add opened play to a playbook"
+            className="w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
+          >
+            <option value="">Add opened play to…</option>
+            {books.map((book) => <option key={book.id} value={book.id}>{book.name}</option>)}
+          </select>}
+          {reuseStatus && <span className="text-caption text-ink-muted" role="status">{reuseStatus}</span>}
+        </>}
+      </div>}
       <button type="button" onClick={onShare} title="Copy a link that opens this play read-only" className={`${pill} flex-none self-start px-3 py-1 text-small`}>
         Copy share link
       </button>

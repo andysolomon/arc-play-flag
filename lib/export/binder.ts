@@ -13,6 +13,7 @@ export interface BinderOptions {
   paper: PaperKey;
   bookName: string;
   team: TeamSettings;
+  vis?: Vis;
 }
 
 /** The largest field that fits a box without letterboxing, given how deep the play needs to be. */
@@ -30,6 +31,7 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const cw = W - 2 * MARGIN;
   const out: string[] = [];
   const play = item.play;
+  const vis = o.vis ?? "both";
   const call = callOf(play.players);
 
   // header: number, name, the call
@@ -52,9 +54,9 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const footerH = 24;
   const top = MARGIN + 2 * r + 16;
   const box = { w: cw, h: H - MARGIN - footerH - notesH - top };
-  const f = fitField(play.players, box.w, box.h);
+  const f = fitField(play.players, box.w, box.h, vis);
   const fx = MARGIN + (cw - f.w) / 2;
-  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed" }, 2));
+  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", show: vis }, 2));
 
   let y = top + f.h + 16 + notesSize;
   for (const l of lines) {
@@ -75,6 +77,7 @@ function fourUpPage(items: readonly Numbered[], o: BinderOptions): SvgPage {
   const m = 0.4 * IN, g = 0.3 * IN, footerH = 20;
   const cw = (W - 2 * m - g) / 2, ch = (H - 2 * m - g - footerH) / 2;
   const out: string[] = [];
+  const vis = o.vis ?? "both";
   items.forEach((item, i) => {
     const col = i % 2, row = Math.floor(i / 2);
     const x = m + col * (cw + g), y = m + row * (ch + g);
@@ -83,8 +86,8 @@ function fourUpPage(items: readonly Numbered[], o: BinderOptions): SvgPage {
     const nameX = x + 2 * r + 6;
     out.push(text(nameX, y + r + 6, 17, fit(item.play.name, x + cw - nameX, 17)));
     const top = y + 2 * r + 8;
-    const f = fitField(item.play.players, cw, y + ch - top);
-    out.push(field(item.play.players, x + (cw - f.w) / 2, top, f.w, f.h, { level: "simple" }, 1.5));
+    const f = fitField(item.play.players, cw, y + ch - top, vis);
+    out.push(field(item.play.players, x + (cw - f.w) / 2, top, f.w, f.h, { level: "simple", show: vis }, 1.5));
   });
   // cut lines through the gutters
   out.push(cutLine(W / 2, m - 8, W / 2, H - footerH - m + 8));

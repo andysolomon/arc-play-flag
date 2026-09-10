@@ -12,6 +12,18 @@ test("the picture card saves as a PNG and says so", async ({ page }) => {
   const panel = page.locator("[aria-label='Export play']");
   const status = panel.getByRole("status");
   await expect(status).toHaveText("Portrait clip: formation, run, then a final hold.");
+  await expect(panel.getByRole("radio", { name: "Both teams" })).toBeChecked();
+  const both = panel.getByRole("img", { name: "Both teams export preview" });
+  await expect(both.locator('circle[fill="#e5675e"]')).toHaveCount(5);
+  await expect(both.locator('circle[fill="#4a8fe0"]')).toHaveCount(5);
+  await panel.getByRole("radio", { name: "Defense" }).check();
+  const defense = panel.getByRole("img", { name: "Defense export preview" });
+  await expect(defense.locator('circle[fill="#e5675e"]')).toHaveCount(0);
+  await expect(defense.locator('circle[fill="#4a8fe0"]')).toHaveCount(5);
+  await panel.getByRole("radio", { name: "Offense" }).check();
+  const offense = panel.getByRole("img", { name: "Offense export preview" });
+  await expect(offense.locator('circle[fill="#e5675e"]')).toHaveCount(5);
+  await expect(offense.locator('circle[fill="#4a8fe0"]')).toHaveCount(0);
 
   const [download] = await Promise.all([page.waitForEvent("download"), panel.getByRole("button", { name: "Save picture card" }).click()]);
   expect(download.suggestedFilename()).toBe("otter-wheel-right.png");

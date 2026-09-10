@@ -16,7 +16,7 @@ export class Designer {
     return this.page.locator("div[role='status']");
   }
   get field(): Locator {
-    return this.page.getByRole("img", { name: "Play diagram" });
+    return this.page.locator("[aria-label='Play diagram']");
   }
   get nameInput(): Locator {
     return this.page.getByRole("textbox", { name: "Play name" });

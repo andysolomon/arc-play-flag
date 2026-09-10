@@ -1,4 +1,3 @@
-import { callOf } from "@/lib/play/call";
 import { ballAt, buildMotion, HOLD, positionsAt, SPEED, type Motion } from "@/lib/play/motion";
 import { kebab } from "@/lib/play/storage";
 import { CARD_H, CARD_W, cardField, cardSvg, type CardOptions } from "./card";
@@ -10,10 +9,9 @@ const FPS = 24;
 const VIDEO_W = CARD_W * 2 / 3;
 const VIDEO_H = CARD_H * 2 / 3;
 
-/** 0.5 chooses play-action (or the throw on an option) for an unmarked mixed call and always selects a primary pass. */
+/** Uses the same deterministic teaching path as designer playback. */
 export function clipMotion(o: CardOptions): Motion {
-  const call = callOf(o.players);
-  const m = buildMotion(o.players, cardField(o.players).top, () => call === "run" ? 0 : 0.5);
+  const m = buildMotion(o.players, cardField(o.players, o.vis).top);
   // Unlike live playback's five-second cap, a clip lets every route finish.
   const end = Math.max(m.dur - HOLD, ...Object.values(m.tracks).map((t) => t.wait + t.len / SPEED));
   return { ...m, dur: end + HOLD };

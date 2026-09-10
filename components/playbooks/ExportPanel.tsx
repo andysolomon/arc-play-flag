@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import { record } from "@/lib/diagnostics";
+import { binderPages } from "@/lib/export/binder";
 import type { Numbered } from "@/lib/export/numbered";
 import { PAPERS, defaultPaper, type PaperKey } from "@/lib/export/pages";
-import { BAND_PRESETS, type BandSize } from "@/lib/export/wristband";
+import { encodePlaybookFile } from "@/lib/export/playbook-file";
+import { download } from "@/lib/export/raster";
+import { exportPdf } from "@/lib/export/run";
+import { BAND_PRESETS, wristbandPages, type BandSize } from "@/lib/export/wristband";
 import { kebab } from "@/lib/play/storage";
-import type { Playbook, TeamSettings } from "@/lib/play/types";
+import type { Playbook, TeamSettings, Vis } from "@/lib/play/types";
+import { playSvg } from "@/lib/render/play-svg";
 import { card, eyebrow, input, pill, select } from "../ui";
 import type { Say } from "./PlaybooksScreen";
 
@@ -19,12 +24,18 @@ interface Props {
 
 const numberField = `${input} w-[76px] px-2 text-center`;
 const first = BAND_PRESETS[0];
+const visibilityChoices: readonly { value: Vis; label: string }[] = [
+  { value: "offense", label: "Offense" },
+  { value: "defense", label: "Defense" },
+  { value: "both", label: "Both teams" },
+];
 
 export function ExportPanel({ book, items, team, say }: Props) {
   const [paper, setPaper] = useState<PaperKey>(() => defaultPaper());
   const [presetKey, setPresetKey] = useState(first?.key ?? "custom");
   const [size, setSize] = useState<BandSize>(first ?? { w: 4.5, h: 2.25, rows: 2, cols: 3 });
   const [layout, setLayout] = useState<"one" | "four">("one");
+  const [vis, setVis] = useState<Vis>("both");
   const [busy, setBusy] = useState(false);
   const none = items.length === 0;
 
@@ -38,32 +49,29 @@ export function ExportPanel({ book, items, team, say }: Props) {
     setSize((s) => ({ ...s, [k]: Math.max(lo, Math.min(hi, v)) }));
   };
 
-  const run = (label: string, job: (progress: (done: number, total: number) => void) => Promise<void>) => {
+  const run = (label: string, job: (progress: (done: number, total: number) => void) => Promise<void> | void) => {
     if (busy || none) return;
     setBusy(true);
     say(`${label}…`, 0);
-    job((done, total) => { say(`${label}… page ${String(Math.min(done + 1, total))} of ${String(total)}`, 0); })
+    Promise.resolve().then(() => { return job((done, total) => { say(`${label}… page ${String(Math.min(done + 1, total))} of ${String(total)}`, 0); }); })
       .then(() => { say("Saved"); }, (e: unknown) => { record("export", e); say("That export failed. Try again on a bigger screen."); })
       .finally(() => { setBusy(false); });
   };
 
   const onWristbands = () => {
     run("Drawing wristbands", async (progress) => {
-      const [{ wristbandPages }, { exportPdf }] = await Promise.all([import("@/lib/export/wristband"), import("@/lib/export/run")]);
-      const pages = wristbandPages(items, { size, paper, bookName: book.name, team });
+      const pages = wristbandPages(items, { size, paper, bookName: book.name, team, vis });
       await exportPdf(pages, `${kebab(book.name)}-wristbands.pdf`, `${book.name} - wristbands`, { dpi: 300, onProgress: progress });
     });
   };
   const onBinder = () => {
     run("Drawing binder pages", async (progress) => {
-      const [{ binderPages }, { exportPdf }] = await Promise.all([import("@/lib/export/binder"), import("@/lib/export/run")]);
-      const pages = binderPages(items, { layout, paper, bookName: book.name, team });
+      const pages = binderPages(items, { layout, paper, bookName: book.name, team, vis });
       await exportPdf(pages, `${kebab(book.name)}-binder.pdf`, `${book.name} - binder`, { dpi: 220, onProgress: progress });
     });
   };
   const onFile = () => {
-    run("Writing the file", async () => {
-      const [{ encodePlaybookFile }, { download }] = await Promise.all([import("@/lib/export/playbook-file"), import("@/lib/export/raster")]);
+    run("Writing the file", () => {
       const json = encodePlaybookFile(book, items.map((i) => i.play), team.name ? team : null);
       download(new Blob([json], { type: "application/json" }), `${kebab(book.name)}.playbook.json`);
     });
@@ -73,7 +81,37 @@ export function ExportPanel({ book, items, team, say }: Props) {
   const inserts = Math.max(1, Math.ceil(items.length / perCard));
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3">
+    <div className="flex flex-col gap-3" aria-label="Export playbook">
+      <div className={`${card} flex flex-col gap-2`}>
+        <fieldset className="flex flex-wrap gap-2" aria-label="Teams visible in PDF exports">
+          <legend className="mb-1 w-full text-small">Visible teams in wristband and binder PDFs</legend>
+          {visibilityChoices.map((choice) => (
+            <label key={choice.value} className={`${pill} flex cursor-pointer items-center gap-1.5 px-2 py-0.5 text-small has-[:checked]:bg-yellow`}>
+              <input
+                type="radio"
+                name="playbook-export-visibility"
+                value={choice.value}
+                checked={vis === choice.value}
+                disabled={busy || none}
+                onChange={() => { setVis(choice.value); }}
+              />
+              {choice.label}
+            </label>
+          ))}
+        </fieldset>
+        {items[0] && (
+          <div className="flex flex-wrap items-center gap-3">
+            <div
+              role="img"
+              aria-label={`${visibilityChoices.find((choice) => choice.value === vis)?.label ?? "Both teams"} PDF preview`}
+              className="w-full max-w-[240px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: vis, box: { pw: 660, ph: 280 } }) }}
+            />
+            <span className="text-caption leading-note text-ink-muted">Preview: {items[0].play.name}. The same choice applies to every play in both PDFs.</span>
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3">
       <div className={`${card} flex flex-col gap-2`}>
         <span className={eyebrow}>WRISTBANDS</span>
         <span className="text-caption leading-note text-ink-muted">One insert per position with that route bold, plus one for the quarterback and coach.</span>
@@ -112,6 +150,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
         </select>
         <span className="text-caption leading-note text-ink-muted">A playbook file carries the plays too. Send it to an assistant coach, or keep it as a backup.</span>
         <button type="button" onClick={onFile} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download playbook file</button>
+      </div>
       </div>
     </div>
   );
