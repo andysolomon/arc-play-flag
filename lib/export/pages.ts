@@ -30,13 +30,18 @@ export const MUTED = "#6f6c66";
 export const PAPER = "#fffdf6";
 export const APP_MARK = "Flag Football Play Designer · arc-play-flag.vercel.app";
 
-const f2 = (n: number): string => (Math.round(n * 100) / 100).toString();
+export const f2 = (n: number): string => (Math.round(n * 100) / 100).toString();
 
 export function page(w: number, h: number, body: string): SvgPage {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f2(w)} ${f2(h)}" width="${f2(w)}" height="${f2(h)}"` +
     ` font-family="${FONT}" fill="${INK}"><rect width="${f2(w)}" height="${f2(h)}" fill="#ffffff"/>${body}</svg>`;
   return { w, h, svg };
+}
+
+/** A filled rectangle in points: colour bands, rules and writing lines. */
+export function rect(x: number, y: number, w: number, h: number, fill: string): string {
+  return `<rect x="${f2(x)}" y="${f2(y)}" width="${f2(w)}" height="${f2(h)}" fill="${fill}"/>`;
 }
 
 export interface TextOpts {

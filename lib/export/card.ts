@@ -29,7 +29,8 @@ export function cardField(players: readonly Player[], vis: Vis = "both"): { w: n
   return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis)) };
 }
 
-export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): SvgPage {
+/** The card's own markup, in its 1080 x 1350 space, so a page can also nest it in a slot. */
+export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): string {
   const W = CARD_W, H = CARD_H, m = 60;
   const out: string[] = [];
   out.push(`<rect width="${String(W)}" height="${String(H)}" fill="#f4efe2"/>`);
@@ -65,7 +66,11 @@ export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "b
   }, 5));
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));
-  return page(W, H, out.join(""));
+  return out.join("");
+}
+
+export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): SvgPage {
+  return page(CARD_W, CARD_H, cardBody(o, frame));
 }
 
 /** Draws the card and saves it as <play-name>.png. */

@@ -23,6 +23,21 @@ export function fitField(players: readonly Player[], w: number, h: number, show:
   return { w: fh / ratio, h: fh };
 }
 
+/**
+ * One simple play in a rectangular slot: its number, its name, and the largest field that
+ * fits underneath them. The four-up binder page and the flyer both lay their grids out of these.
+ */
+export function playSlot(item: Numbered, x: number, y: number, w: number, h: number, vis: Vis, r = 10, nameSize = 17, border = 1.5): string {
+  const out: string[] = [];
+  out.push(badge(x + r, y + r, r, item.n));
+  const nameX = x + 2 * r + 6;
+  out.push(text(nameX, y + r + Math.round(nameSize * 0.35), nameSize, fit(item.play.name, x + w - nameX, nameSize)));
+  const top = y + 2 * r + 8;
+  const f = fitField(item.play.players, w, y + h - top, vis);
+  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show: vis }, border));
+  return out.join("");
+}
+
 const MARGIN = 0.5 * IN;
 
 function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
@@ -80,14 +95,7 @@ function fourUpPage(items: readonly Numbered[], o: BinderOptions): SvgPage {
   const vis = o.vis ?? "both";
   items.forEach((item, i) => {
     const col = i % 2, row = Math.floor(i / 2);
-    const x = m + col * (cw + g), y = m + row * (ch + g);
-    const r = 10;
-    out.push(badge(x + r, y + r, r, item.n));
-    const nameX = x + 2 * r + 6;
-    out.push(text(nameX, y + r + 6, 17, fit(item.play.name, x + cw - nameX, 17)));
-    const top = y + 2 * r + 8;
-    const f = fitField(item.play.players, cw, y + ch - top, vis);
-    out.push(field(item.play.players, x + (cw - f.w) / 2, top, f.w, f.h, { level: "simple", show: vis }, 1.5));
+    out.push(playSlot(item, m + col * (cw + g), m + row * (ch + g), cw, ch, vis));
   });
   // cut lines through the gutters
   out.push(cutLine(W / 2, m - 8, W / 2, H - footerH - m + 8));
