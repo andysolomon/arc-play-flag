@@ -3,8 +3,9 @@ import { Designer } from "../support/designer";
 import { WHEEL_RIGHT, seed } from "../support/fixtures";
 
 /**
- * A smoke check that ▶ runs and comes back. Deterministic playback assertions (who gets
- * the ball, where everyone ends) are added with issue #35.
+ * Browser smoke coverage for ▶: it shows the ball, completes, and restores the whiteboard.
+ * Deterministic primary-read and run/pass/play-action behavior is covered by
+ * lib/play/motion.test.ts; exported-clip parity is covered by lib/export/video.test.ts.
  */
 test("▶ runs the play, shows the ball, and returns to the whiteboard with nothing moved", async ({ page }) => {
   await seed(page, { plays: [WHEEL_RIGHT] });

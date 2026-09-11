@@ -1,6 +1,6 @@
 # Flag Football Play Designer
 
-A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give it a route or a run (offense) or a coverage (defense), save plays, and press ▶ to watch the play run: the centre snaps, the QB hands off or throws, and the primary read gets the ball most of the time.
+A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give it a route or a run (offense) or a coverage (defense), save plays, and press ▶ to watch the deterministic teaching path: the centre snaps, the QB hands off or throws, and the call follows the marked primary read (or the first drawn receiver when no read is marked).
 
 Saved plays go into **playbooks** (`/playbooks`), which print without any server: wristband inserts (one per position, that route bold), binder pages (one detailed play per page, or four simple per page), a 4:5 picture card of any play, and a playbook file to hand to an assistant coach. The **demo tour** (`/demo`) covers the full workflow in five short clips. PDFs are written by a small in-repo writer; nothing is uploaded and it all works offline.
 
