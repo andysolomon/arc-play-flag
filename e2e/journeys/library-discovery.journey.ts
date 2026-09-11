@@ -23,6 +23,21 @@ test("a 100-play library searches notes, filters, sorts, and explains an empty r
   await expect(page.getByText("Pass 001", { exact: true })).toBeVisible();
 });
 
+test("a playbook fits a 320px viewport without horizontal document overflow", async ({ page }) => {
+  const alpha = play("alpha", "Alpha Slant", { o3: { type: "slant" } }, "find the seam");
+  const source = playbook("source", "Source Book", [alpha]);
+  await page.setViewportSize({ width: 320, height: 800 });
+  await seed(page, { plays: [alpha], playbooks: [source] });
+  await page.goto("/playbooks?book=source");
+  await expect(page.getByText("Alpha Slant", { exact: true })).toBeVisible();
+
+  const widths = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(widths.scrollWidth).toBeLessThanOrEqual(widths.clientWidth);
+});
+
 test("a playbook entry opens directly and the designer adds that play to another book once", async ({ page }) => {
   const alpha = play("alpha", "Alpha Slant", { o3: { type: "slant" } }, "find the seam");
   const source = playbook("source", "Source Book", [alpha]);
