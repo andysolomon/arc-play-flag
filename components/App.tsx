@@ -294,7 +294,8 @@ export function App() {
         onUndo={() => { dispatch({ type: "undo" }); }}
         onRedo={() => { dispatch({ type: "redo" }); }}
       />
-      <div className="relative flex min-h-0 flex-1 items-stretch">
+      {/* overflow-hidden clips closed overlay drawers so no border/shadow peeks onto the field */}
+      <div className="relative flex min-h-0 flex-1 items-stretch overflow-hidden">
         {firstUse && !leftOpen && !rightOpen && <FirstUse onDismiss={dismissFirstUse} onExample={onExample} />}
         <Sidebar id="play-sidebar" side="left" open={leftOpen} label="Play tools" overlay={compact}>
           <PlaySidebar

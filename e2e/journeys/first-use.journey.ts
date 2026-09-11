@@ -29,6 +29,39 @@ test("a first-time coach sees the shortest draw-and-run path and can dismiss it 
   await expect(guide).toHaveCount(0);
 });
 
+test("the default phone view keeps overlay drawers fully off a clear canvas", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const d = new Designer(page);
+  await d.goto();
+
+  await expect(page.getByRole("button", { name: "Play tools" })).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Route palette" })).toHaveAttribute("aria-expanded", "false");
+
+  const left = page.locator("#play-sidebar");
+  const right = page.locator("#route-sidebar");
+  await expect(left).toHaveAttribute("data-open", "false");
+  await expect(right).toHaveAttribute("data-open", "false");
+
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  await expect.poll(async () => {
+    const leftBox = await left.boundingBox();
+    const rightBox = await right.boundingBox();
+    if (!leftBox || !rightBox || !viewport) return false;
+    // fully past the left / right edges (1px subpixel tolerance)
+    return leftBox.x + leftBox.width <= 1 && rightBox.x >= viewport.width - 1;
+  }).toBe(true);
+
+  await d.tools();
+  await expect(left).toHaveAttribute("data-open", "true");
+  await d.closeSidebars();
+  await expect(left).toHaveAttribute("data-open", "false");
+  await expect.poll(async () => {
+    const leftBox = await left.boundingBox();
+    return !!leftBox && leftBox.x + leftBox.width <= 1;
+  }).toBe(true);
+});
+
 test("the fictional example is editable and opens on the route choice", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
