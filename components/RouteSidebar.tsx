@@ -84,13 +84,13 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
                   title="Colour this as the primary read"
                   aria-pressed={primaryOn}
                   data-active={primaryOn}
-                  className={`${pill} px-3 py-1 text-small data-[active=true]:bg-rose-soft`}
+                  className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-rose-soft`}
                 >
                   {primaryOn ? "★ Primary read" : "☆ Mark primary"}
                 </button>
               )}
               {canMirror && (
-                <button type="button" onClick={onMirror} title="Mirror this route left/right" className={`${pill} px-3 py-1 text-small`}>
+                <button type="button" onClick={onMirror} title="Mirror this route left/right" className={`${pill} min-h-11 px-3 py-1 text-small`}>
                   ⇄ Mirror route
                 </button>
               )}

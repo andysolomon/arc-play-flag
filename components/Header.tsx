@@ -30,7 +30,7 @@ const persistenceLabel: Record<Props["persistence"], string> = {
 
 function HeaderImpl({ name, persistence, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   return (
-    <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
+    <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5">
       <button
         type="button"
         onClick={onToggleLeft}
