@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { record } from "@/lib/diagnostics";
 import { binderPages } from "@/lib/export/binder";
+import { flyerDefault, flyerPage } from "@/lib/export/flyer";
 import type { Numbered } from "@/lib/export/numbered";
 import { PAPERS, defaultPaper, type PaperKey } from "@/lib/export/pages";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
+import { POSTCARD_SIZES, postcardPages, type PostcardSize } from "@/lib/export/postcard";
 import { download } from "@/lib/export/raster";
 import { exportPdf } from "@/lib/export/run";
 import { BAND_PRESETS, wristbandPages, type BandSize } from "@/lib/export/wristband";
@@ -35,9 +37,16 @@ export function ExportPanel({ book, items, team, say }: Props) {
   const [presetKey, setPresetKey] = useState(first?.key ?? "custom");
   const [size, setSize] = useState<BandSize>(first ?? { w: 4.5, h: 2.25, rows: 2, cols: 3 });
   const [layout, setLayout] = useState<"one" | "four">("one");
+  const [postcardSize, setPostcardSize] = useState<PostcardSize>("twoUp");
+  const [postcardPlay, setPostcardPlay] = useState("");
+  // null until the coach picks: the flyer follows the book's first six until then
+  const [chosen, setChosen] = useState<string[] | null>(null);
   const [vis, setVis] = useState<Vis>("both");
   const [busy, setBusy] = useState(false);
   const none = items.length === 0;
+  const slots = useMemo(() => flyerDefault(items).map((i) => i?.play.id ?? ""), [items]);
+  const featured = chosen ?? slots;
+  const flyerPicks = featured.map((id) => items.find((it) => it.play.id === id) ?? null);
 
   const pickPreset = (key: string) => {
     setPresetKey(key);
@@ -70,6 +79,21 @@ export function ExportPanel({ book, items, team, say }: Props) {
       await exportPdf(pages, `${kebab(book.name)}-binder.pdf`, `${book.name} - binder`, { dpi: 220, onProgress: progress });
     });
   };
+  const onPostcards = () => {
+    run("Drawing postcards", async (progress) => {
+      const picked = postcardPlay ? items.filter((it) => it.play.id === postcardPlay) : items;
+      const pages = postcardPages(picked, { size: postcardSize, paper, bookName: book.name, team, vis });
+      const one = picked.length === 1 ? picked[0] : undefined;
+      const base = one ? `${kebab(one.play.name)}-postcard` : `${kebab(book.name)}-postcards`;
+      await exportPdf(pages, `${base}.pdf`, `${book.name} - postcards`, { dpi: 300, onProgress: progress });
+    });
+  };
+  const onFlyer = () => {
+    run("Drawing the flyer", async (progress) => {
+      const sheet = flyerPage(flyerPicks, { paper, bookName: book.name, team, vis });
+      await exportPdf([sheet], `${kebab(book.name)}-flyer.pdf`, `${book.name} - flyer`, { dpi: 220, onProgress: progress });
+    });
+  };
   const onFile = () => {
     run("Writing the file", () => {
       const json = encodePlaybookFile(book, items.map((i) => i.play), team.name ? team : null);
@@ -84,7 +108,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
     <div className="flex flex-col gap-3" aria-label="Export playbook">
       <div className={`${card} flex flex-col gap-2`}>
         <fieldset className="flex flex-wrap gap-2" aria-label="Teams visible in PDF exports">
-          <legend className="mb-1 w-full text-small">Visible teams in wristband and binder PDFs</legend>
+          <legend className="mb-1 w-full text-small">Visible teams in every PDF</legend>
           {visibilityChoices.map((choice) => (
             <label key={choice.value} className={`${pill} flex cursor-pointer items-center gap-1.5 px-2 py-0.5 text-small has-[:checked]:bg-yellow`}>
               <input
@@ -107,7 +131,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
               className="w-full max-w-[240px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
               dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: vis, box: { pw: 660, ph: 280 } }) }}
             />
-            <span className="text-caption leading-note text-ink-muted">Preview: {items[0].play.name}. The same choice applies to every play in both PDFs.</span>
+            <span className="text-caption leading-note text-ink-muted">Preview: {items[0].play.name}. The same choice applies to every play in every PDF below.</span>
           </div>
         )}
       </div>
@@ -141,6 +165,51 @@ export function ExportPanel({ book, items, team, say }: Props) {
           <option value="four">Four per page · simple</option>
         </select>
         <button type="button" onClick={onBinder} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download binder PDF</button>
+      </div>
+
+      <div className={`${card} flex flex-col gap-2`}>
+        <span className={eyebrow}>POSTCARDS</span>
+        <span className="text-caption leading-note text-ink-muted">
+          The picture card on the front, the coaching points and a name line on the back. Print double-sided, flipping on the long edge.
+        </span>
+        <select value={postcardSize} onChange={(e) => { setPostcardSize(e.target.value === "card46" ? "card46" : "twoUp"); }} aria-label="Postcard size" className={select}>
+          {POSTCARD_SIZES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>
+        <select value={postcardPlay} onChange={(e) => { setPostcardPlay(e.target.value); }} aria-label="Plays to print as postcards" className={select}>
+          <option value="">Every play in this book</option>
+          {items.map((it) => <option key={it.play.id} value={it.play.id}>{it.n} · {it.play.name}</option>)}
+        </select>
+        <button type="button" onClick={onPostcards} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download postcards PDF</button>
+      </div>
+
+      <div className={`${card} flex flex-col gap-2`}>
+        <span className={eyebrow}>FLYER</span>
+        <span className="text-caption leading-note text-ink-muted">One page of six plays for parents and players. Starts with the first six in this book.</span>
+        <fieldset className="grid grid-cols-2 gap-1.5" aria-label="Featured plays">
+          {featured.map((id, i) => (
+            <label key={`slot-${String(i)}`} className="flex min-w-0 items-center gap-1 text-small">
+              {i + 1}
+              <select
+                value={id}
+                aria-label={`Flyer slot ${String(i + 1)}`}
+                disabled={busy || none}
+                onChange={(e) => { setChosen(featured.map((v, k) => (k === i ? e.target.value : v))); }}
+                className={`${select} min-w-0 flex-1 px-2 text-small`}
+              >
+                <option value="">Empty</option>
+                {items.map((it) => <option key={it.play.id} value={it.play.id}>{it.n} · {it.play.name}</option>)}
+              </select>
+            </label>
+          ))}
+        </fieldset>
+        <button
+          type="button"
+          onClick={onFlyer}
+          disabled={busy || none || flyerPicks.every((i) => i === null)}
+          className={`${pill} self-start px-3 py-1 text-small`}
+        >
+          Download flyer PDF
+        </button>
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>

@@ -234,8 +234,9 @@ items:
     dependencies: ["0.review"]
     preserved_behavior: Existing playbooks, numbering and exports are unchanged; formation templates may be split into a child issue.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-11T15:09:32.000Z"
+      evidence_ref: "PR #52"
   - id: "3.34"
     kind: leaf
     title: "#34 Add explicit offense/defense visibility choices for sharing and exports"
@@ -268,8 +269,9 @@ items:
     dependencies: ["0.review"]
     preserved_behavior: Run and play-action choreography is unchanged; no product scrubber is added.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-11T15:15:00.000Z"
+      evidence_ref: "PR #53"
 
   # ── 4. Refresh and make Demo reproducible ─────────────────────────────────
   - id: "4.0"
@@ -279,8 +281,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: ready
+      updated_at: "2026-09-11T21:17:24.000Z"
   - id: "4.37"
     kind: leaf
     title: "#37 Commit executable Demo recording workflow and deterministic fixtures"
@@ -297,8 +299,9 @@ items:
     dependencies: ["3.35"]
     preserved_behavior: Existing clips, manifest checks and WebM/MP4 delivery keep working until regenerated.
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-11T21:17:24.000Z"
+      evidence_ref: "PR #54"
   - id: "4.36"
     kind: leaf
     title: "#36 Make Demo chapters readable and accurately demonstrate their coverage"
@@ -382,8 +385,9 @@ items:
     dependencies: ["2.28", "2.30", "2.32", "5.38", "5.39"]
     preserved_behavior: Coaches' private plays are never published; postcards and flyers stay outside this gate.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-11T00:00:00.000Z"
+      state: cancelled
+      updated_at: "2026-09-11T16:39:30.000Z"
+      evidence_ref: "issue #40, closed as not planned"
 
   # ── 6. After the reliability gate ─────────────────────────────────────────
   - id: "6.0"
@@ -393,8 +397,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: ready
+      updated_at: "2026-09-11T16:39:30.000Z"
   - id: "6.12"
     kind: leaf
     title: "#12 Postcards: two-sided play cards, two-up with cut lines"
@@ -408,11 +412,11 @@ items:
       - 4 by 6 stock option, one card per sheet
       - Exported for one play or every play in the book through the existing PDF runner
       - Legible on a mono printer with the small app mark
-    dependencies: ["5.40"]
+    dependencies: ["5.38", "5.39"]
     preserved_behavior: Existing wristband and binder exports are unchanged.
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: ready
+      updated_at: "2026-09-11T16:39:30.000Z"
   - id: "6.13"
     kind: leaf
     title: "#13 Flyer: one page of six featured plays for parents and players"
@@ -425,8 +429,8 @@ items:
       - Team name and colour band at the top, numbers and names per play, app mark at the bottom
       - Coach picks the six plays, defaulting to the first six
       - Loaded on demand through the existing PDF writer; mono-printer legible
-    dependencies: ["5.40"]
+    dependencies: ["5.38", "5.39"]
     preserved_behavior: Existing wristband and binder exports are unchanged.
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: ready
+      updated_at: "2026-09-11T16:39:30.000Z"

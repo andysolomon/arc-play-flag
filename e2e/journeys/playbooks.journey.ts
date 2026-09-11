@@ -48,7 +48,7 @@ test("exports are disabled for an empty book, download as real files for a full 
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [empty, road], team: OTTERS });
 
   await page.goto("/playbooks?book=fx-empty");
-  for (const label of ["Download wristbands PDF", "Download binder PDF", "Download playbook file"]) {
+  for (const label of ["Download wristbands PDF", "Download binder PDF", "Download postcards PDF", "Download flyer PDF", "Download playbook file"]) {
     await expect(page.getByRole("button", { name: label })).toBeDisabled();
   }
 
@@ -81,6 +81,35 @@ test("exports are disabled for an empty book, download as real files for a full 
   await expect(toast(page)).toHaveText("That export failed. Try again on a bigger screen.");
   await expect(page.getByRole("button", { name: "Download wristbands PDF" })).toBeEnabled();
   expect(downloaded).toBe(false);
+});
+
+test("postcards print two-sided and the flyer prints one page the coach chose", async ({ page }) => {
+  const road = playbook("fx-road", "Otter Road Book", [WHEEL_RIGHT, COVER_TWO, SLANT_LEFT]);
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [road], team: OTTERS });
+  await page.goto("/playbooks?book=fx-road");
+
+  // one play's postcard is named after the play, not the book
+  await page.getByRole("combobox", { name: "Plays to print as postcards" }).selectOption("fx-cover-two");
+  const [cards] = await Promise.all([
+    page.waitForEvent("download", { timeout: 40_000 }),
+    page.getByRole("button", { name: "Download postcards PDF" }).click(),
+  ]);
+  await expect(toast(page)).toHaveText("Saved", { timeout: 40_000 });
+  expect(cards.suggestedFilename()).toBe("otter-cover-two-postcard.pdf");
+  expect((await downloadBytes(cards)).subarray(0, 5).toString("latin1")).toBe("%PDF-");
+
+  // the flyer starts on the book's own order and follows the slots a coach changes
+  const slot = page.getByRole("combobox", { name: "Flyer slot 1" });
+  await expect(slot).toHaveValue("fx-wheel-right");
+  await expect(page.getByRole("combobox", { name: "Flyer slot 4" })).toHaveValue("");
+  await slot.selectOption("fx-slant-left");
+  const [flyer] = await Promise.all([
+    page.waitForEvent("download", { timeout: 40_000 }),
+    page.getByRole("button", { name: "Download flyer PDF" }).click(),
+  ]);
+  await expect(toast(page)).toHaveText("Saved", { timeout: 40_000 });
+  expect(flyer.suggestedFilename()).toBe("otter-road-book-flyer.pdf");
+  expect((await downloadBytes(flyer)).subarray(0, 5).toString("latin1")).toBe("%PDF-");
 });
 
 test("a bad file is refused with a reason and changes nothing; a good one lands as a new book", async ({ page }) => {
