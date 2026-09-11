@@ -73,44 +73,48 @@ export function App() {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => { setToast(null); }, ms);
   }, []);
-  const narrow = useMedia("(max-width: 759px)");
-  const narrowRef = useRef(narrow);
-  useEffect(() => { narrowRef.current = narrow; }, [narrow]);
+  // phones + iPads: drawers overlay the field; only one open at a time
+  const compact = useMedia("(max-width: 1023px)");
+  const compactRef = useRef(compact);
+  useEffect(() => { compactRef.current = compact; }, [compact]);
 
-  // narrow screens show one sidebar at a time
+  const closePanels = useCallback(() => {
+    setLeftOpen(false);
+    setRightOpen(false);
+  }, []);
   const openLeft = useCallback((open: boolean) => {
     setLeftOpen(open);
-    if (open && narrowRef.current) setRightOpen(false);
+    if (open && compactRef.current) setRightOpen(false);
   }, []);
   const openRight = useCallback((open: boolean) => {
     setRightOpen(open);
-    if (open && narrowRef.current) setLeftOpen(false);
+    if (open && compactRef.current) setLeftOpen(false);
   }, []);
 
-  // a tap anywhere but a sidebar or the header folds both sidebars away
+  // a tap on the field (not a control, sidebar, or header) folds both panels away.
+  // overlay drawers sit above the field, so their own taps hit the aside and stay open.
   useEffect(() => {
     if (!leftOpen && !rightOpen) return;
     const outside = (e: PointerEvent) => {
       if (e.target instanceof Element && e.target.closest("aside, header, button, [role='button']")) return;
-      setLeftOpen(false);
-      setRightOpen(false);
+      closePanels();
     };
     document.addEventListener("pointerdown", outside, true);
     return () => { document.removeEventListener("pointerdown", outside, true); };
-  }, [leftOpen, rightOpen]);
+  }, [closePanels, leftOpen, rightOpen]);
 
   const onSelect = useCallback((id: string) => {
     dispatch({ type: "select", id });
     openRight(true);
   }, [openRight]);
-  // on a phone the palette covers the field, so it folds away once a route is chosen
+  // on a phone/tablet the palette covers the field, so it folds away once a route is chosen
   const onPick = useCallback((key: RouteType) => {
     dispatch({ type: "pick", key });
-    if (narrowRef.current) setRightOpen(false);
+    if (compactRef.current) setRightOpen(false);
   }, []);
   const onPrimary = useCallback(() => {
     dispatch({ type: "togglePrimary" });
-    if (narrowRef.current) setRightOpen(false);
+    if (compactRef.current) setRightOpen(false);
   }, []);
   // a custom route mirrored off the field is pulled back to the edge: say so, since the shape changes
   const onMirror = useCallback(() => {
@@ -292,7 +296,7 @@ export function App() {
       />
       <div className="relative flex min-h-0 flex-1 items-stretch">
         {firstUse && !leftOpen && !rightOpen && <FirstUse onDismiss={dismissFirstUse} onExample={onExample} />}
-        <Sidebar id="play-sidebar" side="left" open={leftOpen} label="Play tools">
+        <Sidebar id="play-sidebar" side="left" open={leftOpen} label="Play tools" overlay={compact}>
           <PlaySidebar
             name={s.name}
             notes={s.notes}
@@ -328,7 +332,7 @@ export function App() {
           svgRef={svgRef}
           title={s.name}
         />
-        <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette">
+        <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
           <RouteSidebar
             selected={sel}
             hint={hint}

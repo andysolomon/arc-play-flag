@@ -112,7 +112,7 @@ function PlaySidebarImpl({
               onLoad(e.target.value);
             }}
             aria-label="Open a saved play"
-            className="w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
+            className="min-h-11 w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
           >
             <option value="">Open a saved play…</option>
             {visiblePlays.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -123,7 +123,7 @@ function PlaySidebarImpl({
               type="submit"
               disabled={!template}
               title="Start a new unsaved play from these positions, with every route removed"
-              className={`${pill} self-start px-3 py-1 text-small`}
+              className={`${pill} min-h-11 self-start px-3 py-1 text-small`}
             >
               New from formation
             </button>
@@ -138,7 +138,7 @@ function PlaySidebarImpl({
               setReuseStatus(result.ok ? (alreadyThere ? `Already in ${book.name}` : `Added to ${book.name}`) : "Couldn’t add that play");
             }}
             aria-label="Add opened play to a playbook"
-            className="w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
+            className="min-h-11 w-full flex-none cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base"
           >
             <option value="">Add opened play to…</option>
             {books.map((book) => <option key={book.id} value={book.id}>{book.name}</option>)}
@@ -146,7 +146,7 @@ function PlaySidebarImpl({
           {reuseStatus && <span className="text-caption text-ink-muted" role="status">{reuseStatus}</span>}
         </>}
       </div>}
-      <button type="button" onClick={onShare} title="Copy a link that opens this play read-only" className={`${pill} flex-none self-start px-3 py-1 text-small`}>
+      <button type="button" onClick={onShare} title="Copy a link that opens this play read-only" className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}>
         Copy share link
       </button>
       <span className={divider} />

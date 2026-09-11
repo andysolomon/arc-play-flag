@@ -5,15 +5,44 @@ interface Props {
   side: "left" | "right";
   open: boolean;
   label: string;
+  /**
+   * Phone and tablet: the panel floats over the field instead of squeezing it.
+   * Desktop keeps the in-flow width animation.
+   */
+  overlay?: boolean;
   children: ReactNode;
 }
 
 /**
- * 264px panel that animates its width to 0 when closed. Both sidebars start
- * closed — on every screen size — so the app opens on an uncluttered field and
- * the first paint never slides.
+ * 264px panel. On desktop it animates its width to 0 when closed. On phone and
+ * tablet it overlays the field as a drawer so the full panel stays tappable —
+ * both sidebars open at once used to clip the right edge on iPad.
  */
-export function Sidebar({ id, side, open, label, children }: Props) {
+export function Sidebar({ id, side, open, label, overlay = false, children }: Props) {
+  if (overlay) {
+    const edge = side === "left" ? "left-0 border-r-2" : "right-0 border-l-2";
+    const hidden = side === "left" ? "-translate-x-full" : "translate-x-full";
+    return (
+      <aside
+        id={id}
+        aria-label={label}
+        aria-hidden={!open}
+        className={
+          `absolute top-0 bottom-0 z-30 flex w-[min(266px,85vw)] touch-manipulation flex-col border-ink bg-cream ` +
+          `shadow-tile transition-transform duration-[180ms] ease-in-out motion-reduce:transition-none ` +
+          `${edge} ${open ? "translate-x-0" : `${hidden} pointer-events-none`}`
+        }
+      >
+        <div
+          className="flex h-full min-h-0 w-full flex-col gap-[10px] overflow-y-auto overscroll-contain px-3 py-3.5 [-webkit-overflow-scrolling:touch]"
+          inert={!open}
+        >
+          {children}
+        </div>
+      </aside>
+    );
+  }
+
   const width = open ? (side === "left" ? "w-[266px] border-r-2" : "w-[266px] border-l-2") : "w-0";
   return (
     <aside

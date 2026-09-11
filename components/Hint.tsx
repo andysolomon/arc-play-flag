@@ -4,7 +4,7 @@ export function Hint({ text }: { text: string | null }) {
   return (
     <div
       role="status"
-      className="fixed left-1/2 top-[58px] z-[15] -translate-x-1/2 whitespace-nowrap rounded-pill bg-ink px-4 py-1.5 text-base text-cream shadow-toast"
+      className="pointer-events-none fixed left-1/2 top-[58px] z-[15] max-w-[calc(100%-24px)] -translate-x-1/2 truncate rounded-pill bg-ink px-4 py-1.5 text-base text-cream shadow-toast"
     >
       {text}
     </div>
