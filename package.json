@@ -14,6 +14,8 @@
     "test": "bun test",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
+    "demo:setup": "playwright install chromium",
+    "demo:record": "bun run scripts/demo-recorder.ts",
     "icons": "bun run scripts/optimize-icons.ts",
     "release": "semantic-release"
   },
@@ -25,7 +27,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "1.63.0",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^11.0.1",
