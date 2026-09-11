@@ -130,8 +130,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-10T21:15:39.000Z"
   - id: "2.28"
     kind: leaf
     title: "#28 Make offline readiness, shared plays, and cached demos reliable"
@@ -148,8 +148,9 @@ items:
     dependencies: ["0.review"]
     preserved_behavior: Online behaviour, share links and existing caches keep working across the worker upgrade.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-10T21:15:39.000Z"
+      evidence_ref: "PR #48"
   - id: "2.30"
     kind: leaf
     title: "#30 Add full-library backup and clear local-save status"
@@ -166,8 +167,9 @@ items:
     dependencies: ["1.25", "1.29"]
     preserved_behavior: Playbook files stay importable; local-only storage limits are documented and cloud sync stays a separate decision.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-10T21:15:39.000Z"
+      evidence_ref: "PR #48"
   - id: "2.32"
     kind: leaf
     title: "#32 Make custom-route completion and coverage assignment accessible"
@@ -184,8 +186,9 @@ items:
     dependencies: ["0.review"]
     preserved_behavior: Double-tap to finish and pointer targeting keep working; no product playback scrubber is added.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-10T21:15:39.000Z"
+      evidence_ref: "PR #48"
 
   # ── 3. Improve the coaching experience ───────────────────────────────────
   - id: "3.0"
@@ -379,8 +382,8 @@ items:
     dependencies: ["2.28", "2.30", "2.32", "5.38", "5.39"]
     preserved_behavior: Coaches' private plays are never published; postcards and flyers stay outside this gate.
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: ready
+      updated_at: "2026-09-11T00:00:00.000Z"
 
   # ── 6. After the reliability gate ─────────────────────────────────────────
   - id: "6.0"
