@@ -30,9 +30,9 @@ First time only: `bunx playwright install chromium`.
 | Playbook create, add, reorder, remove, persist; export disabled/success/failure; validated import; backup round-trip to a second device | `playbooks` |
 | Share link shows both teams read-only, opens back in the designer; bad link is a 404 | `sharing` |
 | Picture card saves a real PNG; a card that cannot be drawn reports it | `export` |
-| ▶ runs and comes back with nothing moved (smoke; deterministic checks land with #35) | `playback` |
+| ▶ runs and comes back with nothing moved (browser smoke) | `playback` |
 
-Offline navigation and update coverage is added with #28; deterministic playback assertions with #35.
+Offline navigation and update coverage is added with #28. The default teaching path is deterministic: primary-read selection and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip path parity and timing are covered by `lib/export/video.test.ts`.
 
 ## In CI
 
