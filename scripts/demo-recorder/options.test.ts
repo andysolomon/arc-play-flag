@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEMOS } from "../../components/demo/demos";
 import { CHAPTERS } from "./chapters";
-import { BLANK_DRAFT, CHAPTER_PLAY, DEMO_PLAYS, STORAGE_KEYS, storageFor } from "./fixtures";
+import { BLANK_DRAFT, CHAPTER_PLAY, DEMO_PLAYS, QUICK_SLANT, STORAGE_KEYS, storageFor } from "./fixtures";
 import { CHAPTER_SLUGS, DEFAULT_BASE_URL, UsageError, outputNames, parseArgs, selectedChapters } from "./options";
+import { MAX_SET_BYTES } from "./media";
 import { chapterVideoFilter, dryRunProfileCheck, prepareOutputDirectory, usingDisposableDirectory, verifyOutputSet } from "./runtime";
 
 const temporary: string[] = [];
@@ -68,26 +69,23 @@ describe("Demo recorder chapters and fixtures", () => {
   });
 
   test("encoding trims normalized source timestamps to fixed manifest durations", () => {
-    expect(CHAPTER_SLUGS.map(chapterVideoFilter)).toEqual([
-      "trim=start=0:duration=11.000,setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos",
-      "trim=start=0:duration=7.000,setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos",
-      "trim=start=0:duration=9.000,setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos",
-      "trim=start=0:duration=10.000,setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos",
-      "trim=start=0:duration=7.000,setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos",
-    ]);
+    expect(CHAPTER_SLUGS.map(chapterVideoFilter)).toEqual(
+      [9, 9, 11, 11, 8, 10, 8, 9].map((seconds) => `trim=start=0:duration=${seconds.toFixed(3)},setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos`),
+    );
   });
 
   test("fixtures are fictional, stable, and seed only the app's own storage keys", () => {
-    expect(DEMO_PLAYS.map((play) => play.id)).toEqual(["demo-slant", "demo-play-action", "demo-defense"]);
+    expect(DEMO_PLAYS.map((play) => play.id)).toEqual(["demo-slant", "demo-handoff", "demo-play-action", "demo-defense"]);
     expect(DEMO_PLAYS.every((play) => play.name.startsWith("Otter "))).toBe(true);
     expect(Object.values(STORAGE_KEYS).sort()).toEqual(["ffpd.draft.v1", "ffpd.first-use.v1", "ffpd.playbooks.v1", "ffpd.plays.v2", "ffpd.team.v1"]);
     for (const slug of CHAPTER_SLUGS) {
       const storage = storageFor(slug);
       expect(Object.keys(storage).sort()).toEqual(Object.values(STORAGE_KEYS).sort());
       expect(storage[STORAGE_KEYS.firstUse]).toBe("done");
-      expect(JSON.parse(storage[STORAGE_KEYS.team] ?? "")).toEqual({ name: "Riverside Otters", color: "#2a9d8f" });
+      // `playbooks` types the team name on camera, so only that chapter starts without one
+      expect(JSON.parse(storage[STORAGE_KEYS.team] ?? "")).toEqual({ name: slug === "playbooks" ? "" : "Riverside Otters", color: "#2a9d8f" });
       const draft = JSON.parse(storage[STORAGE_KEYS.draft] ?? "") as { id: string | null; name: string };
-      const opened = CHAPTER_PLAY[slug];
+      const opened = CHAPTER_PLAY[slug] ?? (slug === "custom-routes" ? QUICK_SLANT : undefined);
       expect(draft.id).toBe(opened ? opened.id : null);
       expect(draft.name).toBe(opened ? opened.name : "");
     }
@@ -149,7 +147,7 @@ describe("Demo recorder isolation", () => {
     const committed = join(import.meta.dir, "../../public/demos");
     const bytes = await verifyOutputSet(committed, CHAPTER_SLUGS);
     expect(bytes).toBeGreaterThan(1_000);
-    expect(bytes).toBeLessThan(1_250_000);
+    expect(bytes).toBeLessThan(MAX_SET_BYTES);
     const empty = await mkdtemp(join(tmpdir(), "arc-demo-empty-"));
     temporary.push(empty);
     expect(await rejection(verifyOutputSet(empty, ["run-play"]))).toMatch(/ENOENT.*run-play\.webm/);

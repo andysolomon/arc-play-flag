@@ -7,8 +7,14 @@ export const MIN_SECONDS = 6;
 export const MAX_SECONDS = 12;
 /** anything smaller is a broken encode, not a clip */
 export const MIN_FILE_BYTES = 1_000;
-/** the complete poster-and-video set for every chapter, as enforced by components/demo/demos.test.ts */
-export const MAX_SET_BYTES = 1_250_000;
+/**
+ * The complete poster-and-video set for every chapter, as enforced by
+ * components/demo/demos.test.ts. The service worker precaches all of it, so this is
+ * what an offline install costs. Raised from 1,250,000 when five crammed chapters were
+ * split into eight focused ones (issue #36): the same material, told in smaller pieces,
+ * at a higher encoding CRF to pay for the extra chapters.
+ */
+export const MAX_SET_BYTES = 1_700_000;
 
 export type DeliveryKind = "webm" | "mp4" | "poster";
 

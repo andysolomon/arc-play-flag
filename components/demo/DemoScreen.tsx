@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { DemoClip } from "./DemoClip";
-import { DEMOS } from "./demos";
+import { DEMOS, TOUR_SECONDS } from "./demos";
 import { pillSm } from "../ui";
 
 export function DemoScreen() {
@@ -18,12 +18,12 @@ export function DemoScreen() {
           <section className="grid gap-3 rounded-tile border-2 border-ink bg-yellow p-4 shadow-tile sm:grid-cols-[1fr_auto] sm:items-end">
             <div>
               <span className="text-eyebrow tracking-eyebrow">START HERE</span>
-              <h2 className="mt-1 text-[28px] leading-tight">Learn the whole play designer in five short clips.</h2>
+              <h2 className="mt-1 text-[28px] leading-tight">Learn the whole play designer in {DEMOS.length} short clips.</h2>
               <p className="mb-0 mt-2 max-w-[680px] text-base leading-body text-ink-2">
-                The tour follows the same path as a real practice: draw the offense, run it, add the defense, save it, then put it in a playbook.
+                The tour follows the same path as a real practice: draw the offense, run it, add the defense, save and share it, then build the playbook you print.
               </p>
             </div>
-            <span className="w-fit rounded-pill border-2 border-ink bg-cream px-3 py-1 text-base">Under a minute</span>
+            <span className="w-fit rounded-pill border-2 border-ink bg-cream px-3 py-1 text-base">Under {Math.ceil(TOUR_SECONDS / 30) * 30} seconds</span>
           </section>
           <div className="grid gap-4 md:grid-cols-2">
             {DEMOS.map((demo, index) => <DemoClip key={demo.slug} demo={demo} index={index} />)}

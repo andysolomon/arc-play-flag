@@ -175,8 +175,8 @@ async function encode(slug: ChapterSlug, capture: RawCapture, options: RecorderO
     // Wall-clock capture time varies with browser startup and shutdown. Trim to the
     // manifest duration and reset source timestamps so both formats are repeatable.
     const videoFilter = chapterVideoFilter(slug);
-    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libvpx-vp9", "-crf", "42", "-b:v", "0", staged("webm")], `${slug} WebM encoding`);
-    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libx264", "-crf", "30", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", staged("mp4")], `${slug} MP4 encoding`);
+    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libvpx-vp9", "-crf", "46", "-b:v", "0", staged("webm")], `${slug} WebM encoding`);
+    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libx264", "-crf", "33", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", staged("mp4")], `${slug} MP4 encoding`);
     await command("ffmpeg", ["-y", "-i", posterPng, "-frames:v", "1", "-vf", "scale=960:540:flags=lanczos", "-c:v", "libwebp", "-q:v", "72", staged("webp")], `${slug} poster encoding`);
     if (options.contactSheets) {
       const tile = "fps=1,tile=4x3:padding=6:margin=6:color=white";
