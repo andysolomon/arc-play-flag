@@ -198,8 +198,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
   - id: "3.31"
     kind: leaf
     title: "#31 Make the first drawing session and Demo entry discoverable"
@@ -216,8 +216,9 @@ items:
     dependencies: ["0.review"]
     preserved_behavior: The app still opens on a clear field with both sidebars closed; returning coaches are not re-onboarded.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
+      evidence_ref: "PR #48"
   - id: "3.33"
     kind: leaf
     title: "#33 Improve saved-play discovery and reuse as a season's library grows"
@@ -252,8 +253,9 @@ items:
     dependencies: ["0.review"]
     preserved_behavior: Links already shared decode as before, showing both teams.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
+      evidence_ref: "PR #48"
   - id: "3.35"
     kind: leaf
     title: "#35 Make teaching playback deterministic by default"
@@ -281,8 +283,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: ready
-      updated_at: "2026-09-11T21:17:24.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
   - id: "4.37"
     kind: leaf
     title: "#37 Commit executable Demo recording workflow and deterministic fixtures"
@@ -318,8 +320,9 @@ items:
     dependencies: ["4.37", "3.31"]
     preserved_behavior: Lazy loading, one active clip and efficient delivery are retained; the playback chapter just shows a play running.
     checkpoint:
-      state: planned
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
+      evidence_ref: "branch claude/next-logical-work-rf0nyq"
 
   # ── 5. Establish the release gate ─────────────────────────────────────────
   - id: "5.0"
@@ -397,8 +400,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: ready
-      updated_at: "2026-09-11T16:39:30.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
   - id: "6.12"
     kind: leaf
     title: "#12 Postcards: two-sided play cards, two-up with cut lines"
@@ -415,8 +418,9 @@ items:
     dependencies: ["5.38", "5.39"]
     preserved_behavior: Existing wristband and binder exports are unchanged.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-11T16:39:30.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
+      evidence_ref: "PR #55"
   - id: "6.13"
     kind: leaf
     title: "#13 Flyer: one page of six featured plays for parents and players"
@@ -432,5 +436,6 @@ items:
     dependencies: ["5.38", "5.39"]
     preserved_behavior: Existing wristband and binder exports are unchanged.
     checkpoint:
-      state: ready
-      updated_at: "2026-09-11T16:39:30.000Z"
+      state: completed
+      updated_at: "2026-09-12T00:40:00.000Z"
+      evidence_ref: "PR #55"

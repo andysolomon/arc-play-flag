@@ -1,6 +1,9 @@
 import { resolve } from "node:path";
 
-export const CHAPTER_SLUGS = ["build-play", "run-play", "build-defense", "save-export", "playbooks"] as const;
+export const CHAPTER_SLUGS = [
+  "build-play", "custom-routes", "run-play", "build-defense",
+  "save-share", "export-play", "playbooks", "print-playbook",
+] as const;
 export type ChapterSlug = (typeof CHAPTER_SLUGS)[number];
 
 export interface RecorderOptions {

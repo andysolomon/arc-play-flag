@@ -1,9 +1,12 @@
 /* Verified offline shell for the sideline. Keep this dependency-free. */
-const CACHE = "ffpd-shell-v5";
+const CACHE = "ffpd-shell-v6";
 const SNAPSHOTS = "ffpd-snapshots-v1";
 const READY = "/__ffpd_offline_ready__";
 const SHELLS = ["/", "/playbooks", "/demo"];
-const DEMOS = ["build-play", "run-play", "build-defense", "save-export", "playbooks"];
+const DEMOS = [
+  "build-play", "custom-routes", "run-play", "build-defense",
+  "save-share", "export-play", "playbooks", "print-playbook",
+];
 const ICONS = [
   "app-192", "app-512", "app-maskable-512", "blitz", "clear", "corner", "counter", "cross", "curl", "curlFlat",
   "customDef", "customOff", "defOnly", "delay", "demo", "deselectDef", "deselectOff", "dive", "duplicate", "export",

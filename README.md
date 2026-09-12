@@ -2,7 +2,7 @@
 
 A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give it a route or a run (offense) or a coverage (defense), save plays, and press ▶ to watch the deterministic teaching path: the centre snaps, the QB hands off or throws, and the call follows the marked primary read (or the first drawn receiver when no read is marked).
 
-Saved plays go into **playbooks** (`/playbooks`), which print without any server: wristband inserts (one per position, that route bold), binder pages (one detailed play per page, or four simple per page), a 4:5 picture card of any play, two-sided postcards (two-up with cut lines, or one per 4 × 6 in sheet), a one-page flyer of six featured plays, and a playbook file to hand to an assistant coach. The **demo tour** (`/demo`) covers the full workflow in five short clips. PDFs are written by a small in-repo writer; nothing is uploaded and it all works offline.
+Saved plays go into **playbooks** (`/playbooks`), which print without any server: wristband inserts (one per position, that route bold), binder pages (one detailed play per page, or four simple per page), a 4:5 picture card of any play, two-sided postcards (two-up with cut lines, or one per 4 × 6 in sheet), a one-page flyer of six featured plays, and a playbook file to hand to an assistant coach. The **demo tour** (`/demo`) covers the full workflow in eight short clips, each one focused enough to watch on a phone. PDFs are written by a small in-repo writer; nothing is uploaded and it all works offline.
 
 The design system and functional prototype live in [`design/`](design/readme.md); the app is a faithful port of `design/Flag Football Play Designer.dc.html`.
 
@@ -40,6 +40,6 @@ bunx vercel --prod
 - `lib/render/` — the play as static SVG markup, drawn from the same geometry as the live field (thumbnails, cards, printed pages).
 - `lib/export/` — page composition in points, the zero-dependency PDF writer, the rasteriser, and the wristband, binder, card, postcard, flyer and playbook-file formats. Export code is loaded on demand. `video.ts` records a 4:5 clip from the designer with a 1.5-second formation still, deterministic completed run, and 1.5-second final hold. The play name and selected playbook number stay visible; the browser records WebM or MP4. Keep the tab visible during recording; exports can be cancelled.
 - `public/icons/` — the sticker PNGs, pre-optimised (≤ 8 KB each). New tool stickers are drawn by `scripts/tool-stickers.ts` (run with `node`).
-- `public/demos/` — lazy-loaded 960×540 tour clips: WebM first, MP4 fallback, and a WebP poster per chapter. The complete set is kept under 1.25 MB.
+- `public/demos/` — lazy-loaded 960×540 tour clips: WebM first, MP4 fallback, and a WebP poster per chapter. The complete set is kept under 1.7 MB.
 
 See [`DEMO_WORKFLOW.md`](DEMO_WORKFLOW.md) to record, encode, extend, and verify the tour reproducibly.
