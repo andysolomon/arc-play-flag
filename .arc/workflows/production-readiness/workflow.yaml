@@ -321,8 +321,8 @@ items:
     preserved_behavior: Lazy loading, one active clip and efficient delivery are retained; the playback chapter just shows a play running.
     checkpoint:
       state: completed
-      updated_at: "2026-09-12T00:40:00.000Z"
-      evidence_ref: "branch claude/next-logical-work-rf0nyq"
+      updated_at: "2026-09-12T01:46:10.000Z"
+      evidence_ref: "PR #56"
 
   # ── 5. Establish the release gate ─────────────────────────────────────────
   - id: "5.0"
@@ -332,8 +332,8 @@ items:
     nesting_depth: 0
     dependencies: []
     checkpoint:
-      state: ready
-      updated_at: "2026-09-08T00:00:00.000Z"
+      state: completed
+      updated_at: "2026-09-11T16:39:30.000Z"
   - id: "5.38"
     kind: leaf
     title: "#38 Add browser journey regression tests to pull-request CI"
