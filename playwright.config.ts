@@ -35,7 +35,15 @@ export default defineConfig({
     // playback and route drawing animate; the tests read committed state, not frames
     reducedMotion: "reduce",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // Phones and tablets as Chromium emulates them: viewport, touch, pixel ratio and user
+    // agent, so the overlay drawers and 44px targets are exercised on every pull request.
+    // Real hardware and WebKit are outside this suite; e2e/README.md says what that leaves out.
+    { name: "pixel-7", use: { ...devices["Pixel 7"] } },
+    { name: "iphone-15", use: { ...devices["iPhone 15"], browserName: "chromium" } },
+    { name: "ipad-gen-7", use: { ...devices["iPad (gen 7)"], browserName: "chromium" } },
+  ],
   webServer: {
     command: `bun run start -p ${String(PORT)}`,
     url: `http://localhost:${String(PORT)}`,

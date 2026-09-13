@@ -104,7 +104,15 @@ export class Designer {
   player(label: string, team: "Offense" | "Defense" = "Offense"): Locator {
     return this.field.getByRole("button", { name: `${team} ${label}`, exact: true });
   }
+  /** On a phone or tablet an open drawer floats over the field, so it is folded before a tap has to land there. */
+  async foldOverlays(): Promise<void> {
+    const floating = await this.page
+      .locator("aside[aria-hidden='false']")
+      .evaluateAll((asides) => asides.some((el) => getComputedStyle(el).position === "absolute"));
+    if (floating) await this.closeSidebars();
+  }
   async select(label: string, team: "Offense" | "Defense" = "Offense"): Promise<void> {
+    await this.foldOverlays();
     await expect(async () => {
       await this.player(label, team).click();
       await expect(this.player(label, team)).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
