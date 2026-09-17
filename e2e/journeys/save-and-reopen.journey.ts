@@ -29,12 +29,12 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
   await d.tools();
   await expect(d.nameInput).toHaveValue("Otter Post Corner");
 
-  // start a fresh play, then reopen the saved one from the library
+  // start a fresh play, then reopen the saved one from Playbooks
   await d.clickTool("New play");
   await expect(d.routes).toHaveCount(0);
   await expect(d.nameInput).toHaveValue("New play");
   await d.openSaved("Otter Post Corner");
-  await expect(d.nameInput).toHaveValue("Otter Post Corner");
+  await expect(page.getByRole("heading", { name: "Otter Post Corner" })).toBeVisible();
   await expect(d.routes).toHaveCount(1);
   expect(await d.playerX("Y")).toBe(26);
 
@@ -60,9 +60,9 @@ test("a save that does not land says so, keeps the play on the field, and offers
   const alert = page.locator("#play-sidebar").getByRole("alert");
   await expect(alert).toContainText("Couldn't save: this browser's storage is full.");
   await expect(alert).toContainText("Your play is still here.");
-  // nothing was stored and no saved-play list appeared, so no false success anywhere
+  // nothing was stored and Play tools has no saved-play library to falsely list it
   expect(await storedPlays(page)).toEqual({});
-  await expect(d.openSelect).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Open a saved play" })).toHaveCount(0);
   await expect(d.routes).toHaveCount(1);
 
   // the way out is a one-play playbook file that "Import a file…" takes back
@@ -81,6 +81,7 @@ test("a save that does not land says so, keeps the play on the field, and offers
   await alert.getByRole("button", { name: "Try again" }).click();
   await expect(d.toast).toHaveText("Saved");
   await expect(page.locator("#play-sidebar").getByRole("alert")).toHaveCount(0);
-  await expect(d.openSelect.locator("option")).toHaveText(["Open a saved play…", "Otter Fail Safe"]);
   expect(Object.values(await storedPlays(page)).map((p) => p.name)).toEqual(["Otter Fail Safe"]);
+  await page.goto("/playbooks");
+  await expect(page.getByText("Otter Fail Safe", { exact: true })).toBeVisible();
 });

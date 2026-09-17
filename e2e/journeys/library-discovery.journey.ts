@@ -38,7 +38,7 @@ test("a playbook fits a 320px viewport without horizontal document overflow", as
   expect(widths.scrollWidth).toBeLessThanOrEqual(widths.clientWidth);
 });
 
-test("a playbook entry opens directly and the designer adds that play to another book once", async ({ page }) => {
+test("a playbook entry opens in the designer and can be added to another book from Playbooks", async ({ page }) => {
   const alpha = play("alpha", "Alpha Slant", { o3: { type: "slant" } }, "find the seam");
   const source = playbook("source", "Source Book", [alpha]);
   const target = playbook("target", "Target Book", []);
@@ -50,19 +50,13 @@ test("a playbook entry opens directly and the designer adds that play to another
   const designer = new Designer(page);
   await designer.tools();
   await expect(designer.nameInput).toHaveValue("Alpha Slant");
-  await designer.openSelect.selectOption("alpha");
-  await page.getByRole("button", { name: "New from formation" }).click();
-  await expect(designer.nameInput).toHaveValue("Alpha Slant formation");
-  await expect(designer.routes).toHaveCount(0);
+  await expect(designer.routes).toHaveCount(1);
   expect(Object.keys(await storedPlays(page))).toEqual(["alpha"]);
-  await expect.poll(async () => (await storedDraft(page))?.id).toBeNull();
+  await expect.poll(async () => (await storedDraft(page))?.id).toBe("alpha");
 
-  await designer.tools();
-  await designer.openSelect.selectOption("alpha");
-  const add = page.getByRole("combobox", { name: "Add opened play to a playbook" });
-  await add.selectOption("target");
-  await expect(page.getByRole("status").filter({ hasText: "Added to Target Book" })).toBeVisible();
-  await add.selectOption("target");
-  await expect(page.getByRole("status").filter({ hasText: "Already in Target Book" })).toBeVisible();
+  // add from the playbook editor (saved-play library no longer lives in Play tools)
+  await page.goto("/playbooks?book=target");
+  await page.getByTitle("Add Alpha Slant").click();
   expect((await storedPlaybooks(page)).target?.plays).toEqual(["alpha"]);
+  await expect(page.getByText("Alpha Slant", { exact: true })).toBeVisible();
 });
