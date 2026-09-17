@@ -34,7 +34,7 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
   await expect(d.routes).toHaveCount(0);
   await expect(d.nameInput).toHaveValue("New play");
   await d.openSaved("Otter Post Corner");
-  await expect(d.nameInput).toHaveValue("Otter Post Corner");
+  await expect(page.getByRole("heading", { name: "Otter Post Corner" })).toBeVisible();
   await expect(d.routes).toHaveCount(1);
   expect(await d.playerX("Y")).toBe(26);
 

@@ -20,7 +20,7 @@ test("editing A, saving, opening B, and checking storage leaves B alone and keep
 
   // reopen B from Playbooks (library no longer lives in Play tools)
   await d.openSaved("Otter Wheel Right");
-  await expect(d.nameInput).toHaveValue("Otter Wheel Right");
+  await expect(page.getByRole("heading", { name: "Otter Wheel Right" })).toBeVisible();
   await expect(d.primaryRoutes).toHaveCount(1);
 
   const lib = await storedPlays(page);
