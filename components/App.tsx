@@ -7,7 +7,7 @@ import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import type { RouteType, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
-import { getPlays, getServerPlays, playById, savePlay, subscribe } from "@/lib/play/library";
+import { getPlays, playById, savePlay } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute } from "@/lib/play/routes";
 import { StorageError, failureMessage, newId, readDraft, writeDraft } from "@/lib/play/storage";
@@ -53,7 +53,6 @@ export function App() {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
-  const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const hydratedRef = useRef(false);
   const [toast, setToast] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -254,13 +253,6 @@ export function App() {
     dispatch({ type: "newPlay" });
     say("New play · undo brings the last one back", 2400);
   }, [say]);
-  const onLoad = useCallback((id: string) => {
-    const rec = playById(id);
-    if (!rec) return;
-    const was = s.name || "Untitled play";
-    dispatch({ type: "load", id: rec.id, name: rec.name, notes: rec.notes, players: rec.players });
-    if (dirty) say(`Opened “${rec.name}” · undo brings “${was}” back`, 2800);
-  }, [dirty, say, s.name]);
   const shareUrl = useCallback((vis: Vis) =>
     `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", players: [...s.players] }, vis)}`,
   [s.name, s.players]);
@@ -302,7 +294,6 @@ export function App() {
             notes={s.notes}
             notesOpen={notesOpen}
             vis={s.vis}
-            plays={plays}
             onName={(name) => { dispatch({ type: "setName", name }); }}
             onNotes={(notes) => { dispatch({ type: "setNotes", notes }); }}
             onToggleNotes={() => { setNotesOpen((o) => !o); }}
@@ -313,7 +304,6 @@ export function App() {
             exportOpen={exportOpen}
             exportPanel={exportOpen ? <PlayExport id={s.id} name={s.name} players={s.players} /> : null}
             savePanel={saveFailure ? <SaveFailure message={failureMessage(saveFailure)} onRetry={onSave} onDownload={onDownload} /> : null}
-            onLoad={onLoad}
             onShare={openShare}
             onFlip={() => { dispatch({ type: "flip" }); }}
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}

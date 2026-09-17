@@ -21,9 +21,6 @@ export class Designer {
   get nameInput(): Locator {
     return this.page.getByRole("textbox", { name: "Play name" });
   }
-  get openSelect(): Locator {
-    return this.page.getByRole("combobox", { name: "Open a saved play" });
-  }
   get undo(): Locator {
     return this.page.getByRole("button", { name: "Undo", exact: true });
   }
@@ -153,10 +150,15 @@ export class Designer {
     await this.page.mouse.dblclick(pt.x, pt.y);
   }
 
-  /** Opens a saved play from the sidebar's select. */
+  /** Opens a saved play from the on-device library via the playbooks handoff URL. */
   async openSaved(name: string): Promise<void> {
-    await this.tools();
-    await this.openSelect.selectOption({ label: name });
+    const id = await this.page.evaluate((playName) => {
+      const lib = JSON.parse(localStorage.getItem("ffpd.plays.v2") ?? "{}") as Record<string, { name: string }>;
+      return Object.entries(lib).find(([, play]) => play.name === playName)?.[0] ?? null;
+    }, name);
+    if (!id) throw new Error(`no saved play named ${name}`);
+    await this.goto(`?open=${id}`);
+    await expect(this.page.getByRole("heading", { name })).toBeVisible();
   }
 
   /** The x position (in yards) a player is drawn at, read from its transform. */

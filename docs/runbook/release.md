@@ -25,7 +25,7 @@ In the app (a normal window, then repeat the first three steps in a private wind
 
 - [ ] `/` loads with an empty field and both sidebars closed; no errors in the console.
 - [ ] Drag a player, tap one, give it a route, press ▶: the play runs.
-- [ ] Play tools → Save → the toast says **Saved**. Reload: the play comes back from the draft and appears under "Open a saved play…".
+- [ ] Play tools → Save → the toast says **Saved**. Reload: the play comes back from the draft and appears under Playbooks → All plays.
 - [ ] Copy share link → open it in a private window: the read-only play renders and **Open in designer ›** loads it.
 - [ ] Break a share link on purpose (drop its last 20 characters): the **NOT FOUND** card appears, not Vercel's or Next's default 404.
 - [ ] `/playbooks`: make a playbook, add the play, **Download wristbands PDF** produces a PDF that opens; **Download playbook file** produces a `.playbook.json` that **Import a file…** reads back.
