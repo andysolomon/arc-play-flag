@@ -30,7 +30,7 @@ export function SharedPlay({ id, name, players, side, vis }: Props) {
         <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot · {shown}</span>
         <span className="flex-1" />
-        <Link href={`/?p=${id}`} className={`${pillSm} inline-block !text-ink no-underline`}>
+        <Link href={`/?p=${id}`} className={`${pillSm} inline-flex items-center !text-ink no-underline`}>
           Open in designer ›
         </Link>
       </header>
