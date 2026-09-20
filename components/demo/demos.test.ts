@@ -27,7 +27,7 @@ describe("demo tour", () => {
   test("covers the requested primary features", () => {
     for (const feature of [
       "Create plays", "Running plays", "Passing plays", "Play-action", "Primary routes", "Quick routes", "Custom routes",
-      "Moving players", "Formations", "Without defense", "With defense", "Defensive plays", "Zones", "Man coverage",
+      "Moving players", "Formations", "Shadow offense", "Defense only", "Defensive plays", "Zones", "Man coverage",
       "Play playback", "Saving", "Picture export", "Video export", "Playbook creation", "Team setup", "Import",
       "Wristbands", "Binder PDF",
     ]) expect(COVERED_FEATURES.has(feature)).toBe(true);

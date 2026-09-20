@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { initialState, reducer, selected, shown, unsaved } from "@/lib/play/reducer";
+import { initialState, reducer, selected, shadowing, unsaved } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
-import type { RouteType, Vis } from "@/lib/play/types";
+import type { RouteType, Team, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, playById, savePlay } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
@@ -122,8 +122,8 @@ export function App() {
     if (p?.route && mirrorRoute(p.route, p.x).clamped) say("Mirrored · pulled back inside the field", 2200);
   }, [s, say]);
   const onClear = useCallback(() => {
-    dispatch({ type: "clearRoutes", team: s.vis === "both" ? null : s.vis });
-  }, [s.vis]);
+    dispatch({ type: "clearRoutes", team: s.side });
+  }, [s.side]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -249,8 +249,8 @@ export function App() {
     openRight(true);
     dismissFirstUse();
   }, [dirty, dismissFirstUse, openRight, say]);
-  const onNew = useCallback(() => {
-    dispatch({ type: "newPlay" });
+  const onNew = useCallback((side: Team) => {
+    dispatch({ type: "newPlay", side });
     say("New play · undo brings the last one back", 2400);
   }, [say]);
   const shareUrl = useCallback((vis: Vis) =>
@@ -276,12 +276,11 @@ export function App() {
         name={s.name || "Untitled play"}
         persistence={persistence}
         side={s.side}
-        onSide={(side) => { dispatch({ type: "setSide", side }); }}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         canUndo={s.past.length > 0}
         canRedo={s.future.length > 0}
-        canClear={s.players.some((p) => p.route && shown(p, s.vis))}
+        canClear={s.players.some((p) => p.route && p.team === s.side)}
         onClear={onClear}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
@@ -295,6 +294,7 @@ export function App() {
             name={s.name}
             notes={s.notes}
             notesOpen={notesOpen}
+            side={s.side}
             vis={s.vis}
             onName={(name) => { dispatch({ type: "setName", name }); }}
             onNotes={(notes) => { dispatch({ type: "setNotes", notes }); }}
@@ -310,12 +310,13 @@ export function App() {
             onFlip={() => { dispatch({ type: "flip" }); }}
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}
             onReset={(team) => { dispatch({ type: "resetFormation", team }); }}
-            onVis={(vis) => { dispatch({ type: "setVis", vis }); }}
+            onShadow={(on) => { dispatch({ type: "setShadow", on }); }}
           />
         </Sidebar>
         <Field
           players={s.players}
           vis={s.vis}
+          shadow={shadowing(s.side, s.vis)}
           selectedId={s.selectedId}
           targeting={s.targeting}
           draft={s.draft}

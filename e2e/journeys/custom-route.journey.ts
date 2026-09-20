@@ -75,9 +75,10 @@ test("custom waypoints can be selected, moved, added, removed, undone, and redon
 test("man targets are announced and work by keyboard while pointer targeting remains available", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
-  // Defense-only remains useful while assigning Man: valid offense targets become
+  // hiding the shadow offense still works for Man: valid offense targets become
   // temporarily visible and focusable until the coverage is committed.
-  await d.clickTool("Defense");
+  await d.newPlay("Defense");
+  await d.page.getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true }).click();
   await d.select("d1", "Defense");
   await d.pick("Man");
 

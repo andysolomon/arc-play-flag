@@ -498,20 +498,21 @@ async function runPlay(d: ChapterDriver): Promise<void> {
   await d.runPlay("Run the play-action pass", ["Play-action", "Passing plays"]);
 }
 
-/** Build the defense: offense only, both teams, a deep zone, man coverage and a legal blitz. */
+/** Build the defense: hide or show the shadow offense, then a deep zone, man coverage and a legal blitz. */
 async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.goto("/?open=demo-defense");
-  await d.say("Offense only, or both teams");
+  await d.say("Hide the shadow offense, or keep it");
   await d.openPanel("Play tools");
-  const show = d.page.locator("#play-sidebar").getByRole("group", { name: "Show" });
-  await d.click(show.getByRole("button", { name: "Offense", exact: true }), "Show the offense only", 420);
-  await d.expectState("Defenders are hidden", async () => {
-    await expect(d.player("d1", "Defense")).toBeHidden({ timeout: ASSERT_TIMEOUT });
-  }, 240, ["Without defense"]);
-  await d.click(show.getByRole("button", { name: "Both", exact: true }), "Show both teams", 420);
-  await d.expectState("Both teams are on the field", async () => {
+  const shadow = d.page.locator("#play-sidebar").getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true });
+  await d.click(shadow, "Hide the shadow offense", 420);
+  await d.expectState("The offense is hidden", async () => {
+    await expect(d.player("X", "Offense")).toBeHidden({ timeout: ASSERT_TIMEOUT });
     await expect(d.player("d1", "Defense")).toBeVisible({ timeout: ASSERT_TIMEOUT });
-  }, 200, ["With defense"]);
+  }, 240, ["Defense only"]);
+  await d.click(shadow, "Show the shadow offense", 420);
+  await d.expectState("The faded offense is back as a reference", async () => {
+    await expect(d.player("X", "Offense")).toBeVisible({ timeout: ASSERT_TIMEOUT });
+  }, 200, ["Shadow offense"]);
 
   await d.say("Deep zone");
   await d.selectPlayer("d1", "Defense");

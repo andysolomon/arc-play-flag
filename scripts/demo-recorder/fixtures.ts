@@ -2,7 +2,7 @@ import { FIRST_USE_KEY } from "../../components/FirstUse";
 import { encodePlaybookFile } from "../../lib/export/playbook-file";
 import { defaults } from "../../lib/play/routes";
 import { DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
-import type { Playbook, Player, Route, SavedPlay, TeamSettings } from "../../lib/play/types";
+import type { Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
 import type { ChapterSlug } from "./options";
 
 /**
@@ -16,8 +16,8 @@ function formation(routes: Readonly<Record<string, Route>> = {}): Player[] {
   return defaults().map((player) => ({ ...player, route: routes[player.id] ?? null }));
 }
 
-function play(id: string, name: string, routes: Readonly<Record<string, Route>>, notes = ""): SavedPlay {
-  return { id, name, notes, side: "offense", players: formation(routes) };
+function play(id: string, name: string, routes: Readonly<Record<string, Route>>, notes = "", side: Team = "offense"): SavedPlay {
+  return { id, name, notes, side, players: formation(routes) };
 }
 
 /** The finished slant the library shows; `build-play` draws this play from a blank field. */
@@ -34,11 +34,11 @@ export const PLAY_ACTION_WHEEL = play("demo-play-action", "Otter Play-Action Whe
   o2: { type: "handoff" },
 }, "Sell the handoff, then find Z on the wheel.");
 
-/** Offense only; `build-defense` adds the zone, the man coverage and the blitz on camera. */
+/** A defensive call; `build-defense` adds the zone, the man coverage and the blitz on camera. */
 export const COVER_TWO_PRESSURE = play("demo-defense", "Otter Cover Two Pressure", {
   o3: { type: "go", primary: true },
   o4: { type: "post" },
-}, "Fictional install: a deep zone, man on X, and one legal blitzer.");
+}, "Fictional install: a deep zone, man on X, and one legal blitzer.", "defense");
 
 /** A plain run: Z takes the handoff and carries it. `run-play` runs this before the pass. */
 export const INSIDE_HANDOFF = play("demo-handoff", "Otter Inside Handoff", {

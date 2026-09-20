@@ -19,6 +19,8 @@ import { pillMd } from "./ui";
 interface Props {
   players: readonly Player[];
   vis: Vis;
+  /** fade the offense as a formation reference on a defensive call */
+  shadow?: boolean;
   selectedId: string | null;
   targeting: boolean;
   draft: Draft | null;
@@ -66,7 +68,7 @@ const STEP: Record<string, readonly [number, number]> = {
 };
 
 function FieldImpl({
-  players, vis, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
+  players, vis, shadow = false, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
   readOnly = false, title,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
@@ -123,8 +125,8 @@ function FieldImpl({
   useLayoutEffect(() => { topRef.current = top; }, [top]);
 
   const zones = useMemo(() => zoneLayout(effective, top), [effective, top]);
-  // Man coverage always exposes its valid offense targets, even when the coach is
-  // working in Defense-only view. They disappear again as soon as targeting ends.
+  // Man coverage always exposes its valid offense targets, even when the shadow is hidden.
+  // They disappear again as soon as targeting ends.
   const visible = useMemo(
     () => effective.filter((p) => shown(p, vis) || (targeting && p.team === "offense")),
     [effective, targeting, vis],
@@ -132,6 +134,10 @@ function FieldImpl({
   const routes = useMemo(
     () => visible.flatMap((p) => { const g = geom(p, effective, top, zones); return g ? [{ ...g, id: p.id }] : []; }),
     [visible, effective, top, zones],
+  );
+  const shadowIds = useMemo(
+    () => (shadow ? new Set(visible.filter((p) => p.team === "offense").map((p) => p.id)) : undefined),
+    [shadow, visible],
   );
   const draftD = useMemo(() => {
     if (!draft) return "";
@@ -197,8 +203,9 @@ function FieldImpl({
     const p = players.find((q) => q.id === dr.id);
     if (!p) return;
     if (targeting && p.team === "offense") { dispatch({ type: "target", id: p.id }); return; }
+    if (shadow && p.team === "offense") return;
     onSelect(p.id);
-  }, [dispatch, onSelect, players, snapMode, targeting, toYards]);
+  }, [dispatch, onSelect, players, shadow, snapMode, targeting, toYards]);
 
   const endWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -265,13 +272,13 @@ function FieldImpl({
       e.preventDefault();
       const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
       dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
-      if (selectedId !== id) onSelect(id);
+      if (selectedId !== id && !(shadow && p.team === "offense")) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (targeting && p.team === "offense") dispatch({ type: "target", id });
-      else onSelect(id);
+      else if (!(shadow && p.team === "offense")) onSelect(id);
     }
-  }, [dispatch, onSelect, players, selectedId, targeting]);
+  }, [dispatch, onSelect, players, selectedId, shadow, targeting]);
 
   const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);
@@ -467,7 +474,7 @@ function FieldImpl({
               </g>
             )}
           </g>
-          <RouteLayer routes={routes} draftD={draftD} />
+          <RouteLayer routes={routes} draftD={draftD} shadowIds={shadowIds} />
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;
             return (
@@ -508,6 +515,7 @@ function FieldImpl({
               boing={boingId === p.id}
               dragging={dragging}
               readOnly={readOnly}
+              shadow={shadow && p.team === "offense"}
               onPointerDown={onDown}
               onKeyDown={onKey}
             />

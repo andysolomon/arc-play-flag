@@ -30,7 +30,7 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
   await expect(d.nameInput).toHaveValue("Otter Post Corner");
 
   // start a fresh play, then reopen the saved one from Playbooks
-  await d.clickTool("New play");
+  await d.newPlay();
   await expect(d.routes).toHaveCount(0);
   await expect(d.nameInput).toHaveValue("New play");
   await d.openSaved("Otter Post Corner");

@@ -39,7 +39,7 @@ test("New play clears the field and undo brings the last play back whole", async
   await d.pick("Slant");
   await expect(d.routes).toHaveCount(1);
 
-  await d.clickTool("New play");
+  await d.newPlay();
   await expect(d.toast).toHaveText("New play · undo brings the last one back");
   await expect(d.nameInput).toHaveValue("New play");
   await expect(d.routes).toHaveCount(0);

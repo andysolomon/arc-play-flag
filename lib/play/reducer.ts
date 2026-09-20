@@ -35,16 +35,15 @@ export type Action =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
-  /** a fresh, unsaved play on the default formation; undoable */
-  | { type: "newPlay" }
+  /** a fresh, unsaved play on the default formation; undoable. Side is chosen here and stays put. */
+  | { type: "newPlay"; side: Team }
   | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
   | { type: "setName"; name: string }
   | { type: "setNotes"; notes: string }
-  /** offensive play or defensive call; the field shows that side, like a Show tap would */
-  | { type: "setSide"; side: Team }
   /** after a save: remember which record this play now is */
   | { type: "saved"; id: string }
-  | { type: "setVis"; vis: Vis };
+  /** on a defensive call: show or hide the faded offensive formation */
+  | { type: "setShadow"; on: boolean };
 
 export function initialState(): PlayState {
   return {
@@ -79,6 +78,18 @@ export function shown(p: Player, vis: Vis): boolean {
   return vis === "both" || p.team === vis;
 }
 
+/** On a defensive call, the offense can sit on the field faded, as a formation reference. */
+export function shadowing(side: Team, vis: Vis): boolean {
+  return side === "defense" && vis === "both";
+}
+
+/** What the field shows for a document: an offensive play is offense-only; a defensive call shows the shadow offense. */
+function visFor(side: Team, prev?: Pick<PlayState, "side" | "vis">): Vis {
+  if (side === "offense") return "offense";
+  if (prev?.side === "defense" && (prev.vis === "defense" || prev.vis === "both")) return prev.vis;
+  return "both";
+}
+
 function patch(players: readonly Player[], id: string, upd: Partial<Player>): readonly Player[] {
   return players.map((p) => (p.id === id ? { ...p, ...upd } : p));
 }
@@ -87,9 +98,9 @@ function commit(s: PlayState): PlayState {
   return { ...s, ...push(s, s) };
 }
 
-/** A document whose side changed is shown from that side, so a defensive call opens on the defense. */
+/** Opening a play whose side differs follows that side's default view; a defensive call keeps the shadow preference. */
 function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
-  return { vis: doc.side === s.side ? s.vis : doc.side };
+  return { vis: visFor(doc.side, s) };
 }
 
 /** Replaces the whole document, leaving the one before it one undo away. */
@@ -132,13 +143,18 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const base = a.commit ? commit(s) : s;
       return { ...base, players: patch(base.players, a.id, { x: a.x, y: a.y }) };
     }
-    case "select":
+    case "select": {
+      if (a.id === null) return { ...s, selectedId: null, targeting: false, draft: null };
+      const picked = s.players.find((p) => p.id === a.id);
+      // a play is one side of the ball: the other team is never the selected player
+      if (!picked || picked.team !== s.side) return s;
       return { ...s, selectedId: a.id, targeting: false, draft: null };
+    }
     case "cancelTargeting":
       return { ...s, targeting: false };
     case "pick": {
       const p = selected(s);
-      if (!p) return s;
+      if (!p || p.team !== s.side) return s;
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
       if (a.key === "man") return { ...s, targeting: true, draft: null };
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: false };
@@ -256,7 +272,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "redo":
       return step(s, redoStep(s, s));
     case "newPlay":
-      return swap(s, { id: null, name: "New play", notes: "", side: "offense", players: defaults() });
+      return swap(s, { id: null, name: "New play", notes: "", side: a.side, players: defaults() });
     case "load":
       return swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
     case "hydrate": {
@@ -267,12 +283,13 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return { ...s, name: a.name };
     case "setNotes":
       return { ...s, notes: a.notes };
-    case "setSide":
-      return a.side === s.side ? s : { ...s, side: a.side, vis: a.side, ...cleared };
     case "saved":
       return { ...s, id: a.id };
-    case "setVis":
-      return { ...s, vis: a.vis };
+    case "setShadow": {
+      if (s.side !== "defense") return s;
+      const vis = a.on ? "both" as const : "defense" as const;
+      return vis === s.vis ? s : { ...s, vis };
+    }
   }
 }
 

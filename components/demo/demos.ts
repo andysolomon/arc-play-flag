@@ -37,8 +37,8 @@ export const DEMOS: readonly DemoChapter[] = [
     slug: "build-defense",
     title: "Build the defense",
     time: "11 sec",
-    summary: "Switch between offense only and the full field, then assign a deep zone, man coverage and a legal blitz.",
-    covers: ["Without defense", "With defense", "Defensive plays", "Zones", "Man coverage", "Blitz"],
+    summary: "Show or hide the shadow offense, then assign a deep zone, man coverage and a legal blitz.",
+    covers: ["Shadow offense", "Defense only", "Defensive plays", "Zones", "Man coverage", "Blitz"],
   },
   {
     slug: "save-share",
