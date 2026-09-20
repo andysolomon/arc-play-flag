@@ -32,7 +32,7 @@ First time only: `bunx playwright install chromium`.
 | Picture card saves a real PNG; a card that cannot be drawn reports it | `export` |
 | ▶ runs and comes back with nothing moved (browser smoke) | `playback` |
 
-Offline navigation and update coverage is added with #28. The default teaching path is deterministic: primary-read selection and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip path parity and timing are covered by `lib/export/video.test.ts`.
+Offline navigation and update coverage is added with #28. Live ▶ playback throws to the primary read 80% of the time and exported clips always complete to it: primary-read odds and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip timing is covered by `lib/export/video.test.ts`.
 
 ## In CI
 

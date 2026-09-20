@@ -9,7 +9,7 @@ const FPS = 24;
 const VIDEO_W = CARD_W * 2 / 3;
 const VIDEO_H = CARD_H * 2 / 3;
 
-/** Uses the same deterministic teaching path as designer playback. */
+/** Uses the deterministic teaching path: a clip always completes to the primary read, unlike live ▶ playback. */
 export function clipMotion(o: CardOptions): Motion {
   const m = buildMotion(o.players, cardField(o.players, o.vis).top);
   // Unlike live playback's five-second cap, a clip lets every route finish.
