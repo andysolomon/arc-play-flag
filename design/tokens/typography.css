@@ -10,7 +10,7 @@
   --text-base: 16px;         /* buttons, body */
   --text-input: 17px;        /* text fields */
   --text-title: 18px;        /* panel titles */
-  --text-header: 20px;       /* play name in the header */
+  --text-header: 20px;       /* play name above the field */
   --text-field-label: 17px;  /* yard numbers on the field (SVG) */
   --text-token: 18px;        /* player letter on a token (15px when 3 letters) */
 
