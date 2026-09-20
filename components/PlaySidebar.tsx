@@ -84,7 +84,9 @@ function PlaySidebarImpl({
         <IconTile icon="offOnly" label="Offense" active={vis === "offense"} onClick={() => { onVis("offense"); }} />
         <IconTile icon="defOnly" label="Defense" active={vis === "defense"} onClick={() => { onVis("defense"); }} />
       </div>
-      <span className="flex-none text-caption leading-note text-ink-muted">Clear and reset only touch the team you&apos;re showing.</span>
+      <span className="flex-none text-caption leading-note text-ink-muted">
+        The other team is faded here, like the tiles, and left off the playbook. Clear and reset only touch the team you&apos;re showing.
+      </span>
       <span className={divider} />
       <Support />
     </>

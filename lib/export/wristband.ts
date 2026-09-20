@@ -1,5 +1,5 @@
 import type { TeamSettings, Vis } from "@/lib/play/types";
-import { playerWithLabel, positionsOf, type Numbered } from "./numbered";
+import { playerWithLabel, playShow, positionsOf, type Numbered } from "./numbered";
 import { IN, MUTED, PAPERS, badge, cutRect, field, page, text, type PaperKey, type SvgPage } from "./pages";
 import { measure } from "./raster";
 
@@ -80,7 +80,7 @@ export function fit(s: string, maxWidth: number, size: number): string {
   return t.trimEnd() + "…";
 }
 
-function cell(x: number, y: number, w: number, h: number, item: Numbered | null, position: string | null, vis: Vis): string {
+function cell(x: number, y: number, w: number, h: number, item: Numbered | null, position: string | null, vis?: Vis): string {
   if (!item) return "";
   const pad = Math.min(3, w * 0.03);
   const head = Math.min(0.2 * IN, h * 0.22);
@@ -94,7 +94,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   out.push(
     field(item.play.players, x + pad, fy, w - 2 * pad, y + h - pad - fy, {
       highlight: playerWithLabel(item.play, position),
-      show: vis,
+      show: playShow(item.play, vis),
       showYardNumbers: false,
       // a landscape cell: show only as much field as the cell's shape needs, so the play fills it
       minDepth: 14,
@@ -103,7 +103,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   return out.join("");
 }
 
-function card(x: number, y: number, size: BandSize, c: BandCard, bookName: string, vis: Vis): string {
+function card(x: number, y: number, size: BandSize, c: BandCard, bookName: string, vis?: Vis): string {
   const cw = size.w * IN, ch = size.h * IN;
   const out: string[] = [];
   const who = c.position ?? "Everyone";
@@ -123,7 +123,7 @@ export function wristbandPages(plays: readonly Numbered[], o: WristbandOptions):
   const p = PAPERS[o.paper];
   const t = tile(o.paper, o.size);
   const cards = planCards(plays, o.size.rows * o.size.cols);
-  const vis = o.vis ?? "offense";
+  const vis = o.vis;
   const pages: SvgPage[] = [];
   for (let i = 0; i < cards.length; i += t.perPage) {
     const body: string[] = [];

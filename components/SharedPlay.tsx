@@ -41,6 +41,7 @@ export function SharedPlay({ id, name, players, side, vis }: Props) {
         <Field
           players={players}
           vis={vis}
+          side={side}
           selectedId={null}
           targeting={false}
           draft={null}

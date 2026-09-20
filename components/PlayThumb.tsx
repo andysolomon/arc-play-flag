@@ -1,19 +1,20 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import type { Player, Vis } from "@/lib/play/types";
+import type { Player, Team } from "@/lib/play/types";
 import { playArt } from "@/lib/render/play-svg";
 
 interface Props {
   players: readonly Player[];
   name: string;
-  show?: Vis;
+  /** the play's own side: the other team is left off playbook pictures */
+  side: Team;
   className?: string;
 }
 
 /** A small static picture of a play, drawn from the same geometry as the field. */
-function PlayThumbImpl({ players, name, show = "both", className = "" }: Props) {
-  const art = useMemo(() => playArt(players, { showYardNumbers: false, show }), [players, show]);
+function PlayThumbImpl({ players, name, side, className = "" }: Props) {
+  const art = useMemo(() => playArt(players, { showYardNumbers: false, show: side }), [players, side]);
   return (
     <svg
       viewBox={art.viewBox}

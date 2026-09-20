@@ -79,6 +79,14 @@ export function shown(p: Player, vis: Vis): boolean {
   return vis === "both" || p.team === vis;
 }
 
+/**
+ * The opposite team is only context on the field: faded like the Show icons,
+ * and left off playbook drawings.
+ */
+export function isContext(p: Player, side: Team): boolean {
+  return p.team !== side;
+}
+
 function patch(players: readonly Player[], id: string, upd: Partial<Player>): readonly Player[] {
   return players.map((p) => (p.id === id ? { ...p, ...upd } : p));
 }
