@@ -17,13 +17,15 @@ interface Props {
   dragging: boolean;
   /** read-only rendering (share page): no handlers, not focusable */
   readOnly?: boolean;
+  /** the opposite team, shown as faded context on the field */
+  faded?: boolean;
   onPointerDown: (id: string, e: PointerEvent<SVGGElement>) => void;
   onKeyDown: (id: string, e: KeyboardEvent<SVGGElement>) => void;
 }
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
 
-function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, onPointerDown, onKeyDown }: Props) {
+function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, faded = false, onPointerDown, onKeyDown }: Props) {
   const tokenRef = useRef<SVGGElement>(null);
   useEffect(() => {
     if (focusOnTarget) tokenRef.current?.focus();
@@ -41,7 +43,10 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
       onPointerDown={readOnly ? undefined : (e) => { onPointerDown(p.id, e); }}
       onClick={readOnly ? undefined : (e) => { e.stopPropagation(); }}
       onKeyDown={readOnly ? undefined : (e) => { onKeyDown(p.id, e); }}
-      className={readOnly ? undefined : `group touch-none outline-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+      className={[
+        faded ? "opacity-40" : "",
+        readOnly ? "" : `group touch-none outline-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`,
+      ].filter(Boolean).join(" ") || undefined}
     >
       <g style={{ ...centred, transform: selected ? "scale(1.1)" : "none" }}>
         <g style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : undefined}>

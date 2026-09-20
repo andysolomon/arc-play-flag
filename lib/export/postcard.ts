@@ -1,6 +1,6 @@
 import type { TeamSettings, Vis } from "@/lib/play/types";
 import { CARD_H, CARD_W, cardBody } from "./card";
-import type { Numbered } from "./numbered";
+import { playShow, type Numbered } from "./numbered";
 import { IN, INK, MUTED, PAPERS, appMark, badge, cutRect, f2, page, rect, text, type SvgPage, type PaperKey } from "./pages";
 import { measure, wrap } from "./raster";
 import { fit } from "./wristband";
@@ -104,13 +104,13 @@ function face(body: string, s: Slot): string {
 
 function sheet(items: readonly Numbered[], o: PostcardOptions, side: "front" | "back"): SvgPage {
   const { w, h, slots } = postcardSheet(o);
-  const vis = o.vis ?? "both";
+  const vis = o.vis;
   const out: string[] = [];
   items.forEach((item, i) => {
     const s = slots[i];
     if (!s) return;
     const body = side === "front"
-      ? cardBody({ name: item.play.name, players: item.play.players, n: item.n, team: o.team, vis })
+      ? cardBody({ name: item.play.name, players: item.play.players, n: item.n, team: o.team, vis: playShow(item.play, vis) })
       : postcardBack(item, o);
     out.push(face(body, s));
     // scissors only need a guide where the sheet is bigger than the card

@@ -7,7 +7,7 @@ import {
 import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
-import { shown } from "@/lib/play/reducer";
+import { isContext, shown } from "@/lib/play/reducer";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
@@ -19,6 +19,8 @@ import { pillMd } from "./ui";
 interface Props {
   players: readonly Player[];
   vis: Vis;
+  /** the play's own side: the other team is faded context when shown */
+  side: Team;
   selectedId: string | null;
   targeting: boolean;
   draft: Draft | null;
@@ -73,7 +75,7 @@ const STEP: Record<string, readonly [number, number]> = {
 const TITLE_CHROME = 40;
 
 function FieldImpl({
-  players, vis, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
+  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
   readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
@@ -137,8 +139,15 @@ function FieldImpl({
     [effective, targeting, vis],
   );
   const routes = useMemo(
-    () => visible.flatMap((p) => { const g = geom(p, effective, top, zones); return g ? [{ ...g, id: p.id }] : []; }),
-    [visible, effective, top, zones],
+    () => {
+      const list = visible.flatMap((p) => {
+        const g = geom(p, effective, top, zones);
+        return g ? [{ ...g, id: p.id, faded: isContext(p, side) }] : [];
+      });
+      // faded context sits under the play's own side
+      return list.sort((a, b) => Number(b.faded) - Number(a.faded));
+    },
+    [visible, effective, top, zones, side],
   );
   const draftD = useMemo(() => {
     if (!draft) return "";
@@ -526,6 +535,7 @@ function FieldImpl({
               boing={boingId === p.id}
               dragging={dragging}
               readOnly={readOnly}
+              faded={isContext(p, side)}
               onPointerDown={onDown}
               onKeyDown={onKey}
             />
