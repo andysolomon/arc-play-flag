@@ -1,13 +1,14 @@
 import type { NextConfig } from "next";
+import { resolveRelease } from "./lib/offline/release";
 
-// the commit Vercel built from, so an error report can name the release it came from
-const sha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+// the commit Vercel built from, so an error report and the service worker agree on the release
+const release = resolveRelease();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   env: {
-    NEXT_PUBLIC_RELEASE: sha ? sha.slice(0, 7) : "local",
+    NEXT_PUBLIC_RELEASE: release,
     NEXT_PUBLIC_RELEASE_ENV: process.env.VERCEL_ENV ?? "development",
   },
   images: {

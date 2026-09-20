@@ -31,6 +31,7 @@ First time only: `bunx playwright install chromium`.
 | Share link shows both teams read-only, opens back in the designer; bad link is a 404 | `sharing` |
 | Picture card saves a real PNG; a card that cannot be drawn reports it | `export` |
 | ▶ runs and comes back with nothing moved (browser smoke) | `playback` |
+| A release that lands while the app is open is offered as **Update ready**; **Update now** reloads onto it, the reloaded page takes over its own worker quietly, plays survive | `update` |
 
 Offline navigation and update coverage is added with #28. The default teaching path is deterministic: primary-read selection and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip path parity and timing are covered by `lib/export/video.test.ts`.
 

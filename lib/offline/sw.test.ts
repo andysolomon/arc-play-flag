@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
+import { RELEASE_PLACEHOLDER, stampWorker } from "./release";
 
 const ORIGIN = "https://play.test";
-const SOURCE = readFileSync(join(import.meta.dir, "sw.js"), "utf8");
+const PUBLIC = join(import.meta.dir, "../../public");
+const TEMPLATE = readFileSync(join(import.meta.dir, "sw.js"), "utf8");
+// what scripts/stamp-sw.ts ships for a build whose release is "test"
+const SOURCE = stampWorker(TEMPLATE, "test");
 
 const keyFor = (input: RequestInfo | URL): string => {
   const raw = typeof input === "string" || input instanceof URL ? String(input) : input.url;
@@ -45,6 +49,10 @@ class MemoryCaches {
     return Promise.resolve([...this.stores.keys()]);
   }
 
+  has(name: string): Promise<boolean> {
+    return Promise.resolve(this.stores.has(name));
+  }
+
   delete(name: string): Promise<boolean> {
     return Promise.resolve(this.stores.delete(name));
   }
@@ -61,7 +69,7 @@ type WorkerEvent = "install" | "activate" | "fetch" | "message";
 type Listener = (event: Record<string, unknown>) => void;
 type Fetcher = (input: RequestInfo | URL) => Promise<Response>;
 
-function harness() {
+function harness(script = "/sw.js") {
   const listeners = new Map<WorkerEvent, Listener>();
   const caches = new MemoryCaches();
   const fetched: string[] = [];
@@ -86,7 +94,7 @@ function harness() {
   };
 
   const self = {
-    location: { origin: ORIGIN },
+    location: { origin: ORIGIN, href: ORIGIN + script },
     addEventListener(type: WorkerEvent, listener: Listener) { listeners.set(type, listener); },
     skipWaiting() { skipped = true; return Promise.resolve(); },
     clients: {
@@ -126,6 +134,18 @@ function harness() {
     headers: new Headers(options.range ? { range: options.range } : undefined),
   }) as Request;
 
+  const dispatchMessage = async (data: unknown): Promise<unknown[]> => {
+    const replies: unknown[] = [];
+    let wait: Promise<unknown> | undefined;
+    listeners.get("message")?.({
+      data,
+      source: { postMessage: (value: unknown) => replies.push(value) },
+      waitUntil(value: Promise<unknown>) { wait = value; },
+    });
+    await wait;
+    return replies;
+  };
+
   const dispatchFetch = async (next: Request): Promise<Response> => {
     let response: Promise<Response> | undefined;
     const waits: Promise<unknown>[] = [];
@@ -146,6 +166,7 @@ function harness() {
     posted,
     request,
     dispatchFetch,
+    dispatchMessage,
     lifetime,
     setFetch(next: Fetcher) { fetcher = next; },
     get skipped() { return skipped; },
@@ -161,7 +182,7 @@ describe("offline service worker", () => {
   test("claims readiness only after every route, advertised demo, icon, and discovered build asset is cached", async () => {
     await worker.lifetime("install");
 
-    const shell = await worker.caches.open("ffpd-shell-v6");
+    const shell = await worker.caches.open("ffpd-shell-test");
     expect(await shell.match("/__ffpd_offline_ready__")).toBeDefined();
     expect(worker.fetched).toContain("/");
     expect(worker.fetched).toContain("/playbooks");
@@ -187,9 +208,45 @@ describe("offline service worker", () => {
     expect(worker.fetched).not.toContain("/image-remote.png");
     expect(await shell.match("/_next/static/fonts/test-latin-400.woff2")).toBeDefined();
     expect(await shell.match("/_next/static/fonts/test-latin-700.woff2")).toBeDefined();
-    for (const file of readdirSync(join(import.meta.dir, "icons"))) expect(worker.fetched).toContain(`/icons/${file}`);
-    for (const file of readdirSync(join(import.meta.dir, "demos"))) expect(worker.fetched).toContain(`/demos/${file}`);
+    for (const file of readdirSync(join(PUBLIC, "icons"))) expect(worker.fetched).toContain(`/icons/${file}`);
+    for (const file of readdirSync(join(PUBLIC, "demos"))) expect(worker.fetched).toContain(`/demos/${file}`);
+    // a complete install still waits for the page: the coach decides when to reload
+    expect(worker.skipped).toBe(false);
+  });
+
+  test("names its cache after the stamped release, reports that release, and takes over only when the page asks", async () => {
+    expect(TEMPLATE).toContain(RELEASE_PLACEHOLDER);
+    expect(SOURCE).not.toContain(RELEASE_PLACEHOLDER);
+    expect(() => stampWorker(TEMPLATE, "not a token")).toThrow();
+
+    await worker.lifetime("install");
+    expect(await worker.dispatchMessage({ type: "FFPD_RELEASE_REQUEST" })).toEqual([{ type: "FFPD_RELEASE", release: "test" }]);
+    expect(await worker.dispatchMessage({ type: "FFPD_OFFLINE_STATUS_REQUEST" }))
+      .toEqual([{ type: "FFPD_OFFLINE_STATUS", status: "ready", release: "test" }]);
+    expect(worker.skipped).toBe(false);
+
+    await worker.dispatchMessage({ type: "FFPD_SKIP_WAITING" });
     expect(worker.skipped).toBe(true);
+  });
+
+  test("a superseded worker never re-creates the shell a newer release swept", async () => {
+    await worker.lifetime("install");
+    await worker.caches.delete("ffpd-shell-test");
+
+    const asset = await worker.dispatchFetch(worker.request("/_next/static/late.js"));
+    expect(asset.status).toBe(200);
+    const page = await worker.dispatchFetch(worker.request("/", { mode: "navigate" }));
+    expect(page.status).toBe(200);
+    expect(await worker.dispatchMessage({ type: "FFPD_OFFLINE_STATUS_REQUEST" }))
+      .toEqual([{ type: "FFPD_OFFLINE_STATUS", status: "unavailable", release: "test" }]);
+    expect(await worker.caches.keys()).not.toContain("ffpd-shell-test");
+  });
+
+  test("a page can stand up a worker of a named release for a rehearsal", async () => {
+    const next = harness("/sw.js?release=e2e-next");
+    await next.lifetime("install");
+    expect(await (await next.caches.open("ffpd-shell-e2e-next")).match("/__ffpd_offline_ready__")).toBeDefined();
+    expect(await next.dispatchMessage({ type: "FFPD_RELEASE_REQUEST" })).toEqual([{ type: "FFPD_RELEASE", release: "e2e-next" }]);
   });
 
   test("a missing required asset aborts install without a ready marker", async () => {
@@ -205,7 +262,7 @@ describe("offline service worker", () => {
     }
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toContain("Offline asset unavailable");
-    expect(await (await worker.caches.open("ffpd-shell-v6")).match("/__ffpd_offline_ready__")).toBeUndefined();
+    expect(await (await worker.caches.open("ffpd-shell-test")).match("/__ffpd_offline_ready__")).toBeUndefined();
     expect(worker.skipped).toBe(false);
   });
 
@@ -224,7 +281,7 @@ describe("offline service worker", () => {
   });
 
   test("serves cached media ranges and contains failed background refreshes", async () => {
-    const shell = await worker.caches.open("ffpd-shell-v6");
+    const shell = await worker.caches.open("ffpd-shell-test");
     await shell.put("/demos/run-play.webm", new Response(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]), {
       headers: { "content-type": "video/webm" },
     }));
@@ -240,7 +297,8 @@ describe("offline service worker", () => {
   });
 
   test("deletes only superseded shell caches and leaves shared snapshots and foreign caches intact", async () => {
-    await worker.caches.open("ffpd-shell-v6");
+    await worker.caches.open("ffpd-shell-test");
+    await worker.caches.open("ffpd-shell-1de5257");
     await worker.caches.open("ffpd-shell-v4");
     await worker.caches.open("ffpd-shell-v3");
     await worker.caches.open("ffpd-v3");
@@ -249,7 +307,7 @@ describe("offline service worker", () => {
 
     await worker.lifetime("activate");
 
-    expect(await worker.caches.keys()).toEqual(["ffpd-shell-v6", "ffpd-snapshots-v1", "another-app"]);
+    expect(await worker.caches.keys()).toEqual(["ffpd-shell-test", "ffpd-snapshots-v1", "another-app"]);
     expect(worker.claimed).toBe(true);
     expect(worker.posted).toContainEqual({ type: "FFPD_OFFLINE_STATUS", status: "ready" });
   });

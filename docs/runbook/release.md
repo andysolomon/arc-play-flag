@@ -32,6 +32,7 @@ In the app (a normal window, then repeat the first three steps in a private wind
 - [ ] `/demo`: the first clip plays.
 - [ ] Play tools → **Where your plays live** opens; **Report a problem** opens a GitHub new-issue page whose body shows the new release SHA and `Page: \`/\``, and contains no play names.
 - [ ] DevTools → Network → **Offline**, reload `/`: the designer still opens (service worker shell). Go online again.
+- [ ] In a tab that was open on the *previous* release, switch away and back: **Update ready** appears at the bottom left; **Update now** reloads it, **Report a problem** shows the new SHA, and the plays are still there.
 - [ ] Forced failure drills (below) at least once per month or after any change to `app/`, `components/App.tsx`, `lib/play/storage.ts` or `lib/diagnostics.ts`.
 
 If any box stays unticked, roll back first (next section), then investigate.
@@ -87,7 +88,7 @@ Roll back when a release fails the checklist, when a problem report shows a regr
 
 A Vercel rollback is a pointer change: it is immediate, but the **next push to `main` deploys again and replaces it**. Nothing else may merge until step 2 is done.
 
-Coaches with the app installed will run the rolled-back build on their next navigation: `public/sw.js` fetches pages network-first and refreshes static assets in the background, so one reload is enough. A build-only rollback never touches their stored plays.
+Coaches with the app installed get the rolled-back build the way they get any release. `/sw.js` is stamped with the deploy's commit at build time (`scripts/stamp-sw.ts`, source in `lib/offline/sw.js`), so it is byte-different; browsers re-fetch it on navigation, when a tab comes back, and hourly, install it in the background, and the app shows **Update ready → Update now**. A tab that reloads on its own gets the new build straight away (pages are fetched network-first) and its worker takes over without a prompt. A build-only rollback never touches their stored plays.
 
 ### 2. Revert the change (git, via a PR)
 
@@ -108,7 +109,7 @@ Merge once **Merge Gate** and **PR Checks** are green (`gh pr update-branch <n> 
 
 - **A stored-data shape changed.** Plays are versioned by storage key (`ffpd.plays.v2`, `ffpd.playbooks.v1`, `ffpd.team.v1`, `ffpd.draft.v1`, `ffpd.diagnostics.v1`), and the readers in `lib/play/storage.ts` normalise whatever they find rather than trusting it. A release that introduced a new key (say `ffpd.plays.v3`) and migrated data into it cannot be undone by serving the old build, because the old build reads the old key. Such a release must keep writing the old key too, or must not be rolled back: fix forward instead. Reviewers block any PR that renames a key without a compatibility note here.
 - **A share-link format changed.** Links a coach already copied must keep decoding (`lib/play/share.ts`); `decodeShare` returning null sends them to the NOT FOUND card. A rollback restores the old decoder, so a format change must decode both old and new before it ships.
-- **The service worker cache name changed** (`VERSION` in `public/sw.js`). Rolling back re-serves the older `sw.js`; browsers install it because the bytes differ, and its activate step deletes the newer cache. Expect one extra reload for installed users, nothing more.
+- **The service worker.** Its cache is named after the release stamp (`ffpd-shell-<sha>`), so nothing is bumped by hand and every deploy, rollback included, is a new worker. Browsers install the rolled-back `sw.js` because the bytes differ, the app offers **Update now**, and the activate step deletes the newer release's shell. Expect one prompt for installed users, nothing more.
 
 ### Verifying a rollback safely
 
