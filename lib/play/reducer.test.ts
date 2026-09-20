@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { initialState, reducer, selected, unsaved, type Action, type PlayState } from "./reducer";
+import { initialState, isContext, reducer, selected, unsaved, type Action, type PlayState } from "./reducer";
 import { defaults } from "./routes";
 
 const run = (...actions: Action[]): PlayState => actions.reduce(reducer, initialState());
@@ -355,5 +355,12 @@ describe("play side", () => {
     expect(unsaved(s, saved)).toBe(false);
     expect(unsaved(reducer(s, { type: "setSide", side: "defense" }), saved)).toBe(true);
     expect(unsaved(run({ type: "setSide", side: "defense" }), null)).toBe(true);
+  });
+  test("the opposite team is context on the field", () => {
+    const o = defaults().find((p) => p.team === "offense");
+    const d = defaults().find((p) => p.team === "defense");
+    expect(o && isContext(o, "offense")).toBe(false);
+    expect(d && isContext(d, "offense")).toBe(true);
+    expect(o && isContext(o, "defense")).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
 import type { Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth } from "@/lib/render/play-svg";
-import type { Numbered } from "./numbered";
+import { playShow, type Numbered } from "./numbered";
 import { IN, MUTED, PAPERS, appMark, badge, cutLine, field, page, pill, text, type PaperKey, type SvgPage } from "./pages";
 import { measure, wrap } from "./raster";
 import { fit } from "./wristband";
@@ -27,14 +27,15 @@ export function fitField(players: readonly Player[], w: number, h: number, show:
  * One simple play in a rectangular slot: its number, its name, and the largest field that
  * fits underneath them. The four-up binder page and the flyer both lay their grids out of these.
  */
-export function playSlot(item: Numbered, x: number, y: number, w: number, h: number, vis: Vis, r = 10, nameSize = 17, border = 1.5): string {
+export function playSlot(item: Numbered, x: number, y: number, w: number, h: number, vis?: Vis, r = 10, nameSize = 17, border = 1.5): string {
+  const show = playShow(item.play, vis);
   const out: string[] = [];
   out.push(badge(x + r, y + r, r, item.n));
   const nameX = x + 2 * r + 6;
   out.push(text(nameX, y + r + Math.round(nameSize * 0.35), nameSize, fit(item.play.name, x + w - nameX, nameSize)));
   const top = y + 2 * r + 8;
-  const f = fitField(item.play.players, w, y + h - top, vis);
-  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show: vis }, border));
+  const f = fitField(item.play.players, w, y + h - top, show);
+  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show }, border));
   return out.join("");
 }
 
@@ -46,7 +47,7 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const cw = W - 2 * MARGIN;
   const out: string[] = [];
   const play = item.play;
-  const vis = o.vis ?? "both";
+  const vis = playShow(play, o.vis);
   const call = callOf(play.players);
 
   // header: number, name, the call
@@ -92,10 +93,9 @@ function fourUpPage(items: readonly Numbered[], o: BinderOptions): SvgPage {
   const m = 0.4 * IN, g = 0.3 * IN, footerH = 20;
   const cw = (W - 2 * m - g) / 2, ch = (H - 2 * m - g - footerH) / 2;
   const out: string[] = [];
-  const vis = o.vis ?? "both";
   items.forEach((item, i) => {
     const col = i % 2, row = Math.floor(i / 2);
-    out.push(playSlot(item, m + col * (cw + g), m + row * (ch + g), cw, ch, vis));
+    out.push(playSlot(item, m + col * (cw + g), m + row * (ch + g), cw, ch, o.vis));
   });
   // cut lines through the gutters
   out.push(cutLine(W / 2, m - 8, W / 2, H - footerH - m + 8));

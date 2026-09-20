@@ -4,7 +4,7 @@ import type { Playbook, SavedPlay } from "@/lib/play/types";
 import { binderPages } from "./binder";
 import { cardSvg } from "./card";
 import { FLYER_SLOTS, flyerDefault, flyerPage } from "./flyer";
-import { numbered, positionsOf } from "./numbered";
+import { numbered, playShow, positionsOf } from "./numbered";
 import { defaultPaper } from "./pages";
 import { postcardPages, postcardSheet } from "./postcard";
 import { MAX_FILE_BYTES, decodePlaybookFile, encodePlaybookFile, importMessage, planImport, readPlaybookFile } from "./playbook-file";
@@ -30,6 +30,13 @@ describe("numbering", () => {
   });
   test("positions are offensive labels minus the quarterback", () => {
     expect(positionsOf(numbered(book, library))).toEqual(["C", "X", "Y", "Z"]);
+  });
+  test("a drawing follows the play's side unless a composition is chosen", () => {
+    const off = library[0];
+    const def = { ...play("d0", "Cover 2"), side: "defense" as const };
+    expect(off && playShow(off)).toBe("offense");
+    expect(playShow(def)).toBe("defense");
+    expect(playShow(def, "both")).toBe("both");
   });
 });
 
@@ -192,6 +199,21 @@ describe("export visibility", () => {
       expectVisibility(binder[0]?.svg ?? "", vis);
       expectVisibility(bands[0]?.svg ?? "", vis);
     }
+  });
+  test("each playbook page follows that play's side when no composition is chosen", () => {
+    const off = library[0];
+    const def = { ...play("d0", "Cover 2"), side: "defense" as const };
+    if (!off) throw new Error("missing offensive fixture");
+    const items = numbered({ id: "mix", name: "Mix", plays: [off.id, def.id] }, [off, def]);
+    const binder = binderPages(items, { layout: "one", paper: "letter", bookName: "Mix", team });
+    const flyer = flyerPage(items, { paper: "letter", bookName: "Mix", team });
+    const bands = wristbandPages(items, { size: { w: 4.5, h: 2.25, rows: 2, cols: 3 }, paper: "letter", bookName: "Mix", team });
+    const cards = postcardPages(items.slice(0, 1), { size: "twoUp", paper: "letter", bookName: "Mix", team });
+    expectVisibility(binder[0]?.svg ?? "", "offense");
+    expectVisibility(binder[1]?.svg ?? "", "defense");
+    expectVisibility(flyer.svg, "both");
+    expectVisibility(bands[0]?.svg ?? "", "both");
+    expectVisibility(cards[0]?.svg ?? "", "offense");
   });
 });
 

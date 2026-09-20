@@ -316,6 +316,7 @@ export function App() {
         <Field
           players={s.players}
           vis={s.vis}
+          side={s.side}
           selectedId={s.selectedId}
           targeting={s.targeting}
           draft={s.draft}

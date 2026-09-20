@@ -12,7 +12,7 @@ import { download } from "@/lib/export/raster";
 import { exportPdf } from "@/lib/export/run";
 import { BAND_PRESETS, wristbandPages, type BandSize } from "@/lib/export/wristband";
 import { kebab } from "@/lib/play/storage";
-import type { Playbook, TeamSettings, Vis } from "@/lib/play/types";
+import type { Playbook, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { card, eyebrow, input, pill, select } from "../ui";
 import type { Say } from "./PlaybooksScreen";
@@ -26,11 +26,6 @@ interface Props {
 
 const numberField = `${input} w-[76px] px-2 text-center`;
 const first = BAND_PRESETS[0];
-const visibilityChoices: readonly { value: Vis; label: string }[] = [
-  { value: "offense", label: "Offense" },
-  { value: "defense", label: "Defense" },
-  { value: "both", label: "Both teams" },
-];
 
 export function ExportPanel({ book, items, team, say }: Props) {
   const [paper, setPaper] = useState<PaperKey>(() => defaultPaper());
@@ -41,7 +36,6 @@ export function ExportPanel({ book, items, team, say }: Props) {
   const [postcardPlay, setPostcardPlay] = useState("");
   // null until the coach picks: the flyer follows the book's first six until then
   const [chosen, setChosen] = useState<string[] | null>(null);
-  const [vis, setVis] = useState<Vis>("both");
   const [busy, setBusy] = useState(false);
   const none = items.length === 0;
   const slots = useMemo(() => flyerDefault(items).map((i) => i?.play.id ?? ""), [items]);
@@ -69,20 +63,20 @@ export function ExportPanel({ book, items, team, say }: Props) {
 
   const onWristbands = () => {
     run("Drawing wristbands", async (progress) => {
-      const pages = wristbandPages(items, { size, paper, bookName: book.name, team, vis });
+      const pages = wristbandPages(items, { size, paper, bookName: book.name, team });
       await exportPdf(pages, `${kebab(book.name)}-wristbands.pdf`, `${book.name} - wristbands`, { dpi: 300, onProgress: progress });
     });
   };
   const onBinder = () => {
     run("Drawing binder pages", async (progress) => {
-      const pages = binderPages(items, { layout, paper, bookName: book.name, team, vis });
+      const pages = binderPages(items, { layout, paper, bookName: book.name, team });
       await exportPdf(pages, `${kebab(book.name)}-binder.pdf`, `${book.name} - binder`, { dpi: 220, onProgress: progress });
     });
   };
   const onPostcards = () => {
     run("Drawing postcards", async (progress) => {
       const picked = postcardPlay ? items.filter((it) => it.play.id === postcardPlay) : items;
-      const pages = postcardPages(picked, { size: postcardSize, paper, bookName: book.name, team, vis });
+      const pages = postcardPages(picked, { size: postcardSize, paper, bookName: book.name, team });
       const one = picked.length === 1 ? picked[0] : undefined;
       const base = one ? `${kebab(one.play.name)}-postcard` : `${kebab(book.name)}-postcards`;
       await exportPdf(pages, `${base}.pdf`, `${book.name} - postcards`, { dpi: 300, onProgress: progress });
@@ -90,7 +84,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
   };
   const onFlyer = () => {
     run("Drawing the flyer", async (progress) => {
-      const sheet = flyerPage(flyerPicks, { paper, bookName: book.name, team, vis });
+      const sheet = flyerPage(flyerPicks, { paper, bookName: book.name, team });
       await exportPdf([sheet], `${kebab(book.name)}-flyer.pdf`, `${book.name} - flyer`, { dpi: 220, onProgress: progress });
     });
   };
@@ -106,35 +100,21 @@ export function ExportPanel({ book, items, team, say }: Props) {
 
   return (
     <div className="flex flex-col gap-3" aria-label="Export playbook">
-      <div className={`${card} flex flex-col gap-2`}>
-        <fieldset className="flex flex-wrap gap-2" aria-label="Teams visible in PDF exports">
-          <legend className="mb-1 w-full text-small">Visible teams in every PDF</legend>
-          {visibilityChoices.map((choice) => (
-            <label key={choice.value} className={`${pill} flex cursor-pointer items-center gap-1.5 px-2 py-0.5 text-small has-[:checked]:bg-yellow`}>
-              <input
-                type="radio"
-                name="playbook-export-visibility"
-                value={choice.value}
-                checked={vis === choice.value}
-                disabled={busy || none}
-                onChange={() => { setVis(choice.value); }}
-              />
-              {choice.label}
-            </label>
-          ))}
-        </fieldset>
-        {items[0] && (
+      {items[0] && (
+        <div className={`${card} flex flex-col gap-2`}>
           <div className="flex flex-wrap items-center gap-3">
             <div
               role="img"
-              aria-label={`${visibilityChoices.find((choice) => choice.value === vis)?.label ?? "Both teams"} PDF preview`}
+              aria-label="Playbook PDF preview"
               className="w-full max-w-[240px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: vis, box: { pw: 660, ph: 280 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: items[0].play.side, box: { pw: 660, ph: 280 } }) }}
             />
-            <span className="text-caption leading-note text-ink-muted">Preview: {items[0].play.name}. The same choice applies to every play in every PDF below.</span>
+            <span className="text-caption leading-note text-ink-muted">
+              Preview: {items[0].play.name}. Each play is drawn from its own side. A front shown while drawing stays off the page.
+            </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3">
       <div className={`${card} flex flex-col gap-2`}>
         <span className={eyebrow}>WRISTBANDS</span>
