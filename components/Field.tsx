@@ -31,8 +31,12 @@ interface Props {
   showYardNumbers?: boolean;
   /** share page: draw only, no interaction */
   readOnly?: boolean;
-  /** printed above the field (print stylesheet only) */
+  /** printed above the field; also shown on screen when `showTitle` is set */
   title?: string;
+  /** sit the play name above the diagram instead of squeezing it into the header */
+  showTitle?: boolean;
+  /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
+  status?: string;
 }
 
 interface Drag {
@@ -67,9 +71,12 @@ const STEP: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
 };
 
+/** Name + status line above the diagram; subtracted from the pane so the field still fits. */
+const TITLE_CHROME = 40;
+
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
-  readOnly = false, title,
+  readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -95,7 +102,7 @@ function FieldImpl({
       window.clearTimeout(t);
       t = window.setTimeout(() => {
         const pw = Math.max(240, el.clientWidth - 18);
-        const ph = Math.max(220, el.clientHeight - 18);
+        const ph = Math.max(220, el.clientHeight - 18 - (showTitle ? TITLE_CHROME : 0));
         setPane((prev) => (prev && Math.abs(prev.pw - pw) < 0.5 && Math.abs(prev.ph - ph) < 0.5 ? prev : { pw, ph }));
       }, 16);
     };
@@ -103,7 +110,7 @@ function FieldImpl({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => { ro.disconnect(); window.clearTimeout(t); };
-  }, []);
+  }, [showTitle]);
 
   // the dragged player's live spot overrides its committed spot until pointer-up
   const effective = useMemo(() => players.map((p) => {
@@ -411,8 +418,19 @@ function FieldImpl({
 
   return (
     <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden p-[9px] print:block print:overflow-visible print:p-0">
-      {title !== undefined && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
-      <div className="relative flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
+      {title !== undefined && !showTitle && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
+      <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
+        {title !== undefined && showTitle && (
+          <div className="mb-1 min-w-0 px-1 text-center leading-none print:mb-2">
+            <h1 className="truncate text-header font-normal text-ink" title={title}>{title}</h1>
+            {status !== undefined && (
+              <span className={`whitespace-nowrap text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
+                {status}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="relative">
         {draft && !readOnly && (
           <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
             <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow`}>
@@ -525,6 +543,7 @@ function FieldImpl({
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
         <PlayButton playing={playing} onClick={playing ? stop : play} />
+        </div>
       </div>
     </main>
   );
