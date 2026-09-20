@@ -17,6 +17,7 @@ import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { StorageError, failureMessage } from "@/lib/play/storage";
 import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
+import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, input, pill } from "../ui";
 import type { Say } from "./PlaybooksScreen";
 import { ShowToggle } from "./ShowToggle";
@@ -207,6 +208,7 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
               <div key={p.id} className={`${card} flex flex-col gap-2`}>
                 <PlayThumb players={p.players} name={p.name} show={show} />
                 <span className="truncate text-base" title={p.name}>{p.name}</span>
+                <SideBadge side={p.side} />
                 <div className="flex flex-wrap gap-1.5">
                   <Link href={`/?open=${p.id}`} className={`${pill} inline-block px-3 py-1 text-small !text-ink no-underline`}>Open ›</Link>
                   <TwoStep

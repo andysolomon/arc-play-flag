@@ -118,6 +118,26 @@ describe("the call", () => {
     expect(buildMotion(ps, TOP, simulationPlayback(flips(PRIMARY_ODDS + 0.01, 0.1))).receiver).toBe("o4");
     expect(buildMotion(ps, TOP, simulationPlayback(flips(PRIMARY_ODDS + 0.01, 0.9))).receiver).toBe("o5");
   });
+  test("live playback throws to the primary read 80% of the time and never turns it into a run", () => {
+    // a runner in the mix must not steal the call away from the marked receiver
+    const ps = defaults()
+      .map(withRoute("o3", { type: "go", primary: true }))
+      .map(withRoute("o4", { type: "slant" }))
+      .map(withRoute("o5", { type: "dive" }));
+    // a small linear congruential generator: a fixed seed keeps the tally reproducible
+    let seed = 12345;
+    const lcg = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+    const runs = 2000;
+    let primary = 0;
+    for (let i = 0; i < runs; i++) {
+      const m = buildMotion(ps, TOP, simulationPlayback(lcg));
+      expect(m.kind).toBe("pass");
+      if (m.receiver === "o3") primary++;
+      else expect(m.receiver).toBe("o4");
+    }
+    expect(primary / runs).toBeGreaterThan(PRIMARY_ODDS - 0.04);
+    expect(primary / runs).toBeLessThan(PRIMARY_ODDS + 0.04);
+  });
   test("with nothing marked, teaching uses the first drawn receiver and simulation may vary it", () => {
     const ps = defaults().map(withRoute("o4", { type: "slant" })).map(withRoute("o5", { type: "out" }));
     expect(buildMotion(ps, TOP).receiver).toBe("o4");

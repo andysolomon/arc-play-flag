@@ -11,7 +11,7 @@ import { MAX_FILE_BYTES, decodePlaybookFile, encodePlaybookFile, importMessage, 
 import { planCards, tile, wristbandPages } from "./wristband";
 
 const play = (id: string, name: string, notes = ""): SavedPlay => ({
-  id, name, notes,
+  id, name, notes, side: "offense",
   players: defaults().map((p) => (p.id === "o3" ? { ...p, route: { type: "go", primary: true } } : p.id === "o5" ? { ...p, route: { type: "dive" } } : p)),
 });
 const team = { name: "Sharks", color: "#123abc" };

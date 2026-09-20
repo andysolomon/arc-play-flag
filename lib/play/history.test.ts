@@ -3,7 +3,7 @@ import { HISTORY_CAP, emptyHistory, push, redo, undo, type Doc } from "./history
 import { defaults } from "./routes";
 
 const snap = (n: number, doc: Partial<Doc> = {}): Doc =>
-  ({ id: "play", name: "Play", notes: "", players: defaults().map((p) => ({ ...p, x: n })), ...doc });
+  ({ id: "play", name: "Play", notes: "", side: "offense", players: defaults().map((p) => ({ ...p, x: n })), ...doc });
 const x = (d: Doc | undefined) => d?.players[0]?.x;
 
 describe("history", () => {
@@ -51,5 +51,14 @@ describe("history", () => {
     const r = redo(u?.history ?? emptyHistory, u?.doc ?? a);
     expect(r?.doc).toEqual(b);
     expect(r?.history.past[0]).toEqual({ ...a, swap: true });
+  });
+});
+
+describe("play side", () => {
+  test("a swap restores the side; an ordinary edit keeps the current one", () => {
+    const h = push(emptyHistory, snap(0, { side: "defense" }), true);
+    expect(undo(h, snap(1))?.doc.side).toBe("defense");
+    const edit = push(emptyHistory, snap(0, { side: "defense" }));
+    expect(undo(edit, snap(1))?.doc.side).toBe("offense");
   });
 });

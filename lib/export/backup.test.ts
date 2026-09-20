@@ -23,6 +23,7 @@ const play = (id: string, name: string): SavedPlay => ({
   id,
   name,
   notes: `Read for ${name}`,
+  side: "offense",
   players: defaults().map((p) => p.id === "o3"
     ? { ...p, route: { type: "custom", pts: [[8, -2], [19, -10]], primary: true } }
     : p),

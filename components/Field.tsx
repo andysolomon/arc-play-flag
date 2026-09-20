@@ -5,7 +5,7 @@ import {
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
 import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
-import { ballAt, buildMotion, positionsAt, type Motion } from "@/lib/play/motion";
+import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { shown } from "@/lib/play/reducer";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
@@ -367,7 +367,9 @@ function FieldImpl({
   const targetOwner = targeting ? players.find((p) => p.id === selectedId) : null;
   const targetOwnerName = targetOwner ? `${targetOwner.team === "offense" ? "Offense" : "Defense"} ${targetOwner.label || targetOwner.id}` : null;
 
-  // playback runs on its own rAF clock; the plan is built once, from the committed play
+  // playback runs on its own rAF clock; the plan is built once, from the committed play.
+  // Live playback is a simulation: the primary read gets the ball most of the time, so a
+  // coach who presses ▶ again can see the other reads too. Exports pin the primary.
   const playing = run !== null;
   const played = run ? positionsAt(run.motion, players, run.t) : null;
   const ball = run && played ? ballAt(run.motion, played, run.t) : null;
@@ -378,7 +380,7 @@ function FieldImpl({
   const play = useCallback(() => {
     endDrag();
     dispatch({ type: "select", id: null });
-    const motion = buildMotion(players, topRef.current);
+    const motion = buildMotion(players, topRef.current, simulationPlayback(Math.random));
     let t0 = -1;
     const tick = (now: number) => {
       if (t0 < 0) t0 = now;
