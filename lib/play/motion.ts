@@ -11,7 +11,7 @@ export const HOLD = 0.8;
 export const SHADOW = 2.2;
 /** How long a delay runner waits at the snap before going. */
 export const DELAY = 0.8;
-/** How often simulation playback throws to the primary read when one is marked. */
+/** How often live playback throws to the primary read when one is marked. */
 export const PRIMARY_ODDS = 0.8;
 /** A play-action fake takes this long to sell. */
 const FAKE = 0.25;
@@ -63,9 +63,10 @@ export interface Ball {
 }
 
 /**
- * Teaching playback demonstrates the drawn read consistently. Simulation playback is
- * explicitly opt-in and may explore another valid outcome using the supplied random
- * source; product playback and exported teaching clips use the teaching default.
+ * Teaching playback demonstrates the drawn read consistently: exported clips use it so a
+ * clip always shows the play as drawn. Simulation playback is what the ▶ button runs: the
+ * primary read gets the ball `PRIMARY_ODDS` of the time and the other drawn receivers share
+ * the rest, using the supplied random source so tests can pin the flips.
  */
 export type PlaybackMode =
   | { kind: "teaching" }
@@ -129,10 +130,11 @@ const pickOne = <T>(list: readonly T[], rand: () => number): T | undefined =>
 /**
  * Plan a playback from the committed play. Every routed player gets a track in yards.
  * The centre snaps to the quarterback; a run route makes it a run (the ball is handed
- * or tossed at the mesh point), otherwise it's a pass to one of the receivers — always
- * the primary read when one is marked — with a play-action fake when a runner is in the mix.
- * A pitch runner who doesn't keep it stops at their set point and throws from there.
- * The teaching default is deterministic. Simulation mode explicitly enables coin flips.
+ * or tossed at the mesh point), otherwise it's a pass to one of the receivers — the
+ * primary read when one is marked: always in teaching mode, `PRIMARY_ODDS` of the time in
+ * simulation — with a play-action fake when a runner is in the mix. A pitch runner who
+ * doesn't keep it stops at their set point and throws from there. The teaching default is
+ * deterministic; simulation mode enables the coin flips.
  */
 export function buildMotion(
   players: readonly Player[],
@@ -224,8 +226,9 @@ export function buildMotion(
     setAt = set.wait + set.len / SPEED + SET_UP;
   }
 
-  // Teaching always throws to the configured read, or the first drawn receiver when no
-  // read is marked. Simulation can explore the other drawn receivers.
+  // Teaching always throws to the marked read, or the first drawn receiver when no read
+  // is marked. Simulation throws to the marked read PRIMARY_ODDS of the time and spreads
+  // the rest over the other drawn receivers.
   m.kind = "pass";
   const others = receivers.filter((p) => p.id !== primary?.id);
   const receiver = primary && !primaryRun

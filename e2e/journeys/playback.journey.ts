@@ -4,8 +4,8 @@ import { WHEEL_RIGHT, seed } from "../support/fixtures";
 
 /**
  * Browser smoke coverage for ▶: it shows the ball, completes, and restores the whiteboard.
- * Deterministic primary-read and run/pass/play-action behavior is covered by
- * lib/play/motion.test.ts; exported-clip parity is covered by lib/export/video.test.ts.
+ * Primary-read odds and run/pass/play-action behavior are covered by
+ * lib/play/motion.test.ts; exported-clip timing is covered by lib/export/video.test.ts.
  */
 test("▶ runs the play, shows the ball, and returns to the whiteboard with nothing moved", async ({ page }) => {
   await seed(page, { plays: [WHEEL_RIGHT] });

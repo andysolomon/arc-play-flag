@@ -122,6 +122,12 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
           // about:blank has no storage origin; the same script runs again on the app URL
         }
       }, Object.entries(storageFor(slug)));
+      if (slug === "run-play") {
+        // Live ▶ playback is a simulation (the primary read gets the ball most of the
+        // time). The recording narrates the primary, so pin every coin flip for this
+        // chapter only; it never saves a play, so nothing else draws on Math.random.
+        await context.addInitScript(() => { Math.random = () => 0; });
+      }
       const page = context.pages()[0] ?? await context.newPage();
       const video = page.video();
       if (!video) throw new Error("Playwright did not create a video for the page");
