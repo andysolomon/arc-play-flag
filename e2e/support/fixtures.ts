@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { FILE_KIND, FILE_VERSION } from "../../lib/export/playbook-file";
 import { defaults } from "../../lib/play/routes";
 import { DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
-import type { Playbook, Player, Route, SavedPlay, TeamSettings } from "../../lib/play/types";
+import type { Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
 
 /**
  * Fictional fixtures for the Riverside Otters, a team that does not exist. Every test
@@ -15,8 +15,8 @@ export function formation(routes: Record<string, Route> = {}): Player[] {
   return defaults().map((p) => ({ ...p, route: routes[p.id] ?? null }));
 }
 
-export function play(id: string, name: string, routes: Record<string, Route> = {}, notes = ""): SavedPlay {
-  return { id, name, notes, players: formation(routes) };
+export function play(id: string, name: string, routes: Record<string, Route> = {}, notes = "", side: Team = "offense"): SavedPlay {
+  return { id, name, notes, side, players: formation(routes) };
 }
 
 export const SLANT_LEFT = play("fx-slant-left", "Otter Slant Left", { o3: { type: "slant" }, o4: { type: "out" } }, "X wins inside.");

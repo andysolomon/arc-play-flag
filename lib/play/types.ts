@@ -72,6 +72,8 @@ export interface SavedPlay {
   players: Player[];
   /** the coach's notes, shown on detailed exports */
   notes: string;
+  /** which side of the ball this play is drawn for: an offensive play or a defensive call */
+  side: Team;
 }
 
 /** A named, ordered list of plays. Numbers on exports are positions in this list. */

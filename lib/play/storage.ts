@@ -16,6 +16,8 @@ export interface DraftRecord {
   /** the saved play this draft came from, when it did */
   id?: string | null;
   notes?: string;
+  /** offensive play or defensive call; a draft from before the choice existed is read as inferred from its routes */
+  side?: Team;
 }
 
 export interface StorageLike {
@@ -131,6 +133,20 @@ export function normalizePlayers(raw: unknown): Player[] {
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");
 const cleanName = (v: unknown, fallback: string): string => (typeof v === "string" && v.trim() ? v.slice(0, 80) : fallback);
 
+/**
+ * The side a play from before the choice existed was drawn for: a diagram whose only
+ * routes belong to the defense is a defensive call, anything else is an offensive play.
+ */
+export function inferSide(players: readonly Player[]): Team {
+  const drawn = players.filter((p) => p.route);
+  return drawn.length > 0 && drawn.every((p) => p.team === "defense") ? "defense" : "offense";
+}
+
+/** A stored side when it is one, otherwise the side the routes suggest. */
+export function readSide(v: unknown, players: readonly Player[]): Team {
+  return v === "offense" || v === "defense" ? v : inferSide(players);
+}
+
 /** One saved play from any JSON-ish value, or null when there are no players in it. */
 export function normalizeSavedPlay(raw: unknown, fallbackId = newId()): SavedPlay | null {
   if (!isRecord(raw)) return null;
@@ -141,6 +157,7 @@ export function normalizeSavedPlay(raw: unknown, fallbackId = newId()): SavedPla
     name: cleanName(raw.name, "Untitled play"),
     players,
     notes: cleanNotes(raw.notes),
+    side: readSide(raw.side, players),
   };
 }
 
@@ -216,7 +233,7 @@ function migrateLegacy(storage: StorageLike | null): Library | null {
     const players = normalizePlayers(rec.players);
     if (!players.length) continue;
     const id = newId();
-    lib[id] = { id, name: name.slice(0, 80) || "Untitled play", players, notes: "" };
+    lib[id] = { id, name: name.slice(0, 80) || "Untitled play", players, notes: "", side: inferSide(players) };
   }
   return lib;
 }
@@ -369,6 +386,7 @@ export function normalizeDraft(raw: unknown): DraftRecord | null {
     players,
     id: typeof raw.id === "string" ? raw.id : null,
     notes: cleanNotes(raw.notes),
+    side: readSide(raw.side, players),
   };
 }
 

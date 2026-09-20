@@ -10,9 +10,11 @@ test("a first-time coach sees the shortest draw-and-run path and can dismiss it 
 
   const guide = page.getByRole("region", { name: "Getting started" });
   await expect(guide).toContainText("Tap a player → pick a route → press ▶");
-  const demo = page.getByRole("link", { name: "Demo" });
-  await expect(demo).toBeVisible();
-  await expect(demo).toHaveAttribute("href", "/demo");
+  // a new play is an offensive play until the coach says otherwise; the tour moved into Play tools
+  const sides = page.getByRole("group", { name: "Play side" });
+  await expect(sides.getByRole("button", { name: "Offense play" })).toHaveAttribute("aria-pressed", "true");
+  await expect(sides.getByRole("button", { name: "Defense play" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("header").getByRole("link", { name: "Demo" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Play tools" })).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByRole("button", { name: "Route palette" })).toHaveAttribute("aria-expanded", "false");
   await guide.getByRole("button", { name: "Dismiss getting started" }).click();

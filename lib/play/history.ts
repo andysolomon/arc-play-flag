@@ -1,4 +1,4 @@
-import type { Player } from "./types";
+import type { Player, Team } from "./types";
 
 export const HISTORY_CAP = 60;
 
@@ -7,12 +7,14 @@ export interface Doc {
   id: string | null;
   name: string;
   notes: string;
+  /** offensive play or defensive call */
+  side: Team;
   players: readonly Player[];
 }
 
 /**
  * One undo step, pushed before any mutation. An ordinary edit restores only the players
- * and leaves the name and notes as they are now, since typing into them is not undoable.
+ * and leaves the name, notes and side as they are now, since those are not undoable.
  * A `swap` (Open, New play) restores the whole document, identity included, so undoing
  * it can never leave one play's diagram under another play's id.
  */
@@ -28,7 +30,7 @@ export interface History {
 export const emptyHistory: History = { past: [], future: [] };
 
 export function push(h: History, doc: Doc, swap = false): History {
-  const past = [...h.past, { id: doc.id, name: doc.name, notes: doc.notes, players: doc.players, swap }];
+  const past = [...h.past, { id: doc.id, name: doc.name, notes: doc.notes, side: doc.side, players: doc.players, swap }];
   return { past: past.length > HISTORY_CAP ? past.slice(-HISTORY_CAP) : past, future: [] };
 }
 
@@ -39,13 +41,13 @@ export interface HistoryStep {
 
 function apply(entry: Entry, current: Doc): Doc {
   return entry.swap
-    ? { id: entry.id, name: entry.name, notes: entry.notes, players: entry.players }
-    : { id: current.id, name: current.name, notes: current.notes, players: entry.players };
+    ? { id: entry.id, name: entry.name, notes: entry.notes, side: entry.side, players: entry.players }
+    : { id: current.id, name: current.name, notes: current.notes, side: current.side, players: entry.players };
 }
 
 /** What the reverse step must restore: the same kind of entry, taken from the current document. */
 function inverse(entry: Entry, current: Doc): Entry {
-  return { id: current.id, name: current.name, notes: current.notes, players: current.players, swap: entry.swap };
+  return { id: current.id, name: current.name, notes: current.notes, side: current.side, players: current.players, swap: entry.swap };
 }
 
 export function undo(h: History, current: Doc): HistoryStep | null {

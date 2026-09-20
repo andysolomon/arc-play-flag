@@ -274,7 +274,7 @@ describe("reducer", () => {
     expect(s.notes).toBe("go");
   });
   test("unsaved knows when a play has work its record doesn't", () => {
-    const saved = { id: "abc", name: "Bunch", notes: "hi", players: defaults() };
+    const saved = { id: "abc", name: "Bunch", notes: "hi", side: "offense" as const, players: defaults() };
     let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() });
     expect(unsaved(s, saved)).toBe(false);
     expect(unsaved(reducer(s, { type: "setNotes", notes: "changed" }), saved)).toBe(true);
@@ -308,5 +308,52 @@ describe("reducer", () => {
     s = reducer(s, { type: "rename", id: "d1", label: "cbxy", commit: false });
     expect(find(s, "d1")?.label).toBe("CBX");
     expect(s.past).toHaveLength(1);
+  });
+});
+
+describe("play side", () => {
+  test("a new play is an offensive play shown from the offense", () => {
+    const s = initialState();
+    expect(s.side).toBe("offense");
+    expect(s.vis).toBe("offense");
+  });
+  test("setSide marks the play and shows that team, like a Show tap would", () => {
+    let s = run({ type: "setVis", vis: "both" }, { type: "select", id: "o3" }, { type: "setSide", side: "defense" });
+    expect(s.side).toBe("defense");
+    expect(s.vis).toBe("defense");
+    expect(s.selectedId).toBeNull();
+    expect(s.past).toHaveLength(0);
+    // the same side again changes nothing, not even a Show choice made since
+    s = reducer(reducer(s, { type: "setVis", vis: "both" }), { type: "setSide", side: "defense" });
+    expect(s.vis).toBe("both");
+  });
+  test("opening a defensive call shows the defense, and undoing back to an offensive play shows the offense", () => {
+    let s = run({ type: "load", id: "d", name: "Cover 2", side: "defense", players: defaults() });
+    expect(s.side).toBe("defense");
+    expect(s.vis).toBe("defense");
+    s = reducer(s, { type: "undo" });
+    expect(s.side).toBe("offense");
+    expect(s.vis).toBe("offense");
+    s = reducer(s, { type: "redo" });
+    expect(s.side).toBe("defense");
+    expect(s.vis).toBe("defense");
+  });
+  test("a restored defensive draft is shown from the defense; a play without a side is offensive", () => {
+    expect(run({ type: "hydrate", name: "Blitz", side: "defense", players: defaults() }).vis).toBe("defense");
+    expect(run({ type: "load", name: "Old", players: defaults() }).side).toBe("offense");
+  });
+  test("an ordinary undo keeps the side, and New play goes back to offense", () => {
+    let s = run({ type: "setSide", side: "defense" }, { type: "select", id: "d1" }, { type: "pick", key: "blitz" }, { type: "undo" });
+    expect(s.side).toBe("defense");
+    s = reducer(s, { type: "newPlay" });
+    expect(s.side).toBe("offense");
+    expect(s.vis).toBe("offense");
+  });
+  test("changing the side is unsaved work", () => {
+    const saved = { id: "abc", name: "Bunch", notes: "", side: "offense" as const, players: defaults() };
+    const s = run({ type: "load", id: "abc", name: "Bunch", side: "offense", players: defaults() });
+    expect(unsaved(s, saved)).toBe(false);
+    expect(unsaved(reducer(s, { type: "setSide", side: "defense" }), saved)).toBe(true);
+    expect(unsaved(run({ type: "setSide", side: "defense" }), null)).toBe(true);
   });
 });

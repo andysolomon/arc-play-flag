@@ -8,6 +8,7 @@ test("a 100-play library searches notes, filters, sorts, and explains an empty r
     id: `large-${String(index)}`,
     name: `${index % 2 ? "Pass" : "Run"} ${String(index).padStart(3, "0")}`,
     notes: index === 42 ? "red-zone lighthouse call" : "",
+    side: "offense",
     players: formation({ o3: { type: index % 2 ? "go" : "handoff" } }),
   }));
   const books = Array.from({ length: 20 }, (_, index) => playbook(`book-${String(index)}`, `Book ${String(index + 1)}`, []));

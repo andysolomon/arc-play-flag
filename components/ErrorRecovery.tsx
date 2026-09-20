@@ -64,7 +64,7 @@ export function ErrorRecovery({ error, retry }: Props) {
   const onDownload = () => {
     const d = draft ?? safeDraft();
     if (!d) { setStatus("Nothing to download: no play was in progress."); return; }
-    const play = { id: d.id ?? newId(), name: d.name, notes: d.notes ?? "", players: [...d.players] };
+    const play = { id: d.id ?? newId(), name: d.name, notes: d.notes ?? "", side: d.side ?? "offense", players: [...d.players] };
     Promise.resolve()
       .then(() => {
         const file = encodeRecoveryFile(play);

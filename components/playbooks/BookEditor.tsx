@@ -12,6 +12,7 @@ import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { failureMessage } from "@/lib/play/storage";
 import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
+import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, input, pill, pillSm } from "../ui";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
@@ -99,7 +100,10 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
               <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} show={show} /></div>
               <div className="min-w-0 flex-1">
                 <span className="block truncate text-base" title={it.play.name}>{it.play.name}</span>
-                <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <SideBadge side={it.play.side} />
+                  <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
+                </span>
               </div>
               <div className="flex flex-none flex-col gap-1">
                 <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} px-2 py-0 text-small`}>↑</button>

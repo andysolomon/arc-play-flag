@@ -161,7 +161,7 @@ describe("offline service worker", () => {
   test("claims readiness only after every route, advertised demo, icon, and discovered build asset is cached", async () => {
     await worker.lifetime("install");
 
-    const shell = await worker.caches.open("ffpd-shell-v6");
+    const shell = await worker.caches.open("ffpd-shell-v7");
     expect(await shell.match("/__ffpd_offline_ready__")).toBeDefined();
     expect(worker.fetched).toContain("/");
     expect(worker.fetched).toContain("/playbooks");
@@ -205,7 +205,7 @@ describe("offline service worker", () => {
     }
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toContain("Offline asset unavailable");
-    expect(await (await worker.caches.open("ffpd-shell-v6")).match("/__ffpd_offline_ready__")).toBeUndefined();
+    expect(await (await worker.caches.open("ffpd-shell-v7")).match("/__ffpd_offline_ready__")).toBeUndefined();
     expect(worker.skipped).toBe(false);
   });
 
@@ -224,7 +224,7 @@ describe("offline service worker", () => {
   });
 
   test("serves cached media ranges and contains failed background refreshes", async () => {
-    const shell = await worker.caches.open("ffpd-shell-v6");
+    const shell = await worker.caches.open("ffpd-shell-v7");
     await shell.put("/demos/run-play.webm", new Response(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]), {
       headers: { "content-type": "video/webm" },
     }));
@@ -240,7 +240,7 @@ describe("offline service worker", () => {
   });
 
   test("deletes only superseded shell caches and leaves shared snapshots and foreign caches intact", async () => {
-    await worker.caches.open("ffpd-shell-v6");
+    await worker.caches.open("ffpd-shell-v7");
     await worker.caches.open("ffpd-shell-v4");
     await worker.caches.open("ffpd-shell-v3");
     await worker.caches.open("ffpd-v3");
@@ -249,7 +249,7 @@ describe("offline service worker", () => {
 
     await worker.lifetime("activate");
 
-    expect(await worker.caches.keys()).toEqual(["ffpd-shell-v6", "ffpd-snapshots-v1", "another-app"]);
+    expect(await worker.caches.keys()).toEqual(["ffpd-shell-v7", "ffpd-snapshots-v1", "another-app"]);
     expect(worker.claimed).toBe(true);
     expect(worker.posted).toContainEqual({ type: "FFPD_OFFLINE_STATUS", status: "ready" });
   });
