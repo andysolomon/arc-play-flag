@@ -1,15 +1,26 @@
-// Draws the new, notes and playbook tool stickers in the style of the design's icons, into
+// Draws the new, notes, playbook, undo and redo tool stickers in the style of the design's icons, into
 // design/assets/icons. Then run `bun run icons`.
 // Run with `node scripts/tool-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
 import path from "node:path";
 import sharp from "sharp";
 
-const INK = "#1b1a17", YELLOW = "#f2b705", OFF = "#e5675e", CREAM = "#fffdf6";
+const INK = "#1b1a17", YELLOW = "#f2b705", OFF = "#e5675e", DEF = "#4a8fe0", CREAM = "#fffdf6";
 const W = "512";
 const svg = (body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${body}</svg>`;
 const line = (x1: number, y1: number, x2: number, y2: number, w = 26): string =>
   `<line x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}" stroke="${INK}" stroke-width="${String(w)}" stroke-linecap="round"/>`;
+
+// A route being taken back: the red token, the dashed path it came along and its X, and a
+// bold arrow arcing back over it. Undo is ink; redo is the same picture mirrored, in blue.
+const takeBack = (colour: string): string =>
+  `<path d="M304 350 C 260 312, 216 296, 176 292" fill="none" stroke="${INK}" stroke-width="22" stroke-linecap="round" stroke-dasharray="30 34"/>` +
+  line(96, 262, 156, 322, 24) + line(156, 262, 96, 322, 24) +
+  `<circle cx="376" cy="356" r="54" fill="${OFF}" stroke="${INK}" stroke-width="22"/>` +
+  `<path d="M376 280 C 376 176, 300 128, 210 138" fill="none" stroke="${INK}" stroke-width="60" stroke-linecap="round"/>` +
+  `<polygon points="112,138 214,72 214,204" fill="${colour}" stroke="${INK}" stroke-width="22" stroke-linejoin="round"/>` +
+  // the shaft runs into the head so the two read as one arrow
+  `<path d="M376 280 C 376 176, 300 128, 228 138" fill="none" stroke="${colour}" stroke-width="30" stroke-linecap="round"/>`;
 
 const stickers: Record<string, string> = {
   // a fresh sheet, corner turned up, with a bold yellow plus
@@ -40,6 +51,8 @@ const stickers: Record<string, string> = {
     `<polygon points="300,96 326,140 274,140" fill="${INK}" stroke="${INK}" stroke-width="14" stroke-linejoin="round"/>` +
     line(228, 340, 372, 340, 22) + line(228, 392, 330, 392, 22),
   ),
+  undo: svg(takeBack(INK)),
+  redo: svg(`<g transform="translate(512 0) scale(-1 1)">${takeBack(DEF)}</g>`),
 };
 
 const out = path.resolve("design/assets/icons");

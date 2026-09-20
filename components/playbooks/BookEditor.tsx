@@ -37,7 +37,7 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
     return (
       <div className="flex flex-col items-start gap-3">
         <span className="text-base text-ink-muted">That playbook isn&apos;t on this device.</span>
-        <Link href="/playbooks" className={`${pillSm} inline-block !text-ink no-underline`}>‹ All playbooks</Link>
+        <Link href="/playbooks" className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ All playbooks</Link>
       </div>
     );
   }
@@ -58,7 +58,7 @@ export function BookEditor({ id, say, show, onShow }: { id: string; say: Say; sh
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/playbooks" className={`${pillSm} inline-block !text-ink no-underline`}>‹ All playbooks</Link>
+        <Link href="/playbooks" className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ All playbooks</Link>
         <input
           value={book.name}
           maxLength={80}

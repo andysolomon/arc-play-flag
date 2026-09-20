@@ -36,6 +36,18 @@ const SIDES: readonly { key: Team; label: string; title: string }[] = [
   { key: "defense", label: "Defense", title: "A defensive call: draw the blue team" },
 ];
 
+/** Icon-only on phones: a 44px circle with the glyph centred, instead of a tall oval round a bare character. */
+const round = "inline-flex shrink-0 items-center justify-center gap-1 max-[479px]:w-11 max-[479px]:px-0";
+
+/** A drawn chevron, so the sidebar toggles centre exactly instead of sitting on the font's baseline. */
+function Chevron({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" className="block shrink-0">
+      <path d={dir === "left" ? "M9 2 4 7l5 5" : "M5 2l5 5-5 5"} fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** One pill split in two: the side this play is for. The chosen half is yellow. */
 const segment =
   "flex min-h-11 cursor-pointer items-center gap-1 whitespace-nowrap bg-white px-[11px] py-[3px] text-base leading-pill " +
@@ -52,9 +64,9 @@ function HeaderImpl({ name, persistence, side, leftOpen, rightOpen, canUndo, can
         aria-expanded={leftOpen}
         aria-controls="play-sidebar"
         data-active={leftOpen}
-        className={`${pillSm} data-[active=true]:bg-yellow`}
+        className={`${pillSm} ${round} data-[active=true]:bg-yellow`}
       >
-        {leftOpen ? "‹" : "›"}<span className="max-[479px]:hidden"> Play</span>
+        <Chevron dir={leftOpen ? "left" : "right"} /><span className="max-[479px]:hidden">Play</span>
       </button>
       <div className="min-w-0 flex-1 leading-none">
         <h1 className="truncate text-base font-normal text-ink" title={name}>{name}</h1>
@@ -80,11 +92,13 @@ function HeaderImpl({ name, persistence, side, leftOpen, rightOpen, canUndo, can
             </button>
           ))}
         </div>
-        <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={pillMd}>
-          ↶<span className="max-[479px]:hidden"> Undo</span>
+        <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
+          <Image src="/icons/undo.png" alt="" width={24} height={24} sizes="24px" className={`block shrink-0 ${canUndo ? "" : "opacity-40"}`} />
+          <span className="max-[479px]:hidden">Undo</span>
         </button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={pillMd}>
-          <span className="max-[479px]:hidden">Redo </span>↷
+        <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${round}`}>
+          <span className="max-[479px]:hidden">Redo</span>
+          <Image src="/icons/redo.png" alt="" width={24} height={24} sizes="24px" className={`block shrink-0 ${canRedo ? "" : "opacity-40"}`} />
         </button>
         <button
           type="button"
@@ -92,9 +106,9 @@ function HeaderImpl({ name, persistence, side, leftOpen, rightOpen, canUndo, can
           disabled={!canClear}
           title="Clear routes (undoable)"
           aria-label="Clear routes"
-          className={`${pillMd} flex shrink-0 items-center gap-1`}
+          className={`${pillMd} ${round}`}
         >
-          <Image src="/icons/clear.png" alt="" width={18} height={18} sizes="18px" className={`block shrink-0 ${canClear ? "" : "opacity-40"}`} />
+          <Image src="/icons/clear.png" alt="" width={22} height={22} sizes="22px" className={`block shrink-0 ${canClear ? "" : "opacity-40"}`} />
           <span className="max-[479px]:hidden">Clear</span>
         </button>
       </div>
@@ -106,9 +120,9 @@ function HeaderImpl({ name, persistence, side, leftOpen, rightOpen, canUndo, can
         aria-expanded={rightOpen}
         aria-controls="route-sidebar"
         data-active={rightOpen}
-        className={`${pillSm} data-[active=true]:bg-yellow`}
+        className={`${pillSm} ${round} data-[active=true]:bg-yellow`}
       >
-        <span className="max-[479px]:hidden">Routes </span>{rightOpen ? "›" : "‹"}
+        <span className="max-[479px]:hidden">Routes</span><Chevron dir={rightOpen ? "right" : "left"} />
       </button>
     </header>
   );
