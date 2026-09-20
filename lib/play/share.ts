@@ -1,5 +1,5 @@
-import { normalizePlayers, type DraftRecord } from "./storage";
-import type { Player, Vis } from "./types";
+import { normalizePlayers, readSide, type DraftRecord } from "./storage";
+import type { Player, Team, Vis } from "./types";
 
 /** Share links carry the whole play as base64url JSON in the path: /p/<id>. No backend. */
 
@@ -36,16 +36,19 @@ function compact(p: Player): Player {
 
 /** A decoded link: the whole play plus which side the sender chose to show. */
 export interface SharedRecord extends DraftRecord {
+  side: Team;
   vis: Vis;
 }
 
 /**
  * Both teams always travel in the payload so "Open in designer" recovers the full play;
  * `vis` records which side the link shows. "both" is omitted, so links made before the
- * choice existed and both-team links are the same bytes.
+ * choice existed and both-team links are the same bytes. `side` is written only for a
+ * defensive call, so an offensive play's link is unchanged from before plays had a side.
  */
 export function encodeShare(rec: DraftRecord, vis: Vis = "both"): string {
-  const payload: { name: string; players: Player[]; vis?: Vis } = { name: rec.name, players: rec.players.map(compact) };
+  const payload: { name: string; players: Player[]; side?: Team; vis?: Vis } = { name: rec.name, players: rec.players.map(compact) };
+  if (rec.side === "defense") payload.side = "defense";
   if (vis !== "both") payload.vis = vis;
   return toBase64Url(JSON.stringify(payload));
 }
@@ -63,7 +66,9 @@ export function decodeShare(id: string): SharedRecord | null {
     // links without a vis field predate the choice and always meant both teams
     const raw = "vis" in parsed ? parsed.vis : "both";
     const vis: Vis = raw === "offense" || raw === "defense" ? raw : "both";
-    return { name, players, vis };
+    // links without a side predate the choice: read the side off the routes, as storage does
+    const side = readSide("side" in parsed ? parsed.side : undefined, players);
+    return { name, players, side, vis };
   } catch {
     return null;
   }

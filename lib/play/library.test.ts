@@ -5,7 +5,7 @@ import type { Route, SavedPlay } from "./types";
 
 function saved(id: string, name: string, route: Route | null, team: "offense" | "defense" = "offense", notes = ""): SavedPlay {
   const players = defaults().map((player) => player.id === (team === "offense" ? "o3" : "d1") ? { ...player, route } : player);
-  return { id, name, notes, players };
+  return { id, name, notes, side: team, players };
 }
 
 describe("saved-play discovery", () => {
@@ -52,5 +52,16 @@ describe("reusable references and formations", () => {
     templatePlayer.x = 99;
     expect(originalPlayer.x).not.toBe(99);
     expect(original.players.find((p) => p.id === "o3")?.route).toEqual({ type: "custom", pts: [[3, -4]] });
+  });
+});
+
+describe("play side filters", () => {
+  test("Defense is the play's side; Run and Pass are offensive plays only", () => {
+    const def = saved("def", "Cover 2", { type: "zoneDeep" }, "defense");
+    const both = { ...saved("both", "Mixed", { type: "go" }), side: "defense" as const };
+    const pass = saved("pass", "Seam", { type: "go" });
+    expect(discoverPlays([def, both, pass], { filter: "defense" }).map((p) => p.id)).toEqual(["both", "def"]);
+    expect(discoverPlays([def, both, pass], { filter: "pass" }).map((p) => p.id)).toEqual(["pass"]);
+    expect(formationTemplate(def).side).toBe("defense");
   });
 });

@@ -31,6 +31,7 @@ First time only: `bunx playwright install chromium`.
 | Share link shows both teams read-only, opens back in the designer; bad link is a 404 | `sharing` |
 | Picture card saves a real PNG; a card that cannot be drawn reports it | `export` |
 | ▶ runs and comes back with nothing moved (browser smoke) | `playback` |
+| Offense/Defense toggle marks the play, follows it through save, reload and reopen; gallery badge and filter | `play-side` |
 
 Offline navigation and update coverage is added with #28. Live ▶ playback throws to the primary read 80% of the time and exported clips always complete to it: primary-read odds and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip timing is covered by `lib/export/video.test.ts`.
 

@@ -34,12 +34,14 @@ export type Action =
   | { type: "resetFormation"; team: Team | null }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "load"; id?: string | null; name: string; notes?: string; players: Player[] }
+  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
   /** a fresh, unsaved play on the default formation; undoable */
   | { type: "newPlay" }
-  | { type: "hydrate"; id?: string | null; name: string; notes?: string; players: Player[] }
+  | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
   | { type: "setName"; name: string }
   | { type: "setNotes"; notes: string }
+  /** offensive play or defensive call; the field shows that side, like a Show tap would */
+  | { type: "setSide"; side: Team }
   /** after a save: remember which record this play now is */
   | { type: "saved"; id: string }
   | { type: "setVis"; vis: Vis };
@@ -49,6 +51,7 @@ export function initialState(): PlayState {
     id: null,
     name: "New play",
     notes: "",
+    side: "offense",
     players: defaults(),
     selectedId: null,
     targeting: false,
@@ -64,8 +67,11 @@ export function selected(s: PlayState): Player | null {
 
 /** Whether the document holds work its saved record doesn't (or, never saved, anything past a blank new play). */
 export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
-  if (saved) return s.name !== saved.name || s.notes !== saved.notes || JSON.stringify(s.players) !== JSON.stringify(saved.players);
-  return s.past.length > 0 || s.notes !== "" || (s.name !== "New play" && s.name !== "");
+  if (saved) {
+    return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side
+      || JSON.stringify(s.players) !== JSON.stringify(saved.players);
+  }
+  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || (s.name !== "New play" && s.name !== "");
 }
 
 /** Whether a player is drawn under the current Show filter. */
@@ -81,13 +87,18 @@ function commit(s: PlayState): PlayState {
   return { ...s, ...push(s, s) };
 }
 
+/** A document whose side changed is shown from that side, so a defensive call opens on the defense. */
+function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
+  return { vis: doc.side === s.side ? s.vis : doc.side };
+}
+
 /** Replaces the whole document, leaving the one before it one undo away. */
 function swap(s: PlayState, doc: Doc): PlayState {
-  return { ...s, ...push(s, s, true), ...doc, ...cleared };
+  return { ...s, ...push(s, s, true), ...doc, ...follow(s, doc), ...cleared };
 }
 
 function step(s: PlayState, st: HistoryStep | null): PlayState {
-  return st ? { ...s, ...st.history, ...st.doc, ...cleared } : s;
+  return st ? { ...s, ...st.history, ...st.doc, ...follow(s, st.doc), ...cleared } : s;
 }
 
 /** Sets a route, and backs a new blitzer off to the blitz line if they were lined up closer. */
@@ -245,15 +256,19 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "redo":
       return step(s, redoStep(s, s));
     case "newPlay":
-      return swap(s, { id: null, name: "New play", notes: "", players: defaults() });
+      return swap(s, { id: null, name: "New play", notes: "", side: "offense", players: defaults() });
     case "load":
-      return swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players });
-    case "hydrate":
-      return { ...s, id: a.id ?? null, name: a.name, notes: a.notes ?? "", players: a.players };
+      return swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+    case "hydrate": {
+      const doc: Doc = { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players };
+      return { ...s, ...doc, ...follow(s, doc) };
+    }
     case "setName":
       return { ...s, name: a.name };
     case "setNotes":
       return { ...s, notes: a.notes };
+    case "setSide":
+      return a.side === s.side ? s : { ...s, side: a.side, vis: a.side, ...cleared };
     case "saved":
       return { ...s, id: a.id };
     case "setVis":

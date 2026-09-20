@@ -23,9 +23,13 @@ export interface PlayDiscovery {
   sort?: PlaySort;
 }
 
-/** A play may match more than one route filter; blank diagrams remain under All. */
+/**
+ * Defense is the play's side; Run and Pass are offensive plays by what their routes do,
+ * and an offensive play may match both. Blank diagrams remain under All.
+ */
 export function playMatchesFilter(play: SavedPlay, filter: Exclude<PlayFilter, "all">): boolean {
-  if (filter === "defense") return play.players.some((p) => p.team === "defense" && p.route);
+  if (filter === "defense") return play.side === "defense";
+  if (play.side !== "offense") return false;
   if (filter === "run") return play.players.some((p) => p.team === "offense" && p.route && isRun(p.route.type));
   return play.players.some((p) => p.team === "offense" && p.route && !isRun(p.route.type));
 }
@@ -52,6 +56,7 @@ export function formationTemplate(play: SavedPlay): SavedPlay {
     id: play.id,
     name: play.name,
     notes: "",
+    side: play.side,
     players: play.players.map((player) => ({ ...player, route: null })),
   };
 }
@@ -110,7 +115,7 @@ export function playbookById(id: string | null | undefined): Playbook | null {
 
 /** Saves a play (new id when none is given) and returns the record as stored. */
 export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): Written<SavedPlay> {
-  const rec: SavedPlay = { id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes };
+  const rec: SavedPlay = { id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side };
   return attempt(() => {
     plays = Object.values(store(rec));
     emit();

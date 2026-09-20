@@ -17,7 +17,7 @@ function formation(routes: Readonly<Record<string, Route>> = {}): Player[] {
 }
 
 function play(id: string, name: string, routes: Readonly<Record<string, Route>>, notes = ""): SavedPlay {
-  return { id, name, notes, players: formation(routes) };
+  return { id, name, notes, side: "offense", players: formation(routes) };
 }
 
 /** The finished slant the library shows; `build-play` draws this play from a blank field. */
@@ -80,7 +80,7 @@ export const CHAPTER_PLAY: Readonly<Partial<Record<ChapterSlug, SavedPlay>>> = {
 /** A blank, unnamed formation: `build-play` names it and draws its routes on camera. */
 export const BLANK_DRAFT: DraftRecord = { id: null, name: "", notes: "", players: formation() };
 
-const draftOf = (saved: SavedPlay): DraftRecord => ({ id: saved.id, name: saved.name, notes: saved.notes, players: saved.players });
+const draftOf = (saved: SavedPlay): DraftRecord => ({ id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, players: saved.players });
 
 /** Where `custom-routes` picks up from `build-play`: the slant is drawn, Z is still empty. */
 export const SLANT_IN_PROGRESS: DraftRecord = {

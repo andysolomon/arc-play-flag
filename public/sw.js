@@ -1,5 +1,5 @@
 /* Verified offline shell for the sideline. Keep this dependency-free. */
-const CACHE = "ffpd-shell-v6";
+const CACHE = "ffpd-shell-v7";
 const SNAPSHOTS = "ffpd-snapshots-v1";
 const READY = "/__ffpd_offline_ready__";
 const SHELLS = ["/", "/playbooks", "/demo"];
@@ -9,8 +9,8 @@ const DEMOS = [
 ];
 const ICONS = [
   "app-192", "app-512", "app-maskable-512", "blitz", "clear", "corner", "counter", "cross", "curl", "curlFlat",
-  "customDef", "customOff", "defOnly", "delay", "demo", "deselectDef", "deselectOff", "dive", "duplicate", "export",
-  "flat", "flip", "football", "go", "handoff", "in", "man", "midRead", "new", "notes", "offOnly", "out", "pitch",
+  "customDef", "customOff", "defense", "defOnly", "delay", "demo", "deselectDef", "deselectOff", "dive", "duplicate", "export",
+  "flat", "flip", "football", "go", "handoff", "in", "man", "midRead", "new", "notes", "offense", "offOnly", "out", "pitch",
   "playbook", "post", "reset", "reverse", "save", "slant", "spy", "stretch", "wheel", "zoneDeep", "zoneFlat",
 ];
 const REQUIRED = [
