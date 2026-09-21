@@ -1,4 +1,9 @@
-import type { Playbook, SavedPlay } from "@/lib/play/types";
+import type { Playbook, SavedPlay, Vis } from "@/lib/play/types";
+
+/** Which team a playbook drawing shows: this play's side, unless a coach overrode it. */
+export function playShow(play: SavedPlay, vis?: Vis): Vis {
+  return vis ?? play.side;
+}
 
 /** A play with its number: its position in the playbook, counted from 1. */
 export interface Numbered {

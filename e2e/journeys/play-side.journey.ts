@@ -77,6 +77,11 @@ test("the playbook gallery labels each play's side and filters defensive calls b
   const cover = page.locator("div", { has: page.getByText("Otter Cover Two", { exact: true }) }).last();
   await expect(slant).toContainText("Offense");
   await expect(cover).toContainText("Defense");
+  await expect(page.getByRole("group", { name: "Show" })).toHaveCount(0);
+  await expect(slant.getByRole("img", { name: "Otter Slant Left" }).locator('circle[fill="#e5675e"]')).toHaveCount(5);
+  await expect(slant.getByRole("img", { name: "Otter Slant Left" }).locator('circle[fill="#4a8fe0"]')).toHaveCount(0);
+  await expect(cover.getByRole("img", { name: "Otter Cover Two" }).locator('circle[fill="#4a8fe0"]')).toHaveCount(5);
+  await expect(cover.getByRole("img", { name: "Otter Cover Two" }).locator('circle[fill="#e5675e"]')).toHaveCount(0);
 
   await page.getByRole("combobox", { name: "Filter saved plays" }).selectOption("defense");
   await expect(page.getByText("Otter Cover Two", { exact: true })).toBeVisible();
@@ -84,4 +89,20 @@ test("the playbook gallery labels each play's side and filters defensive calls b
   await page.getByRole("combobox", { name: "Filter saved plays" }).selectOption("pass");
   await expect(page.getByText("Otter Slant Left", { exact: true })).toBeVisible();
   await expect(page.getByText("Otter Cover Two", { exact: true })).toHaveCount(0);
+});
+
+test("the shadow offense is faded context, and hiding it leaves only the defense", async ({ page }) => {
+  const d = new Designer(page);
+  await d.goto();
+  await expect(d.player("d1", "Defense")).toBeHidden();
+  await d.newPlay("Defense");
+  const offense = d.player("X", "Offense");
+  const defense = d.player("d1", "Defense");
+  await expect(offense).toBeVisible();
+  await expect(offense).toHaveCSS("opacity", "0.4");
+  await expect(defense).toHaveCSS("opacity", "1");
+  await shadowTile(d).click();
+  await expect(offense).toHaveCount(0);
+  await expect(defense).toBeVisible();
+  await expect(defense).toHaveCSS("opacity", "1");
 });

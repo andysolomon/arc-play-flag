@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { initialState, reducer, selected, shadowing, unsaved } from "@/lib/play/reducer";
+import { initialState, reducer, selected, unsaved } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import type { RouteType, Team, Vis } from "@/lib/play/types";
@@ -21,6 +21,13 @@ import { RouteSidebar } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
 import { Sidebar } from "./Sidebar";
 import { pillSm } from "./ui";
+
+const persistenceLabel: Record<"saved" | "unsaved" | "autosaved" | "failed", string> = {
+  saved: "Saved",
+  unsaved: "Unsaved",
+  autosaved: "Draft autosaved",
+  failed: "Saving failed",
+};
 
 const examplePlayers = () => initialState().players.map((p) => {
   if (p.id === "o3") return { ...p, route: { type: "slant" as const, primary: true } };
@@ -273,8 +280,6 @@ export function App() {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
-        name={s.name || "Untitled play"}
-        persistence={persistence}
         side={s.side}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
@@ -316,14 +321,16 @@ export function App() {
         <Field
           players={s.players}
           vis={s.vis}
-          shadow={shadowing(s.side, s.vis)}
+          side={s.side}
           selectedId={s.selectedId}
           targeting={s.targeting}
           draft={s.draft}
           dispatch={dispatch}
           onSelect={onSelect}
           svgRef={svgRef}
-          title={s.name}
+          title={s.name || "Untitled play"}
+          showTitle
+          status={persistenceLabel[persistence]}
         />
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
           <RouteSidebar

@@ -7,7 +7,7 @@ import {
 import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
-import { shown } from "@/lib/play/reducer";
+import { isContext, shown } from "@/lib/play/reducer";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
@@ -19,8 +19,8 @@ import { pillMd } from "./ui";
 interface Props {
   players: readonly Player[];
   vis: Vis;
-  /** fade the offense as a formation reference on a defensive call */
-  shadow?: boolean;
+  /** the play's own side: the other team is faded context when shown */
+  side: Team;
   selectedId: string | null;
   targeting: boolean;
   draft: Draft | null;
@@ -31,8 +31,12 @@ interface Props {
   showYardNumbers?: boolean;
   /** share page: draw only, no interaction */
   readOnly?: boolean;
-  /** printed above the field (print stylesheet only) */
+  /** printed above the field; also shown on screen when `showTitle` is set */
   title?: string;
+  /** sit the play name above the diagram instead of squeezing it into the header */
+  showTitle?: boolean;
+  /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
+  status?: string;
 }
 
 interface Drag {
@@ -67,9 +71,12 @@ const STEP: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
 };
 
+/** Name + status line above the diagram; subtracted from the pane so the field still fits. */
+const TITLE_CHROME = 24;
+
 function FieldImpl({
-  players, vis, shadow = false, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
-  readOnly = false, title,
+  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
+  readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -95,7 +102,7 @@ function FieldImpl({
       window.clearTimeout(t);
       t = window.setTimeout(() => {
         const pw = Math.max(240, el.clientWidth - 18);
-        const ph = Math.max(220, el.clientHeight - 18);
+        const ph = Math.max(220, el.clientHeight - 18 - (showTitle ? TITLE_CHROME : 0));
         setPane((prev) => (prev && Math.abs(prev.pw - pw) < 0.5 && Math.abs(prev.ph - ph) < 0.5 ? prev : { pw, ph }));
       }, 16);
     };
@@ -103,7 +110,7 @@ function FieldImpl({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => { ro.disconnect(); window.clearTimeout(t); };
-  }, []);
+  }, [showTitle]);
 
   // the dragged player's live spot overrides its committed spot until pointer-up
   const effective = useMemo(() => players.map((p) => {
@@ -132,12 +139,15 @@ function FieldImpl({
     [effective, targeting, vis],
   );
   const routes = useMemo(
-    () => visible.flatMap((p) => { const g = geom(p, effective, top, zones); return g ? [{ ...g, id: p.id }] : []; }),
-    [visible, effective, top, zones],
-  );
-  const shadowIds = useMemo(
-    () => (shadow ? new Set(visible.filter((p) => p.team === "offense").map((p) => p.id)) : undefined),
-    [shadow, visible],
+    () => {
+      const list = visible.flatMap((p) => {
+        const g = geom(p, effective, top, zones);
+        return g ? [{ ...g, id: p.id, faded: isContext(p, side) }] : [];
+      });
+      // faded context sits under the play's own side
+      return list.sort((a, b) => Number(b.faded) - Number(a.faded));
+    },
+    [visible, effective, top, zones, side],
   );
   const draftD = useMemo(() => {
     if (!draft) return "";
@@ -203,9 +213,9 @@ function FieldImpl({
     const p = players.find((q) => q.id === dr.id);
     if (!p) return;
     if (targeting && p.team === "offense") { dispatch({ type: "target", id: p.id }); return; }
-    if (shadow && p.team === "offense") return;
+    if (isContext(p, side)) return;
     onSelect(p.id);
-  }, [dispatch, onSelect, players, shadow, snapMode, targeting, toYards]);
+  }, [dispatch, onSelect, players, side, snapMode, targeting, toYards]);
 
   const endWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -272,13 +282,13 @@ function FieldImpl({
       e.preventDefault();
       const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
       dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
-      if (selectedId !== id && !(shadow && p.team === "offense")) onSelect(id);
+      if (selectedId !== id && !isContext(p, side)) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (targeting && p.team === "offense") dispatch({ type: "target", id });
-      else if (!(shadow && p.team === "offense")) onSelect(id);
+      else if (!isContext(p, side)) onSelect(id);
     }
-  }, [dispatch, onSelect, players, selectedId, shadow, targeting]);
+  }, [dispatch, onSelect, players, selectedId, side, targeting]);
 
   const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);
@@ -409,8 +419,19 @@ function FieldImpl({
 
   return (
     <main ref={paneRef} className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden p-[9px] print:block print:overflow-visible print:p-0">
-      {title !== undefined && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
-      <div className="relative flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
+      {title !== undefined && !showTitle && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
+      <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
+        {title !== undefined && showTitle && (
+          <div className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
+            <h1 className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
+            {status !== undefined && (
+              <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
+                {status}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="relative">
         {draft && !readOnly && (
           <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
             <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow`}>
@@ -474,7 +495,7 @@ function FieldImpl({
               </g>
             )}
           </g>
-          <RouteLayer routes={routes} draftD={draftD} shadowIds={shadowIds} />
+          <RouteLayer routes={routes} draftD={draftD} />
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;
             return (
@@ -515,7 +536,7 @@ function FieldImpl({
               boing={boingId === p.id}
               dragging={dragging}
               readOnly={readOnly}
-              shadow={shadow && p.team === "offense"}
+              faded={isContext(p, side)}
               onPointerDown={onDown}
               onKeyDown={onKey}
             />
@@ -523,6 +544,7 @@ function FieldImpl({
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
         <PlayButton playing={playing} onClick={playing ? stop : play} />
+        </div>
       </div>
     </main>
   );

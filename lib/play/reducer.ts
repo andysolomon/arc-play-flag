@@ -90,6 +90,14 @@ function visFor(side: Team, prev?: Pick<PlayState, "side" | "vis">): Vis {
   return "both";
 }
 
+/**
+ * The opposite team is only context on the field: faded like the shadow offense,
+ * and left off playbook drawings.
+ */
+export function isContext(p: Player, side: Team): boolean {
+  return p.team !== side;
+}
+
 function patch(players: readonly Player[], id: string, upd: Partial<Player>): readonly Player[] {
   return players.map((p) => (p.id === id ? { ...p, ...upd } : p));
 }

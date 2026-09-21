@@ -33,7 +33,7 @@ const ROWS = FLYER_SLOTS / COLS;
 export function flyerPage(picks: readonly (Numbered | null)[], o: FlyerOptions): SvgPage {
   const p = PAPERS[o.paper];
   const W = p.w, H = p.h;
-  const vis = o.vis ?? "both";
+  const vis = o.vis;
   const out: string[] = [];
 
   // team band: the colour reads across a room, the name and book read up close

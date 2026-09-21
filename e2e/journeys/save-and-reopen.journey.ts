@@ -19,7 +19,7 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
 
   await d.save();
   await expect(d.toast).toHaveText("Saved");
-  await expect(page.locator("header").getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.locator("main").getByText("Saved", { exact: true })).toBeVisible();
 
   // the draft survives a reload exactly as it was left
   await page.reload();

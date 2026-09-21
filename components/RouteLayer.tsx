@@ -4,17 +4,15 @@ import { memo } from "react";
 import type { RouteGeom } from "@/lib/play/geometry";
 
 interface Props {
-  routes: readonly (RouteGeom & { id: string })[];
+  routes: readonly (RouteGeom & { id: string; faded?: boolean })[];
   draftD: string;
-  /** ids drawn faded, as a formation reference */
-  shadowIds?: ReadonlySet<string>;
 }
 
-function RouteLayerImpl({ routes, draftD, shadowIds }: Props) {
+function RouteLayerImpl({ routes, draftD }: Props) {
   return (
     <g>
       {routes.map((r) => (
-        <g key={r.id} opacity={shadowIds?.has(r.id) ? 0.5 : undefined}>
+        <g key={r.id} className={r.faded ? "opacity-40" : undefined}>
           <path
             d={r.d}
             fill="none"

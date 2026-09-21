@@ -15,17 +15,15 @@ import {
 } from "@/lib/play/library";
 import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { StorageError, failureMessage } from "@/lib/play/storage";
-import type { Vis } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, input, pill } from "../ui";
 import type { Say } from "./PlaybooksScreen";
-import { ShowToggle } from "./ShowToggle";
 import { TwoStep } from "./TwoStep";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
-export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: Vis) => void }) {
+export function Home({ say }: { say: Say }) {
   const router = useRouter();
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
@@ -180,11 +178,7 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
       })()}
 
       <span className={divider} />
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={eyebrow}>ALL PLAYS</span>
-        <span className="flex-1" />
-        {plays.length > 0 && <ShowToggle value={show} onChange={onShow} />}
-      </div>
+      <span className={eyebrow}>ALL PLAYS</span>
       {plays.length === 0 ? (
         <span className="text-base text-ink-muted">Save a play in the designer and it shows up here.</span>
       ) : (<>
@@ -206,7 +200,7 @@ export function Home({ say, show, onShow }: { say: Say; show: Vis; onShow: (v: V
             const holding = booksHolding(p.id).length;
             return (
               <div key={p.id} className={`${card} flex flex-col gap-2`}>
-                <PlayThumb players={p.players} name={p.name} show={show} />
+                <PlayThumb players={p.players} name={p.name} side={p.side} />
                 <span className="truncate text-base" title={p.name}>{p.name}</span>
                 <SideBadge side={p.side} />
                 <div className="flex flex-wrap gap-1.5">

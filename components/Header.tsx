@@ -6,8 +6,6 @@ import type { Team } from "@/lib/play/types";
 import { pillMd, pillSm } from "./ui";
 
 interface Props {
-  name: string;
-  persistence: "saved" | "unsaved" | "autosaved" | "failed";
   /** offensive play or defensive call */
   side: Team;
   leftOpen: boolean;
@@ -23,13 +21,6 @@ interface Props {
   onClear: () => void;
 }
 
-const persistenceLabel: Record<Props["persistence"], string> = {
-  saved: "Saved",
-  unsaved: "Unsaved",
-  autosaved: "Draft autosaved",
-  failed: "Saving failed",
-};
-
 const SIDE: Record<Team, { label: string; title: string }> = {
   offense: { label: "Offense", title: "This is an offensive play" },
   defense: { label: "Defense", title: "This is a defensive call" },
@@ -38,7 +29,16 @@ const SIDE: Record<Team, { label: string; title: string }> = {
 /** Icon-only on phones: a 44px circle with the glyph centred, instead of a tall oval round a bare character. */
 const round = "inline-flex shrink-0 items-center justify-center gap-1 max-[479px]:w-11 max-[479px]:px-0";
 
-/** A drawn chevron, so the sidebar toggles centre exactly instead of sitting on the font's baseline. */
+/** Three-line menu mark for Play tools, so it reads as a menu instead of a panel chevron. */
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" width="16" height="14" viewBox="0 0 16 14" className="block shrink-0">
+      <path d="M1 2h14M1 7h14M1 12h14" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A drawn chevron, so the Routes toggle centres exactly instead of sitting on the font's baseline. */
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" className="block shrink-0">
@@ -47,7 +47,7 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function HeaderImpl({ name, persistence, side, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
+function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   const kind = SIDE[side];
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5">
@@ -61,14 +61,9 @@ function HeaderImpl({ name, persistence, side, leftOpen, rightOpen, canUndo, can
         data-active={leftOpen}
         className={`${pillSm} ${round} data-[active=true]:bg-yellow`}
       >
-        <Chevron dir={leftOpen ? "left" : "right"} /><span className="max-[479px]:hidden">Play</span>
+        <MenuIcon /><span className="max-[479px]:hidden">Play</span>
       </button>
-      <div className="min-w-0 flex-1 leading-none">
-        <h1 className="truncate text-base font-normal text-ink" title={name}>{name}</h1>
-        <span className={`whitespace-nowrap text-caption ${persistence === "failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
-          {persistenceLabel[persistence]}
-        </span>
-      </div>
+      <div className="min-w-0 flex-1" />
       <div className="flex gap-1.5">
         <span
           role="img"
