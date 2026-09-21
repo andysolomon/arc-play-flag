@@ -111,6 +111,8 @@ test("a custom route keeps its primary read through Mirror and Flip, all the way
   await d.palette();
   await expect(d.primaryButton).toHaveText("☆ Mark primary");
   await d.primaryButton.click();
+  // on a phone the palette folds away once the read is marked; open it again to check the button
+  await d.palette();
   await expect(d.primaryButton).toHaveText("★ Primary read");
   await expect(d.primaryRoutes).toHaveCount(1);
 

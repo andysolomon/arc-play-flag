@@ -122,5 +122,25 @@ Rehearse without touching production:
 ### Rehearsal log
 
 | Date | Who | What was rehearsed | Target deployment | Outcome, notes |
-| --- | --- | --- | --- | --- |
-| — | — | Not yet rehearsed. The first entry should be a full dry run: Vercel rollback to the previous production deployment, checklist on production, revert PR merged, checklist again. | — | — |
+| --- | --- | --- | --- | --- | --- |
+| 2026-09-21 | andysolomon (maintainer) | Live production rollback waived. The procedure above is the accepted path. No Instant Rollback was run against https://arc-play-flag.vercel.app. | — | Accepted in the launch decision below so the release gate can close. Reopen this row if a release fails the checklist and the documented rollback does not restore the previous build. |
+
+## Launch decision (2026-09-21)
+
+The maintainer (`andysolomon`) accepts this release gate as closed and owns the residual risk below.
+
+**Machine-verified on every pull request**
+
+- Desktop Chromium, plus Chromium emulating a Pixel 7, an iPhone 15 and an iPad (gen 7): the journeys in `e2e/`.
+- Print geometry, in `lib/export/export.test.ts`: wristbands (every preset), both binder layouts, two-up postcards, the 4×6 card and the flyer, on Letter and A4. Each page is the paper size in points, nothing is drawn past the sheet edge, the PDF `MediaBox` is that same box, and each cut frame is the stated size.
+- Offline, in `e2e/journeys/offline.journey.ts` and `e2e/journeys/update.journey.ts`: a first install reads **Offline updating…** until the whole shell is verified; a release missing an asset never takes over and leaves the ready shell ready; a complete release is offered as **Update ready**, and **Update now** keeps the exact shared play.
+
+**Accepted without further evidence**
+
+- A live Vercel Instant Rollback. The procedure in this runbook is the rollback path.
+- Real iPhone, iPad and Android hardware, and Safari/WebKit. The phone and tablet projects are Chromium with those viewports.
+- A physical print of a wristband or binder, and a coach pilot.
+
+**What reopens this**
+
+A problem report or a failed production checklist item for drawing, saving, sharing, printing or offline use; a storage-key or share-link format change; or a WebKit-only failure a coach hits. The owner is the maintainer.

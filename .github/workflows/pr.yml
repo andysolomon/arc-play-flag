@@ -31,7 +31,8 @@ jobs:
   journeys:
     name: Browser journeys
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # four browser projects (desktop, two phones, a tablet) share the two workers
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

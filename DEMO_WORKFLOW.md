@@ -262,6 +262,6 @@ Then check the production build in a desktop and 390×844 mobile viewport:
 - Confirm no horizontal overflow on mobile.
 - Wait for **Offline ready**, then turn the network off and confirm `/`, `/playbooks`, and `/demo` still open. All advertised clips (including ones not yet played) must load and seek from the service-worker cache.
 - While offline, reopen a shared URL that was visited online and confirm the exact play returns. A different, unvisited shared URL must show **Shared play unavailable offline** rather than the designer or another play.
-- During a worker update, confirm the indicator reads **Offline updating…** and does not return to **Offline ready** until every shell dependency and demo asset has been verified. A failed update must leave the prior worker and its cached shared URLs usable.
+- On a first visit, confirm the indicator reads **Offline updating…** and does not switch to **Offline ready** until every shell dependency and demo asset has been verified. A later release offers **Update ready** once its shell is complete; **Update now** reloads onto it. A failed update must leave the prior worker and its cached shared URLs usable. `e2e/journeys/offline.journey.ts` and `e2e/journeys/update.journey.ts` prove both on every pull request; this check is for a real device after a deploy.
 
 In the pull request, name the chapters added or refreshed, report the aggregate media size, include the verification commands, and call out any workflow coverage that remains for a later clip.

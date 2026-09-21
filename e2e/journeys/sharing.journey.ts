@@ -31,7 +31,10 @@ test("a share snapshot previews and preserves the selected teams, then opens bac
   await expect(page.getByRole("heading", { name: "Otter Cover Two" })).toBeVisible();
   const shared = page.getByRole("img", { name: "Play diagram" });
   await expect(page.getByText(/This link is a snapshot, not a live view/)).toBeVisible();
-  await expect(page.getByText("Snapshot · Defense only")).toBeVisible();
+  // the composition label gives way to the play name on the narrowest phones
+  const label = page.getByText("Snapshot · Defense only");
+  await expect(label).toBeAttached();
+  if ((page.viewportSize()?.width ?? 0) >= 480) await expect(label).toBeVisible();
   // the chosen defense composition is read-only
   await expect(shared.getByRole("img")).toHaveCount(5);
   await expect(shared.getByRole("button")).toHaveCount(0);
