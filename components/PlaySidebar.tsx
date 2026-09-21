@@ -97,10 +97,10 @@ function PlaySidebarImpl({
         <IconTile icon="reset" label="Reset spots" onClick={() => { onReset(side); }} />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">Clear and reset only touch this play&apos;s team.</span>
-      {side === "defense" && (
+      <span className={divider} />
+      <span className={eyebrow}>SHOW</span>
+      {side === "defense" ? (
         <>
-          <span className={divider} />
-          <span className={eyebrow}>SHOW</span>
           <div className={tileGrid} role="group" aria-label="Shadow offense">
             <IconTile
               icon="offOnly"
@@ -111,6 +111,19 @@ function PlaySidebarImpl({
             />
           </div>
           <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the offense. Tap again to hide it.</span>
+        </>
+      ) : (
+        <>
+          <div className={tileGrid} role="group" aria-label="Shadow defense">
+            <IconTile
+              icon="defOnly"
+              label="Shadow defense"
+              title="Show the defensive formation faded, as a reference"
+              active={vis === "both"}
+              onClick={() => { onShadow(vis !== "both"); }}
+            />
+          </div>
+          <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the defense. Tap again to hide it.</span>
         </>
       )}
       <span className={divider} />
