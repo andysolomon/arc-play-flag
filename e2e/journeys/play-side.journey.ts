@@ -3,8 +3,8 @@ import { Designer } from "../support/designer";
 import { COVER_TWO, SLANT_LEFT, seed, storedDraft, storedPlays } from "../support/fixtures";
 
 const sideBadge = (d: Designer, side: "Offense" | "Defense") => d.page.getByRole("img", { name: `${side} play` });
-const shadowTile = (d: Designer) =>
-  d.page.getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true });
+const shadowTile = (d: Designer, which: "offense" | "defense") =>
+  d.page.getByRole("group", { name: `Shadow ${which}` }).getByRole("button", { name: `Shadow ${which}`, exact: true });
 
 test("a coach starts a defensive call, and the choice survives save, reload and reopen", async ({ page }) => {
   const d = new Designer(page);
@@ -12,6 +12,7 @@ test("a coach starts a defensive call, and the choice survives save, reload and 
   await expect(sideBadge(d, "Offense")).toBeVisible();
 
   await d.tools();
+  await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
   await expect(d.page.getByRole("group", { name: "Shadow offense" })).toHaveCount(0);
   await expect(d.page.getByRole("group", { name: "Show" })).toHaveCount(0);
 
@@ -19,7 +20,8 @@ test("a coach starts a defensive call, and the choice survives save, reload and 
   await expect(d.toast).toHaveText("New play · undo brings the last one back");
   await expect(sideBadge(d, "Defense")).toBeVisible();
   await expect(sideBadge(d, "Offense")).toHaveCount(0);
-  await expect(shadowTile(d)).toHaveAttribute("aria-pressed", "true");
+  await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "true");
+  await expect(d.page.getByRole("group", { name: "Shadow defense" })).toHaveCount(0);
   await expect(d.field.getByRole("button")).toHaveCount(10);
 
   await d.setName("Otter Cover Two");
@@ -36,6 +38,7 @@ test("a coach starts a defensive call, and the choice survives save, reload and 
   await d.tools();
   await d.newPlay("Offense");
   await expect(sideBadge(d, "Offense")).toBeVisible();
+  await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
   await expect(d.page.getByRole("group", { name: "Shadow offense" })).toHaveCount(0);
   await expect(d.field.getByRole("button")).toHaveCount(5);
   await d.openSaved("Otter Cover Two");
@@ -47,18 +50,19 @@ test("a defensive call can hide or show the shadow offense, and never offers bot
   const d = new Designer(page);
   await d.goto();
   await d.newPlay("Defense");
-  await expect(shadowTile(d)).toHaveAttribute("aria-pressed", "true");
+  await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "true");
+  await expect(d.page.getByRole("group", { name: "Shadow defense" })).toHaveCount(0);
   await expect(d.player("X")).toBeVisible();
   await expect(d.player("d1", "Defense")).toBeVisible();
 
-  await shadowTile(d).click();
-  await expect(shadowTile(d)).toHaveAttribute("aria-pressed", "false");
+  await shadowTile(d, "offense").click();
+  await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "false");
   await expect(d.player("X")).toHaveCount(0);
   await expect(d.player("d1", "Defense")).toBeVisible();
   await expect(d.field.getByRole("button")).toHaveCount(5);
 
-  await shadowTile(d).click();
-  await expect(shadowTile(d)).toHaveAttribute("aria-pressed", "true");
+  await shadowTile(d, "offense").click();
+  await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "true");
   await expect(d.player("X")).toBeVisible();
   await expect(d.field.getByRole("button")).toHaveCount(10);
 
@@ -101,8 +105,36 @@ test("the shadow offense is faded context, and hiding it leaves only the defense
   await expect(offense).toBeVisible();
   await expect(offense).toHaveCSS("opacity", "0.4");
   await expect(defense).toHaveCSS("opacity", "1");
-  await shadowTile(d).click();
+  await shadowTile(d, "offense").click();
   await expect(offense).toHaveCount(0);
   await expect(defense).toBeVisible();
   await expect(defense).toHaveCSS("opacity", "1");
+});
+
+test("an offensive play can show a faded shadow defense, and that defense cannot be selected", async ({ page }) => {
+  const d = new Designer(page);
+  await d.goto();
+  await d.tools();
+  await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
+  await expect(d.player("d1", "Defense")).toHaveCount(0);
+
+  await shadowTile(d, "defense").click();
+  await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "true");
+  const defense = d.player("d1", "Defense");
+  await expect(defense).toBeVisible();
+  await expect(defense).toHaveCSS("opacity", "0.4");
+  await expect(d.player("X", "Offense")).toHaveCSS("opacity", "1");
+  await expect(d.field.getByRole("button")).toHaveCount(10);
+
+  await d.closeSidebars();
+  await defense.click();
+  await expect(defense).toHaveAttribute("aria-pressed", "false");
+  await d.select("X");
+  await expect(d.player("X")).toHaveAttribute("aria-pressed", "true");
+
+  await d.tools();
+  await shadowTile(d, "defense").click();
+  await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
+  await expect(defense).toHaveCount(0);
+  await expect(d.field.getByRole("button")).toHaveCount(5);
 });

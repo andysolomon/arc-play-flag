@@ -42,7 +42,7 @@ export type Action =
   | { type: "setNotes"; notes: string }
   /** after a save: remember which record this play now is */
   | { type: "saved"; id: string }
-  /** on a defensive call: show or hide the faded offensive formation */
+  /** show or hide the other team, faded, as a formation reference */
   | { type: "setShadow"; on: boolean };
 
 export function initialState(): PlayState {
@@ -78,16 +78,15 @@ export function shown(p: Player, vis: Vis): boolean {
   return vis === "both" || p.team === vis;
 }
 
-/** On a defensive call, the offense can sit on the field faded, as a formation reference. */
+/** The other team is on the field, faded, as a formation reference. */
 export function shadowing(side: Team, vis: Vis): boolean {
-  return side === "defense" && vis === "both";
+  return (side === "offense" || side === "defense") && vis === "both";
 }
 
-/** What the field shows for a document: an offensive play is offense-only; a defensive call shows the shadow offense. */
+/** A defensive call opens with the shadow offense. An offensive play opens without the shadow defense. The same side keeps that choice. */
 function visFor(side: Team, prev?: Pick<PlayState, "side" | "vis">): Vis {
-  if (side === "offense") return "offense";
-  if (prev?.side === "defense" && (prev.vis === "defense" || prev.vis === "both")) return prev.vis;
-  return "both";
+  if (prev?.side === side && (prev.vis === side || prev.vis === "both")) return prev.vis;
+  return side === "defense" ? "both" : "offense";
 }
 
 /**
@@ -106,7 +105,7 @@ function commit(s: PlayState): PlayState {
   return { ...s, ...push(s, s) };
 }
 
-/** Opening a play whose side differs follows that side's default view; a defensive call keeps the shadow preference. */
+/** Opening a play of the same side keeps the shadow preference; a different side uses that side's default. */
 function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
   return { vis: visFor(doc.side, s) };
 }
@@ -294,8 +293,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "saved":
       return { ...s, id: a.id };
     case "setShadow": {
-      if (s.side !== "defense") return s;
-      const vis = a.on ? "both" as const : "defense" as const;
+      const vis = a.on ? "both" as const : s.side;
       return vis === s.vis ? s : { ...s, vis };
     }
   }
