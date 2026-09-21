@@ -34,14 +34,18 @@ export default defineConfig({
     video: "off",
     // playback and route drawing animate; the tests read committed state, not frames
     reducedMotion: "reduce",
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } } : {}),
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: `bun run start -p ${String(PORT)}`,
-    url: `http://localhost:${String(PORT)}`,
-    reuseExistingServer: !CI,
-    timeout: 60_000,
-    stdout: "ignore",
-    stderr: "pipe",
-  },
+  webServer: [
+    ...(process.env.SHARING_TEST_REDIS_URL ? [{ command: "bun e2e/support/redis-rest.ts", url: "http://127.0.0.1:3134", reuseExistingServer: !CI }] : []),
+    {
+      command: `bun run start --hostname 127.0.0.1 -p ${String(PORT)}`,
+      url: `http://localhost:${String(PORT)}`,
+      reuseExistingServer: !CI,
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  ],
 });

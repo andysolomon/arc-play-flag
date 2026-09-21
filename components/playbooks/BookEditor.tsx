@@ -13,6 +13,7 @@ import { failureMessage } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, input, pill, pillSm } from "../ui";
+import { ShareBook } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
 import { TwoStep } from "./TwoStep";
@@ -78,6 +79,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
       </div>
       <span className="text-caption leading-note text-ink-muted">Plays are numbered by their order here. Deleting a playbook keeps the plays.</span>
 
+      <ShareBook key={book.id} book={book} plays={plays} team={team} />
       <span className={divider} />
       <span className={eyebrow}>PLAYS IN THIS PLAYBOOK</span>
       {items.length === 0 ? (

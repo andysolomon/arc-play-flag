@@ -54,6 +54,8 @@ const MAX_UA = 200;
 
 /** Every replacement runs on every string that goes into a diagnostic, in this order. */
 const SCRUB: readonly (readonly [RegExp, string])[] = [
+  [/\/(?:s|api\/shares)\/[A-Za-z0-9_-]+/g, "/s/[token]"],
+  [/Bearer\s+[A-Za-z0-9_-]+/g, "Bearer [redacted]"],
   // share ids in a path, and the ids the designer and playbooks read from the query
   [/\/p\/[A-Za-z0-9_\-%=]+/g, "/p/[id]"],
   [/([?&#](?:p|open|book)=)[^&\s"'#]*/g, "$1[id]"],

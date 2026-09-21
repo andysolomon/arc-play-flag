@@ -2,7 +2,7 @@
 
 A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give it a route or a run (offense) or a coverage (defense), save plays, and press ▶ to watch the play run: the centre snaps, the QB hands off or throws, and the marked primary read gets the ball 80% of the time (the other drawn receivers share the rest; exported clips always complete to the primary).
 
-Saved plays go into **playbooks** (`/playbooks`), which print without any server: wristband inserts (one per position, that route bold), binder pages (one detailed play per page, or four simple per page), a 4:5 picture card of any play, two-sided postcards (two-up with cut lines, or one per 4 × 6 in sheet), a one-page flyer of six featured plays, and a playbook file to hand to an assistant coach. The **demo tour** (`/demo`) covers the full workflow in eight short clips, each one focused enough to watch on a phone. PDFs are written by a small in-repo writer; nothing is uploaded and it all works offline.
+Saved plays go into **playbooks** (`/playbooks`), which print without any server: wristband inserts (one per position, that route bold), binder pages (one detailed play per page, or four simple per page), a 4:5 picture card of any play, two-sided postcards (two-up with cut lines, or one per 4 × 6 in sheet), a one-page flyer of six featured plays, and a playbook file to hand to an assistant coach. The **demo tour** (`/demo`) covers the full workflow in eight short clips, each one focused enough to watch on a phone. PDFs and JSON files are written locally and work offline. Creating a short playbook share link explicitly uploads that book as a snapshot; recipients can preview and import it without downloading a file. Individual plays export as `.play.json` files.
 
 The design system and functional prototype live in [`design/`](design/readme.md); the app is a faithful port of `design/Flag Football Play Designer.dc.html`.
 
@@ -23,7 +23,7 @@ bun run icons    # re-encode design/assets/icons → public/icons (already commi
 
 ## Deploy
 
-Live at **https://arc-play-flag.vercel.app**. Hosted on Vercel: every push to `main` deploys production; pull requests get preview URLs. No environment variables are needed: the app has no backend, plays live in `localStorage`.
+Live at **https://arc-play-flag.vercel.app**. Hosted on Vercel: every push to `main` deploys production; pull requests get preview URLs. Plays still live in `localStorage`. Short-link sharing uses server-side `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; local editing and file transfers work without them. See [sharing setup and retention](docs/runbook/sharing.md) and the [architecture decision](docs/adr/001-short-playbook-links.md).
 
 Manual deploy from a machine with the Vercel CLI:
 
@@ -33,7 +33,7 @@ bunx vercel --prod
 
 ## Layout
 
-- `app/` — Next.js App Router: the designer (`/`), the playbooks screen (`/playbooks`, one static shell that also shows a single book via `?book=<id>` so it opens offline), the video tour (`/demo`), shared plays (`/p/[id]`), root layout, `globals.css` with the design tokens in `@theme`.
+- `app/` — Next.js App Router: the designer (`/`), the playbooks screen (`/playbooks`, one static shell that also shows a single book via `?book=<id>` so it opens offline), the video tour (`/demo`), shared plays (`/p/[id]`), short playbook links (`/s/[token]`), sharing API (`/api/shares`), root layout, `globals.css` with the design tokens in `@theme`.
 - `components/` — Header, PlaySidebar, RouteSidebar, Field, PlayerToken, RouteLayer, Hint, PlayThumb; `components/playbooks/` holds the playbook list, book editor and export panel, while `components/demo/` defines the tour chapters and player cards.
 - `lib/play/` — pure domain code (routes, geometry, zones, history, storage, library, the derived call) with `bun test` coverage. Plays are keyed by a generated id (`ffpd.plays.v2`); the prototype's name-keyed `ffpd.plays.v1` is migrated on first read.
 - `e2e/` — Playwright browser journeys (`*.journey.ts`) that drive the production build through the saving, history, playbook, import, sharing and export flows with fictional fixtures; they run on every pull request.

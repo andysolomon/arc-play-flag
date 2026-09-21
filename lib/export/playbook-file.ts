@@ -59,7 +59,7 @@ export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[]
  * file is refused with a reason and never touches the library.
  */
 export function readPlaybookFile(json: string): ImportRead {
-  if (json.length > MAX_FILE_BYTES) return { ok: false, error: "tooLarge" };
+  if (new TextEncoder().encode(json).byteLength > MAX_FILE_BYTES) return { ok: false, error: "tooLarge" };
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -99,6 +99,8 @@ export function decodePlaybookFile(json: string): PlaybookFile | null {
 }
 
 export interface ImportPlan {
+  /** Existing or new book to open after confirmation. */
+  bookId: string | null;
   /** plays to store (new ids for copies); identical plays already on the device are not here */
   plays: SavedPlay[];
   /** the playbook to store, or null when an identical one already exists */
@@ -124,6 +126,8 @@ export function planImport(file: PlaybookFile, library: readonly SavedPlay[], bo
     const mine = local.get(p.id);
     if (!mine) { plays.push(p); map.set(p.id, p.id); added++; continue; }
     if (same(mine, p)) { map.set(p.id, p.id); reused++; continue; }
+    const priorCopy = library.find((candidate) => same(candidate, p));
+    if (priorCopy) { map.set(p.id, priorCopy.id); reused++; continue; }
     const copy: SavedPlay = { ...p, id: newId() };
     plays.push(copy);
     map.set(p.id, copy.id);
@@ -131,11 +135,14 @@ export function planImport(file: PlaybookFile, library: readonly SavedPlay[], bo
   }
   const ids = file.playbook.plays.flatMap((id) => { const m = map.get(id); return m ? [m] : []; });
   const existing = books.find((b) => b.id === file.playbook.id);
+  const importedName = (file.playbook.name + " (imported)").slice(0, 80);
+  const priorBook = books.find((b) => (b.name === file.playbook.name || b.name === importedName) && b.plays.join() === ids.join());
   let book: Playbook | null;
-  if (!existing) book = { id: file.playbook.id, name: file.playbook.name, plays: ids };
+  if (priorBook) book = null;
+  else if (!existing) book = { id: file.playbook.id, name: file.playbook.name, plays: ids };
   else if (existing.name === file.playbook.name && existing.plays.join() === ids.join()) book = null;
-  else book = { id: newId(), name: file.playbook.name + " (imported)", plays: ids };
-  return { plays, book, reused, copied, added };
+  else book = { id: newId(), name: importedName, plays: ids };
+  return { plays, book, bookId: book?.id ?? priorBook?.id ?? null, reused, copied, added };
 }
 
 /**

@@ -6,7 +6,7 @@ import {
 
 const toast = (page: Page) => page.locator("div[role='status']");
 const items = (page: Page) => page.getByRole("list").getByRole("listitem");
-const importInput = (page: Page) => page.getByLabel("Import a playbook file");
+const importInput = (page: Page) => page.getByLabel("Import a play or playbook file");
 
 test("a coach makes a playbook, adds plays, reorders them, and the order survives a reload", async ({ page }) => {
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], team: OTTERS });
@@ -133,6 +133,7 @@ test("a bad file is refused with a reason and changes nothing; a good one lands 
 
   const good = playbookFile(playbook("fx-road", "Otter Road Book", [WHEEL_RIGHT, COVER_TWO]), [WHEEL_RIGHT, COVER_TWO], OTTERS);
   await importInput(page).setInputFiles(jsonUpload("otter-road-book.playbook.json", good));
+  await page.getByRole("button", { name: "Import playbook", exact: true }).click();
   await expect(toast(page)).toHaveText("Imported “Otter Road Book” · 2 plays added");
   await expect(page).toHaveURL(/book=fx-road/);
   await expect(items(page)).toHaveText([/Otter Wheel Right/, /Otter Cover Two/]);
@@ -156,6 +157,7 @@ test("a playbook file downloaded on one device imports whole on another", async 
   const page2 = await other.newPage();
   await page2.goto("/playbooks");
   await importInput(page2).setInputFiles(jsonUpload("otter-season-book.playbook.json", text));
+  await page2.getByRole("button", { name: "Import playbook", exact: true }).click();
   await expect(toast(page2)).toHaveText("Imported “Otter Season Book” · 3 plays added");
   await expect(items(page2)).toHaveText([/Otter Cover Two/, /Otter Slant Left/, /Otter Wheel Right/]);
   expect(await storedPlays(page2)).toEqual(await storedPlays(page));
