@@ -301,6 +301,17 @@ describe("offline service worker", () => {
     expect(await missing.text()).toContain("Shared play unavailable offline");
   });
 
+  test("hosted book links are never cached and cannot substitute a local book offline", async () => {
+    const path = "/s/abcdefghijklmnop";
+    worker.setFetch(() => Promise.resolve(new Response("shared book")));
+    expect(await (await worker.dispatchFetch(worker.request(path, { mode: "navigate" }))).text()).toBe("shared book");
+    expect(await worker.caches.match(path)).toBeUndefined();
+    worker.setFetch(() => Promise.reject(new TypeError("offline")));
+    const response = await worker.dispatchFetch(worker.request(path, { mode: "navigate" }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain("Shared playbook unavailable offline");
+  });
+
   test("serves cached media ranges and contains failed background refreshes", async () => {
     const shell = await worker.caches.open("ffpd-shell-test");
     await shell.put("/demos/run-play.webm", new Response(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]), {

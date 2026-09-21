@@ -19,6 +19,12 @@ jobs:
   checks:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      SHARING_TEST_REDIS_URL: redis://127.0.0.1:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -31,6 +37,14 @@ jobs:
   journeys:
     name: Browser journeys
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      SHARING_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+      UPSTASH_REDIS_REST_URL: http://127.0.0.1:3134
+      UPSTASH_REDIS_REST_TOKEN: fixture-only
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4

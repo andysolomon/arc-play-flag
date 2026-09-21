@@ -370,12 +370,13 @@ export class ChapterDriver {
 
   /** Hands the app a playbook file through its own file chooser, as a coach would. */
   async importPlaybookFile(json: string, proves: readonly string[]): Promise<void> {
-    await this.beat("export", "Import a file…", async () => {
-      const button = await this.visible(this.page.getByRole("button", { name: "Import a file…", exact: true }), "Import a file…");
+    await this.beat("export", "Import play / playbook…", async () => {
+      const button = await this.visible(this.page.getByRole("button", { name: "Import play / playbook…", exact: true }), "Import play / playbook…");
       await this.spotlight(button);
       await this.page.waitForTimeout(140);
       const [chooser] = await Promise.all([this.page.waitForEvent("filechooser", { timeout: 10_000 }), button.click()]);
       await chooser.setFiles({ name: "otter-red-zone.playbook.json", mimeType: "application/json", buffer: Buffer.from(json, "utf8") });
+      await this.page.getByRole("button", { name: "Import playbook", exact: true }).click();
     }, 200);
     await this.spotlight(null);
     // a successful import opens the book it just added, so its name is in the editor
