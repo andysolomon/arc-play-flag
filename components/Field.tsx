@@ -19,7 +19,7 @@ import { pillMd } from "./ui";
 interface Props {
   players: readonly Player[];
   vis: Vis;
-  /** the play's own side: the other team is faded context when shown */
+  /** the play's own side: the other team is faded when shown, and can still take an assignment */
   side: Team;
   selectedId: string | null;
   targeting: boolean;
@@ -213,9 +213,8 @@ function FieldImpl({
     const p = players.find((q) => q.id === dr.id);
     if (!p) return;
     if (targeting && p.team === "offense") { dispatch({ type: "target", id: p.id }); return; }
-    if (isContext(p, side)) return;
     onSelect(p.id);
-  }, [dispatch, onSelect, players, side, snapMode, targeting, toYards]);
+  }, [dispatch, onSelect, players, snapMode, targeting, toYards]);
 
   const endWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -282,13 +281,13 @@ function FieldImpl({
       e.preventDefault();
       const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
       dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
-      if (selectedId !== id && !isContext(p, side)) onSelect(id);
+      if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (targeting && p.team === "offense") dispatch({ type: "target", id });
-      else if (!isContext(p, side)) onSelect(id);
+      else onSelect(id);
     }
-  }, [dispatch, onSelect, players, selectedId, side, targeting]);
+  }, [dispatch, onSelect, players, selectedId, targeting]);
 
   const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);
