@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { initialState, isContext, reducer, selected, unsaved, type Action, type PlayState } from "./reducer";
+import { initialState, isContext, reducer, selected, shadowing, unsaved, type Action, type PlayState } from "./reducer";
 import { defaults } from "./routes";
 
 const run = (...actions: Action[]): PlayState => actions.reduce(reducer, initialState());
@@ -15,17 +15,22 @@ describe("reducer", () => {
     expect(s.past).toHaveLength(2);
   });
   test("a blitz backs a shallow defender off to 7 yards, and leaves a deeper one alone", () => {
-    let s = run({ type: "select", id: "d2" }, { type: "pick", key: "blitz" });
+    let s = run({ type: "hydrate", side: "defense", name: "Blitz", players: defaults() }, { type: "select", id: "d2" }, { type: "pick", key: "blitz" });
     expect(find(s, "d2")?.route).toEqual({ type: "blitz" });
     expect(find(s, "d2")?.y).toBe(-7);
     expect(s.past).toHaveLength(1);
-    s = run({ type: "select", id: "d5" }, { type: "pick", key: "blitz" });
+    s = run({ type: "hydrate", side: "defense", name: "Blitz", players: defaults() }, { type: "select", id: "d5" }, { type: "pick", key: "blitz" });
     expect(find(s, "d5")?.y).toBe(-11);
-    s = run({ type: "setRoute", id: "d1", route: { type: "blitz" } });
+    s = run({ type: "hydrate", side: "defense", name: "Blitz", players: defaults() }, { type: "setRoute", id: "d1", route: { type: "blitz" } });
     expect(find(s, "d1")?.y).toBe(-7);
   });
   test("reset formation keeps a blitzer on the blitz line", () => {
-    let s = run({ type: "select", id: "d2" }, { type: "pick", key: "blitz" }, { type: "move", id: "d2", x: 11, y: -9, commit: true });
+    let s = run(
+      { type: "hydrate", side: "defense", name: "Blitz", players: defaults() },
+      { type: "select", id: "d2" },
+      { type: "pick", key: "blitz" },
+      { type: "move", id: "d2", x: 11, y: -9, commit: true },
+    );
     s = reducer(s, { type: "resetFormation", team: "defense" });
     expect(find(s, "d2")?.y).toBe(-7);
     expect(find(s, "d1")?.y).toBe(-5);
@@ -33,7 +38,7 @@ describe("reducer", () => {
     expect(reducer(s, { type: "resetFormation", team: "defense" })).toBe(s);
   });
   test("man enters targeting and the next red player becomes the target", () => {
-    let s = run({ type: "select", id: "d1" }, { type: "pick", key: "man" });
+    let s = run({ type: "hydrate", side: "defense", name: "Cover", players: defaults() }, { type: "select", id: "d1" }, { type: "pick", key: "man" });
     expect(s.targeting).toBe(true);
     s = reducer(s, { type: "target", id: "d2" });
     expect(s.targeting).toBe(true);
@@ -200,7 +205,7 @@ describe("reducer", () => {
   });
   test("newPlay starts a fresh unsaved play and undo brings the old one back", () => {
     let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() }, { type: "select", id: "o3" }, { type: "pick", key: "go" });
-    s = reducer(s, { type: "newPlay" });
+    s = reducer(s, { type: "newPlay", side: "offense" });
     expect(s.id).toBeNull();
     expect(s.name).toBe("New play");
     expect(s.notes).toBe("");
@@ -316,45 +321,61 @@ describe("play side", () => {
     const s = initialState();
     expect(s.side).toBe("offense");
     expect(s.vis).toBe("offense");
+    expect(shadowing(s.side, s.vis)).toBe(false);
   });
-  test("setSide marks the play and shows that team, like a Show tap would", () => {
-    let s = run({ type: "setVis", vis: "both" }, { type: "select", id: "o3" }, { type: "setSide", side: "defense" });
+  test("New play chooses a side once: a defensive call shows the shadow offense", () => {
+    const s = run({ type: "select", id: "o3" }, { type: "newPlay", side: "defense" });
     expect(s.side).toBe("defense");
-    expect(s.vis).toBe("defense");
-    expect(s.selectedId).toBeNull();
-    expect(s.past).toHaveLength(0);
-    // the same side again changes nothing, not even a Show choice made since
-    s = reducer(reducer(s, { type: "setVis", vis: "both" }), { type: "setSide", side: "defense" });
     expect(s.vis).toBe("both");
+    expect(shadowing(s.side, s.vis)).toBe(true);
+    expect(s.selectedId).toBeNull();
+    expect(s.name).toBe("New play");
   });
-  test("opening a defensive call shows the defense, and undoing back to an offensive play shows the offense", () => {
+  test("only this play's team can be selected, and the shadow offense cannot pick a route", () => {
+    let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "o3" });
+    expect(s.selectedId).toBeNull();
+    s = reducer(s, { type: "select", id: "d1" });
+    expect(s.selectedId).toBe("d1");
+    s = reducer(s, { type: "pick", key: "blitz" });
+    expect(find(s, "d1")?.route).toEqual({ type: "blitz" });
+  });
+  test("opening a defensive call shows the shadow offense, and undoing back to an offensive play shows the offense", () => {
     let s = run({ type: "load", id: "d", name: "Cover 2", side: "defense", players: defaults() });
     expect(s.side).toBe("defense");
-    expect(s.vis).toBe("defense");
+    expect(s.vis).toBe("both");
     s = reducer(s, { type: "undo" });
     expect(s.side).toBe("offense");
     expect(s.vis).toBe("offense");
     s = reducer(s, { type: "redo" });
     expect(s.side).toBe("defense");
-    expect(s.vis).toBe("defense");
+    expect(s.vis).toBe("both");
   });
-  test("a restored defensive draft is shown from the defense; a play without a side is offensive", () => {
-    expect(run({ type: "hydrate", name: "Blitz", side: "defense", players: defaults() }).vis).toBe("defense");
+  test("a restored defensive draft shows the shadow offense; a play without a side is offensive", () => {
+    expect(run({ type: "hydrate", name: "Blitz", side: "defense", players: defaults() }).vis).toBe("both");
     expect(run({ type: "load", name: "Old", players: defaults() }).side).toBe("offense");
   });
-  test("an ordinary undo keeps the side, and New play goes back to offense", () => {
-    let s = run({ type: "setSide", side: "defense" }, { type: "select", id: "d1" }, { type: "pick", key: "blitz" }, { type: "undo" });
+  test("hiding the shadow offense is remembered while the call stays defensive", () => {
+    let s = run({ type: "newPlay", side: "defense" }, { type: "setShadow", on: false });
+    expect(s.vis).toBe("defense");
+    s = reducer(s, { type: "load", id: "d2", name: "Cover 3", side: "defense", players: defaults() });
+    expect(s.vis).toBe("defense");
+    s = reducer(s, { type: "setShadow", on: true });
+    expect(s.vis).toBe("both");
+    expect(reducer(s, { type: "setShadow", on: true })).toBe(s);
+    expect(run({ type: "setShadow", on: false }).vis).toBe("offense");
+  });
+  test("an ordinary undo keeps the side, and New play can start an offensive play again", () => {
+    let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "d1" }, { type: "pick", key: "blitz" }, { type: "undo" });
     expect(s.side).toBe("defense");
-    s = reducer(s, { type: "newPlay" });
+    s = reducer(s, { type: "newPlay", side: "offense" });
     expect(s.side).toBe("offense");
     expect(s.vis).toBe("offense");
   });
-  test("changing the side is unsaved work", () => {
+  test("a new defensive call is unsaved work", () => {
     const saved = { id: "abc", name: "Bunch", notes: "", side: "offense" as const, players: defaults() };
     const s = run({ type: "load", id: "abc", name: "Bunch", side: "offense", players: defaults() });
     expect(unsaved(s, saved)).toBe(false);
-    expect(unsaved(reducer(s, { type: "setSide", side: "defense" }), saved)).toBe(true);
-    expect(unsaved(run({ type: "setSide", side: "defense" }), null)).toBe(true);
+    expect(unsaved(run({ type: "newPlay", side: "defense" }), null)).toBe(true);
   });
   test("the opposite team is context on the field", () => {
     const o = defaults().find((p) => p.team === "offense");

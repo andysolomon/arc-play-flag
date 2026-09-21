@@ -12,20 +12,19 @@ interface Props {
   rightOpen: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  /** something is drawn on the team being shown */
+  /** something is drawn on this play's team */
   canClear: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
-  onSide: (side: Team) => void;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
 }
 
-const SIDES: readonly { key: Team; label: string; title: string }[] = [
-  { key: "offense", label: "Offense", title: "An offensive play: draw the red team" },
-  { key: "defense", label: "Defense", title: "A defensive call: draw the blue team" },
-];
+const SIDE: Record<Team, { label: string; title: string }> = {
+  offense: { label: "Offense", title: "This is an offensive play" },
+  defense: { label: "Defense", title: "This is a defensive call" },
+};
 
 /** Icon-only on phones: a 44px circle with the glyph centred, instead of a tall oval round a bare character. */
 const round = "inline-flex shrink-0 items-center justify-center gap-1 max-[479px]:w-11 max-[479px]:px-0";
@@ -48,12 +47,8 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-/** One pill split in two: the side this play is for. The chosen half is yellow. */
-const segment =
-  "flex min-h-11 cursor-pointer items-center gap-1 whitespace-nowrap bg-white px-[11px] py-[3px] text-base leading-pill " +
-  "hover:bg-yellow-soft data-[active=true]:bg-yellow first:rounded-l-pill last:rounded-r-pill";
-
-function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onSide, onUndo, onRedo, onClear }: Props) {
+function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
+  const kind = SIDE[side];
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5">
       <button
@@ -70,23 +65,15 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
       </button>
       <div className="min-w-0 flex-1" />
       <div className="flex gap-1.5">
-        <div role="group" aria-label="Play side" className="flex shrink-0 divide-x-2 divide-ink overflow-hidden rounded-pill border-2 border-ink">
-          {SIDES.map((choice) => (
-            <button
-              key={choice.key}
-              type="button"
-              onClick={() => { onSide(choice.key); }}
-              title={choice.title}
-              aria-label={`${choice.label} play`}
-              aria-pressed={side === choice.key}
-              data-active={side === choice.key}
-              className={segment}
-            >
-              <Image src={`/icons/${choice.key}.png`} alt="" width={22} height={22} sizes="22px" className="block shrink-0" />
-              <span className="max-[479px]:hidden">{choice.label}</span>
-            </button>
-          ))}
-        </div>
+        <span
+          role="img"
+          aria-label={`${kind.label} play`}
+          title={kind.title}
+          className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
+        >
+          <Image src={`/icons/${side}.png`} alt="" width={22} height={22} sizes="22px" className="block shrink-0" />
+          <span className="max-[479px]:hidden">{kind.label}</span>
+        </span>
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
           <Image src="/icons/undo.png" alt="" width={24} height={24} sizes="24px" className={`block shrink-0 ${canUndo ? "" : "opacity-40"}`} />
           <span className="max-[479px]:hidden">Undo</span>

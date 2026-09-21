@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type ReactNode, type ChangeEvent } from "react";
+import { memo, useState, type ReactNode, type ChangeEvent } from "react";
 import { MAX_NOTES } from "@/lib/play/storage";
 import type { Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
@@ -11,11 +11,12 @@ interface Props {
   name: string;
   notes: string;
   notesOpen: boolean;
+  side: Team;
   vis: Vis;
   onName: (name: string) => void;
   onNotes: (notes: string) => void;
   onToggleNotes: () => void;
-  onNew: () => void;
+  onNew: (side: Team) => void;
   onSave: () => void;
   onDuplicate: () => void;
   onExport: () => void;
@@ -25,16 +26,20 @@ interface Props {
   savePanel: ReactNode;
   onShare: () => void;
   onFlip: () => void;
-  onClear: (team: Team | null) => void;
-  onReset: (team: Team | null) => void;
-  onVis: (vis: Vis) => void;
+  onClear: (team: Team) => void;
+  onReset: (team: Team) => void;
+  onShadow: (on: boolean) => void;
 }
 
 function PlaySidebarImpl({
-  name, notes, notesOpen, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, onExport, onShare,
-  exportOpen, exportPanel, savePanel, onFlip, onClear, onReset, onVis,
+  name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, onExport, onShare,
+  exportOpen, exportPanel, savePanel, onFlip, onClear, onReset, onShadow,
 }: Props) {
-  const scope: Team | null = vis === "both" ? null : vis;
+  const [choosing, setChoosing] = useState(false);
+  const start = (next: Team) => {
+    onNew(next);
+    setChoosing(false);
+  };
   return (
     <>
       <span className={eyebrow}>PLAY</span>
@@ -45,15 +50,29 @@ function PlaySidebarImpl({
         aria-label="Play name"
         className={`flex-none ${input}`}
       />
-      <div className={tileGrid}>
-        <IconTile icon="new" label="New play" title="Start a fresh play on the default formation" onClick={onNew} />
-        <IconTile icon="save" label="Save" onClick={onSave} />
-        <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
-        <IconTile icon="export" label="Export" title="Save a picture card or video clip" active={exportOpen} onClick={onExport} />
-        <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
-        <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
-        <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
-      </div>
+      {choosing ? (
+        <>
+          <span className="flex-none text-small leading-note text-ink">Offense or defense?</span>
+          <div className="grid flex-none grid-cols-2 gap-2" role="group" aria-label="New play">
+            <IconTile icon="offense" label="Offense" title="Start an offensive play" onClick={() => { start("offense"); }} />
+            <IconTile icon="defense" label="Defense" title="Start a defensive call" onClick={() => { start("defense"); }} />
+          </div>
+          <button type="button" onClick={() => { setChoosing(false); }} className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}>
+            Cancel
+          </button>
+          <span className="flex-none text-caption leading-note text-ink-muted">They are different plays. Pick one to start a fresh one.</span>
+        </>
+      ) : (
+        <div className={tileGrid}>
+          <IconTile icon="new" label="New play" title="Start a fresh play: offense or defense" onClick={() => { setChoosing(true); }} />
+          <IconTile icon="save" label="Save" onClick={onSave} />
+          <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
+          <IconTile icon="export" label="Export" title="Save a picture card or video clip" active={exportOpen} onClick={onExport} />
+          <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
+          <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
+          <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
+        </div>
+      )}
       {savePanel}
       {exportPanel}
       {notesOpen && (
@@ -74,19 +93,26 @@ function PlaySidebarImpl({
       <span className={eyebrow}>FIELD</span>
       <div className={tileGrid}>
         <IconTile icon="flip" label="Flip play" onClick={onFlip} />
-        <IconTile icon="clear" label="Clear routes" onClick={() => { onClear(scope); }} />
-        <IconTile icon="reset" label="Reset spots" onClick={() => { onReset(scope); }} />
+        <IconTile icon="clear" label="Clear routes" onClick={() => { onClear(side); }} />
+        <IconTile icon="reset" label="Reset spots" onClick={() => { onReset(side); }} />
       </div>
-      <span className={divider} />
-      <span className={eyebrow}>SHOW</span>
-      <div className={tileGrid} role="group" aria-label="Show">
-        <IconTile icon="football" label="Both" active={vis === "both"} onClick={() => { onVis("both"); }} />
-        <IconTile icon="offOnly" label="Offense" active={vis === "offense"} onClick={() => { onVis("offense"); }} />
-        <IconTile icon="defOnly" label="Defense" active={vis === "defense"} onClick={() => { onVis("defense"); }} />
-      </div>
-      <span className="flex-none text-caption leading-note text-ink-muted">
-        The other team is faded here, like the tiles, and left off the playbook. Clear and reset only touch the team you&apos;re showing.
-      </span>
+      <span className="flex-none text-caption leading-note text-ink-muted">Clear and reset only touch this play&apos;s team.</span>
+      {side === "defense" && (
+        <>
+          <span className={divider} />
+          <span className={eyebrow}>SHOW</span>
+          <div className={tileGrid} role="group" aria-label="Shadow offense">
+            <IconTile
+              icon="offOnly"
+              label="Shadow offense"
+              title="Show the offensive formation faded, as a reference"
+              active={vis === "both"}
+              onClick={() => { onShadow(vis !== "both"); }}
+            />
+          </div>
+          <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the offense. Tap again to hide it.</span>
+        </>
+      )}
       <span className={divider} />
       <Support />
     </>

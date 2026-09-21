@@ -88,6 +88,12 @@ export class Designer {
     await (await this.tool(label)).click();
   }
 
+  /** Starts a fresh play of the chosen side. Offense and defense are different plays. */
+  async newPlay(side: "Offense" | "Defense" = "Offense"): Promise<void> {
+    await this.clickTool("New play");
+    await this.page.locator("#play-sidebar").getByRole("group", { name: "New play" }).getByRole("button", { name: side, exact: true }).click();
+  }
+
   async setName(name: string): Promise<void> {
     await this.tools();
     await this.nameInput.fill(name);
