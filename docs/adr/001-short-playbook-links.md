@@ -6,7 +6,7 @@ Status: implemented for issue #66.
 
 Keep editing and the library in localStorage. A standalone `ffpd.play` v1 file contains one complete saved play; existing `ffpd.playbook` v1 files keep their current shape. A single reader/planner handles files and hosted snapshots. Preview/confirmation precedes persistence. Repeated unchanged imports reuse records, including copies previously created for ID conflicts. Book references follow the resulting IDs. Legacy recovery files and device backups remain supported.
 
-Short links use `/s/<16 random base64url characters>` (96 bits). Production URLs are 49 characters, regardless of play count. JSON stays in durable Redis, accessed through Next route handlers and the Upstash HTTPS REST API. Compression inside a URL cannot give a size-independent short link; browser-local IDs cannot transfer data between devices.
+Short links use `/s/<16 random base64url characters>` (96 bits). Production URLs are 51 characters, regardless of play count. JSON stays in durable Redis, accessed through Next route handlers and the Upstash HTTPS REST API. Compression inside a URL cannot give a size-independent short link; browser-local IDs cannot transfer data between devices.
 
 A link is an immutable snapshot, not synchronization. A recipient explicitly imports an independent local copy. A changed sender book needs a new link. File transfer remains fully offline. Hosted links require connectivity and are never cached by the service worker or API; already imported books remain available offline. Existing payload-based `/p/` links continue to work.
 
