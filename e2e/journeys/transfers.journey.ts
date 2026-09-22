@@ -6,6 +6,7 @@ import { armSabotage, downloadText, sabotage } from "../support/designer";
 test("standalone play export/import previews first, preserves notes, and creates no book", async ({ page, browser }) => {
   await seed(page, { plays: [SLANT_LEFT] });
   await page.goto("/playbooks");
+  await page.getByRole("button", { name: `More actions for ${SLANT_LEFT.name}` }).click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export play", exact: true }).click()]);
   expect(download.suggestedFilename()).toBe("otter-slant-left.play.json");
   const text = await downloadText(download);
@@ -117,7 +118,8 @@ test("gallery copies a short standalone link, reuses it, previews without writes
   await copy.click();
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
-  await page.getByRole("button", { name: "Manage share links" }).click();
+  await page.getByRole("button", { name: `More actions for ${SLANT_LEFT.name}` }).click();
+  await page.getByRole("button", { name: /^Manage share links/ }).click();
   await expect(page.getByRole("textbox", { name: "Share URL", exact: true })).toHaveCount(1);
   const other = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {

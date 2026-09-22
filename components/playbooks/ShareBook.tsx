@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { encodePlayFile } from "@/lib/export/transfer";
 import { PreviewModal } from "./PreviewModal";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
@@ -42,8 +42,18 @@ export function ShareBookButton(props: Props) {
   return <><button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => { setOpen(true); }}>Share playbook…</button>
     {open && <PreviewModal title="Share entire playbook" onClose={() => { setOpen(false); }}><SharePanel {...props} initialPreview /></PreviewModal>}</>;
 }
-export function SharePlayButton({ play }: { play: SavedPlay }) { return <SharePanel play={play} />; }
-function SharePanel({ book, plays = [], team, play, initialPreview = false }: Partial<Props> & { play?: SavedPlay; initialPreview?: boolean }) {
+/** What a play card needs to offer "Manage share links" from its own menu. */
+export type ShareControls = { links: number; manage: () => void };
+/**
+ * The play card's one primary action. Quick results ("Link copied") go to the page toast via `say`
+ * so the card never changes height; `children` renders beside the button with the share controls.
+ */
+export function SharePlayButton({ play, say, children }: { play: SavedPlay; say?: (text: string) => void; children?: (share: ShareControls) => ReactNode }) {
+  return <SharePanel play={play} say={say} menu={children} />;
+}
+function SharePanel({ book, plays = [], team, play, say, menu, initialPreview = false }: Partial<Props> & {
+  play?: SavedPlay; say?: (text: string) => void; menu?: (share: ShareControls) => ReactNode; initialPreview?: boolean;
+}) {
   const id = play ? `play:${play.id}` : book?.id ?? "";
   const name = play?.name ?? book?.name ?? "";
   const kind = play ? "play" : "playbook";
@@ -66,7 +76,7 @@ function SharePanel({ book, plays = [], team, play, initialPreview = false }: Pa
     try {
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(`${window.location.origin}/s/${share.token}`);
-      setMessage("Link copied");
+      if (say && !open) say("Link copied"); else setMessage("Link copied");
     } catch { setOpen(true); setMessage("Select the URL below and copy it, or use Copy link."); }
   };
   const create = async () => {
@@ -80,7 +90,7 @@ function SharePanel({ book, plays = [], team, play, initialPreview = false }: Pa
       if (!TOKEN_PATTERN.test(share.token) || !/^[A-Za-z0-9_-]{32}$/.test(share.revokeKey)) throw new Error("Sharing returned an invalid link.");
       if (play) share.snapshotJson = json;
       setLatest(share); setPreview(false);
-      try { save([...(parse(snapshot())[id] ?? []), share]); setMessage("Link created. Copy or share it below."); }
+      try { save([...(parse(snapshot())[id] ?? []), share]); if (!play) setMessage("Link created. Copy or share it below."); }
       catch { setOpen(true); setMessage("Link created, but its revoke control could not be saved on this device. Keep this page open to revoke it."); return; }
       if (play) await copy(share);
     } catch (error) { setOpen(true); setMessage(error instanceof Error ? error.message : "Could not create a link. Try again online."); }
@@ -130,10 +140,12 @@ function SharePanel({ book, plays = [], team, play, initialPreview = false }: Pa
     </div>)}
   </section>;
   if (!play) return panel;
-  return <div className="flex flex-col gap-1">
-    <button type="button" disabled={busy} className={`${pill} min-h-11 px-3 text-small`} onClick={() => { void create(); }}>{busy ? "Creating link…" : "Copy share link"}</button>
-    {(visible.length > 0 || message) && <button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => { setOpen(true); }}>Manage share links</button>}
-    {message && !open && <span role="status" className="text-caption">{message}</span>}
-    {open && <PreviewModal title={`Share ${name}`} onClose={() => { setOpen(false); }}>{panel}</PreviewModal>}
-  </div>;
+  const manage = () => { setOpen(true); };
+  return <>
+    <div className="flex items-center gap-1.5">
+      <button type="button" disabled={busy} className={`${pill} min-h-11 flex-1 px-3 text-small`} onClick={() => { void create(); }}>{busy ? "Creating link…" : "Copy share link"}</button>
+      {menu?.({ links: visible.length, manage })}
+    </div>
+    {open && <PreviewModal title={`Share ${name}`} onClose={() => { setOpen(false); setMessage(""); }}>{panel}</PreviewModal>}
+  </>;
 }
