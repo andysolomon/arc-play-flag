@@ -7,14 +7,17 @@ import {
   MAX_BACKUP_BYTES, applyBackupRestore, backupMessage, encodeBackupFile, planBackupRestore, readBackupFile, readBackupState,
   type BackupFile, type RestoreMode,
 } from "@/lib/export/backup";
-import { MAX_FILE_BYTES, importMessage, planImport, readPlaybookFile } from "@/lib/export/playbook-file";
+import { MAX_FILE_BYTES, importMessage } from "@/lib/export/playbook-file";
+import { encodePlayFile, readTransfer, type TransferRead } from "@/lib/export/transfer";
+import { ImportPreview } from "./ImportPreview";
+import { ImportLink } from "./ImportLink";
 import { download } from "@/lib/export/raster";
 import {
-  applyImport, booksHolding, createPlaybook, deletePlay, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
+  booksHolding, createPlaybook, deletePlay, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
   getServerTeam, getTeam, refresh, setTeam, subscribe,
 } from "@/lib/play/library";
 import type { PlayFilter, PlaySort } from "@/lib/play/library";
-import { StorageError, failureMessage } from "@/lib/play/storage";
+import { StorageError, failureMessage, kebab } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, input, pill } from "../ui";
@@ -29,6 +32,7 @@ export function Home({ say }: { say: Say }) {
   const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [importPreview, setImportPreview] = useState<Extract<TransferRead, { ok: true }> | null>(null);
   const backupRef = useRef<HTMLInputElement>(null);
   const [backupPreview, setBackupPreview] = useState<BackupFile | null>(null);
   const [query, setQuery] = useState("");
@@ -46,21 +50,12 @@ export function Home({ say }: { say: Say }) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    // the whole file is checked before anything is written; a refused file changes nothing
-    const read = f.size > MAX_FILE_BYTES ? { ok: false as const, error: "tooLarge" as const } : readPlaybookFile(await f.text());
-    if (!read.ok) { say(importMessage(read.error), 3200); return; }
-    const file = read.file;
-    const plan = planImport(file, getPlays(), getPlaybooks());
-    const r = applyImport(plan, file.team);
-    if (!r.ok) { say(`Nothing was imported · ${failureMessage(r.error)}`, 3200); return; }
-    const bits = [
-      plan.added ? `${plural(plan.added, "play")} added` : "",
-      plan.copied ? `${plural(plan.copied, "play")} copied` : "",
-      plan.reused ? `${plural(plan.reused, "play")} already here` : "",
-      read.skipped ? `${plural(read.skipped, "unreadable play")} left out` : "",
-    ].filter(Boolean);
-    say(plan.book ? `Imported “${plan.book.name}”${bits.length ? " · " + bits.join(" · ") : ""}` : "That playbook is already here.", 3200);
-    if (plan.book) router.push(`/playbooks?book=${plan.book.id}`);
+    setImportPreview(null);
+    try {
+      const read = f.size > MAX_FILE_BYTES ? { ok: false as const, error: "tooLarge" as const } : readTransfer(await f.text());
+      if (!read.ok) { say(importMessage(read.error), 3200); return; }
+      setImportPreview(read);
+    } catch { say("That file could not be read. Try again.", 3200); }
   };
 
   const onBackup = () => {
@@ -94,13 +89,18 @@ export function Home({ say }: { say: Say }) {
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className={eyebrow}>PLAYBOOKS</span>
         <span className="flex-1" />
         <button type="button" onClick={onNew} className={`${pill} px-3 py-1 text-small`}>+ New playbook</button>
-        <button type="button" onClick={() => fileRef.current?.click()} className={`${pill} px-3 py-1 text-small`}>Import a file…</button>
-        <input ref={fileRef} type="file" accept="application/json,.json" onChange={(e) => { void onFile(e); }} className="hidden" aria-label="Import a playbook file" />
+        <button type="button" onClick={() => fileRef.current?.click()} className={`${pill} px-3 py-1 text-small`}>Import play / playbook…</button>
+        <input ref={fileRef} type="file" accept="application/json,.json" onChange={(e) => { void onFile(e); }} className="hidden" aria-label="Import a play or playbook file" />
       </div>
+      <ImportLink />
+      {importPreview && <ImportPreview file={importPreview.file} skipped={importPreview.skipped} normalized={importPreview.normalized}
+        onCancel={() => { setImportPreview(null); }} onImported={(id, message) => {
+          setImportPreview(null); say(message, 3200); if (id) router.push(`/playbooks?book=${id}`);
+        }} />}
       {books.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base leading-body text-ink-muted">
           <span>No playbooks yet.</span>
@@ -145,7 +145,7 @@ export function Home({ say }: { say: Say }) {
         <input ref={backupRef} type="file" accept="application/json,.json" onChange={(e) => { void onBackupFile(e); }} className="hidden" aria-label="Restore a device backup" />
       </div>
       <span className="text-caption leading-note text-ink-muted">
-        Plays, playbooks, team settings and your current draft live only on this device. Download a backup before clearing site data or changing devices.
+        Plays, playbooks, team settings and your current draft are saved on this device. Creating a share link uploads the selected snapshot. Download a backup before clearing site data or changing devices.
       </span>
       {backupPreview && (() => {
         const localPlayIds = new Set(plays.map((p) => p.id));
@@ -205,6 +205,9 @@ export function Home({ say }: { say: Say }) {
                 <SideBadge side={p.side} />
                 <div className="flex flex-wrap gap-1.5">
                   <Link href={`/?open=${p.id}`} className={`${pill} inline-block px-3 py-1 text-small !text-ink no-underline`}>Open ›</Link>
+                  <button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => {
+                    download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
+                  }}>Export play</button>
                   <TwoStep
                     label="Delete"
                     confirm={holding ? `Delete? It's in ${plural(holding, "playbook")}` : "Delete?"}

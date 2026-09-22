@@ -249,6 +249,27 @@ describe("offline service worker", () => {
     expect(await next.dispatchMessage({ type: "FFPD_RELEASE_REQUEST" })).toEqual([{ type: "FFPD_RELEASE", release: "e2e-next" }]);
   });
 
+  test("stores each optimizer url as the source icon and never calls the optimizer", async () => {
+    worker.setFetch((input) => {
+      const key = keyFor(input);
+      if (key.startsWith("/_next/image")) return Promise.reject(new Error("optimizer stalled"));
+      const html = key === "/"
+        ? '<img src="/_next/image?url=%2Ficons%2FzoneFlat.png&amp;w=40&amp;q=75" srcSet="/_next/image?url=%2Ficons%2FzoneFlat.png&amp;w=56&amp;q=75 56w">'
+        : key === "/icons/zoneFlat.png"
+          ? "png-bytes"
+          : "asset";
+      return Promise.resolve(new Response(html, { status: 200 }));
+    });
+
+    await worker.lifetime("install");
+    const shell = await worker.caches.open("ffpd-shell-test");
+    const sized = await shell.match("/_next/image?url=%2Ficons%2FzoneFlat.png&w=56&q=75");
+    expect(sized).toBeDefined();
+    expect(await sized?.text()).toBe("png-bytes");
+    expect(await (await shell.match("/_next/image?url=%2Ficons%2FzoneFlat.png&w=40&q=75"))?.text()).toBe("png-bytes");
+    expect(worker.fetched.some((path) => path.startsWith("/_next/image"))).toBe(false);
+  });
+
   test("a missing required asset aborts install without a ready marker", async () => {
     worker.setFetch((input) => Promise.resolve(keyFor(input) === "/demos/save-share.mp4"
       ? new Response("missing", { status: 404 })
@@ -278,6 +299,17 @@ describe("offline service worker", () => {
     const missing = await worker.dispatchFetch(worker.request("/p/different-play", { mode: "navigate" }));
     expect(missing.status).toBe(503);
     expect(await missing.text()).toContain("Shared play unavailable offline");
+  });
+
+  test("hosted book links are never cached and cannot substitute a local book offline", async () => {
+    const path = "/s/abcdefghijklmnop";
+    worker.setFetch(() => Promise.resolve(new Response("shared book")));
+    expect(await (await worker.dispatchFetch(worker.request(path, { mode: "navigate" }))).text()).toBe("shared book");
+    expect(await worker.caches.match(path)).toBeUndefined();
+    worker.setFetch(() => Promise.reject(new TypeError("offline")));
+    const response = await worker.dispatchFetch(worker.request(path, { mode: "navigate" }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain("Shared playbook unavailable offline");
   });
 
   test("serves cached media ranges and contains failed background refreshes", async () => {

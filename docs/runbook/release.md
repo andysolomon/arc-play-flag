@@ -1,6 +1,6 @@
 # Release runbook
 
-How a change reaches https://arc-play-flag.vercel.app, how to check it landed, who watches what, and how to roll it back. The app has no backend and no database: every play lives in the coach's browser (`localStorage`), so a release can only break the code that is served, never the data on the device, and a rollback is only ever a change of which build Vercel serves.
+How a change reaches https://arc-play-flag.vercel.app, how to check it landed, who watches what, and how to roll it back. Local editing still uses the coach's browser (`localStorage`). Short playbook links additionally use durable Redis snapshots: see [sharing operations](sharing.md). Rollback changes the served build and must leave Redis intact; builds predating `/s/` cannot serve short links until a compatible build is restored.
 
 ## How a release happens
 

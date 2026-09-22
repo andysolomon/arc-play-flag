@@ -364,6 +364,21 @@ describe("play side", () => {
     expect(reducer(s, { type: "setShadow", on: true })).toBe(s);
     expect(run({ type: "setShadow", on: false }).vis).toBe("offense");
   });
+  test("an offensive play can show a shadow defense, and that choice sticks to the next offensive play", () => {
+    let s = run({ type: "setShadow", on: true });
+    expect(s.side).toBe("offense");
+    expect(s.vis).toBe("both");
+    expect(shadowing(s.side, s.vis)).toBe(true);
+    s = reducer(s, { type: "select", id: "d1" });
+    expect(s.selectedId).toBeNull();
+    s = reducer(s, { type: "select", id: "o3" });
+    expect(s.selectedId).toBe("o3");
+    s = reducer(s, { type: "load", id: "o2", name: "Slant", side: "offense", players: defaults() });
+    expect(s.vis).toBe("both");
+    s = reducer(s, { type: "setShadow", on: false });
+    expect(s.vis).toBe("offense");
+    expect(reducer(s, { type: "setShadow", on: false })).toBe(s);
+  });
   test("an ordinary undo keeps the side, and New play can start an offensive play again", () => {
     let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "d1" }, { type: "pick", key: "blitz" }, { type: "undo" });
     expect(s.side).toBe("defense");
