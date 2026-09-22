@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
-import type { Player, Team, Vis } from "@/lib/play/types";
+import type { Player, Team } from "@/lib/play/types";
 import { Field } from "./Field";
 import { pillSm } from "./ui";
 
@@ -13,22 +13,20 @@ interface Props {
   players: Player[];
   /** offensive play or defensive call */
   side: Team;
-  vis: Vis;
 }
 
 const noop = (): void => undefined;
 
 /** Read-only view of a shared play, with a way back into the designer. */
-export function SharedPlay({ id, name, players, side, vis }: Props) {
+export function SharedPlay({ id, name, players, side }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const kind = side === "defense" ? "Defensive call" : "Offensive play";
-  const shown = vis === "both" ? "Both teams" : vis === "offense" ? "Offense only" : "Defense only";
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 print:hidden">
         <Image src="/icons/football.png" alt="" width={26} height={26} sizes="26px" className="block flex-none" priority />
         <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
-        <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot · {shown}</span>
+        <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot</span>
         <span className="flex-1" />
         <Link href={`/?p=${id}`} className={`${pillSm} inline-flex items-center !text-ink no-underline`}>
           Open in designer ›
@@ -40,7 +38,7 @@ export function SharedPlay({ id, name, players, side, vis }: Props) {
       <div className="flex min-h-0 flex-1 items-stretch">
         <Field
           players={players}
-          vis={vis}
+          vis={side}
           side={side}
           selectedId={null}
           targeting={false}

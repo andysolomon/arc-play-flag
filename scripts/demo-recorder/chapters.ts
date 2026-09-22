@@ -540,7 +540,7 @@ async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.poster();
 }
 
-/** Save, note and share: save, coaching notes, a duplicate, and a link that shows one side. */
+/** Save, note and share: save, coaching notes, a duplicate, and a snapshot of the play. */
 async function saveShare(d: ChapterDriver): Promise<void> {
   await d.goto(`/?open=${PLAY_ACTION_WHEEL.id}`);
   const tools = d.page.locator("#play-sidebar");
@@ -563,9 +563,8 @@ async function saveShare(d: ChapterDriver): Promise<void> {
     await expect(d.page.getByRole("textbox", { name: "Play name" })).toHaveValue(`${PLAY_ACTION_WHEEL.name} copy`, { timeout: ASSERT_TIMEOUT });
   }, 440, ["Duplicate"]);
 
-  await d.say("Share a snapshot of the offense only");
+  await d.say("Share a snapshot of the play");
   await d.click(tools.getByRole("button", { name: "Copy share link", exact: true }), "Copy share link", 400);
-  await d.chooseVisibility("Teams visible in shared snapshot", "Offense", ["Share visibility"]);
   await d.poster();
   await d.click(d.page.getByRole("dialog", { name: "Share snapshot" }).getByRole("button", { name: "Copy snapshot link", exact: true }), "Copy snapshot link", 200);
   await d.expectState("The link is on the clipboard", async () => {

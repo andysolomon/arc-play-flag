@@ -34,7 +34,7 @@ export type Action =
   | { type: "resetFormation"; team: Team | null }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
+  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[]; shadow?: boolean }
   /** a fresh, unsaved play on the default formation; undoable. Side is chosen here and stays put. */
   | { type: "newPlay"; side: Team }
   | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
@@ -280,8 +280,11 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return step(s, redoStep(s, s));
     case "newPlay":
       return swap(s, { id: null, name: "New play", notes: "", side: a.side, players: defaults() });
-    case "load":
-      return swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+    case "load": {
+      const next = swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+      // A shared snapshot opens with the other team faded, whichever side this play is.
+      return a.shadow && next.vis !== "both" ? { ...next, vis: "both" } : next;
+    }
     case "hydrate": {
       const doc: Doc = { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players };
       return { ...s, ...doc, ...follow(s, doc) };
