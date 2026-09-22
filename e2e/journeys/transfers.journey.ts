@@ -6,6 +6,7 @@ import { armSabotage, downloadText, sabotage } from "../support/designer";
 test("standalone play export/import previews first, preserves notes, and creates no book", async ({ page, browser }) => {
   await seed(page, { plays: [SLANT_LEFT] });
   await page.goto("/playbooks");
+  await page.getByRole("button", { name: `More actions for ${SLANT_LEFT.name}` }).click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export play", exact: true }).click()]);
   expect(download.suggestedFilename()).toBe("otter-slant-left.play.json");
   const text = await downloadText(download);
@@ -91,6 +92,7 @@ test("short link opens on another device, imports a snapshot, survives reload, a
     await recipient.goto(url);
     await expect(recipient.getByRole("heading", { name: book.name, exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Revoke link", exact: true }).click();
+    await page.getByRole("button", { name: "Tap again to revoke", exact: true }).click();
     await expect(page.getByText("Link revoked. Copies already imported are unaffected.", { exact: true })).toBeVisible();
     await recipient.reload();
     await expect(recipient.getByRole("alert").filter({ hasText: /missing|Paste an Arc/ })).toContainText("missing, expired, or revoked");
@@ -117,7 +119,8 @@ test("gallery copies a short standalone link, reuses it, previews without writes
   await copy.click();
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
-  await page.getByRole("button", { name: "Manage share links" }).click();
+  await page.getByRole("button", { name: `More actions for ${SLANT_LEFT.name}` }).click();
+  await page.getByRole("button", { name: /^Manage share links/ }).click();
   await expect(page.getByRole("textbox", { name: "Share URL", exact: true })).toHaveCount(1);
   const other = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
@@ -139,6 +142,7 @@ test("gallery copies a short standalone link, reuses it, previews without writes
     expect(await storedPlays(recipient)).toEqual({ [SLANT_LEFT.id]: SLANT_LEFT });
     expect(await storedPlaybooks(recipient)).toEqual({});
     await page.getByRole("button", { name: "Revoke link", exact: true }).click();
+    await page.getByRole("button", { name: "Tap again to revoke", exact: true }).click();
     await recipient.goto(url);
     await expect(recipient.getByRole("alert").filter({ hasText: "missing, expired, or revoked" })).toBeVisible();
   } finally { await other.close(); }

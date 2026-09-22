@@ -12,6 +12,7 @@ import { encodePlayFile, readTransfer, type TransferRead } from "@/lib/export/tr
 import { ImportPreview } from "./ImportPreview";
 import { ShareBookButton, SharePlayButton } from "./ShareBook";
 import { ImportLink } from "./ImportLink";
+import { MoreMenu, menuItem } from "./MoreMenu";
 import { download } from "@/lib/export/raster";
 import {
   booksHolding, createPlaybook, deletePlay, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
@@ -181,8 +182,10 @@ export function Home({ say }: { say: Say }) {
       })()}
 
       <span className={divider} />
-      <span className={eyebrow}>ALL PLAYS</span>
-      <p className="text-caption text-ink-muted">Share links include both teams and coaching notes. Anyone with the link can preview and import the play.</p>
+      <div className="flex items-baseline gap-2">
+        <span className={eyebrow}>ALL PLAYS</span>
+        {plays.length > 0 && <span className="text-caption text-ink-muted">{plural(plays.length, "play")}</span>}
+      </div>
       {plays.length === 0 ? (
         <span className="text-base text-ink-muted">Save a play in the designer and it shows up here.</span>
       ) : (<>
@@ -199,25 +202,48 @@ export function Home({ say }: { say: Say }) {
           <div className="rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base text-ink-muted">
             No plays match. Try another search or filter.
           </div>
-        ) : <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+        ) : <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
           {visiblePlays.map((p) => {
             const holding = booksHolding(p.id).length;
             return (
-              <div key={p.id} className={`${card} flex flex-col gap-2`}>
-                <PlayThumb players={p.players} name={p.name} side={p.side} />
-                <span className="truncate text-base" title={p.name}>{p.name}</span>
-                <SideBadge side={p.side} />
-                <div className="flex flex-wrap gap-1.5">
-                  <Link href={`/?open=${p.id}`} className={`${pill} inline-block px-3 py-1 text-small !text-ink no-underline`}>Open ›</Link>
-                  <button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => {
-                    download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
-                  }}>Export play</button>
-                  <SharePlayButton play={p} />
-                  <TwoStep
-                    label="Delete"
-                    confirm={holding ? `Delete? It's in ${plural(holding, "playbook")}` : "Delete?"}
-                    onConfirm={() => { const r = deletePlay(p.id); say(r.ok ? `Deleted “${p.name}”` : failureMessage(r.error), r.ok ? undefined : 3200); }}
-                  />
+              <div key={p.id} className={`${card} flex flex-col gap-2.5`}>
+                {/* the picture and name are the way in: no separate "Open" button */}
+                <Link href={`/?open=${p.id}`} aria-label={`Open ${p.name} in the designer`}
+                  className="group flex flex-col gap-2 !text-ink no-underline">
+                  <PlayThumb players={p.players} name={p.name} side={p.side}
+                    className="transition-transform duration-[120ms] group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+                  <span className="truncate text-title leading-tight group-hover:underline" title={p.name}>{p.name}</span>
+                </Link>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption text-ink-muted">
+                  <SideBadge side={p.side} />
+                  {holding > 0 && <span>· In {plural(holding, "playbook")}</span>}
+                </div>
+                {/* pinned to the bottom so every card in a row lines up */}
+                <div className="mt-auto">
+                  <SharePlayButton play={p} say={(text) => { say(text); }}>
+                    {(share) => (
+                      <MoreMenu label={`More actions for ${p.name}`}>
+                        {(close) => (<>
+                          {share.links > 0 && (
+                            <button type="button" className={menuItem} onClick={() => { close(); share.manage(); }}>
+                              Manage share links ({share.links})
+                            </button>
+                          )}
+                          <button type="button" className={menuItem} onClick={() => {
+                            close();
+                            download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
+                          }}>Export play</button>
+                          <span className="mx-2 my-0.5 h-px bg-divider" aria-hidden />
+                          <TwoStep
+                            label="Delete"
+                            base={menuItem}
+                            confirm={holding ? `Delete? It's in ${plural(holding, "playbook")}` : "Tap again to delete"}
+                            onConfirm={() => { close(); const r = deletePlay(p.id); say(r.ok ? `Deleted “${p.name}”` : failureMessage(r.error), r.ok ? undefined : 3200); }}
+                          />
+                        </>)}
+                      </MoreMenu>
+                    )}
+                  </SharePlayButton>
                 </div>
               </div>
             );
