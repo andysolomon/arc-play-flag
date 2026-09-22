@@ -335,7 +335,8 @@ describe("play side", () => {
     let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "o3" }, { type: "pick", key: "slant" });
     expect(s.selectedId).toBe("o3");
     expect(find(s, "o3")?.route).toEqual({ type: "slant" });
-    expect(find(s, "o3") && isContext(find(s, "o3")!, s.side)).toBe(true);
+    const shadow = find(s, "o3");
+    expect(shadow && isContext(shadow, s.side)).toBe(true);
     s = reducer(s, { type: "select", id: "d1" });
     expect(s.selectedId).toBe("d1");
     s = reducer(s, { type: "pick", key: "blitz" });
