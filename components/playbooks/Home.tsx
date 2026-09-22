@@ -10,6 +10,7 @@ import {
 import { MAX_FILE_BYTES, importMessage } from "@/lib/export/playbook-file";
 import { encodePlayFile, readTransfer, type TransferRead } from "@/lib/export/transfer";
 import { ImportPreview } from "./ImportPreview";
+import { ShareBookButton, SharePlayButton } from "./ShareBook";
 import { ImportLink } from "./ImportLink";
 import { download } from "@/lib/export/raster";
 import {
@@ -109,10 +110,12 @@ export function Home({ say }: { say: Say }) {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
           {books.map((b) => (
-            <Link key={b.id} href={`/playbooks?book=${b.id}`} className={`${card} flex flex-col gap-1 !text-ink no-underline transition-transform duration-[120ms] hover:-translate-y-0.5 motion-reduce:transition-none`}>
+            <div key={b.id} className={`${card} flex flex-col gap-2`}><Link href={`/playbooks?book=${b.id}`} className={`flex flex-col gap-1 !text-ink no-underline transition-transform duration-[120ms] hover:-translate-y-0.5 motion-reduce:transition-none`}>
               <span className="truncate text-title">{b.name}</span>
               <span className="text-caption text-ink-muted">{plural(b.plays.length, "play")}</span>
             </Link>
+            <ShareBookButton book={b} plays={plays} team={team} />
+            </div>
           ))}
         </div>
       )}
@@ -179,6 +182,7 @@ export function Home({ say }: { say: Say }) {
 
       <span className={divider} />
       <span className={eyebrow}>ALL PLAYS</span>
+      <p className="text-caption text-ink-muted">Share links include both teams and coaching notes. Anyone with the link can preview and import the play.</p>
       {plays.length === 0 ? (
         <span className="text-base text-ink-muted">Save a play in the designer and it shows up here.</span>
       ) : (<>
@@ -208,6 +212,7 @@ export function Home({ say }: { say: Say }) {
                   <button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => {
                     download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
                   }}>Export play</button>
+                  <SharePlayButton play={p} />
                   <TwoStep
                     label="Delete"
                     confirm={holding ? `Delete? It's in ${plural(holding, "playbook")}` : "Delete?"}

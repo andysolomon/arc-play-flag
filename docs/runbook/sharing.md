@@ -27,11 +27,11 @@
 
 ## Coach workflow
 
-- On **Playbooks**, each saved play has **Export play**, producing `*.play.json`.
+- In **All Plays**, **Copy share link** creates and copies a short snapshot URL for that play, including both teams and coaching notes. Repeated copying reuses an unexpired link while the play is unchanged. **Manage share links** provides selectable URLs and revoke controls; clipboard failures expose the URL for manual copying. **Export play** still produces `*.play.json`.
 - **Import play / playbook…** accepts standalone plays and existing `*.playbook.json` files. Review counts, repairs, and notes, then confirm. Importing a standalone play does not create a book.
 - A book's existing **Download playbook file** exports only that book with its referenced plays. Full-device backups remain separate.
-- **Share playbook…** shows included plays/notes and an optional team checkbox before creating the hosted snapshot. **Copy link** and **Share link** offer clipboard/native sharing; the URL field is selectable if those APIs are unavailable.
-- Open a share link directly or paste it into **Playbook share URL → Preview link**. Local `?book=` URLs are not share links.
+- **Share playbook…** is available on every playbook card and inside the editor. It shares the entire ordered book and shows included plays/notes and an optional team checkbox before creating the hosted snapshot. **Copy link** and **Share link** offer clipboard/native sharing; the URL field is selectable if those APIs are unavailable.
+- Open a share link directly or paste it into **Play or playbook share URL → Preview link**. A modal shows full-size diagrams and notes; use Previous/Next or the play selector to browse a book. Close/Escape/Cancel leaves the personal library untouched. Only **Import play** or **Import playbook** saves data. Local `?book=` URLs are not share links.
 - Links expire in 90 days. Sender controls survive reload on the same browser; **Revoke link** stops future access. Clearing that browser's site data loses its revoke controls. It does not delete already imported copies.
 
 ## Failure and recovery
