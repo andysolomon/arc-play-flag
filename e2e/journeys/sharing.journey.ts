@@ -30,7 +30,10 @@ test("a share snapshot shows the play, keeps the other team, and opens it as a s
   await expect(page.getByRole("heading", { name: "Otter Cover Two" })).toBeVisible();
   const shared = page.getByRole("img", { name: "Play diagram" });
   await expect(page.getByText(/This link is a snapshot, not a live view/)).toBeVisible();
-  await expect(page.getByText("Offensive play · Snapshot")).toBeVisible();
+  // the play label gives way to the play name on the narrowest phones
+  const label = page.getByText("Offensive play · Snapshot");
+  await expect(label).toBeAttached();
+  if ((page.viewportSize()?.width ?? 0) >= 480) await expect(label).toBeVisible();
   // the snapshot draws the offense; the defense stays in the link
   await expect(shared.getByRole("img", { name: /^Offense / })).toHaveCount(5);
   await expect(shared.getByRole("img", { name: /^Defense / })).toHaveCount(0);
@@ -68,7 +71,9 @@ test("a defensive snapshot shows the call, then opens with the shadow offense", 
 
   await page.goto(url);
   const shared = page.getByRole("img", { name: "Play diagram" });
-  await expect(page.getByText("Defensive call · Snapshot")).toBeVisible();
+  const label = page.getByText("Defensive call · Snapshot");
+  await expect(label).toBeAttached();
+  if ((page.viewportSize()?.width ?? 0) >= 480) await expect(label).toBeVisible();
   await expect(shared.getByRole("img", { name: /^Defense / })).toHaveCount(5);
   await expect(shared.getByRole("img", { name: /^Offense / })).toHaveCount(0);
 

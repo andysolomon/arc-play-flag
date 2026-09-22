@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { Designer, downloadBytes, downloadText } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
 import { KEYS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook } from "../support/fixtures";
@@ -75,4 +76,86 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
   ]);
   expect((await downloadBytes(cardDownload)).subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   expect(failedChunks).toEqual([]);
+});
+
+/**
+ * A deploy the test can break. The browser fetches a worker's script itself, so a release
+ * that must fail is registered under `?release=` and answered with the worker source edited
+ * to require an asset this server does not have. A sound release uses the built worker as-is.
+ */
+async function releaseBrokenWorker(context: BrowserContext, page: Page): Promise<void> {
+  const source = await readFile(new URL("../../lib/offline/sw.js", import.meta.url), "utf8");
+  const script = source.replace(
+    'const SHELLS = ["/", "/playbooks", "/demo"];',
+    'const SHELLS = ["/nothing-is-served-here", "/playbooks", "/demo"];',
+  );
+  if (script === source) throw new Error("worker script has no SHELLS list to break");
+  await context.route(/\/sw\.js\?release=broken$/, (route) => route.fulfill({ body: script, contentType: "text/javascript" }));
+  await page.evaluate(async () => { await navigator.serviceWorker.register("/sw.js?release=broken"); });
+}
+
+const shellCaches = (page: Page): Promise<string[]> =>
+  page.evaluate(async () => (await caches.keys()).filter((name) => name.startsWith("ffpd-shell-")).sort());
+const readyMarked = (page: Page, cache: string): Promise<boolean> =>
+  page.evaluate(async (name) => !!(await (await caches.open(name)).match("/__ffpd_offline_ready__")), cache);
+const controllerUrl = (page: Page): Promise<string> =>
+  page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? "");
+
+test("a first install says it is updating until the shell is verified, a broken release never takes over, and a sound one keeps the shared play", async ({ context, page }) => {
+  await page.goto("/demo");
+  // the pill stays on "updating" until every shell page, icon and demo asset is in the cache
+  await expect(page.getByText("Offline updating…", { exact: true })).toBeVisible();
+  await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+
+  const sharedId = encodeShare({ name: SLANT_LEFT.name, players: SLANT_LEFT.players });
+  await page.goto(`/p/${sharedId}`);
+  await expect(page.getByRole("heading", { name: SLANT_LEFT.name })).toBeVisible();
+  await page.goto("/demo");
+  await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  const [current] = await shellCaches(page);
+  expect(current).toBeTruthy();
+
+  // one required asset 404s: install fails, the offer never appears, the ready shell stays ready
+  await releaseBrokenWorker(context, page);
+  await expect.poll(async () => {
+    const caches = await shellCaches(page);
+    return {
+      ready: await readyMarked(page, "ffpd-shell-broken"),
+      offered: await page.getByRole("region", { name: "Update ready" }).count(),
+      hasBroken: caches.includes("ffpd-shell-broken"),
+      controller: await controllerUrl(page),
+    };
+  }, { timeout: 30_000 }).toEqual({
+    ready: false,
+    offered: 0,
+    hasBroken: true,
+    controller: expect.stringMatching(/\/sw\.js$/),
+  });
+  expect(await readyMarked(page, String(current))).toBe(true);
+  await context.setOffline(true);
+  await page.goto(`/p/${sharedId}`);
+  await expect(page.getByRole("heading", { name: SLANT_LEFT.name })).toBeVisible();
+  await page.goto("/demo");
+  await expect(page.getByRole("heading", { name: "Demo" })).toBeVisible();
+  await context.setOffline(false);
+  await page.reload();
+  await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+
+  // a complete release waits for the coach, then the exact shared play survives the swap
+  await page.evaluate(async () => { await navigator.serviceWorker.register("/sw.js?release=e2e-shell"); });
+  const banner = page.getByRole("region", { name: "Update ready" });
+  await expect(banner).toBeVisible({ timeout: 30_000 });
+  expect(await readyMarked(page, "ffpd-shell-e2e-shell")).toBe(true);
+  expect(await controllerUrl(page)).toMatch(/\/sw\.js$/);
+  const reloaded = page.waitForEvent("load");
+  await banner.getByRole("button", { name: "Update now" }).click();
+  await reloaded;
+  await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => controllerUrl(page), { timeout: 30_000 }).toMatch(/\/sw\.js$/);
+  await expect.poll(() => shellCaches(page), { timeout: 30_000 }).not.toContain("ffpd-shell-broken");
+  await context.setOffline(true);
+  await page.goto(`/p/${sharedId}`);
+  await expect(page.getByRole("heading", { name: SLANT_LEFT.name })).toBeVisible();
+  await page.goto("/playbooks");
+  await expect(page.getByRole("heading", { name: "Playbooks" })).toBeVisible();
 });
