@@ -3,14 +3,24 @@
 ## Configure deployment
 
 1. Provision a durable Upstash Redis database for this app. Use a **separate database for previews** so PR deployments cannot read/revoke production snapshots. Select a plan supporting EVAL and REST requests larger than the maximum 4 MB upload (the command/envelope adds overhead). Disable data eviction so stored snapshots remain until revoked/expired; arrange capacity and alerts above the app's 64 MiB value budget plus metadata.
-2. Add these server-only variables to the corresponding Vercel environment:
+2. Give the route handlers server-only credentials in one of two ways:
 
-   | Variable | Value |
-   | --- | --- |
-   | `UPSTASH_REDIS_REST_URL` | Database HTTPS REST endpoint |
-   | `UPSTASH_REDIS_REST_TOKEN` | Write-capable database REST token |
+   - **Vercel Marketplace (recommended).** Create the store from the project's Storage tab (product `upstash/upstash-kv`) or the CLI, then connect it to the project. Connect the production store to **Production only** and a second store to **Preview only**; the Marketplace injects `KV_REST_API_URL` and `KV_REST_API_TOKEN` (plus `KV_URL`, `REDIS_URL`, and a read-only token the app ignores), and the app reads those names automatically.
 
-   Never prefix these with `NEXT_PUBLIC_`, commit credentials, or share a production token with the browser.
+     ```sh
+     vercel integration-resource connect <production-store> arc-play-flag -e production --yes
+     vercel integration add upstash/upstash-kv --name arc-play-flag-preview --plan free \
+       -m eviction=false -m autoUpgrade=false -e preview --no-env-pull
+     ```
+
+   - **Manual.** Add these variables to the corresponding Vercel environment. They take precedence over the `KV_*` names when both exist.
+
+     | Variable | Value |
+     | --- | --- |
+     | `UPSTASH_REDIS_REST_URL` | Database HTTPS REST endpoint |
+     | `UPSTASH_REDIS_REST_TOKEN` | Write-capable database REST token |
+
+   Never prefix these with `NEXT_PUBLIC_`, commit credentials, or share a production token with the browser. Do not connect one store to both Preview and Production.
 3. Redeploy that environment so the route handlers receive the settings. Without configuration, local files still work and link creation explains that sharing is unavailable.
 4. Create a fictional playbook, use **Share playbook… → Create link**, and open the link in a fresh browser. Confirm that preview does not write local data, import works, sender edits do not update the snapshot, and the imported book survives reload. Revoke from the original browser and confirm the link is unavailable while the imported copy remains.
 5. Verify the same existing link after a redeploy. Check provider availability/capacity alerts. No account or full-library migration is involved.
