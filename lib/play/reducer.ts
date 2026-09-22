@@ -35,7 +35,7 @@ export type Action =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
-  /** a fresh, unsaved play on the default formation; undoable. Side is chosen here and stays put. */
+  /** a fresh, unsaved play on the default formation. History from the play you left is dropped. */
   | { type: "newPlay"; side: Team }
   | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
   | { type: "setName"; name: string }
@@ -110,9 +110,9 @@ function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
   return { vis: visFor(doc.side, s) };
 }
 
-/** Replaces the whole document, leaving the one before it one undo away. */
-function swap(s: PlayState, doc: Doc): PlayState {
-  return { ...s, ...push(s, s, true), ...doc, ...follow(s, doc), ...cleared };
+/** Replaces the whole document and drops undo and redo, which belong to the play you left. */
+function openPlay(s: PlayState, doc: Doc): PlayState {
+  return { ...s, ...emptyHistory, ...doc, ...follow(s, doc), ...cleared };
 }
 
 function step(s: PlayState, st: HistoryStep | null): PlayState {
@@ -279,9 +279,9 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "redo":
       return step(s, redoStep(s, s));
     case "newPlay":
-      return swap(s, { id: null, name: "New play", notes: "", side: a.side, players: defaults() });
+      return openPlay(s, { id: null, name: "New play", notes: "", side: a.side, players: defaults() });
     case "load":
-      return swap(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+      return openPlay(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
     case "hydrate": {
       const doc: Doc = { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players };
       return { ...s, ...doc, ...follow(s, doc) };

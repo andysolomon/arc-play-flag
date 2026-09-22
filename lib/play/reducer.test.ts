@@ -203,51 +203,54 @@ describe("reducer", () => {
     for (let i = 0; i < 70; i++) s = reducer(s, { type: "move", id: "o3", x: 2 + (i % 20), y: 1, commit: true });
     expect(s.past).toHaveLength(60);
   });
-  test("newPlay starts a fresh unsaved play and undo brings the old one back", () => {
-    let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() }, { type: "select", id: "o3" }, { type: "pick", key: "go" });
-    s = reducer(s, { type: "newPlay", side: "offense" });
+  test("newPlay starts a fresh play and leaves the previous one out of undo and redo", () => {
+    let s = run(
+      { type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() },
+      { type: "select", id: "o3" },
+      { type: "pick", key: "go" },
+      { type: "saved", id: "abc" },
+      { type: "newPlay", side: "offense" },
+    );
     expect(s.id).toBeNull();
     expect(s.name).toBe("New play");
     expect(s.notes).toBe("");
     expect(s.selectedId).toBeNull();
     expect(find(s, "o3")?.route).toBeNull();
+    expect(s.past).toHaveLength(0);
+    expect(s.future).toHaveLength(0);
+    expect(reducer(s, { type: "undo" })).toBe(s);
+    expect(reducer(s, { type: "redo" })).toBe(s);
+    s = reducer(s, { type: "select", id: "o4" });
+    s = reducer(s, { type: "pick", key: "post" });
     s = reducer(s, { type: "undo" });
-    expect(find(s, "o3")?.route).toEqual({ type: "go" });
-    // the whole play comes back, not just its diagram: the toast promised as much
-    expect(s.id).toBe("abc");
-    expect(s.name).toBe("Bunch");
-    expect(s.notes).toBe("hi");
-    s = reducer(s, { type: "redo" });
+    expect(find(s, "o4")?.route).toBeNull();
     expect(s.id).toBeNull();
     expect(s.name).toBe("New play");
-    expect(find(s, "o3")?.route).toBeNull();
-  });
-  test("A → B → undo leaves A's diagram under A's identity, so Save can't overwrite B", () => {
-    const aPlayers = defaults().map((p) => (p.id === "o3" ? { ...p, route: { type: "go" as const } } : p));
-    const bPlayers = defaults().map((p) => (p.id === "o4" ? { ...p, route: { type: "post" as const } } : p));
-    let s = run(
-      { type: "load", id: "play-a", name: "Play A", notes: "A notes", players: aPlayers },
-      { type: "load", id: "play-b", name: "Play B", notes: "B notes", players: bPlayers },
-    );
-    s = reducer(s, { type: "undo" });
-    expect(find(s, "o3")?.route).toEqual({ type: "go" });
-    expect(find(s, "o4")?.route).toBeNull();
-    expect(s.id).toBe("play-a");
-    expect(s.name).toBe("Play A");
-    expect(s.notes).toBe("A notes");
-    // redo is the mirror image
     s = reducer(s, { type: "redo" });
     expect(find(s, "o4")?.route).toEqual({ type: "post" });
+    expect(s.id).toBeNull();
+    expect(s.name).toBe("New play");
+  });
+  test("opening B replaces A, so undo and redo cannot put one play's diagram on the other", () => {
+    const aPlayers = defaults().map((p) => (p.id === "o3" ? { ...p, route: { type: "go" as const } } : p));
+    const bPlayers = defaults().map((p) => (p.id === "o4" ? { ...p, route: { type: "post" as const } } : p));
+    const s = run(
+      { type: "load", id: "play-a", name: "Play A", notes: "A notes", players: aPlayers },
+      { type: "setRoute", id: "o5", route: { type: "slant" } },
+      { type: "undo" },
+      { type: "load", id: "play-b", name: "Play B", notes: "B notes", players: bPlayers },
+    );
     expect(s.id).toBe("play-b");
     expect(s.name).toBe("Play B");
     expect(s.notes).toBe("B notes");
-    // and undoing past both loads lands on the blank new play
-    s = reducer(reducer(s, { type: "undo" }), { type: "undo" });
-    expect(s.id).toBeNull();
-    expect(s.name).toBe("New play");
-    expect(s.players).toEqual(defaults());
+    expect(find(s, "o4")?.route).toEqual({ type: "post" });
+    expect(find(s, "o3")?.route).toBeNull();
+    expect(s.past).toHaveLength(0);
+    expect(s.future).toHaveLength(0);
+    expect(reducer(s, { type: "undo" })).toBe(s);
+    expect(reducer(s, { type: "redo" })).toBe(s);
   });
-  test("edits made in B stay in B after undoing back through the switch", () => {
+  test("edits made in B undo and redo inside B", () => {
     let s = run(
       { type: "load", id: "play-a", name: "Play A", notes: "", players: defaults() },
       { type: "load", id: "play-b", name: "Play B", notes: "", players: defaults() },
@@ -255,21 +258,17 @@ describe("reducer", () => {
       { type: "setNotes", notes: "B notes" },
       { type: "setRoute", id: "o4", route: { type: "post" } },
     );
-    // undoing the route edit keeps B's identity and everything typed into it
     s = reducer(s, { type: "undo" });
     expect(find(s, "o4")?.route).toBeNull();
     expect(s.id).toBe("play-b");
     expect(s.name).toBe("Play B v2");
     expect(s.notes).toBe("B notes");
-    // the next undo crosses the switch and restores A whole
-    s = reducer(s, { type: "undo" });
-    expect(s.id).toBe("play-a");
-    expect(s.name).toBe("Play A");
-    // redo brings back B as it was when we left: edited name and notes included
+    expect(reducer(s, { type: "undo" })).toBe(s);
     s = reducer(s, { type: "redo" });
     expect(s.id).toBe("play-b");
     expect(s.name).toBe("Play B v2");
     expect(s.notes).toBe("B notes");
+    expect(find(s, "o4")?.route).toEqual({ type: "post" });
   });
   test("undoing a move keeps a name typed after the move", () => {
     let s = run({ type: "move", id: "o3", x: 9, y: 2, commit: true }, { type: "setName", name: "Sprint" }, { type: "setNotes", notes: "go" });
@@ -289,13 +288,15 @@ describe("reducer", () => {
     expect(unsaved(reducer(s, { type: "setName", name: "Mine" }), null)).toBe(true);
     expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2, commit: true }), null)).toBe(true);
   });
-  test("load pushes history and renames; hydrate does not", () => {
+  test("load replaces the document and clears history; hydrate does not push any", () => {
     const players = defaults().map((p) => ({ ...p, x: 15 }));
-    let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players });
+    let s = run({ type: "move", id: "o3", x: 9, y: 2, commit: true }, { type: "load", id: "abc", name: "Bunch", notes: "hi", players });
     expect(s.name).toBe("Bunch");
     expect(s.id).toBe("abc");
     expect(s.notes).toBe("hi");
-    expect(s.past).toHaveLength(1);
+    expect(find(s, "o3")?.x).toBe(15);
+    expect(s.past).toHaveLength(0);
+    expect(s.future).toHaveLength(0);
     s = reducer(initialState(), { type: "hydrate", name: "Draft", players });
     expect(s.past).toHaveLength(0);
     expect(s.id).toBeNull();
@@ -339,16 +340,28 @@ describe("play side", () => {
     s = reducer(s, { type: "pick", key: "blitz" });
     expect(find(s, "d1")?.route).toEqual({ type: "blitz" });
   });
-  test("opening a defensive call shows the shadow offense, and undoing back to an offensive play shows the offense", () => {
-    let s = run({ type: "load", id: "d", name: "Cover 2", side: "defense", players: defaults() });
+  test("opening a defensive call shows the shadow offense, and undo stays on that call", () => {
+    let s = run(
+      { type: "select", id: "o3" },
+      { type: "pick", key: "go" },
+      { type: "load", id: "d", name: "Cover 2", side: "defense", players: defaults() },
+    );
     expect(s.side).toBe("defense");
     expect(s.vis).toBe("both");
+    expect(s.past).toHaveLength(0);
     s = reducer(s, { type: "undo" });
-    expect(s.side).toBe("offense");
-    expect(s.vis).toBe("offense");
+    expect(s.side).toBe("defense");
+    expect(s.vis).toBe("both");
+    expect(s.id).toBe("d");
+    s = reducer(s, { type: "select", id: "d1" });
+    s = reducer(s, { type: "pick", key: "blitz" });
+    s = reducer(s, { type: "undo" });
+    expect(s.side).toBe("defense");
+    expect(find(s, "d1")?.route).toBeNull();
     s = reducer(s, { type: "redo" });
     expect(s.side).toBe("defense");
     expect(s.vis).toBe("both");
+    expect(find(s, "d1")?.route).toEqual({ type: "blitz" });
   });
   test("a restored defensive draft shows the shadow offense; a play without a side is offensive", () => {
     expect(run({ type: "hydrate", name: "Blitz", side: "defense", players: defaults() }).vis).toBe("both");

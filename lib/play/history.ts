@@ -13,13 +13,12 @@ export interface Doc {
 }
 
 /**
- * One undo step, pushed before any mutation. An ordinary edit restores only the players
- * and leaves the name, notes and side as they are now, since those are not undoable.
- * A `swap` (Open, New play) restores the whole document, identity included, so undoing
- * it can never leave one play's diagram under another play's id.
+ * One undo step: the players before an edit on this play.
+ * Name, notes, side, and id belong to the play and are never undone.
+ * Opening or starting a play clears the stacks, so a step cannot point at another play.
  */
-export interface Entry extends Doc {
-  swap: boolean;
+export interface Entry {
+  players: readonly Player[];
 }
 
 export interface History {
@@ -29,8 +28,8 @@ export interface History {
 
 export const emptyHistory: History = { past: [], future: [] };
 
-export function push(h: History, doc: Doc, swap = false): History {
-  const past = [...h.past, { id: doc.id, name: doc.name, notes: doc.notes, side: doc.side, players: doc.players, swap }];
+export function push(h: History, doc: Pick<Doc, "players">): History {
+  const past = [...h.past, { players: doc.players }];
   return { past: past.length > HISTORY_CAP ? past.slice(-HISTORY_CAP) : past, future: [] };
 }
 
@@ -40,14 +39,12 @@ export interface HistoryStep {
 }
 
 function apply(entry: Entry, current: Doc): Doc {
-  return entry.swap
-    ? { id: entry.id, name: entry.name, notes: entry.notes, side: entry.side, players: entry.players }
-    : { id: current.id, name: current.name, notes: current.notes, side: current.side, players: entry.players };
+  return { id: current.id, name: current.name, notes: current.notes, side: current.side, players: entry.players };
 }
 
-/** What the reverse step must restore: the same kind of entry, taken from the current document. */
-function inverse(entry: Entry, current: Doc): Entry {
-  return { id: current.id, name: current.name, notes: current.notes, side: current.side, players: current.players, swap: entry.swap };
+/** What the reverse step must restore: the players on the document as it is now. */
+function inverse(current: Doc): Entry {
+  return { players: current.players };
 }
 
 export function undo(h: History, current: Doc): HistoryStep | null {
@@ -55,7 +52,7 @@ export function undo(h: History, current: Doc): HistoryStep | null {
   if (!prev) return null;
   return {
     doc: apply(prev, current),
-    history: { past: h.past.slice(0, -1), future: [inverse(prev, current), ...h.future] },
+    history: { past: h.past.slice(0, -1), future: [inverse(current), ...h.future] },
   };
 }
 
@@ -64,6 +61,6 @@ export function redo(h: History, current: Doc): HistoryStep | null {
   if (!next) return null;
   return {
     doc: apply(next, current),
-    history: { past: [...h.past, inverse(next, current)], future: h.future.slice(1) },
+    history: { past: [...h.past, inverse(current)], future: h.future.slice(1) },
   };
 }
