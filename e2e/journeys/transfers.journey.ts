@@ -92,6 +92,7 @@ test("short link opens on another device, imports a snapshot, survives reload, a
     await recipient.goto(url);
     await expect(recipient.getByRole("heading", { name: book.name, exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Revoke link", exact: true }).click();
+    await page.getByRole("button", { name: "Tap again to revoke", exact: true }).click();
     await expect(page.getByText("Link revoked. Copies already imported are unaffected.", { exact: true })).toBeVisible();
     await recipient.reload();
     await expect(recipient.getByRole("alert").filter({ hasText: /missing|Paste an Arc/ })).toContainText("missing, expired, or revoked");
@@ -141,6 +142,7 @@ test("gallery copies a short standalone link, reuses it, previews without writes
     expect(await storedPlays(recipient)).toEqual({ [SLANT_LEFT.id]: SLANT_LEFT });
     expect(await storedPlaybooks(recipient)).toEqual({});
     await page.getByRole("button", { name: "Revoke link", exact: true }).click();
+    await page.getByRole("button", { name: "Tap again to revoke", exact: true }).click();
     await recipient.goto(url);
     await expect(recipient.getByRole("alert").filter({ hasText: "missing, expired, or revoked" })).toBeVisible();
   } finally { await other.close(); }
