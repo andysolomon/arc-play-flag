@@ -3,6 +3,7 @@ import { redisRest } from "@/e2e/support/redis-rest";
 import { POST } from "@/app/api/shares/route";
 import { GET, DELETE } from "@/app/api/shares/[token]/route";
 import { encodePlaybookFile, MAX_FILE_BYTES } from "@/lib/export/playbook-file";
+import { encodePlayFile } from "@/lib/export/transfer";
 import { defaults } from "@/lib/play/routes";
 import { boundedBody } from "./http";
 import { SHARE_TTL_SECONDS } from "./links";
@@ -56,6 +57,16 @@ describe.skipIf(!url)("share API with real Redis", () => {
     expect((await get(created.token)).status).toBe(404);
     const sizes: unknown = await bridge.redis.send("HLEN", ["ffpd:shares:sizes"]);
     expect(sizes).toBe(0);
+  });
+  test("standalone play snapshots preserve notes and support revocation", async () => {
+    const response = await post(encodePlayFile(play));
+    expect(response.status).toBe(201);
+    const created = await response.json() as { token: string; revokeKey: string };
+    expect(await (await get(created.token)).json()).toEqual(JSON.parse(encodePlayFile(play)));
+    expect((await remove(created.token, created.revokeKey)).status).toBe(204);
+    expect((await get(created.token)).status).toBe(404);
+    const damaged = { ...play, side: "invalid" };
+    expect((await post(JSON.stringify({ kind: "ffpd.play", version: 1, play: damaged }))).status).toBe(400);
   });
   test("refuses malformed, normalized, unrelated and future payloads before storing", async () => {
     expect((await post("{bad")).status).toBe(400);

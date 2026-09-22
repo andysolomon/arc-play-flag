@@ -23,7 +23,7 @@ export function StorageNote() {
     <details className="text-caption leading-note text-ink-muted">
       <summary className="cursor-pointer">Where your plays live</summary>
       <ul className="mb-0 mt-1 flex flex-col gap-1 pl-4">
-        <li>Plays, playbooks, your team name and the play you&apos;re drawing are saved in this browser only, on this device. Creating a playbook share link uploads that snapshot for anyone with the link to view or import. Links expire after 90 days and can be revoked from the creating browser.</li>
+        <li>Plays, playbooks, your team name and the play you&apos;re drawing are saved in this browser only, on this device. Creating a play or playbook share link uploads that snapshot for anyone with the link to view or import. Links expire after 90 days and can be revoked from the creating browser.</li>
         <li>A share link carries the whole play inside the address, so anyone who has the link can open it.</li>
         <li>Clearing this site&apos;s data, or closing a private window, removes your plays. Keep a copy: export a playbook file from Playbooks.</li>
         <li>When something breaks, a short note about the error (never your plays or notes) is kept in this browser for “Report a problem”.</li>
