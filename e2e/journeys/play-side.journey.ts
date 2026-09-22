@@ -67,10 +67,14 @@ test("a defensive call can hide or show the shadow offense, and never offers bot
   await expect(d.field.getByRole("button")).toHaveCount(10);
 
   await d.closeSidebars();
-  await d.player("X").click();
-  await expect(d.player("X")).toHaveAttribute("aria-pressed", "false");
+  await d.select("X");
+  await expect(d.player("X")).toHaveCSS("opacity", "0.4");
+  await expect(d.page.getByRole("heading", { name: "Pick a route" })).toBeVisible();
+  await d.pick("Slant");
+  await expect(d.routes).toHaveCount(1);
   await d.select("d1", "Defense");
   await expect(d.player("d1", "Defense")).toHaveAttribute("aria-pressed", "true");
+  await expect(d.page.getByRole("heading", { name: "Pick a coverage" })).toBeVisible();
 });
 
 test("the playbook gallery labels each play's side and filters defensive calls by it", async ({ page }) => {
@@ -111,7 +115,7 @@ test("the shadow offense is faded context, and hiding it leaves only the defense
   await expect(defense).toHaveCSS("opacity", "1");
 });
 
-test("an offensive play can show a faded shadow defense, and that defense cannot be selected", async ({ page }) => {
+test("an offensive play can give a faded defender a coverage", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
   await d.tools();
@@ -127,14 +131,20 @@ test("an offensive play can show a faded shadow defense, and that defense cannot
   await expect(d.field.getByRole("button")).toHaveCount(10);
 
   await d.closeSidebars();
-  await defense.click();
-  await expect(defense).toHaveAttribute("aria-pressed", "false");
+  await d.select("d1", "Defense");
+  await expect(defense).toHaveCSS("opacity", "0.4");
+  await expect(d.page.getByRole("heading", { name: "Pick a coverage" })).toBeVisible();
+  await d.pick("Zone deep");
+  await expect(d.page.getByRole("button", { name: "Zone deep", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(d.routes).toHaveCount(1);
   await d.select("X");
   await expect(d.player("X")).toHaveAttribute("aria-pressed", "true");
+  await expect(d.page.getByRole("heading", { name: "Pick a route" })).toBeVisible();
 
   await d.tools();
   await shadowTile(d, "defense").click();
   await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
   await expect(defense).toHaveCount(0);
   await expect(d.field.getByRole("button")).toHaveCount(5);
+  await expect(d.page.getByRole("heading", { name: "Pick a coverage" })).toHaveCount(0);
 });
