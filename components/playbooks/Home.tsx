@@ -65,6 +65,8 @@ export function Home({ say }: { say: Say }) {
 
   return (
     <>
+      <ImportLink />
+      <span className={divider} />
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-baseline gap-2">
           <span className={eyebrow}>PLAYBOOKS</span>
@@ -77,7 +79,6 @@ export function Home({ say }: { say: Say }) {
         <button type="button" onClick={() => bookFileRef.current?.click()} className={`${pill} min-h-11 px-3 text-small`}>Import playbook…</button>
         <input ref={bookFileRef} type="file" accept="application/json,.json" onChange={(e) => { void onFile(e, "ffpd.playbook"); }} className="hidden" aria-label="Import a playbook file" />
       </div>
-      <ImportLink />
       {importPreview?.file.kind === "ffpd.playbook" && preview}
       {books.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base leading-body text-ink-muted">
