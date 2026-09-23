@@ -45,7 +45,7 @@ type Props = { book: Playbook; plays: readonly SavedPlay[]; team: TeamSettings }
 export function ShareBook(props: Props) { return <SharePanel {...props} />; }
 export function ShareBookButton(props: Props) {
   const [open, setOpen] = useState(false);
-  return <><button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => { setOpen(true); }}>Share playbook…</button>
+  return <><button type="button" className={`${pill} min-h-11 px-3 text-small`} aria-label={`Share ${props.book.name}`} onClick={() => { setOpen(true); }}>Share</button>
     {open && <PreviewModal title="Share entire playbook" onClose={() => { setOpen(false); }}><SharePanel {...props} initialPreview inModal /></PreviewModal>}</>;
 }
 /** What a play card needs to offer "Manage share links" from its own menu. */

@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { MAX_FILE_BYTES, importMessage } from "@/lib/export/playbook-file";
 import { readTransfer, type TransferRead } from "@/lib/export/transfer";
 import { ImportPreview } from "./ImportPreview";
-import { ShareBookButton } from "./ShareBook";
 import { ImportLink } from "./ImportLink";
 import { TypeFilter } from "./TypeFilter";
 import { PlayCard } from "./PlayCard";
+import { BookCard } from "./BookCard";
 import { SettingsButton } from "./Settings";
 import {
   createPlaybook, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
@@ -17,7 +16,7 @@ import {
 } from "@/lib/play/library";
 import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { failureMessage } from "@/lib/play/storage";
-import { card, divider, eyebrow, input, pill } from "../ui";
+import { divider, eyebrow, input, pill, pillDark } from "../ui";
 import type { Say } from "./PlaybooksScreen";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
@@ -54,12 +53,16 @@ export function Home({ say }: { say: Say }) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={eyebrow}>PLAYBOOKS</span>
-        <span className="flex-1" />
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+          <span className={eyebrow}>PLAYBOOKS</span>
+          {books.length > 0 && <span className="text-caption text-ink-muted">{plural(books.length, "playbook")}</span>}
+        </div>
         <SettingsButton />
-        <button type="button" onClick={onNew} className={`${pill} px-3 py-1 text-small`}>+ New playbook</button>
-        <button type="button" onClick={() => fileRef.current?.click()} className={`${pill} px-3 py-1 text-small`}>Import play / playbook…</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onNew} className={`${pillDark} min-h-11 px-4 text-small`}>+ New playbook</button>
+        <button type="button" onClick={() => fileRef.current?.click()} className={`${pill} min-h-11 px-3 text-small`}>Import play / playbook…</button>
         <input ref={fileRef} type="file" accept="application/json,.json" onChange={(e) => { void onFile(e); }} className="hidden" aria-label="Import a play or playbook file" />
       </div>
       <ImportLink />
@@ -73,15 +76,8 @@ export function Home({ say }: { say: Say }) {
           <span>Make one, add your saved plays, then print wristbands or a binder.</span>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-          {books.map((b) => (
-            <div key={b.id} className={`${card} flex flex-col gap-2`}><Link href={`/playbooks?book=${b.id}`} className={`flex flex-col gap-1 !text-ink no-underline transition-transform duration-[120ms] hover:-translate-y-0.5 motion-reduce:transition-none`}>
-              <span className="truncate text-title">{b.name}</span>
-              <span className="text-caption text-ink-muted">{plural(b.plays.length, "play")}</span>
-            </Link>
-            <ShareBookButton book={b} plays={plays} team={team} />
-            </div>
-          ))}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(230px,100%),1fr))] gap-3">
+          {books.map((b) => <BookCard key={b.id} book={b} plays={plays} team={team} say={say} />)}
         </div>
       )}
 
