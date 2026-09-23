@@ -54,7 +54,7 @@ test("short link opens on another device, imports a snapshot, survives reload, a
   const book = playbook("share-book", "Otter Shared Calls", [WHEEL_RIGHT, SLANT_LEFT, COVER_TWO]);
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [book] });
   await page.goto("/playbooks");
-  await page.getByRole("button", { name: "Share playbook…", exact: true }).click();
+  await page.getByRole("button", { name: "Share Otter Shared Calls", exact: true }).click();
   await page.getByRole("button", { name: "Create link", exact: true }).click();
   const field = page.getByRole("textbox", { name: "Share URL", exact: true });
   await expect(field).toHaveValue(/\/s\/[A-Za-z0-9_-]{16}$/);
