@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { encodePlayFile } from "@/lib/export/transfer";
 import { PreviewModal } from "./PreviewModal";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 import { TOKEN_PATTERN } from "@/lib/sharing/links";
-import { card, input, pill } from "../ui";
+import { card, eyebrow, input, pill, pillDark } from "../ui";
 import { TwoStep } from "./TwoStep";
 
 type Share = { token: string; revokeKey: string; expiresAt: string; snapshotJson?: string };
@@ -31,6 +31,11 @@ function parse(raw: string): Record<string, Share[]> {
     }));
   } catch { return {}; }
 }
+/** How many live share links this device holds for a play or playbook id. */
+export function useShareCount(id: string): number {
+  const raw = useSyncExternalStore(subscribe, snapshot, () => "{}");
+  return (parse(raw)[id] ?? []).length;
+}
 async function failure(response: Response): Promise<never> {
   const data = await response.json() as { error?: string };
   throw new Error(data.error ?? "Sharing failed. Try again.");
@@ -46,19 +51,18 @@ export function ShareBookButton(props: Props) {
 /** What a play card needs to offer "Manage share links" from its own menu. */
 export type ShareControls = { links: number; manage: () => void };
 /**
- * The play card's one primary action. Quick results ("Link copied") go to the page toast via `say`
- * so the card never changes height; `children` renders beside the button with the share controls.
+ * The play card's Share button: it reads "Copied ✓" for a moment after a successful copy, so the
+ * card never changes height. `children` renders beside it with the share controls.
  */
-export function SharePlayButton({ play, say, children }: { play: SavedPlay; say?: (text: string) => void; children?: (share: ShareControls) => ReactNode }) {
-  return <SharePanel play={play} say={say} menu={children} />;
+export function SharePlayButton({ play, children }: { play: SavedPlay; children?: (share: ShareControls) => ReactNode }) {
+  return <SharePanel play={play} menu={children} />;
 }
-/** "Dec 21", or "Dec 21, 2027" when it isn't this year. */
+/** "Dec 21, 2026" */
 function expiry(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }) });
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
-function SharePanel({ book, plays = [], team, play, say, menu, initialPreview = false, inModal = !!play }: Partial<Props> & {
-  play?: SavedPlay; say?: (text: string) => void; menu?: (share: ShareControls) => ReactNode; initialPreview?: boolean;
+function SharePanel({ book, plays = [], team, play, menu, initialPreview = false, inModal = !!play }: Partial<Props> & {
+  play?: SavedPlay; menu?: (share: ShareControls) => ReactNode; initialPreview?: boolean;
   /** a modal already titles it and frames it, so drop the card and heading */
   inModal?: boolean;
 }) {
@@ -73,6 +77,12 @@ function SharePanel({ book, plays = [], team, play, say, menu, initialPreview = 
   const [message, setMessage] = useState("");
   const [latest, setLatest] = useState<Share | null>(null);
   const [includeTeam, setIncludeTeam] = useState(false);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => { setCopied(false); }, 2000);
+    return () => { window.clearTimeout(t); };
+  }, [copied]);
   const json = play ? encodePlayFile(play) : book ? encodePlaybookFile(book, plays, includeTeam && team ? team : null) : "";
   const save = (next: Share[]) => {
     const all = parse(snapshot());
@@ -84,7 +94,7 @@ function SharePanel({ book, plays = [], team, play, say, menu, initialPreview = 
     try {
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(`${window.location.origin}/s/${share.token}`);
-      if (say && !open) say("Link copied"); else setMessage("Link copied");
+      if (play && !open) setCopied(true); else setMessage("Link copied");
     } catch { setOpen(true); setMessage("Select the URL below and copy it, or use Copy link."); }
   };
   const create = async () => {
@@ -120,7 +130,7 @@ function SharePanel({ book, plays = [], team, play, say, menu, initialPreview = 
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const panel = <section className={inModal ? "flex flex-col gap-3" : `${card} flex flex-col gap-3`} aria-label={`Share ${kind}`}>
     {!inModal && <h2 className="text-title">Share {kind}: {name}</h2>}
-    <p className="text-caption leading-note text-ink-muted">Anyone with a link can view and import a snapshot of this {kind}. Links expire after 90 days; later edits aren&apos;t included.</p>
+    <p className="max-w-[46ch] text-base leading-body text-ink-muted">Anyone with this link can view and import a snapshot with both teams and notes. Your later edits stay on this device.</p>
     {!inModal && <button type="button" className={`${pill} min-h-11 self-start px-3`} disabled={busy} onClick={() => { setPreview(p => !p); }}>Share playbook…</button>}
     {preview && book && team && <div className="flex flex-col gap-2">
       <p><strong>{book.name}</strong> · {book.plays.length} plays, including both teams&apos; routes and coaching notes.</p>
@@ -129,37 +139,35 @@ function SharePanel({ book, plays = [], team, play, say, menu, initialPreview = 
         return <div key={id} className="py-2"><strong>{play?.name ?? "Missing play"}</strong><p className="whitespace-pre-wrap break-words">{play?.notes}</p></div>;
       })}</details>
       <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={includeTeam} onChange={e => { setIncludeTeam(e.target.checked); }} />Include team name and colour: {team.name || "No team name"}</label>
-      <p className="text-caption leading-note text-ink-muted">Revoke controls are saved in this browser; clearing site data loses them. Imported copies can&apos;t be revoked.</p>
-      <button type="button" disabled={busy || book.plays.some(id => !plays.some(p => p.id === id))} className={`${pill} min-h-11 self-start px-3`} onClick={() => { void create(); }}>{busy ? "Creating link…" : "Create link"}</button>
+      <p className="text-caption leading-note text-ink-muted">Links expire after 90 days. Revoke controls are saved in this browser; clearing site data loses them. Imported copies can&apos;t be revoked.</p>
+      <button type="button" disabled={busy || book.plays.some(id => !plays.some(p => p.id === id))} className={`${pillDark} min-h-11 self-start px-4`} onClick={() => { void create(); }}>{busy ? "Creating link…" : "Create link"}</button>
     </div>}
     {message && <p role="status" className="text-small">{message}</p>}
-    {visible.length > 0 && <ul className="flex flex-col">
-      {visible.map(share => <li key={share.token} className="flex flex-col gap-1.5 border-t-2 border-divider py-3 last:pb-0">
-        <div className="flex items-center gap-2">
-          <input className={`${input} min-w-0 flex-1 text-small`} aria-label="Share URL" readOnly value={url(share)} onFocus={e => { e.target.select(); }} />
-          <button className={`${pill} min-h-11 px-3 text-small`} type="button" onClick={() => {
-            if (!navigator.clipboard) { setMessage("Select the URL and copy it."); return; }
-            void navigator.clipboard.writeText(url(share)).then(() => { setMessage("Link copied"); }).catch(() => { setMessage("Select the URL and copy it."); });
-          }}>Copy link</button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-caption text-ink-muted">
-          <span>Expires {expiry(share.expiresAt)}</span>
-          <span className="flex-1" />
-          {canShare && <button className={`${pill} min-h-11 px-3 text-small text-ink`} type="button" onClick={() => {
-            void navigator.share({ title: name, url: url(share) }).catch(() => { /* the person closed the share sheet */ });
-          }}>Share link</button>}
-          <TwoStep label="Revoke link" confirm="Tap again to revoke" onConfirm={() => { void revoke(share); }} base={`${pill} min-h-11 px-3 text-small text-ink`} />
-        </div>
-      </li>)}
-    </ul>}
+    {visible.map((share, i) => <div key={share.token} className="flex flex-col gap-2">
+      <span className={`${eyebrow} mt-1`}>{visible.length > 1 ? `SHARE LINK ${String(i + 1)}` : "SHARE LINK"}</span>
+      <input className={`${input} min-w-0`} aria-label="Share URL" readOnly value={url(share)} onFocus={e => { e.target.select(); }} />
+      <span className="text-caption text-ink-muted">Expires {expiry(share.expiresAt)}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className={`${pillDark} min-h-11 px-4 text-small`} type="button" onClick={() => {
+          if (!navigator.clipboard) { setMessage("Select the URL and copy it."); return; }
+          void navigator.clipboard.writeText(url(share)).then(() => { setMessage("Link copied"); }).catch(() => { setMessage("Select the URL and copy it."); });
+        }}>Copy link</button>
+        {canShare && <button className={`${pill} min-h-11 px-3 text-small`} type="button" onClick={() => {
+          void navigator.share({ title: name, url: url(share) }).catch(() => { /* the person closed the share sheet */ });
+        }}>Send to…</button>}
+        <span className="flex-1" />
+        <TwoStep label="Revoke link" confirm="Tap again to revoke" onConfirm={() => { void revoke(share); }} base={`${pill} min-h-11 px-3 text-small text-offense data-[active=true]:text-ink`} />
+      </div>
+    </div>)}
   </section>;
   if (!play) return panel;
   const manage = () => { setOpen(true); };
   return <>
-    <div className="flex items-center gap-1.5">
-      <button type="button" disabled={busy} className={`${pill} min-h-11 flex-1 px-3 text-small`} onClick={() => { void create(); }}>{busy ? "Creating link…" : "Copy share link"}</button>
-      {menu?.({ links: visible.length, manage })}
-    </div>
-    {open && <PreviewModal title={`Share links · ${name}`} onClose={() => { setOpen(false); setMessage(""); }}>{panel}</PreviewModal>}
+    <button type="button" disabled={busy} data-copied={copied} className={`${pill} min-h-11 flex-1 px-3 text-small data-[copied=true]:bg-yellow-soft`} onClick={() => { void create(); }}>
+      {busy ? "Creating…" : copied ? "Copied ✓" : "Share"}
+    </button>
+    <span role="status" className="sr-only">{copied ? "Link copied" : ""}</span>
+    {menu?.({ links: visible.length, manage })}
+    {open && <PreviewModal title={`Share “${name}”`} onClose={() => { setOpen(false); setMessage(""); }}>{panel}</PreviewModal>}
   </>;
 }

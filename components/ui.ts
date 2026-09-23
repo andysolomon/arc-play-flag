@@ -18,3 +18,9 @@ export const input =
   "min-h-11 w-full rounded-pill border-2 border-ink bg-white px-3.5 py-1.5 text-input text-ink placeholder:text-ink-muted";
 export const select = "min-h-11 cursor-pointer rounded-pill border-2 border-ink bg-white px-3 py-1.5 text-base";
 export const card = "rounded-tile border-2 border-ink bg-white p-3 shadow-tile";
+/** The one filled pill on a card: the action a coach most often wants. */
+export const pillDark =
+  "cursor-pointer whitespace-nowrap rounded-pill border-2 border-ink bg-ink text-cream leading-pill hover:bg-ink-2 " +
+  "disabled:cursor-default disabled:bg-ink-faint";
+/** Small yellow sticker for a state word, e.g. "Shared". */
+export const chip = "inline-flex items-center rounded-pill border-2 border-ink bg-yellow-soft px-2 py-px text-caption leading-tight text-ink";

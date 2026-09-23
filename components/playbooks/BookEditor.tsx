@@ -12,6 +12,7 @@ import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { failureMessage } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
+import { TypeFilter } from "./TypeFilter";
 import { card, divider, eyebrow, input, pill, pillSm } from "../ui";
 import { ShareBook } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
@@ -118,11 +119,9 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
           {plays.length === 0 ? "Save a play in the designer first." : "Every saved play is already in this playbook."}
         </span>
       ) : (<>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
-          <input value={query} onChange={(e) => { setQuery(e.target.value); }} placeholder="Search names and notes" aria-label="Search plays to add" className={input} />
-          <select value={filter} onChange={(e) => { setFilter(e.target.value as PlayFilter); }} aria-label="Filter plays to add" className={input}>
-            <option value="all">All types</option><option value="run">Run</option><option value="pass">Pass</option><option value="defense">Defense</option>
-          </select>
+        <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
+          <input value={query} onChange={(e) => { setQuery(e.target.value); }} placeholder="Search names and notes" aria-label="Search plays to add" className={`${input} col-span-2 sm:col-span-1`} />
+          <TypeFilter value={filter} onChange={setFilter} label="Filter plays to add" />
           <select value={sort} onChange={(e) => { setSort(e.target.value as PlaySort); }} aria-label="Sort plays to add" className={input}>
             <option value="recent">Recent</option><option value="name">Name</option>
           </select>

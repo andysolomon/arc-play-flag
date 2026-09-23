@@ -15,9 +15,9 @@ export function PreviewModal({ title, onClose, children }: { title: string; onCl
   }, []);
   return <dialog ref={dialog} aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }}
     className="m-auto max-h-[calc(100dvh-24px)] w-[calc(100%-24px)] max-w-[760px] overflow-y-auto rounded-tile border-2 border-ink bg-cream p-4 text-ink shadow-tile backdrop:bg-ink/35">
-    <div className="mb-3 flex items-center gap-3">
+    <div className="mb-3 flex items-start gap-3">
       <h2 id={titleId} className="text-header font-normal">{title}</h2>
-      <button type="button" className={`${pill} ml-auto min-h-11 px-3`} onClick={onClose} aria-label="Close preview">Close</button>
+      <button type="button" className={`${pill} ml-auto flex h-11 w-11 flex-none items-center justify-center text-header`} onClick={onClose} aria-label="Close preview">×</button>
     </div>
     {children}
   </dialog>;
