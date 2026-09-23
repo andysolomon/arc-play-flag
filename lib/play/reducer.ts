@@ -34,7 +34,7 @@ export type Action =
   | { type: "resetFormation"; team: Team | null }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
+  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[]; shadow?: boolean }
   /** a fresh, unsaved play on the default formation. History from the play you left is dropped. */
   | { type: "newPlay"; side: Team }
   | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
@@ -90,8 +90,8 @@ function visFor(side: Team, prev?: Pick<PlayState, "side" | "vis">): Vis {
 }
 
 /**
- * The opposite team is only context on the field: faded like the shadow offense,
- * and left off playbook drawings.
+ * The opposite team is faded on the field and left off playbook drawings.
+ * A coach can still select one and give them a route or coverage.
  */
 export function isContext(p: Player, side: Team): boolean {
   return p.team !== side;
@@ -153,15 +153,15 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "select": {
       if (a.id === null) return { ...s, selectedId: null, targeting: false, draft: null };
       const picked = s.players.find((p) => p.id === a.id);
-      // a play is one side of the ball: the other team is never the selected player
-      if (!picked || picked.team !== s.side) return s;
+      // either team can be selected, including the faded shadow, so they can take an assignment
+      if (!picked) return s;
       return { ...s, selectedId: a.id, targeting: false, draft: null };
     }
     case "cancelTargeting":
       return { ...s, targeting: false };
     case "pick": {
       const p = selected(s);
-      if (!p || p.team !== s.side) return s;
+      if (!p) return s;
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
       if (a.key === "man") return { ...s, targeting: true, draft: null };
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: false };
@@ -280,8 +280,11 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return step(s, redoStep(s, s));
     case "newPlay":
       return openPlay(s, { id: null, name: "New play", notes: "", side: a.side, players: defaults() });
-    case "load":
-      return openPlay(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+    case "load": {
+      const next = openPlay(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+      // A shared snapshot opens with the other team faded, whichever side this play is.
+      return a.shadow && next.vis !== "both" ? { ...next, vis: "both" } : next;
+    }
     case "hydrate": {
       const doc: Doc = { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players };
       return { ...s, ...doc, ...follow(s, doc) };
@@ -294,7 +297,11 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return { ...s, id: a.id };
     case "setShadow": {
       const vis = a.on ? "both" as const : s.side;
-      return vis === s.vis ? s : { ...s, vis };
+      if (vis === s.vis) return s;
+      const picked = selected(s);
+      // hiding the shadow takes that player off the field, so stop editing them
+      if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: false, draft: null };
+      return { ...s, vis };
     }
   }
 }

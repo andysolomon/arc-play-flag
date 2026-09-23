@@ -33,8 +33,21 @@ First time only: `bunx playwright install chromium`.
 | ▶ runs and comes back with nothing moved (browser smoke) | `playback` |
 | Offense/Defense toggle marks the play, follows it through save, reload and reopen; gallery badge and filter | `play-side` |
 | A release that lands while the app is open is offered as **Update ready**; **Update now** reloads onto it, the reloaded page takes over its own worker quietly, plays survive | `update` |
+| First visit: the draw-and-run hint, the editable example that never replaces a draft, Demo from the collapsed layout | `first-use` |
+| A device backup waits for merge or replace; an invalid one changes nothing | `backup` |
+| A 100-play library searches, filters and sorts; a playbook fits 320px; open from an entry, add from the designer | `library-discovery` |
+| Offline: the shells, exact shared plays and demo media are ready before it says so, imports and exports work offline, a first install says **Offline updating…** until the whole shell is verified, a broken release never takes over, and a sound one keeps the shared play | `offline` |
 
-Offline navigation and update coverage is added with #28. Live ▶ playback throws to the primary read 80% of the time and exported clips always complete to it: primary-read odds and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip timing is covered by `lib/export/video.test.ts`.
+Live ▶ playback throws to the primary read 80% of the time and exported clips always complete to it: primary-read odds and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip timing is covered by `lib/export/video.test.ts`.
+
+## Devices
+
+Every journey runs under four Playwright projects: `chromium` (desktop), `pixel-7` and `iphone-15` (phones) and `ipad-gen-7` (tablet). The phone and tablet projects are Chromium emulating the device's viewport, touch, pixel ratio and user agent, so the overlay drawers, 44px targets and the 393px, 412px and 810px layouts are exercised on every pull request (the 320px check lives in `library-discovery`, which sets its own viewport). Two things that leaves out, and that no automated check here claims:
+
+- **WebKit.** iPhone and iPad run Safari; these projects run Chromium with an iOS viewport. Safari-only rendering or input differences are not caught.
+- **Real hardware.** Emulation does not cover real touch latency, memory pressure, iOS Safari's viewport quirks, or a printer.
+
+The `Designer` helper folds a floating drawer before tapping the field (`foldOverlays`), since on a phone or tablet an open drawer covers the players. A journey that reads a palette control after an action that folds the palette on compact layouts (picking a route, marking the primary read) opens the palette again first.
 
 ## In CI
 

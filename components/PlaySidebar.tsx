@@ -105,12 +105,12 @@ function PlaySidebarImpl({
             <IconTile
               icon="offOnly"
               label="Shadow offense"
-              title="Show the offensive formation faded, as a reference"
+              title="Show the offense faded. Tap a player to give them a route."
               active={vis === "both"}
               onClick={() => { onShadow(vis !== "both"); }}
             />
           </div>
-          <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the offense. Tap again to hide it.</span>
+          <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the offense. Tap a player to give them a route.</span>
         </>
       ) : (
         <>
@@ -118,12 +118,12 @@ function PlaySidebarImpl({
             <IconTile
               icon="defOnly"
               label="Shadow defense"
-              title="Show the defensive formation faded, as a reference"
+              title="Show the defense faded. Tap a player to give them a coverage."
               active={vis === "both"}
               onClick={() => { onShadow(vis !== "both"); }}
             />
           </div>
-          <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the defense. Tap again to hide it.</span>
+          <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the defense. Tap a player to give them a coverage.</span>
         </>
       )}
       <span className={divider} />

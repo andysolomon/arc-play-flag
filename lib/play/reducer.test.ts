@@ -332,13 +332,21 @@ describe("play side", () => {
     expect(s.selectedId).toBeNull();
     expect(s.name).toBe("New play");
   });
-  test("only this play's team can be selected, and the shadow offense cannot pick a route", () => {
-    let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "o3" });
-    expect(s.selectedId).toBeNull();
+  test("a shadow player can be selected and given their own assignment", () => {
+    let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "o3" }, { type: "pick", key: "slant" });
+    expect(s.selectedId).toBe("o3");
+    expect(find(s, "o3")?.route).toEqual({ type: "slant" });
+    const shadow = find(s, "o3");
+    expect(shadow && isContext(shadow, s.side)).toBe(true);
     s = reducer(s, { type: "select", id: "d1" });
     expect(s.selectedId).toBe("d1");
     s = reducer(s, { type: "pick", key: "blitz" });
     expect(find(s, "d1")?.route).toEqual({ type: "blitz" });
+    s = reducer(s, { type: "select", id: "o3" });
+    s = reducer(s, { type: "setShadow", on: false });
+    expect(s.vis).toBe("defense");
+    expect(s.selectedId).toBeNull();
+    expect(find(s, "o3")?.route).toEqual({ type: "slant" });
   });
   test("opening a defensive call shows the shadow offense, and undo stays on that call", () => {
     let s = run(
@@ -377,13 +385,35 @@ describe("play side", () => {
     expect(reducer(s, { type: "setShadow", on: true })).toBe(s);
     expect(run({ type: "setShadow", on: false }).vis).toBe("offense");
   });
+  test("opening a shared play shows the shadow, on either side", () => {
+    const offense = run({ type: "load", name: "Trips", side: "offense", players: defaults(), shadow: true });
+    expect(offense.vis).toBe("both");
+    expect(shadowing(offense.side, offense.vis)).toBe(true);
+    expect(offense.past).toHaveLength(0);
+    expect(offense.future).toHaveLength(0);
+    const defense = run(
+      { type: "newPlay", side: "defense" },
+      { type: "setShadow", on: false },
+      { type: "load", name: "Cover 2", side: "defense", players: defaults(), shadow: true },
+    );
+    expect(defense.side).toBe("defense");
+    expect(defense.vis).toBe("both");
+    expect(shadowing(defense.side, defense.vis)).toBe(true);
+  });
   test("an offensive play can show a shadow defense, and that choice sticks to the next offensive play", () => {
     let s = run({ type: "setShadow", on: true });
     expect(s.side).toBe("offense");
     expect(s.vis).toBe("both");
     expect(shadowing(s.side, s.vis)).toBe(true);
     s = reducer(s, { type: "select", id: "d1" });
-    expect(s.selectedId).toBeNull();
+    expect(s.selectedId).toBe("d1");
+    s = reducer(s, { type: "pick", key: "zoneDeep" });
+    expect(find(s, "d1")?.route).toEqual({ type: "zoneDeep" });
+    s = reducer(s, { type: "select", id: "d2" });
+    s = reducer(s, { type: "pick", key: "man" });
+    expect(s.targeting).toBe(true);
+    s = reducer(s, { type: "target", id: "o3" });
+    expect(find(s, "d2")?.route).toEqual({ type: "man", target: "o3" });
     s = reducer(s, { type: "select", id: "o3" });
     expect(s.selectedId).toBe("o3");
     s = reducer(s, { type: "load", id: "o2", name: "Slant", side: "offense", players: defaults() });

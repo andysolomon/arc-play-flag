@@ -1,0 +1,12 @@
+{
+  "name": "Flag Football Play Designer",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "bun run dev"
+    }
+  ],
+  "ports": [3000]
+}

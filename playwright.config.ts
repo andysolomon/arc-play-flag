@@ -36,7 +36,15 @@ export default defineConfig({
     reducedMotion: "reduce",
     ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } } : {}),
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // Phones and tablets as Chromium emulates them: viewport, touch, pixel ratio and user
+    // agent, so the overlay drawers and 44px targets are exercised on every pull request.
+    // Real hardware and WebKit are outside this suite; e2e/README.md says what that leaves out.
+    { name: "pixel-7", use: { ...devices["Pixel 7"] } },
+    { name: "iphone-15", use: { ...devices["iPhone 15"], browserName: "chromium" } },
+    { name: "ipad-gen-7", use: { ...devices["iPad (gen 7)"], browserName: "chromium" } },
+  ],
   webServer: [
     ...(process.env.SHARING_TEST_REDIS_URL ? [{ command: "bun e2e/support/redis-rest.ts", url: "http://127.0.0.1:3134", reuseExistingServer: !CI }] : []),
     {

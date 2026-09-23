@@ -5,10 +5,11 @@ import { binderPages } from "./binder";
 import { cardSvg } from "./card";
 import { FLYER_SLOTS, flyerDefault, flyerPage } from "./flyer";
 import { numbered, playShow, positionsOf } from "./numbered";
-import { defaultPaper } from "./pages";
+import { PAPERS, defaultPaper, f2, type PaperKey, type SvgPage } from "./pages";
+import { buildPdf } from "./pdf";
 import { postcardPages, postcardSheet } from "./postcard";
 import { MAX_FILE_BYTES, decodePlaybookFile, encodePlaybookFile, importMessage, planImport, readPlaybookFile } from "./playbook-file";
-import { planCards, tile, wristbandPages } from "./wristband";
+import { BAND_PRESETS, planCards, tile, wristbandPages } from "./wristband";
 
 const play = (id: string, name: string, notes = ""): SavedPlay => ({
   id, name, notes, side: "offense",
@@ -214,6 +215,127 @@ describe("export visibility", () => {
     expectVisibility(flyer.svg, "both");
     expectVisibility(bands[0]?.svg ?? "", "both");
     expectVisibility(cards[0]?.svg ?? "", "offense");
+  });
+});
+
+/**
+ * The page markup with every nested `<svg>` (play art, card faces) collapsed to a `<frame>`
+ * carrying its placement, so only shapes in the sheet's own point coordinates remain.
+ */
+const sheetMarkup = (svg: string): string => {
+  let body = svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
+  for (;;) {
+    const next = body.replace(/<svg\b([^>]*)>(?:(?!<svg\b)[\s\S])*?<\/svg>/g, "<frame$1/>");
+    if (next === body) return body;
+    body = next;
+  }
+};
+const attr = (tag: string, name: string, fallback = 0): number => {
+  const m = new RegExp(` ${name}="([-\\d.]+)"`).exec(tag);
+  return m?.[1] ? Number(m[1]) : fallback;
+};
+/** Every box, line and disc drawn on the sheet, as [left, top, right, bottom] in points. */
+const drawnBounds = (svg: string): [number, number, number, number][] => {
+  const body = sheetMarkup(svg);
+  const bounds: [number, number, number, number][] = [];
+  for (const [tag] of body.matchAll(/<(?:rect|frame)\b[^>]*>/g)) {
+    const x = attr(tag, "x"), y = attr(tag, "y");
+    bounds.push([x, y, x + attr(tag, "width"), y + attr(tag, "height")]);
+  }
+  for (const [tag] of body.matchAll(/<line\b[^>]*>/g)) {
+    const xs = [attr(tag, "x1"), attr(tag, "x2")], ys = [attr(tag, "y1"), attr(tag, "y2")];
+    bounds.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+  }
+  for (const [tag] of body.matchAll(/<circle\b[^>]*>/g)) {
+    const cx = attr(tag, "cx"), cy = attr(tag, "cy"), r = attr(tag, "r");
+    bounds.push([cx - r, cy - r, cx + r, cy + r]);
+  }
+  return bounds;
+};
+const expectOnTheSheet = (pg: SvgPage) => {
+  const bounds = drawnBounds(pg.svg);
+  expect(bounds.length).toBeGreaterThan(1);
+  for (const [l, t, r, b] of bounds) {
+    expect(l).toBeGreaterThanOrEqual(-0.01);
+    expect(t).toBeGreaterThanOrEqual(-0.01);
+    expect(r).toBeLessThanOrEqual(pg.w + 0.01);
+    expect(b).toBeLessThanOrEqual(pg.h + 0.01);
+  }
+};
+/** The dashed frames a coach cuts along, as [width, height] in points. */
+const cutFrames = (svg: string): [number, number][] =>
+  [...sheetMarkup(svg).matchAll(/<rect\b[^>]*stroke-dasharray="3 3"[^>]*>/g)].map(([tag]) => [attr(tag, "width"), attr(tag, "height")]);
+
+describe("actual size", () => {
+  const list = numbered(book, library);
+  const opts = { bookName: "Week 1", team };
+  const formats: Record<string, (paper: PaperKey) => SvgPage[]> = {
+    wristbands: (paper) => wristbandPages(list, { ...opts, paper, size: { w: 4.5, h: 2.25, rows: 2, cols: 3 } }),
+    "binder, one play a page": (paper) => binderPages(list, { ...opts, paper, layout: "one" }),
+    "binder, four up": (paper) => binderPages(list, { ...opts, paper, layout: "four" }),
+    "postcards, two up": (paper) => postcardPages(list, { ...opts, paper, size: "twoUp" }),
+    flyer: (paper) => [flyerPage(list.slice(0, 6), { ...opts, paper })],
+  };
+
+  for (const paper of ["letter", "a4"] as const) {
+    const { w, h, label } = PAPERS[paper];
+    for (const [name, render] of Object.entries(formats)) {
+      test(`${name} on ${label} is exactly ${f2(w)} × ${f2(h)} pt with nothing past the edge`, () => {
+        const pages = render(paper);
+        expect(pages.length).toBeGreaterThan(0);
+        for (const pg of pages) {
+          expect([pg.w, pg.h]).toEqual([w, h]);
+          expect(pg.svg.startsWith(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f2(w)} ${f2(h)}" width="${f2(w)}" height="${f2(h)}"`)).toBe(true);
+          expectOnTheSheet(pg);
+        }
+        // the page box the printer sees is the paper, not the pixel size the page was drawn at
+        const pdf = new TextDecoder("latin1").decode(buildPdf(
+          pages.map((pg) => ({ w: pg.w, h: pg.h, image: { width: 1, height: 1, filter: "DCTDecode" as const, data: new Uint8Array(1) } })),
+          name,
+        ));
+        expect([...pdf.matchAll(/\/MediaBox \[0 0 [\d.]+ [\d.]+\]/g)].map(([box]) => box)).toEqual(pages.map(() => `/MediaBox [0 0 ${f2(w)} ${f2(h)}]`));
+      });
+    }
+  }
+
+  test("a 4 by 6 postcard sheet is 4 by 6 inches whichever paper the book prints on", () => {
+    for (const paper of ["letter", "a4"] as const) {
+      for (const pg of postcardPages(list.slice(0, 1), { ...opts, paper, size: "card46" })) {
+        expect([pg.w, pg.h]).toEqual([288, 432]);
+        expectOnTheSheet(pg);
+      }
+    }
+  });
+
+  test("every wristband preset cuts out at its stated inches on both papers", () => {
+    for (const preset of BAND_PRESETS) {
+      for (const paper of ["letter", "a4"] as const) {
+        const pages = wristbandPages(list, { ...opts, paper, size: preset });
+        const { perPage } = tile(paper, preset);
+        const cards = planCards(list, preset.rows * preset.cols).length;
+        expect(pages).toHaveLength(Math.ceil(cards / perPage));
+        const frames = pages.flatMap((pg) => cutFrames(pg.svg));
+        expect(frames).toHaveLength(cards);
+        for (const frame of frames) expect(frame).toEqual([preset.w * 72, preset.h * 72]);
+      }
+    }
+  });
+
+  test("two-up postcards are 4:5 cards inside the printable margin, cut where they are drawn", () => {
+    for (const paper of ["letter", "a4"] as const) {
+      const { w, h, slots } = postcardSheet({ ...opts, paper, size: "twoUp" });
+      expect([w, h]).toEqual([PAPERS[paper].w, PAPERS[paper].h]);
+      expect(slots).toHaveLength(2);
+      for (const s of slots) {
+        expect(s.w / s.h).toBeCloseTo(0.8, 6);
+        expect(s.x).toBeGreaterThanOrEqual(0.4 * 72);
+        expect(s.y).toBeGreaterThanOrEqual(0.4 * 72);
+        expect(s.x + s.w).toBeLessThanOrEqual(w - 0.4 * 72);
+        expect(s.y + s.h).toBeLessThanOrEqual(h - 0.4 * 72);
+      }
+      const front = postcardPages(list.slice(0, 2), { ...opts, paper, size: "twoUp" })[0];
+      expect(cutFrames(front?.svg ?? "")).toEqual(slots.map((s) => [Number(f2(s.w)), Number(f2(s.h))]));
+    }
   });
 });
 

@@ -17,7 +17,7 @@ test("a 100-play library searches notes, filters, sorts, and explains an empty r
 
   await page.getByRole("textbox", { name: "Search saved plays" }).fill("lighthouse");
   await expect(page.getByText("Run 042", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Filter saved plays" }).selectOption("pass");
+  await page.getByRole("radiogroup", { name: "Filter saved plays" }).getByRole("radio", { name: "Pass" }).check();
   await expect(page.getByText("No plays match. Try another search or filter.")).toBeVisible();
   await page.getByRole("textbox", { name: "Search saved plays" }).fill("");
   await page.getByRole("combobox", { name: "Sort saved plays" }).selectOption("name");

@@ -8,21 +8,21 @@ import {
   type BackupFile, type RestoreMode,
 } from "@/lib/export/backup";
 import { MAX_FILE_BYTES, importMessage } from "@/lib/export/playbook-file";
-import { encodePlayFile, readTransfer, type TransferRead } from "@/lib/export/transfer";
+import { readTransfer, type TransferRead } from "@/lib/export/transfer";
 import { ImportPreview } from "./ImportPreview";
+import { ShareBookButton } from "./ShareBook";
 import { ImportLink } from "./ImportLink";
+import { TypeFilter } from "./TypeFilter";
+import { PlayCard } from "./PlayCard";
 import { download } from "@/lib/export/raster";
 import {
-  booksHolding, createPlaybook, deletePlay, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
+  createPlaybook, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
   getServerTeam, getTeam, refresh, setTeam, subscribe,
 } from "@/lib/play/library";
 import type { PlayFilter, PlaySort } from "@/lib/play/library";
-import { StorageError, failureMessage, kebab } from "@/lib/play/storage";
-import { PlayThumb } from "../PlayThumb";
-import { SideBadge } from "../SideBadge";
+import { StorageError, failureMessage } from "@/lib/play/storage";
 import { card, divider, eyebrow, input, pill } from "../ui";
 import type { Say } from "./PlaybooksScreen";
-import { TwoStep } from "./TwoStep";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -109,10 +109,12 @@ export function Home({ say }: { say: Say }) {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
           {books.map((b) => (
-            <Link key={b.id} href={`/playbooks?book=${b.id}`} className={`${card} flex flex-col gap-1 !text-ink no-underline transition-transform duration-[120ms] hover:-translate-y-0.5 motion-reduce:transition-none`}>
+            <div key={b.id} className={`${card} flex flex-col gap-2`}><Link href={`/playbooks?book=${b.id}`} className={`flex flex-col gap-1 !text-ink no-underline transition-transform duration-[120ms] hover:-translate-y-0.5 motion-reduce:transition-none`}>
               <span className="truncate text-title">{b.name}</span>
               <span className="text-caption text-ink-muted">{plural(b.plays.length, "play")}</span>
             </Link>
+            <ShareBookButton book={b} plays={plays} team={team} />
+            </div>
           ))}
         </div>
       )}
@@ -178,15 +180,16 @@ export function Home({ say }: { say: Say }) {
       })()}
 
       <span className={divider} />
-      <span className={eyebrow}>ALL PLAYS</span>
+      <div className="flex items-baseline gap-2">
+        <span className={eyebrow}>ALL PLAYS</span>
+        {plays.length > 0 && <span className="text-caption text-ink-muted">{plural(plays.length, "play")}</span>}
+      </div>
       {plays.length === 0 ? (
         <span className="text-base text-ink-muted">Save a play in the designer and it shows up here.</span>
       ) : (<>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
-          <input value={query} onChange={(e) => { setQuery(e.target.value); }} placeholder="Search names and notes" aria-label="Search saved plays" className={input} />
-          <select value={filter} onChange={(e) => { setFilter(e.target.value as PlayFilter); }} aria-label="Filter saved plays" className={input}>
-            <option value="all">All types</option><option value="run">Run</option><option value="pass">Pass</option><option value="defense">Defense</option>
-          </select>
+        <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
+          <input value={query} onChange={(e) => { setQuery(e.target.value); }} placeholder="Search names and notes" aria-label="Search saved plays" className={`${input} col-span-2 sm:col-span-1`} />
+          <TypeFilter value={filter} onChange={setFilter} label="Filter saved plays" />
           <select value={sort} onChange={(e) => { setSort(e.target.value as PlaySort); }} aria-label="Sort saved plays" className={input}>
             <option value="recent">Recent</option><option value="name">Name</option>
           </select>
@@ -195,28 +198,8 @@ export function Home({ say }: { say: Say }) {
           <div className="rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base text-ink-muted">
             No plays match. Try another search or filter.
           </div>
-        ) : <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-          {visiblePlays.map((p) => {
-            const holding = booksHolding(p.id).length;
-            return (
-              <div key={p.id} className={`${card} flex flex-col gap-2`}>
-                <PlayThumb players={p.players} name={p.name} side={p.side} />
-                <span className="truncate text-base" title={p.name}>{p.name}</span>
-                <SideBadge side={p.side} />
-                <div className="flex flex-wrap gap-1.5">
-                  <Link href={`/?open=${p.id}`} className={`${pill} inline-block px-3 py-1 text-small !text-ink no-underline`}>Open ›</Link>
-                  <button type="button" className={`${pill} min-h-11 px-3 text-small`} onClick={() => {
-                    download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
-                  }}>Export play</button>
-                  <TwoStep
-                    label="Delete"
-                    confirm={holding ? `Delete? It's in ${plural(holding, "playbook")}` : "Delete?"}
-                    onConfirm={() => { const r = deletePlay(p.id); say(r.ok ? `Deleted “${p.name}”` : failureMessage(r.error), r.ok ? undefined : 3200); }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+        ) : <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3">
+          {visiblePlays.map((p) => <PlayCard key={p.id} play={p} say={say} />)}
         </div>}
       </>)}
     </>
