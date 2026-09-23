@@ -9,10 +9,12 @@ interface Props {
   confirm: string;
   onConfirm: () => void;
   className?: string;
+  /** replaces the default pill look, e.g. for a row inside a menu */
+  base?: string;
 }
 
 /** A destructive action that asks by changing its own label: tap once to arm, again within 3 s to do it. */
-export function TwoStep({ label, confirm, onConfirm, className = "" }: Props) {
+export function TwoStep({ label, confirm, onConfirm, className = "", base = `${pill} px-3 py-1 text-small` }: Props) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
@@ -25,7 +27,7 @@ export function TwoStep({ label, confirm, onConfirm, className = "" }: Props) {
       data-active={armed}
       aria-live="polite"
       onClick={() => { if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}
-      className={`${pill} px-3 py-1 text-small data-[active=true]:bg-rose-soft ${className}`}
+      className={`${base} data-[active=true]:bg-rose-soft ${className}`}
     >
       {armed ? confirm : label}
     </button>
