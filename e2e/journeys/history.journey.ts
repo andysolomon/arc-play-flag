@@ -51,6 +51,9 @@ test("saving a play and starting a new one keeps undo and redo inside the new pl
   await d.select("Y");
   await d.pick("Go");
   await expect(d.routes).toHaveCount(1);
+  // the name field lives in Play tools, and a phone or tablet folds that drawer away to
+  // select a player and again once a route is picked, so open it to read the name back
+  await d.tools();
   await expect(d.nameInput).toHaveValue("New play");
   await d.undo.click();
   await expect(d.routes).toHaveCount(0);
