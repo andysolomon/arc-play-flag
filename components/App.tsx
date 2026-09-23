@@ -177,7 +177,7 @@ export function App() {
       if (!d && getPlays().length === 0) firstUseTimer = window.setTimeout(() => { setFirstUse(true); }, 0);
     }
     const params = new URLSearchParams(window.location.search);
-    // "Open in designer" from a share page: /?p=<id> loads the play (undoable) and cleans the URL
+    // "Open in designer" from a share page: /?p=<id> loads the play and cleans the URL
     const shared = params.get("p");
     const rec = shared ? decodeShare(shared) : null;
     if (rec) {
@@ -222,8 +222,6 @@ export function App() {
     const file = encodeRecoveryFile(play);
     download(new Blob([file.json], { type: "application/json" }), file.filename);
   }, [s.id, s.name, s.notes, s.side, s.players]);
-  // opening another play (or a fresh one) over unsaved work is undoable as a whole:
-  // undo brings back the previous play's diagram, name, notes and identity together
   const dirty = unsaved(s, playById(s.id));
   const persistence = saveFailure
     ? "failed"
@@ -251,7 +249,7 @@ export function App() {
   }, [dirty, dismissFirstUse, openRight, say]);
   const onNew = useCallback((side: Team) => {
     dispatch({ type: "newPlay", side });
-    say("New play · undo brings the last one back", 2400);
+    say("New play");
   }, [say]);
   const shareUrl = useCallback(() =>
     `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, players: [...s.players] })}`,

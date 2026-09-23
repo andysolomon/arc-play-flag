@@ -31,26 +31,34 @@ test("editing A, saving, opening B, and checking storage leaves B alone and keep
   expect(lib["fx-slant-left"]?.players.find((p) => p.id === "o3")?.route).toEqual({ type: "slant" });
 });
 
-test("New play clears the field and undo brings the last play back whole", async ({ page }) => {
+test("saving a play and starting a new one keeps undo and redo inside the new play", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
   await d.setName("Otter Scratch");
   await d.select("X");
   await d.pick("Slant");
   await expect(d.routes).toHaveCount(1);
+  await d.save();
+  await expect(d.toast).toHaveText("Saved");
 
   await d.newPlay();
-  await expect(d.toast).toHaveText("New play · undo brings the last one back");
+  await expect(d.toast).toHaveText("New play");
   await expect(d.nameInput).toHaveValue("New play");
   await expect(d.routes).toHaveCount(0);
+  await expect(d.undo).toBeDisabled();
+  await expect(d.redo).toBeDisabled();
 
-  await d.undo.click();
-  await expect(d.nameInput).toHaveValue("Otter Scratch");
+  await d.select("Y");
+  await d.pick("Go");
   await expect(d.routes).toHaveCount(1);
-
-  await d.redo.click();
   await expect(d.nameInput).toHaveValue("New play");
+  await d.undo.click();
   await expect(d.routes).toHaveCount(0);
+  await expect(d.nameInput).toHaveValue("New play");
+  await d.redo.click();
+  await expect(d.routes).toHaveCount(1);
+  await expect(d.nameInput).toHaveValue("New play");
+  await expect(d.redo).toBeDisabled();
 });
 
 test("Duplicate saves a copy, and later edits go to the copy, not the original", async ({ page }) => {

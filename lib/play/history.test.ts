@@ -4,7 +4,7 @@ import { defaults } from "./routes";
 
 const snap = (n: number, doc: Partial<Doc> = {}): Doc =>
   ({ id: "play", name: "Play", notes: "", side: "offense", players: defaults().map((p) => ({ ...p, x: n })), ...doc });
-const x = (d: Doc | undefined) => d?.players[0]?.x;
+const x = (d: { players: readonly { x: number }[] } | undefined) => d?.players[0]?.x;
 
 describe("history", () => {
   test("undo and redo walk the snapshots", () => {
@@ -35,30 +35,14 @@ describe("history", () => {
     expect(x(h.past[0])).toBe(15);
     expect(x(h.past.at(-1))).toBe(74);
   });
-  test("an ordinary edit restores the players and keeps the name and notes typed since", () => {
-    const h = push(emptyHistory, snap(0, { name: "Old", notes: "" }));
-    const u = undo(h, snap(1, { name: "Renamed", notes: "typed later" }));
-    expect(u?.doc).toMatchObject({ id: "play", name: "Renamed", notes: "typed later" });
+  test("an ordinary edit restores the players and keeps the play you are on", () => {
+    const h = push(emptyHistory, snap(0, { id: "a", name: "Old", notes: "", side: "defense" }));
+    const current = snap(1, { id: "b", name: "Renamed", notes: "typed later", side: "offense" });
+    const u = undo(h, current);
+    expect(u?.doc).toMatchObject({ id: "b", name: "Renamed", notes: "typed later", side: "offense" });
     expect(x(u?.doc)).toBe(0);
-  });
-  test("a swap restores the whole document, and redo brings the other one back whole", () => {
-    const a = snap(0, { id: "a", name: "A", notes: "A notes" });
-    const b = snap(5, { id: "b", name: "B", notes: "B notes" });
-    const h = push(emptyHistory, a, true);
-    const u = undo(h, b);
-    expect(u?.doc).toEqual(a);
-    expect(u?.history.future[0]).toEqual({ ...b, swap: true });
-    const r = redo(u?.history ?? emptyHistory, u?.doc ?? a);
-    expect(r?.doc).toEqual(b);
-    expect(r?.history.past[0]).toEqual({ ...a, swap: true });
-  });
-});
-
-describe("play side", () => {
-  test("a swap restores the side; an ordinary edit keeps the current one", () => {
-    const h = push(emptyHistory, snap(0, { side: "defense" }), true);
-    expect(undo(h, snap(1))?.doc.side).toBe("defense");
-    const edit = push(emptyHistory, snap(0, { side: "defense" }));
-    expect(undo(edit, snap(1))?.doc.side).toBe("offense");
+    const r = redo(u?.history ?? emptyHistory, u?.doc ?? current);
+    expect(r?.doc).toMatchObject({ id: "b", name: "Renamed", notes: "typed later", side: "offense" });
+    expect(x(r?.doc)).toBe(1);
   });
 });

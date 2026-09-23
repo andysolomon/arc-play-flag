@@ -25,7 +25,7 @@ First time only: `bunx playwright install chromium`.
 | Journey | File |
 | --- | --- |
 | Name, draw, save, reload, reopen; failed save → warning, recovery file, retry | `save-and-reopen` |
-| A → B → undo → save writes under A's id and leaves B alone; New play + undo/redo; Duplicate | `history` |
+| Save A, open B, each diagram stays under its own id; New play keeps undo and redo inside the new play; Duplicate | `history` |
 | Custom route: primary read survives Mirror and Flip, through to the share page | `custom-route` |
 | Playbook create, add, reorder, remove, persist; export disabled/success/failure; validated import; backup round-trip to a second device | `playbooks` |
 | Share link shows both teams read-only, opens back in the designer; bad link is a 404 | `sharing` |

@@ -17,7 +17,7 @@ test("a coach starts a defensive call, and the choice survives save, reload and 
   await expect(d.page.getByRole("group", { name: "Show" })).toHaveCount(0);
 
   await d.newPlay("Defense");
-  await expect(d.toast).toHaveText("New play · undo brings the last one back");
+  await expect(d.toast).toHaveText("New play");
   await expect(sideBadge(d, "Defense")).toBeVisible();
   await expect(sideBadge(d, "Offense")).toHaveCount(0);
   await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "true");
