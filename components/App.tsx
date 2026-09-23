@@ -15,7 +15,6 @@ import { Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
 import { Header } from "./Header";
 import { Hint } from "./Hint";
-import { PlayExport } from "./PlayExport";
 import { PlaySidebar } from "./PlaySidebar";
 import { RouteSidebar } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
@@ -56,7 +55,6 @@ export function App() {
   const svgRef = useRef<SVGSVGElement>(null);
   const hydratedRef = useRef(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [firstUse, setFirstUse] = useState(false);
@@ -295,9 +293,8 @@ export function App() {
             onNew={onNew}
             onSave={onSave}
             onDuplicate={onDuplicate}
-            onExport={() => { setExportOpen((open) => !open); }}
-            exportOpen={exportOpen}
-            exportPanel={exportOpen ? <PlayExport id={s.id} name={s.name} players={s.players} /> : null}
+            unsaved={dirty}
+            saved={!dirty && s.id !== null}
             savePanel={saveFailure ? <SaveFailure message={failureMessage(saveFailure)} onRetry={onSave} onDownload={onDownload} /> : null}
             onShare={openShare}
             onFlip={() => { dispatch({ type: "flip" }); }}

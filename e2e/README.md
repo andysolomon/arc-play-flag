@@ -38,7 +38,7 @@ First time only: `bunx playwright install chromium`.
 | A 100-play library searches, filters and sorts; a playbook fits 320px; open from an entry, add from the designer | `library-discovery` |
 | Offline: the shells, exact shared plays and demo media are ready before it says so, imports and exports work offline, a first install says **Offline updating…** until the whole shell is verified, a broken release never takes over, and a sound one keeps the shared play | `offline` |
 
-Live ▶ playback throws to the primary read 80% of the time and exported clips always complete to it: primary-read odds and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`, while exported-clip timing is covered by `lib/export/video.test.ts`.
+Live ▶ playback throws to the primary read 80% of the time: primary-read odds and run/pass/play-action choreography are covered by `lib/play/motion.test.ts`.
 
 ## Devices
 

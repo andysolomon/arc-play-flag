@@ -57,7 +57,7 @@ Object.keys(localStorage).filter((k) => k.startsWith("ffpd.drill.")).forEach((k)
 
 **Render failure (the screen throws).** Open React DevTools → Components, select `App`, and use the **Suspend / Error boundary** toggle (the ⚠ button) to throw inside the tree. Expected: the **SOMETHING BROKE** card from `app/error.tsx` replaces the screen, names the play that is in the autosave, and **Download play** saves the same recovery file; **Try again** restores the screen; **Reload** starts fresh with the draft intact. Without DevTools, `throw new Error("drill")` in the console only reaches the diagnostics list (the boundary is for render errors), so check **Report a problem** shows it as `error · Error: drill`.
 
-**Export failure.** Play tools → Export → **Save picture card** with DevTools **Offline** and a cold cache (private window). Expected: the status line under the buttons reports the failure in words, the designer keeps working, and the report lists an `export` entry.
+**Export failure.** Open a playbook → Export → **Download binder PDF** with DevTools **Offline** and a cold cache (private window). Expected: the toast reports the failure in words, the designer keeps working, and the report lists an `export` entry.
 
 **Diagnostics cannot write.** With storage full (the first drill), trigger any of the above. Expected: the app behaves the same; the report still lists the errors from memory (the browser line says `storage full`).
 

@@ -70,7 +70,7 @@ describe("Demo recorder chapters and fixtures", () => {
 
   test("encoding trims normalized source timestamps to fixed manifest durations", () => {
     expect(CHAPTER_SLUGS.map(chapterVideoFilter)).toEqual(
-      [9, 9, 11, 11, 8, 10, 8, 9].map((seconds) => `trim=start=0:duration=${seconds.toFixed(3)},setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos`),
+      [9, 9, 11, 11, 8, 8, 9].map((seconds) => `trim=start=0:duration=${seconds.toFixed(3)},setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos`),
     );
   });
 

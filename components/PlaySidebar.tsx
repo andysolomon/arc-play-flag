@@ -19,9 +19,10 @@ interface Props {
   onNew: (side: Team) => void;
   onSave: () => void;
   onDuplicate: () => void;
-  onExport: () => void;
-  exportOpen: boolean;
-  exportPanel: ReactNode;
+  /** the play differs from its last Save, notes included */
+  unsaved: boolean;
+  /** the play is in the library and matches it */
+  saved: boolean;
   /** what to do about a save that didn't land, while it hasn't */
   savePanel: ReactNode;
   onShare: () => void;
@@ -32,8 +33,8 @@ interface Props {
 }
 
 function PlaySidebarImpl({
-  name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, onExport, onShare,
-  exportOpen, exportPanel, savePanel, onFlip, onClear, onReset, onShadow,
+  name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
+  savePanel, onFlip, onClear, onReset, onShadow,
 }: Props) {
   const [choosing, setChoosing] = useState(false);
   const start = (next: Team) => {
@@ -65,26 +66,29 @@ function PlaySidebarImpl({
       ) : (
         <div className={tileGrid}>
           <IconTile icon="new" label="New play" title="Start a fresh play: offense or defense" onClick={() => { setChoosing(true); }} />
-          <IconTile icon="save" label="Save" onClick={onSave} />
+          <IconTile icon="save" label="Save" title={unsaved ? "Save changes to this play" : "Save this play"} dot={unsaved} onClick={onSave} />
           <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
-          <IconTile icon="export" label="Export" title="Save a picture card or video clip" active={exportOpen} onClick={onExport} />
           <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
           <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
           <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
         </div>
       )}
       {savePanel}
-      {exportPanel}
       {notesOpen && (
-        <textarea
-          value={notes}
-          maxLength={MAX_NOTES}
-          rows={4}
-          onChange={(e: ChangeEvent<HTMLTextAreaElement>) => { onNotes(e.target.value); }}
-          placeholder="Coaching points. Shown on the binder page."
-          aria-label="Coaching points"
-          className="w-full flex-none resize-y rounded-note border-2 border-ink bg-white px-3 py-2 text-base leading-note text-ink placeholder:text-ink-muted"
-        />
+        <>
+          <textarea
+            value={notes}
+            maxLength={MAX_NOTES}
+            rows={4}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => { onNotes(e.target.value); }}
+            placeholder="Coaching points. Shown on the binder page."
+            aria-label="Coaching points"
+            className="w-full flex-none resize-y rounded-note border-2 border-ink bg-white px-3 py-2 text-base leading-note text-ink placeholder:text-ink-muted"
+          />
+          <span className="flex-none text-caption leading-note text-ink-muted" aria-live="polite">
+            {saved ? "Saved with the play." : unsaved ? "Not saved yet. Save keeps these notes with the play." : "Save keeps these notes with the play."}
+          </span>
+        </>
       )}
       <button type="button" onClick={onShare} title="Copy a link that opens this play read-only" className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}>
         Copy share link

@@ -25,7 +25,6 @@ Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses 
 | `run-play` | Watch plays run | Run a handoff to the end, then run play-action through to the primary read |
 | `build-defense` | Build the defense | Toggle offense/both, then show zones, man coverage, and a legal blitz |
 | `save-share` | Save, note and share | Save, notes, duplicate, choose the shared side, copy the link |
-| `export-play` | Export a card or a clip | Choose the visible teams, save the picture card, record the video clip |
 | `playbooks` | Build a playbook | Name the team, import a handed-over book, create one, add and order plays |
 | `print-playbook` | Print it for the sideline | Wristbands, binder pages, postcards, flyer, playbook file |
 

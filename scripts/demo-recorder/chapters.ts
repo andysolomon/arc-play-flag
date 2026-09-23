@@ -338,15 +338,6 @@ export class ChapterDriver {
     }, 260, proves);
   }
 
-  /** Chooses which teams a share or export shows, inside the named group of radios. */
-  async chooseVisibility(group: string, choice: string, proves: readonly string[]): Promise<void> {
-    const radio = this.page.getByRole("group", { name: group }).getByRole("radio", { name: choice, exact: true });
-    await this.click(radio, `Show ${choice.toLowerCase()} only`, 260);
-    await this.expectState(`The preview shows ${choice.toLowerCase()} only`, async () => {
-      await expect(radio).toBeChecked({ timeout: ASSERT_TIMEOUT });
-    }, 420, proves);
-  }
-
   /** Clicks a download control and checks that the browser received the named file. */
   async download(label: string, expected: RegExp, proves: readonly string[] = [], { hold = 240, timeout = 20_000 }: { hold?: number; timeout?: number } = {}): Promise<void> {
     await this.beat("export", label, async () => {
@@ -355,7 +346,7 @@ export class ChapterDriver {
       await this.page.waitForTimeout(140);
       const pending = this.page.waitForEvent("download", { timeout });
       await button.click();
-      // an export that takes seconds (the video clip) must not sit behind a ring
+      // an export that takes seconds (a whole PDF) must not sit behind a ring
       await this.page.waitForTimeout(240);
       await this.spotlight(null);
       const download = await pending;
@@ -572,29 +563,6 @@ async function saveShare(d: ChapterDriver): Promise<void> {
   }, 400, ["Share link"]);
 }
 
-/** Export: choose what an export shows, save the picture card, then record the clip. */
-async function exportPlay(d: ChapterDriver): Promise<void> {
-  await d.goto(`/?open=${INSIDE_HANDOFF.id}`);
-  const tools = d.page.locator("#play-sidebar");
-  await d.say("Choose what an export shows");
-  await d.openPanel("Play tools");
-  await d.click(tools.getByRole("button", { name: "Export", exact: true }), "Export", 160);
-  await d.beat("selector", "Export panel", async () => {
-    await (await d.visible(tools.locator("[aria-label='Export play']"), "Export play panel")).scrollIntoViewIfNeeded();
-  }, 160);
-  await d.chooseVisibility("Teams visible in picture and video exports", "Offense", ["Export visibility"]);
-  await d.poster();
-
-  await d.say("Save it as a picture card");
-  await d.download("Save picture card", /\.png$/, ["Picture export"]);
-
-  await d.say("Or record it as a video clip");
-  await d.download("Save video clip", /\.(webm|mp4)$/, ["Video export"], { timeout: 40_000 });
-  await d.expectState("The clip is saved", async () => {
-    await expect(d.page.getByRole("status")).toHaveText("Clip saved", { timeout: 10_000 });
-  }, 200);
-}
-
 /** Playbooks: name the team, take a book from another coach, start one, and order it. */
 async function playbooks(d: ChapterDriver): Promise<void> {
   d.captionEdge = "bottom";
@@ -670,7 +638,6 @@ export const CHAPTERS: Readonly<Record<ChapterSlug, ChapterDefinition>> = {
   "run-play": { slug: "run-play", targetSeconds: 11, run: runPlay },
   "build-defense": { slug: "build-defense", targetSeconds: 11, run: buildDefense },
   "save-share": { slug: "save-share", targetSeconds: 8, run: saveShare },
-  "export-play": { slug: "export-play", targetSeconds: 10, run: exportPlay },
   playbooks: { slug: "playbooks", targetSeconds: 8, run: playbooks },
   "print-playbook": { slug: "print-playbook", targetSeconds: 9, run: printPlaybook },
 };

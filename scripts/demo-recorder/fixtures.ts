@@ -74,7 +74,6 @@ export const CHAPTER_PLAY: Readonly<Partial<Record<ChapterSlug, SavedPlay>>> = {
   "run-play": INSIDE_HANDOFF,
   "build-defense": COVER_TWO_PRESSURE,
   "save-share": PLAY_ACTION_WHEEL,
-  "export-play": PLAY_ACTION_WHEEL,
 };
 
 /** A blank, unnamed formation: `build-play` names it and draws its routes on camera. */
