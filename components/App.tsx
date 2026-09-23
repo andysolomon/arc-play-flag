@@ -5,7 +5,7 @@ import { install, record } from "@/lib/diagnostics";
 import { initialState, reducer, selected, unsaved } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
-import type { RouteType, Team, Vis } from "@/lib/play/types";
+import type { RouteType, Team } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, playById, savePlay } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
@@ -38,12 +38,6 @@ const examplePlayers = () => initialState().players.map((p) => {
 const isEditable = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
 
-const visibilityChoices: readonly { value: Vis; label: string }[] = [
-  { value: "offense", label: "Offense" },
-  { value: "defense", label: "Defense" },
-  { value: "both", label: "Both teams" },
-];
-
 /** Media-query state that hydrates without a mismatch (server snapshot is false). */
 function useMedia(query: string): boolean {
   const subscribe = useCallback((cb: () => void) => {
@@ -64,7 +58,6 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [shareVis, setShareVis] = useState<Vis>("both");
   const [notesOpen, setNotesOpen] = useState(false);
   const [firstUse, setFirstUse] = useState(false);
   // the last Save or Duplicate that didn't land; cleared by the next one that does
@@ -188,7 +181,7 @@ export function App() {
     const shared = params.get("p");
     const rec = shared ? decodeShare(shared) : null;
     if (rec) {
-      dispatch({ type: "load", name: rec.name, side: rec.side, players: rec.players });
+      dispatch({ type: "load", name: rec.name, side: rec.side, players: rec.players, shadow: true });
       // A formation/share payload is an intentional handoff into the designer;
       // keep the tools visible so the coach can immediately inspect or name it.
       openToolsTimer = window.setTimeout(() => { setLeftOpen(true); }, 0);
@@ -260,18 +253,15 @@ export function App() {
     dispatch({ type: "newPlay", side });
     say("New play · undo brings the last one back", 2400);
   }, [say]);
-  const shareUrl = useCallback((vis: Vis) =>
-    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, players: [...s.players] }, vis)}`,
+  const shareUrl = useCallback(() =>
+    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, players: [...s.players] })}`,
   [s.name, s.side, s.players]);
   const copyShare = useCallback(() => {
-    const url = shareUrl(shareVis);
+    const url = shareUrl();
     setShareOpen(false);
     navigator.clipboard.writeText(url).then(() => { say("Link copied"); }, () => { window.prompt("Copy this link", url); });
-  }, [say, shareUrl, shareVis]);
-  const openShare = useCallback(() => {
-    setShareVis("both");
-    setShareOpen(true);
-  }, []);
+  }, [say, shareUrl]);
+  const openShare = useCallback(() => { setShareOpen(true); }, []);
   // errors nobody caught are remembered (scrubbed, on this device only) for "Report a problem"
   useEffect(() => install(), []);
   const sel = selected(s);
@@ -359,28 +349,13 @@ export function App() {
               <button type="button" className={`${pillSm} !text-ink`} onClick={() => { setShareOpen(false); }} aria-label="Close share dialog">✕</button>
             </div>
             <p className="text-small leading-note text-ink-muted">
-              Choose exactly what the link shows. It is a snapshot of this play now, not a live view; later edits are not added to it.
+              It is a snapshot of this play now, not a live view; later edits are not added to it. The other team is saved with the link and appears, faded, when the play is opened in the designer.
             </p>
-            <fieldset className="flex flex-wrap gap-2" aria-label="Teams visible in shared snapshot">
-              <legend className="mb-1 w-full text-small">Visible teams</legend>
-              {visibilityChoices.map((choice) => (
-                <label key={choice.value} className={`${pillSm} flex cursor-pointer items-center gap-1.5 has-[:checked]:bg-yellow`}>
-                  <input
-                    type="radio"
-                    name="share-visibility"
-                    value={choice.value}
-                    checked={shareVis === choice.value}
-                    onChange={() => { setShareVis(choice.value); }}
-                  />
-                  {choice.label}
-                </label>
-              ))}
-            </fieldset>
             <div
               role="img"
-              aria-label={`${visibilityChoices.find((choice) => choice.value === shareVis)?.label ?? "Both teams"} snapshot preview`}
+              aria-label={`${s.side === "defense" ? "Defense" : "Offense"} snapshot preview`}
               className="mx-auto w-full max-w-[360px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: shareVis, box: { pw: 660, ph: 360 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.side, box: { pw: 660, ph: 360 } }) }}
             />
             <button type="button" className={`${pillSm} self-start px-4 py-1`} onClick={copyShare}>Copy snapshot link</button>
           </section>
