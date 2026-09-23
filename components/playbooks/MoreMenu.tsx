@@ -7,6 +7,8 @@ import { pill } from "../ui";
 export const menuItem =
   "flex min-h-11 w-full cursor-pointer items-center rounded-note px-3 text-left text-small hover:bg-yellow-soft " +
   "data-[active=true]:bg-rose-soft";
+/** A row that removes something: red so it reads as different before it's tapped. */
+export const menuItemDanger = `${menuItem} text-offense data-[active=true]:text-ink`;
 
 /**
  * A "⋯" button that drops down the less-used actions of a card.
@@ -36,7 +38,8 @@ export function MoreMenu({ label, children }: { label: string; children: (close:
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => { setOpen((o) => !o); }}
-        className={`${pill} min-h-11 min-w-11 px-2 text-title leading-none`}
+        className={`${pill} flex h-11 w-11 items-center justify-center text-title leading-none data-[open=true]:bg-yellow-soft`}
+        data-open={open}
       >
         ⋯
       </button>
@@ -45,7 +48,7 @@ export function MoreMenu({ label, children }: { label: string; children: (close:
           id={menuId}
           role="group"
           aria-label={label}
-          className="absolute bottom-full right-0 z-10 mb-1.5 flex w-max min-w-[180px] flex-col gap-0.5 rounded-tile border-2 border-ink bg-white p-1.5 shadow-toast"
+          className="absolute right-0 top-full z-10 mt-1.5 flex w-max min-w-[200px] flex-col gap-0.5 rounded-tile border-2 border-ink bg-white p-1.5 shadow-toast"
         >
           {children(close)}
         </div>

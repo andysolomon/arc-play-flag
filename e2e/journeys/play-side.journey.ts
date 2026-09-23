@@ -91,10 +91,10 @@ test("the playbook gallery labels each play's side and filters defensive calls b
   await expect(cover.getByRole("img", { name: "Otter Cover Two" }).locator('circle[fill="#4a8fe0"]')).toHaveCount(5);
   await expect(cover.getByRole("img", { name: "Otter Cover Two" }).locator('circle[fill="#e5675e"]')).toHaveCount(0);
 
-  await page.getByRole("combobox", { name: "Filter saved plays" }).selectOption("defense");
+  await page.getByRole("radiogroup", { name: "Filter saved plays" }).getByRole("radio", { name: "Defense" }).check();
   await expect(page.getByText("Otter Cover Two", { exact: true })).toBeVisible();
   await expect(page.getByText("Otter Slant Left", { exact: true })).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Filter saved plays" }).selectOption("pass");
+  await page.getByRole("radiogroup", { name: "Filter saved plays" }).getByRole("radio", { name: "Pass" }).check();
   await expect(page.getByText("Otter Slant Left", { exact: true })).toBeVisible();
   await expect(page.getByText("Otter Cover Two", { exact: true })).toHaveCount(0);
 });

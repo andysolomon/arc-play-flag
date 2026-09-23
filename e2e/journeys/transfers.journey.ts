@@ -7,7 +7,7 @@ test("standalone play export/import previews first, preserves notes, and creates
   await seed(page, { plays: [SLANT_LEFT] });
   await page.goto("/playbooks");
   await page.getByRole("button", { name: `More actions for ${SLANT_LEFT.name}` }).click();
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export play", exact: true }).click()]);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export play file", exact: true }).click()]);
   expect(download.suggestedFilename()).toBe("otter-slant-left.play.json");
   const text = await downloadText(download);
   const other = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -110,7 +110,7 @@ test("gallery copies a short standalone link, reuses it, previews without writes
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await seed(page, { plays: [SLANT_LEFT] });
   await page.goto("/playbooks");
-  const copy = page.getByRole("button", { name: "Copy share link", exact: true });
+  const copy = page.getByRole("button", { name: "Share", exact: true });
   await copy.click();
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   const url = await page.evaluate(() => navigator.clipboard.readText());
@@ -120,7 +120,7 @@ test("gallery copies a short standalone link, reuses it, previews without writes
   await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
   await page.getByRole("button", { name: `More actions for ${SLANT_LEFT.name}` }).click();
-  await page.getByRole("button", { name: /^Manage share links/ }).click();
+  await page.getByRole("button", { name: "Share link details…", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Share URL", exact: true })).toHaveCount(1);
   const other = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
@@ -162,12 +162,12 @@ test("gallery reports upload failures and offers a selectable URL when clipboard
   });
   await seed(page, { plays: [SLANT_LEFT] });
   await page.goto("/playbooks");
-  await page.getByRole("button", { name: "Copy share link", exact: true }).click();
+  await page.getByRole("button", { name: "Share", exact: true }).click();
   const modal = page.getByRole("dialog");
   await expect(modal.getByRole("status")).toHaveText("Sharing is temporarily unavailable.");
   await expect(modal.getByRole("textbox", { name: "Share URL", exact: true })).toHaveCount(0);
   await modal.getByRole("button", { name: "Close preview" }).click();
-  await page.getByRole("button", { name: "Copy share link", exact: true }).click();
+  await page.getByRole("button", { name: "Share", exact: true }).click();
   await expect(modal.getByRole("textbox", { name: "Share URL", exact: true })).toHaveValue(/\/s\/abcdefghijklmnop$/);
   await expect(modal.getByRole("status")).toContainText("Select the URL");
   expect(await storedPlays(page)).toEqual({ [SLANT_LEFT.id]: SLANT_LEFT });
