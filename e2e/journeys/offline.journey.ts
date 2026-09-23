@@ -57,11 +57,13 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
 
   await page.goto("/playbooks");
   await expect(page.getByRole("heading", { name: "Playbooks" })).toBeVisible();
+  await page.getByRole("button", { name: /team & backup settings/ }).click();
   const [backupDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Download backup" }).click(),
   ]);
   expect(JSON.parse(await downloadText(backupDownload))).toMatchObject({ kind: "ffpd.backup" });
+  await page.getByRole("button", { name: "Close preview" }).click();
   await page.getByLabel("Import a play or playbook file").setInputFiles(jsonUpload("offline.playbook.json", playbookJson));
   await page.getByRole("button", { name: "Import playbook", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Playbook name" })).toHaveValue("Offline Book");

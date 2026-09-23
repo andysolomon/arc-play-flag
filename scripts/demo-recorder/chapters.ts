@@ -157,7 +157,7 @@ export class ChapterDriver {
       if (!response?.ok()) throw new Error(`app returned HTTP ${String(response?.status() ?? "no response")}`);
       // the first control each screen hydrates: the designer, the playbooks home, one book
       const ready = this.page.getByRole("button", { name: "Play tools", exact: true })
-        .or(this.page.getByRole("textbox", { name: "Team name" }))
+        .or(this.page.getByRole("button", { name: /team & backup settings/ }))
         .or(this.page.getByRole("textbox", { name: "Playbook name" }));
       await expect(ready).toBeVisible({ timeout: ASSERT_TIMEOUT });
     }, 160);
@@ -602,10 +602,12 @@ async function playbooks(d: ChapterDriver): Promise<void> {
   const items = d.page.getByRole("list").getByRole("listitem");
 
   await d.say("Your team name goes on every export");
+  await d.click(d.page.getByRole("button", { name: /team & backup settings/ }), "Team & backup", 260);
   await d.type(d.page.getByRole("textbox", { name: "Team name" }), "Team name", "Riverside Otters", 260);
   await d.expectState("The team is named", async () => {
     await expect(d.page.getByRole("textbox", { name: "Team name" })).toHaveValue("Riverside Otters", { timeout: ASSERT_TIMEOUT });
   }, 260, ["Team setup"]);
+  await d.click(d.page.getByRole("button", { name: "Close preview" }), "Close", 200);
 
   await d.say("Take a playbook from another coach");
   await d.importPlaybookFile(sharedBookFile(), ["Import"]);

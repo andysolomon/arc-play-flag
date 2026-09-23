@@ -5,6 +5,7 @@ import {
 } from "../support/fixtures";
 
 const restoreInput = (page: import("@playwright/test").Page) => page.getByLabel("Restore a device backup");
+const openSettings = (page: import("@playwright/test").Page) => page.getByRole("button", { name: /team & backup settings/ }).click();
 
 test("a complete device backup waits for an explicit merge or replace choice", async ({ page }) => {
   const custom = play("fx-custom", "Otter Custom", { o3: { type: "custom", pts: [[8, -2], [19, -12]], primary: true } }, "Read the safety.");
@@ -12,6 +13,7 @@ test("a complete device backup waits for an explicit merge or replace choice", a
   const draft = { id: custom.id, name: "Current chalkboard", notes: "Still changing", players: custom.players };
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, custom], playbooks: [book], team: OTTERS, draft });
   await page.goto("/playbooks");
+  await openSettings(page);
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -35,6 +37,7 @@ test("a complete device backup waits for an explicit merge or replace choice", a
     localStorage.setItem(keys.books, JSON.stringify({}));
   }, [KEYS, localOnly] as const);
   await page.reload();
+  await openSettings(page);
   await restoreInput(page).setInputFiles(jsonUpload("device-backup.json", backup));
   const preview = page.getByRole("region", { name: "Restore preview" });
   await expect(preview).toContainText("3 plays");
@@ -54,6 +57,7 @@ test("a complete device backup waits for an explicit merge or replace choice", a
 test("an invalid device backup changes nothing and never offers restore actions", async ({ page }) => {
   await seed(page, { plays: [SLANT_LEFT], team: OTTERS });
   await page.goto("/playbooks");
+  await openSettings(page);
   const before = await storageSnapshot(page);
   await restoreInput(page).setInputFiles(jsonUpload("bad-backup.json", JSON.stringify({ kind: "ffpd.backup", version: 1, plays: [] })));
   await expect(page.locator("div[role='status']")).toHaveText("That file isn't a device backup.");
