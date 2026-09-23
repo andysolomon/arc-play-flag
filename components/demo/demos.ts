@@ -44,8 +44,8 @@ export const DEMOS: readonly DemoChapter[] = [
     slug: "save-share",
     title: "Save, note and share",
     time: "8 sec",
-    summary: "Save the play, add coaching notes, duplicate it, then copy a share link that shows only the side you chose.",
-    covers: ["Saving", "Notes", "Duplicate", "Share link", "Share visibility"],
+    summary: "Save the play, add coaching notes, duplicate it, then copy a snapshot of the play.",
+    covers: ["Saving", "Notes", "Duplicate", "Share link"],
   },
   {
     slug: "export-play",

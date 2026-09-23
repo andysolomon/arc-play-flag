@@ -372,6 +372,19 @@ describe("play side", () => {
     expect(reducer(s, { type: "setShadow", on: true })).toBe(s);
     expect(run({ type: "setShadow", on: false }).vis).toBe("offense");
   });
+  test("opening a shared play shows the shadow, on either side", () => {
+    const offense = run({ type: "load", name: "Trips", side: "offense", players: defaults(), shadow: true });
+    expect(offense.vis).toBe("both");
+    expect(shadowing(offense.side, offense.vis)).toBe(true);
+    const defense = run(
+      { type: "newPlay", side: "defense" },
+      { type: "setShadow", on: false },
+      { type: "load", name: "Cover 2", side: "defense", players: defaults(), shadow: true },
+    );
+    expect(defense.side).toBe("defense");
+    expect(defense.vis).toBe("both");
+    expect(shadowing(defense.side, defense.vis)).toBe(true);
+  });
   test("an offensive play can show a shadow defense, and that choice sticks to the next offensive play", () => {
     let s = run({ type: "setShadow", on: true });
     expect(s.side).toBe("offense");

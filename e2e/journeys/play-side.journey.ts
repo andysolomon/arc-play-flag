@@ -135,6 +135,8 @@ test("an offensive play can give a faded defender a coverage", async ({ page }) 
   await expect(defense).toHaveCSS("opacity", "0.4");
   await expect(d.page.getByRole("heading", { name: "Pick a coverage" })).toBeVisible();
   await d.pick("Zone deep");
+  // a phone or tablet folds the palette once a coverage is chosen, so open it again to read the tile
+  await d.palette();
   await expect(d.page.getByRole("button", { name: "Zone deep", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(d.routes).toHaveCount(1);
   await d.select("X");

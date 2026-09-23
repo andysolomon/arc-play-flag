@@ -1,5 +1,5 @@
 import { normalizePlayers, readSide, type DraftRecord } from "./storage";
-import type { Player, Team, Vis } from "./types";
+import type { Player, Team } from "./types";
 
 /** Share links carry the whole play as base64url JSON in the path: /p/<id>. No backend. */
 
@@ -34,22 +34,21 @@ function compact(p: Player): Player {
   return out;
 }
 
-/** A decoded link: the whole play plus which side the sender chose to show. */
+/** A decoded link: the whole play, including the other team kept for the designer. */
 export interface SharedRecord extends DraftRecord {
   side: Team;
-  vis: Vis;
 }
 
 /**
- * Both teams always travel in the payload so "Open in designer" recovers the full play;
- * `vis` records which side the link shows. "both" is omitted, so links made before the
- * choice existed and both-team links are the same bytes. `side` is written only for a
- * defensive call, so an offensive play's link is unchanged from before plays had a side.
+ * Both teams always travel in the payload. The snapshot view draws only this play's
+ * side; "Open in designer" restores the other team as the faded shadow. `side` is
+ * written only for a defensive call, so an offensive play's link is unchanged from
+ * before plays had a side. A `vis` field from an older link is ignored: those links
+ * still carry every player.
  */
-export function encodeShare(rec: DraftRecord, vis: Vis = "both"): string {
-  const payload: { name: string; players: Player[]; side?: Team; vis?: Vis } = { name: rec.name, players: rec.players.map(compact) };
+export function encodeShare(rec: DraftRecord): string {
+  const payload: { name: string; players: Player[]; side?: Team } = { name: rec.name, players: rec.players.map(compact) };
   if (rec.side === "defense") payload.side = "defense";
-  if (vis !== "both") payload.vis = vis;
   return toBase64Url(JSON.stringify(payload));
 }
 
@@ -63,12 +62,9 @@ export function decodeShare(id: string): SharedRecord | null {
     const players = normalizePlayers(parsed.players);
     if (!players.length) return null;
     const name = "name" in parsed && typeof parsed.name === "string" ? parsed.name.slice(0, 80) : "Shared play";
-    // links without a vis field predate the choice and always meant both teams
-    const raw = "vis" in parsed ? parsed.vis : "both";
-    const vis: Vis = raw === "offense" || raw === "defense" ? raw : "both";
     // links without a side predate the choice: read the side off the routes, as storage does
     const side = readSide("side" in parsed ? parsed.side : undefined, players);
-    return { name, players, side, vis };
+    return { name, players, side };
   } catch {
     return null;
   }
