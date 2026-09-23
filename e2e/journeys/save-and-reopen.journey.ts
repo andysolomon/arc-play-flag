@@ -45,7 +45,34 @@ test("a coach names a play, draws it, saves it, and finds it again after a reloa
   expect(stored[0]?.players.find((p) => p.id === "o4")?.x).toBe(26);
 });
 
-test("a save that does not land says so, keeps the play on the field, and offers a file and a retry", async ({ page }) => {
+test("notes say whether they are saved with the play, and Save marks unsaved changes", async ({ page }) => {
+  const d = new Designer(page);
+  await d.goto();
+  await d.setName("Otter Notes");
+  await d.save();
+  await expect(d.toast).toHaveText("Saved");
+
+  const tools = page.locator("#play-sidebar");
+  const notes = tools.getByRole("textbox", { name: "Coaching points" });
+  await expect(notes).toHaveCount(0);
+  await d.clickTool("Notes");
+  await expect(tools.getByText("Saved with the play.", { exact: true })).toBeVisible();
+
+  await notes.fill("Sell the fake, then look for the open man.");
+  await expect(tools.getByText("Not saved yet. Save keeps these notes with the play.", { exact: true })).toBeVisible();
+  await expect((await d.tool("Save")).locator("span[aria-hidden]")).toHaveCount(1);
+
+  await d.save();
+  await expect(tools.getByText("Saved with the play.", { exact: true })).toBeVisible();
+  await expect((await d.tool("Save")).locator("span[aria-hidden]")).toHaveCount(0);
+  expect(Object.values(await storedPlays(page))[0]?.notes).toBe("Sell the fake, then look for the open man.");
+
+  // the notes fold away when they are not needed
+  await d.clickTool("Notes");
+  await expect(notes).toHaveCount(0);
+});
+
+test("a save that does not land says so,keeps the play on the field, and offers a file and a retry", async ({ page }) => {
   await armSabotage(page);
   const d = new Designer(page);
   await d.goto();

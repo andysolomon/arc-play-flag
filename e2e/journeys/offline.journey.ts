@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { Designer, downloadBytes, downloadText } from "../support/designer";
+import { Designer, downloadText } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
 import { KEYS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook } from "../support/fixtures";
 
@@ -71,12 +71,6 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
   await page.goto("/?open=fx-wheel-right");
   const designer = new Designer(page);
   await expect(designer.field).toBeVisible();
-  await designer.clickTool("Export");
-  const [cardDownload] = await Promise.all([
-    page.waitForEvent("download"),
-    page.getByRole("button", { name: "Save picture card" }).click(),
-  ]);
-  expect((await downloadBytes(cardDownload)).subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   expect(failedChunks).toEqual([]);
 });
 

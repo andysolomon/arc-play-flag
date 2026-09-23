@@ -6,7 +6,7 @@ import { COVERED_FEATURES, DEMOS, TOUR_SECONDS } from "./demos";
 
 describe("demo tour", () => {
   test("keeps every chapter short, uniquely named and fully described", () => {
-    expect(DEMOS).toHaveLength(8);
+    expect(DEMOS).toHaveLength(7);
     expect(new Set(DEMOS.map((demo) => demo.slug)).size).toBe(DEMOS.length);
     for (const demo of DEMOS) {
       expect(demo.summary.length).toBeGreaterThan(40);
@@ -28,7 +28,7 @@ describe("demo tour", () => {
     for (const feature of [
       "Create plays", "Running plays", "Passing plays", "Play-action", "Primary routes", "Quick routes", "Custom routes",
       "Moving players", "Formations", "Shadow offense", "Defense only", "Defensive plays", "Zones", "Man coverage",
-      "Play playback", "Saving", "Picture export", "Video export", "Playbook creation", "Team setup", "Import",
+      "Play playback", "Saving", "Playbook creation", "Team setup", "Import",
       "Wristbands", "Binder PDF",
     ]) expect(COVERED_FEATURES.has(feature)).toBe(true);
   });

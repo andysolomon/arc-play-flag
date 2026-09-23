@@ -63,8 +63,8 @@ export interface Ball {
 }
 
 /**
- * Teaching playback demonstrates the drawn read consistently: exported clips use it so a
- * clip always shows the play as drawn. Simulation playback is what the ▶ button runs: the
+ * Teaching playback demonstrates the drawn read consistently, so it always shows the play
+ * as drawn. Simulation playback is what the ▶ button runs: the
  * primary read gets the ball `PRIMARY_ODDS` of the time and the other drawn receivers share
  * the rest, using the supplied random source so tests can pin the flips.
  */

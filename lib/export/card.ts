@@ -1,11 +1,10 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
-import { kebab } from "@/lib/play/storage";
 import type { Level, Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
 import { ybv } from "@/lib/play/geometry";
 import { fitField } from "./binder";
 import { INK, MUTED, appMark, badge, field, page, pill, text, type SvgPage } from "./pages";
-import { download, ensureFont, measure, rasterise } from "./raster";
+import { measure } from "./raster";
 import { fit } from "./wristband";
 
 /** The shareable card: a 4:5 portrait that reads on a phone and prints as a postcard front. */
@@ -71,14 +70,4 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
 
 export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): SvgPage {
   return page(CARD_W, CARD_H, cardBody(o, frame));
-}
-
-/** Draws the card and saves it as <play-name>.png. */
-export async function exportCardPng(o: CardOptions): Promise<void> {
-  await ensureFont();
-  const card = cardSvg(o);
-  const c = await rasterise(card.svg, CARD_W, CARD_H, "#f4efe2");
-  const blob = await new Promise<Blob | null>((resolve) => { c.toBlob(resolve, "image/png"); });
-  if (!blob) throw new Error("The card could not be encoded.");
-  download(blob, kebab(o.name) + ".png");
 }

@@ -7,7 +7,7 @@ export interface DemoChapter {
 }
 
 /**
- * Eight short chapters, each one small enough to watch on a phone at the field.
+ * Seven short chapters, each one small enough to watch on a phone at the field.
  * Every entry in `covers` is a promise: `scripts/demo-recorder` refuses to record a
  * chapter unless each one was demonstrated by an action that completed on camera.
  */
@@ -46,13 +46,6 @@ export const DEMOS: readonly DemoChapter[] = [
     time: "8 sec",
     summary: "Save the play, add coaching notes, duplicate it, then copy a snapshot of the play.",
     covers: ["Saving", "Notes", "Duplicate", "Share link"],
-  },
-  {
-    slug: "export-play",
-    title: "Export a card or a clip",
-    time: "10 sec",
-    summary: "Pick which teams an export shows, save the play as a picture card, and record it as a video clip for the team chat.",
-    covers: ["Export visibility", "Picture export", "Video export"],
   },
   {
     slug: "playbooks",
