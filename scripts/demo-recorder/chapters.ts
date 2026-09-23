@@ -370,8 +370,8 @@ export class ChapterDriver {
 
   /** Hands the app a playbook file through its own file chooser, as a coach would. */
   async importPlaybookFile(json: string, proves: readonly string[]): Promise<void> {
-    await this.beat("export", "Import play / playbook…", async () => {
-      const button = await this.visible(this.page.getByRole("button", { name: "Import play / playbook…", exact: true }), "Import play / playbook…");
+    await this.beat("export", "Import playbook…", async () => {
+      const button = await this.visible(this.page.getByRole("button", { name: "Import playbook…", exact: true }), "Import playbook…");
       await this.spotlight(button);
       await this.page.waitForTimeout(140);
       const [chooser] = await Promise.all([this.page.waitForEvent("filechooser", { timeout: 10_000 }), button.click()]);

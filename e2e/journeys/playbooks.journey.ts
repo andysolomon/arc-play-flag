@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { encodePlayFile } from "../../lib/export/transfer";
 import { armSabotage, downloadBytes, downloadText, sabotage } from "../support/designer";
 import {
   COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook, playbookFile, seed, storageSnapshot, storedPlaybooks, storedPlays,
@@ -6,7 +7,7 @@ import {
 
 const toast = (page: Page) => page.locator("div[role='status']");
 const items = (page: Page) => page.getByRole("list").getByRole("listitem");
-const importInput = (page: Page) => page.getByLabel("Import a play or playbook file");
+const importInput = (page: Page) => page.getByLabel("Import a playbook file");
 
 test("a coach makes a playbook, adds plays, reorders them, and the order survives a reload", async ({ page }) => {
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], team: OTTERS });
@@ -127,6 +128,11 @@ test("a bad file is refused with a reason and changes nothing; a good one lands 
   future.version = 99;
   await importInput(page).setInputFiles(jsonUpload("future.playbook.json", JSON.stringify(future)));
   await expect(toast(page)).toHaveText("That playbook was made by a newer version of this app. Update, then try again.");
+
+  await importInput(page).setInputFiles(jsonUpload("wheel.play.json", encodePlayFile(WHEEL_RIGHT)));
+  await expect(toast(page)).toHaveText("That file is a single play. Use Import play… under All plays instead.");
+  await page.getByLabel("Import a play file").setInputFiles(jsonUpload("book.playbook.json", playbookFile(playbook("fx-wrong", "Otter Wrong Box", [WHEEL_RIGHT]), [WHEEL_RIGHT])));
+  await expect(toast(page)).toHaveText("That file is a playbook. Use Import playbook… instead.");
 
   expect(await storageSnapshot(page)).toEqual(before);
   await expect(page.getByText("No playbooks yet.")).toBeVisible();
