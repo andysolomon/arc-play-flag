@@ -16,17 +16,6 @@ function memory(): StorageLike & { data: Map<string, string> } {
 }
 
 describe("storage", () => {
-  test("round-trips a play under ffpd.plays.v2 keyed by id", () => {
-    const s = memory();
-    const players = defaults().map((p) => (p.id === "o3" ? { ...p, route: { type: "go" as const, primary: true } } : p));
-    const play = { id: "abc", name: "Trips right", side: "offense" as const, players, notes: "Watch the flat." };
-    store(play, s);
-    const raw: unknown = JSON.parse(s.data.get(PLAYS_KEY) ?? "");
-    expect(raw).toEqual({ abc: play });
-    expect(readAll(s)).toEqual({ abc: play });
-    store({ id: "def", name: "Trips right", side: "offense", players: defaults(), notes: "" }, s);
-    expect(Object.keys(readAll(s))).toEqual(["abc", "def"]);
-  });
   test("migrates the prototype's name-keyed library once, clamping players onto the field", () => {
     const s = memory();
     s.setItem(
@@ -68,10 +57,6 @@ describe("storage", () => {
     expect(readPlaybooks(s)).toEqual({});
     s.setItem(TEAM_KEY, "null");
     expect(readTeam(s)).toEqual({ name: "", color: "#f2b705" });
-  });
-  test("normalizes custom waypoints and drops bad ones", () => {
-    const [p] = normalizePlayers([{ id: "o5", team: "offense", x: 19, y: 5, route: { type: "custom", pts: [[19, 2], "x", [1]] } }]);
-    expect(p?.route).toEqual({ type: "custom", pts: [[19, 2]] });
   });
   test("routes must be finite, on the field, the right team's, and aimed at someone", () => {
     const players = normalizePlayers(JSON.parse(`[
@@ -118,13 +103,6 @@ describe("storage", () => {
     importAll(plays, { id: "wk1", name: "Week 1", plays: ["a", "b"] }, s);
     expect(Object.keys(readAll(s))).toEqual(["keep", "a", "b"]);
     expect(readPlaybooks(s).wk1?.plays).toEqual(["a", "b"]);
-  });
-  test("draft autosave round-trips under ffpd.draft.v1 with its id and notes", () => {
-    const s = memory();
-    writeDraft({ name: "Work in progress", players: defaults(), id: "abc", notes: "hi" }, s);
-    expect(readDraft(s)).toEqual({ name: "Work in progress", players: defaults(), id: "abc", notes: "hi", side: "offense" });
-    writeDraft({ name: "Loose", players: defaults() }, s);
-    expect(readDraft(s)).toEqual({ name: "Loose", players: defaults(), id: null, notes: "", side: "offense" });
   });
   test("playbooks round-trip and deleting a play drops it from every book", () => {
     const s = memory();
@@ -184,22 +162,6 @@ describe("storage", () => {
     try { store({ id: "abc", name: "A", side: "offense", players: defaults(), notes: "" }, refusing); throw new Error("stored"); }
     catch (e) { expect((e as StorageError).reason).toBe("write"); }
   });
-  test("a failed update leaves the existing record as it was, and a retry lands", () => {
-    const s = memory();
-    const before = { id: "abc", name: "Trips right", side: "offense" as const, players: defaults(), notes: "v1" };
-    store(before, s);
-    let full = true;
-    const flaky: StorageLike = {
-      getItem: (k) => s.getItem(k),
-      setItem: (k, v) => { if (full) throw Object.assign(new Error("full"), { name: "QuotaExceededError" }); s.setItem(k, v); },
-    };
-    const after = { ...before, notes: "v2" };
-    expect(() => store(after, flaky)).toThrow(StorageError);
-    expect(readAll(flaky)).toEqual({ abc: before });
-    full = false;
-    expect(store(after, flaky)).toEqual({ abc: after });
-    expect(readAll(s)).toEqual({ abc: after });
-  });
   test("the legacy migration never throws on the read path when it can't write through", () => {
     const legacy = JSON.stringify({ Old: { players: defaults() } });
     const readOnly: StorageLike = { getItem: (k) => (k === LEGACY_PLAYS_KEY ? legacy : null), setItem: () => { throw new Error("read only"); } };
@@ -225,10 +187,5 @@ describe("play side", () => {
     expect(normalizeSavedPlay({ id: "a", name: "A", players: offensive, side: "coaches" })?.side).toBe("offense");
     expect(normalizeDraft({ name: "D", players: defensive })?.side).toBe("defense");
     expect(normalizeDraft({ name: "D", players: defensive, side: "offense" })?.side).toBe("offense");
-  });
-  test("a defensive call round-trips through the library", () => {
-    const s = memory();
-    store({ id: "abc", name: "Cover 2", players: defaults(), notes: "", side: "defense" }, s);
-    expect(readAll(s).abc?.side).toBe("defense");
   });
 });

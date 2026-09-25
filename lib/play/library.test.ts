@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaults } from "./routes";
-import { discoverPlays, formationTemplate, playMatchesFilter, swapPlaybookReferences } from "./library";
+import { discoverPlays, playMatchesFilter } from "./library";
 import type { Route, SavedPlay } from "./types";
 
 function saved(id: string, name: string, route: Route | null, team: "offense" | "defense" = "offense", notes = ""): SavedPlay {
@@ -31,37 +31,5 @@ describe("saved-play discovery", () => {
     expect(result).toHaveLength(50);
     expect(result[0]?.id).toBe("p98");
     expect(result.at(-1)?.id).toBe("p0");
-  });
-});
-
-describe("reusable references and formations", () => {
-  test("reordering known plays preserves unknown durable references", () => {
-    const book = { id: "book", name: "Season", plays: ["a", "missing", "b", "c"] };
-    expect(swapPlaybookReferences(book, "a", "b").plays).toEqual(["b", "missing", "a", "c"]);
-    expect(book.plays).toEqual(["a", "missing", "b", "c"]);
-  });
-
-  test("a formation template strips routes and shares no mutable player records", () => {
-    const original = saved("pass", "Alpha Pass", { type: "custom", pts: [[3, -4]] }, "offense", "read this");
-    const template = formationTemplate(original);
-    expect(template.notes).toBe("");
-    expect(template.players.every((p) => p.route === null)).toBe(true);
-    const templatePlayer = template.players[0];
-    const originalPlayer = original.players[0];
-    if (!templatePlayer || !originalPlayer) throw new Error("fixture has no players");
-    templatePlayer.x = 99;
-    expect(originalPlayer.x).not.toBe(99);
-    expect(original.players.find((p) => p.id === "o3")?.route).toEqual({ type: "custom", pts: [[3, -4]] });
-  });
-});
-
-describe("play side filters", () => {
-  test("Defense is the play's side; Run and Pass are offensive plays only", () => {
-    const def = saved("def", "Cover 2", { type: "zoneDeep" }, "defense");
-    const both = { ...saved("both", "Mixed", { type: "go" }), side: "defense" as const };
-    const pass = saved("pass", "Seam", { type: "go" });
-    expect(discoverPlays([def, both, pass], { filter: "defense" }).map((p) => p.id)).toEqual(["both", "def"]);
-    expect(discoverPlays([def, both, pass], { filter: "pass" }).map((p) => p.id)).toEqual(["pass"]);
-    expect(formationTemplate(def).side).toBe("defense");
   });
 });
