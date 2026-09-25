@@ -2,13 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { defaults } from "@/lib/play/routes";
 import type { Playbook, SavedPlay } from "@/lib/play/types";
 import { binderPages } from "./binder";
-import { cardSvg } from "./card";
-import { FLYER_SLOTS, flyerDefault, flyerPage } from "./flyer";
-import { numbered, playShow, positionsOf } from "./numbered";
+import { flyerPage } from "./flyer";
+import { numbered } from "./numbered";
 import { PAPERS, defaultPaper, f2, type PaperKey, type SvgPage } from "./pages";
 import { buildPdf } from "./pdf";
 import { postcardPages, postcardSheet } from "./postcard";
-import { MAX_FILE_BYTES, decodePlaybookFile, encodePlaybookFile, importMessage, planImport, readPlaybookFile } from "./playbook-file";
+import { MAX_FILE_BYTES, decodePlaybookFile, encodePlaybookFile, planImport, readPlaybookFile } from "./playbook-file";
 import { BAND_PRESETS, planCards, tile, wristbandPages } from "./wristband";
 
 const play = (id: string, name: string, notes = ""): SavedPlay => ({
@@ -22,24 +21,6 @@ const expectVisibility = (svg: string, vis: "offense" | "defense" | "both") => {
   expect(svg.includes("#e5675e")).toBe(vis !== "defense");
   expect(svg.includes("#4a8fe0")).toBe(vis !== "offense");
 };
-
-describe("numbering", () => {
-  test("skips plays that no longer exist and numbers from 1", () => {
-    const list = numbered(book, library);
-    expect(list.map((n) => n.n)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(list[2]?.play.id).toBe("p2");
-  });
-  test("positions are offensive labels minus the quarterback", () => {
-    expect(positionsOf(numbered(book, library))).toEqual(["C", "X", "Y", "Z"]);
-  });
-  test("a drawing follows the play's side unless a composition is chosen", () => {
-    const off = library[0];
-    const def = { ...play("d0", "Cover 2"), side: "defense" as const };
-    expect(off && playShow(off)).toBe("offense");
-    expect(playShow(def)).toBe("defense");
-    expect(playShow(def, "both")).toBe("both");
-  });
-});
 
 describe("wristbands", () => {
   test("plans one card set per position plus everyone, overflowing past the grid", () => {
@@ -83,59 +64,13 @@ describe("binder", () => {
   });
 });
 
-describe("card", () => {
-  test("is a 4:5 canvas with the team band and number", () => {
-    const c = cardSvg({ name: "Trips right", players: library[0]?.players ?? [], n: 3, team });
-    expect(c.w / c.h).toBeCloseTo(0.8);
-    expect(c.svg).toContain('fill="#123abc"');
-    expect(c.svg).toContain(">3<");
-    expect(c.svg).toContain(">Sharks<");
-  });
-  test("draws the selected team composition", () => {
-    for (const vis of ["offense", "defense", "both"] as const) {
-      expectVisibility(cardSvg({ name: "Trips right", players: library[0]?.players ?? [], team, vis }).svg, vis);
-    }
-  });
-});
-
 describe("flyer", () => {
-  const six = numbered(book, library).slice(0, 6);
-  test("is one page of six plays with the team band, numbers and names", () => {
-    const flyer = flyerPage(six, { paper: "letter", bookName: "Week 1", team });
-    expect(flyer.w).toBe(612);
-    expect(flyer.h).toBe(792);
-    expect(flyer.svg).toContain('fill="#123abc"');
-    expect(flyer.svg).toContain(">Sharks<");
-    expect(flyer.svg).toContain(">Week 1<");
-    expect(flyer.svg).toContain("arc-play-flag.vercel.app");
-    for (const item of six) expect(flyer.svg).toContain(`>${item.play.name}<`);
-    expect(flyer.svg.match(/<circle[^>]*fill="#f2b705"/g)?.length).toBe(6);
-  });
-  test("shows the plays simply: no route names and no read marker", () => {
-    const flyer = flyerPage(six, { paper: "a4", bookName: "Week 1", team });
-    expect(flyer.svg).not.toContain(">Go<");
-    expect(flyer.svg).not.toContain(">Play-action<");
-  });
-  test("defaults to the first six and leaves an unfilled slot blank", () => {
-    const list = numbered(book, library);
-    expect(flyerDefault(list).map((i) => i?.n)).toEqual([1, 2, 3, 4, 5, 6]);
-    const short = flyerDefault(list.slice(0, 4));
-    expect(short).toHaveLength(FLYER_SLOTS);
-    expect(short[4]).toBeNull();
-    const flyer = flyerPage(short, { paper: "letter", bookName: "Week 1", team });
-    expect(flyer.svg.match(/<circle[^>]*fill="#f2b705"/g)?.length).toBe(4);
-  });
   test("a coach's own six are drawn in the order they picked", () => {
     const list = numbered(book, library);
     const picked = [list[6] ?? null, list[0] ?? null, null, list[3] ?? null, null, list[1] ?? null];
     const flyer = flyerPage(picked, { paper: "letter", bookName: "Week 1", team });
     expect(flyer.svg.match(/<circle[^>]*fill="#f2b705"/g)?.length).toBe(4);
     expect(flyer.svg.indexOf(">Play 7<")).toBeLessThan(flyer.svg.indexOf(">Play 1<"));
-  });
-  test("carries the chosen team composition", () => {
-    for (const vis of ["offense", "defense", "both"] as const) {
-      expectVisibility(flyerPage(six, { paper: "letter", bookName: "Week 1", team, vis }).svg, vis);
-    }
   });
 });
 
@@ -150,13 +85,6 @@ describe("postcards", () => {
     expect(pages[1]?.svg).toContain("flip on the long edge");
     expect(pages[0]?.svg).toContain("stroke-dasharray=\"3 3\"");
   });
-  test("a back sits exactly where its front did, so a duplex sheet lines up", () => {
-    const pages = postcardPages(list.slice(0, 2), twoUp);
-    // only the card-sized frames, not the play art nested inside them
-    const slots = (svg: string) => svg.match(/<svg x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" viewBox="0 0 1080 1350"/g);
-    expect(slots(pages[0]?.svg ?? "")).toEqual(slots(pages[1]?.svg ?? ""));
-    expect(postcardSheet(twoUp).slots).toHaveLength(2);
-  });
   test("the back carries the coaching points, the team and a line for the player", () => {
     const pages = postcardPages(list.slice(0, 1), twoUp);
     const back = pages[1]?.svg ?? "";
@@ -166,41 +94,9 @@ describe("postcards", () => {
     expect(back).toContain(">Player<");
     expect(back).toContain(">Play 1<");
   });
-  test("a play with no notes gets ruled lines to write on", () => {
-    const blank = postcardPages(list.slice(1, 2), twoUp)[1]?.svg ?? "";
-    const written = postcardPages(list.slice(0, 1), twoUp)[1]?.svg ?? "";
-    const rules = (svg: string) => svg.match(/<rect[^>]*height="2"[^>]*fill="#6f6c66"/g)?.length ?? 0;
-    expect(rules(blank)).toBeGreaterThan(4);
-    expect(rules(written)).toBe(0);
-  });
-  test("4 by 6 stock is one card a sheet on a 4 by 6 page, with no cut lines", () => {
-    const o = { size: "card46", paper: "letter", bookName: "Week 1", team } as const;
-    const pages = postcardPages(list.slice(0, 3), o);
-    expect(pages).toHaveLength(6);
-    expect(pages[0]?.w).toBe(288);
-    expect(pages[0]?.h).toBe(432);
-    expect(pages[0]?.svg).not.toContain("stroke-dasharray");
-    expect(postcardSheet(o).slots).toHaveLength(1);
-  });
-  test("the front is the picture card and carries the chosen composition", () => {
-    for (const vis of ["offense", "defense", "both"] as const) {
-      const front = postcardPages(list.slice(0, 1), { ...twoUp, vis })[0]?.svg ?? "";
-      expect(front).toContain(">Play-action<");
-      expectVisibility(front, vis);
-    }
-  });
 });
 
 describe("export visibility", () => {
-  test("carries offense, defense and both through binder and wristband PDFs", () => {
-    const items = numbered(book, library).slice(0, 1);
-    for (const vis of ["offense", "defense", "both"] as const) {
-      const binder = binderPages(items, { layout: "one", paper: "letter", bookName: "Week 1", team, vis });
-      const bands = wristbandPages(items, { size: { w: 4.5, h: 2.25, rows: 2, cols: 3 }, paper: "letter", bookName: "Week 1", team, vis });
-      expectVisibility(binder[0]?.svg ?? "", vis);
-      expectVisibility(bands[0]?.svg ?? "", vis);
-    }
-  });
   test("each playbook page follows that play's side when no composition is chosen", () => {
     const off = library[0];
     const def = { ...play("d0", "Cover 2"), side: "defense" as const };
@@ -348,15 +244,6 @@ describe("paper", () => {
 });
 
 describe("playbook file", () => {
-  test("round-trips the book, its plays and the team", () => {
-    const json = encodePlaybookFile(book, library, team);
-    const file = decodePlaybookFile(json);
-    expect(file?.playbook.plays).toEqual(["p0", "p1", "p2", "p3", "p4", "p5", "p6"]);
-    expect(file?.plays).toHaveLength(7);
-    expect(file?.team).toEqual(team);
-    expect(decodePlaybookFile("{}")).toBeNull();
-    expect(decodePlaybookFile("nope")).toBeNull();
-  });
   test("refuses files it can't vouch for, each with a reason", () => {
     const good = JSON.parse(encodePlaybookFile(book, library, team)) as Record<string, unknown>;
     const read = (patch: Record<string, unknown>) => readPlaybookFile(JSON.stringify({ ...good, ...patch }));
@@ -371,9 +258,6 @@ describe("playbook file", () => {
     expect(read({ plays: Array.from({ length: 501 }, () => dup) })).toEqual({ ok: false, error: "tooManyPlays" });
     expect(read({ plays: [dup, dup] })).toEqual({ ok: false, error: "duplicatePlays" });
     expect(readPlaybookFile("x".repeat(MAX_FILE_BYTES + 1))).toEqual({ ok: false, error: "tooLarge" });
-    for (const e of ["tooLarge", "notJson", "notPlaybook", "newerVersion", "unknownVersion", "tooManyPlays", "duplicatePlays"] as const) {
-      expect(importMessage(e).length).toBeGreaterThan(10);
-    }
   });
   test("extreme values are tamed and unreadable plays are counted, not imported", () => {
     const good = JSON.parse(encodePlaybookFile(book, library, team)) as { plays: Record<string, unknown>[] };

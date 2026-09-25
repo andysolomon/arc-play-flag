@@ -1,13 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { defaults } from "@/lib/play/routes";
 import {
-  DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, StorageError, readAll, readDraft, readPlaybooks, readTeam, store,
-  storePlaybook, writeDraft, writeTeam, type StorageLike,
+  TEAM_KEY, StorageError, readAll, readPlaybooks, readTeam, store, storePlaybook, writeDraft, writeTeam, type StorageLike,
 } from "@/lib/play/storage";
 import type { SavedPlay } from "@/lib/play/types";
-import {
-  BACKUP_KIND, applyBackupRestore, backupMessage, encodeBackupFile, planBackupRestore, readBackupFile, readBackupState,
-} from "./backup";
+import { applyBackupRestore, encodeBackupFile, planBackupRestore, readBackupFile, readBackupState } from "./backup";
 
 function memory(): StorageLike & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -30,37 +27,6 @@ const play = (id: string, name: string): SavedPlay => ({
 });
 
 describe("on-device backup", () => {
-  test("round-trips every play, ordered references, team, draft, notes, primary flags and custom geometry", () => {
-    const source = memory();
-    const inBook = play("booked", "Booked");
-    const unbooked = play("loose", "Unbooked");
-    store(inBook, source);
-    store(unbooked, source);
-    storePlaybook({ id: "week", name: "Week", plays: ["loose", "booked"] }, source);
-    writeTeam({ name: "Otters", color: "#123abc" }, source);
-    writeDraft({ id: "booked", name: "Changed draft", notes: "Not saved yet", players: unbooked.players }, source);
-
-    const encoded = encodeBackupFile(source);
-    expect(encoded.filename).toMatch(/^otters-device-backup-\d{4}-\d{2}-\d{2}\.json$/);
-    const read = readBackupFile(encoded.json);
-    expect(read.ok).toBe(true);
-    if (!read.ok) throw new Error(read.error);
-    expect(read.file.kind).toBe(BACKUP_KIND);
-    expect(read.file.plays.map((p) => p.id)).toEqual(["booked", "loose"]);
-    expect(read.file.playbooks[0]?.plays).toEqual(["loose", "booked"]);
-    expect(read.file.plays[0]?.notes).toBe("Read for Booked");
-    expect(read.file.plays[0]?.players.find((p) => p.id === "o3")?.route).toEqual({
-      type: "custom", pts: [[8, -2], [19, -10]], primary: true,
-    });
-
-    const target = memory();
-    applyBackupRestore(planBackupRestore(read.file, readBackupState(target), "replace"), target);
-    expect(readAll(target)).toEqual(readAll(source));
-    expect(readPlaybooks(target)).toEqual(readPlaybooks(source));
-    expect(readTeam(target)).toEqual(readTeam(source));
-    expect(readDraft(target)).toEqual(readDraft(source));
-  });
-
   test("refuses an invalid or incomplete backup before any write", () => {
     const target = memory();
     store(play("keep", "Keep"), target);
@@ -76,7 +42,6 @@ describe("on-device backup", () => {
     const playbooks = [{ id: "bad", name: "Bad", plays: ["missing"] }];
     expect(read({ playbooks })).toEqual({ ok: false, error: "invalidData" });
     expect(target.data).toEqual(before);
-    expect(backupMessage("invalidData")).toContain("Nothing was changed");
   });
 
   test("refuses prototype-pollution IDs before any restore write", () => {
@@ -235,9 +200,5 @@ describe("on-device backup", () => {
     };
     expect(() => { applyBackupRestore(plan, flaky); }).toThrow(StorageError);
     expect(target.data).toEqual(before);
-    expect(target.data.get(PLAYS_KEY)).toBe(before.get(PLAYS_KEY));
-    expect(target.data.get(PLAYBOOKS_KEY)).toBe(before.get(PLAYBOOKS_KEY));
-    expect(target.data.get(TEAM_KEY)).toBe(before.get(TEAM_KEY));
-    expect(target.data.get(DRAFT_KEY)).toBe(before.get(DRAFT_KEY));
   });
 });

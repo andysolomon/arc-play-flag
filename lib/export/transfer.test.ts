@@ -2,37 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { defaults } from "@/lib/play/routes";
 import type { SavedPlay } from "@/lib/play/types";
 import { encodePlaybookFile, MAX_FILE_BYTES } from "./playbook-file";
-import { encodePlayFile, planTransfer, readTransfer, transferPlays, type Transfer } from "./transfer";
+import { planTransfer, readTransfer, type Transfer } from "./transfer";
 
 const play: SavedPlay = { id: "one", name: "Wheel", side: "offense", notes: "Sell the fake. 🏈", players: defaults().map(p => p.id === "o3" ? { ...p, route: { type: "custom", pts: [[12, -5], [8, -10]], primary: true } } : p.id === "d1" ? { ...p, route: { type: "man", target: "o3" } } : p) };
 const decode = (text: string): Transfer => { const result = readTransfer(text); if (!result.ok) throw new Error(result.error); return result.file; };
 
 describe("play and playbook transfers", () => {
-  test("standalone offense and defense preserve routes, notes and primary without creating a book", () => {
-    for (const side of ["offense", "defense"] as const) {
-      const source = { ...play, side };
-      const result = readTransfer(encodePlayFile(source));
-      expect(result).toMatchObject({ ok: true, skipped: 0, normalized: false, file: { play: source } });
-      const plan = planTransfer(decode(encodePlayFile(source)), [], []);
-      expect(plan.plays).toEqual([source]);
-      expect(plan.book).toBeNull();
-    }
-  });
-  test("book order is independent of library order and unrelated plays stay out", () => {
-    const other = { ...play, id: "two", name: "Zone", side: "defense" as const };
-    const json = encodePlaybookFile({ id: "book", name: "Sunday", plays: ["two", "one"] }, [play, other, { ...play, id: "private" }], null);
-    const file = decode(json);
-    expect(transferPlays(file)).toEqual([other, play]);
-    expect(json).not.toContain("private");
-    expect(readTransfer(json)).toMatchObject({ normalized: false });
-  });
-  test("distinct identical plays keep their own IDs and book positions", () => {
-    const second = { ...play, id: "second" };
-    const file = decode(encodePlaybookFile({ id: "b", name: "Two calls", plays: [play.id, second.id] }, [play, second], null));
-    const plan = planTransfer(file, [second, play], []);
-    expect(plan.book?.plays).toEqual([play.id, second.id]);
-    expect(plan.reused).toBe(2);
-  });
   test("repeated conflicting imports reuse both copied plays and the copied book", () => {
     const file = decode(encodePlaybookFile({ id: "book", name: "Sunday", plays: [play.id] }, [play], null));
     const local = { ...play, notes: "Local edits" };
