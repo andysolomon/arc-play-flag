@@ -28,11 +28,11 @@ Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses 
 | `playbooks` | Build a playbook | Name the team, import a handed-over book, create one, add and order plays |
 | `print-playbook` | Print it for the sideline | Wristbands, binder pages, postcards, flyer, playbook file |
 
-A chapter carries at most six `covers` entries; past that it stops being legible on a phone. If a feature does not fit one of these stories, add the smallest useful chapter rather than stretching an existing clip. Update the expected chapter count in `components/demo/demos.test.ts` deliberately.
+A chapter carries at most six `covers` entries; past that it stops being legible on a phone. If a feature does not fit one of these stories, add the smallest useful chapter rather than stretching an existing clip.
 
 ### Coverage is a promise, not a caption
 
-The `covers` pills on a chapter's `/demo` card are checked, not asserted by hand. Each beat declares the features it demonstrates, and a feature is only counted once that beat has completed — so a failed assertion never counts as coverage. `driver.finish()` refuses to publish a chapter whose card promises something no beat demonstrated, and a beat that claims a feature the card does not list is an error too. `scripts/demo-recorder/coverage.ts` holds the rules; `coverage.test.ts` covers them without a browser.
+The `covers` pills on a chapter's `/demo` card are checked, not asserted by hand. Each beat declares the features it demonstrates, and a feature is only counted once that beat has completed — so a failed assertion never counts as coverage. `driver.finish()` refuses to publish a chapter whose card promises something no beat demonstrated, and a beat that claims a feature the card does not list is an error too. `scripts/demo-recorder/coverage.ts` holds the rules; `coverage.test.ts` checks, without a browser, that a chapter is only satisfied once every promised feature is proven.
 
 ## The recorder
 
@@ -47,7 +47,7 @@ The development-only recorder in `scripts/demo-recorder/` is the canonical way t
 | `scripts/demo-recorder/interactions.ts` | Bounded, state-confirmed retries for controls that can render before React hydration |
 | `scripts/demo-recorder/runtime.ts` | Disposable profile, capture, encoding, verification, publishing into the output directory |
 | `scripts/demo-recorder/media.ts` | The asset contract as pure checks over `ffprobe` output |
-| `scripts/demo-recorder/*.test.ts` | Unit tests for arguments, fixtures, manifest alignment, cleanup, and the contract |
+| `scripts/demo-recorder/*.test.ts` | Unit tests for the coverage ledger and the refusal to overwrite existing output |
 
 ### Privacy and isolation
 
@@ -171,8 +171,7 @@ To add a chapter:
 2. Add the slug to `CHAPTER_SLUGS` in `options.ts` and a `CHAPTERS` entry in `chapters.ts` with the same `targetSeconds` as the manifest's `time`.
 3. Add any starting play to `fixtures.ts` and, if the chapter opens one, to `CHAPTER_PLAY`; a chapter that must start mid-edit seeds `CHAPTER_DRAFT` instead.
 4. Give every `covers` entry a beat that proves it: pass the feature names to the `expectState` (or `download`) that confirms the action landed.
-5. Run `bun test scripts/demo-recorder`; the tests fail until the manifest, slugs, and lengths agree.
-6. Record it, review it, publish the three files, and add them to `public/sw.js` with a cache version bump.
+5. Record it, review it, publish the three files, and add them to `public/sw.js` with a cache version bump.
 
 ## 1. Prepare deterministic app data
 
