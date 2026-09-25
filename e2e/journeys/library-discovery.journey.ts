@@ -55,9 +55,30 @@ test("a playbook entry opens in the designer and can be added to another book fr
   expect(Object.keys(await storedPlays(page))).toEqual(["alpha"]);
   await expect.poll(async () => (await storedDraft(page))?.id).toBe("alpha");
 
-  // add from the playbook editor (saved-play library no longer lives in Play tools)
+  // add from the playbooks list without opening the book (saved-play library no longer lives in Play tools)
+  await page.goto("/playbooks");
+  await page.getByRole("button", { name: "More actions for Alpha Slant" }).click();
+  await page.getByRole("button", { name: "Add to playbook…" }).click();
+  const picker = page.getByRole("dialog", { name: "Add “Alpha Slant” to a playbook" });
+  await expect(picker.getByRole("button", { name: "Source Book" })).toHaveAttribute("aria-pressed", "true");
+  await picker.getByRole("button", { name: "Target Book" }).click();
+  await expect(picker.getByRole("button", { name: "Target Book" })).toHaveAttribute("aria-pressed", "true");
+  await picker.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("link", { name: /Target Book/ }).first()).toContainText("1 play");
+  expect((await storedPlaybooks(page)).target?.plays).toEqual(["alpha"]);
+
+  // or from the book's card: the same picker the playbook editor opens
+  await page.getByRole("button", { name: "More actions for Target Book" }).click();
+  await page.getByRole("button", { name: "Add plays…" }).click();
+  const books = page.getByRole("dialog", { name: "Add plays to “Target Book”" });
+  await books.getByTitle("Remove Alpha Slant").click();
+  await books.getByRole("button", { name: "Done" }).click();
+  expect((await storedPlaybooks(page)).target?.plays).toEqual([]);
+
   await page.goto("/playbooks?book=target");
-  await page.getByTitle("Add Alpha Slant").click();
+  await page.getByRole("button", { name: "+ Add plays" }).click();
+  await page.getByRole("dialog").getByTitle("Add Alpha Slant").click();
+  await page.getByRole("button", { name: "Done" }).click();
   expect((await storedPlaybooks(page)).target?.plays).toEqual(["alpha"]);
   await expect(page.getByText("Alpha Slant", { exact: true })).toBeVisible();
 });

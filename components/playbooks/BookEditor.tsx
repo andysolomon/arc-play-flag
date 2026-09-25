@@ -5,15 +5,14 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { numbered } from "@/lib/export/numbered";
 import {
-  addPlayToPlaybook, deletePlaybook, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam,
+  deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam,
   subscribe, swapPlaybookReferences, updatePlaybook,
 } from "@/lib/play/library";
-import type { PlayFilter, PlaySort } from "@/lib/play/library";
 import { failureMessage } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
-import { TypeFilter } from "./TypeFilter";
-import { card, divider, eyebrow, input, pill, pillSm } from "../ui";
+import { card, divider, eyebrow, input, pill, pillDark, pillSm } from "../ui";
+import { AddPlaysModal } from "./AddPlays";
 import { ShareBook } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
@@ -26,12 +25,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const book = books.find((b) => b.id === id) ?? null;
   const items = useMemo(() => (book ? numbered(book, plays) : []), [book, plays]);
-  const inBook = useMemo(() => new Set(items.map((i) => i.play.id)), [items]);
-  const others = plays.filter((p) => !inBook.has(p.id));
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<PlayFilter>("all");
-  const [sort, setSort] = useState<PlaySort>("recent");
-  const visibleOthers = useMemo(() => discoverPlays(others, { query, filter, sort }), [filter, others, query, sort]);
+  const [adding, setAdding] = useState(false);
 
   if (!book) {
     return (
@@ -82,10 +76,15 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
 
       <ShareBook key={book.id} book={book} plays={plays} team={team} />
       <span className={divider} />
-      <span className={eyebrow}>PLAYS IN THIS PLAYBOOK</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={eyebrow}>PLAYS IN THIS PLAYBOOK</span>
+        <span className="flex-1" />
+        <button type="button" onClick={() => { setAdding(true); }} className={`${pillDark} min-h-11 px-4 text-small`}>+ Add plays</button>
+      </div>
+      {adding && <AddPlaysModal bookId={book.id} say={say} onClose={() => { setAdding(false); }} />}
       {items.length === 0 ? (
         <div className="rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base leading-body text-ink-muted">
-          Empty. Add plays from the list below.
+          {plays.length === 0 ? "Empty. Save a play in the designer, then add it here." : "Empty. Tap + Add plays to pick from your saved plays."}
         </div>
       ) : (
         <ol className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-3">
@@ -111,39 +110,6 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
           ))}
         </ol>
       )}
-
-      <span className={divider} />
-      <span className={eyebrow}>ADD PLAYS</span>
-      {others.length === 0 ? (
-        <span className="text-base text-ink-muted">
-          {plays.length === 0 ? "Save a play in the designer first." : "Every saved play is already in this playbook."}
-        </span>
-      ) : (<>
-        <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
-          <input value={query} onChange={(e) => { setQuery(e.target.value); }} placeholder="Search names and notes" aria-label="Search plays to add" className={`${input} col-span-2 sm:col-span-1`} />
-          <TypeFilter value={filter} onChange={setFilter} label="Filter plays to add" />
-          <select value={sort} onChange={(e) => { setSort(e.target.value as PlaySort); }} aria-label="Sort plays to add" className={input}>
-            <option value="recent">Recent</option><option value="name">Name</option>
-          </select>
-        </div>
-        {visibleOthers.length === 0 ? (
-          <div className="rounded-tile border-2 border-dashed border-ink px-3 py-5 text-center text-base text-ink-muted">No plays match. Try another search or filter.</div>
-        ) : <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-          {visibleOthers.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => { const r = addPlayToPlaybook(book.id, p.id); if (!r.ok) say(failureMessage(r.error), 3200); }}
-              title={`Add ${p.name}`}
-              className={`${card} flex cursor-pointer flex-col gap-2 text-left transition-transform duration-[120ms] hover:-translate-y-0.5 hover:bg-yellow-soft motion-reduce:transition-none`}
-            >
-              <PlayThumb players={p.players} name={p.name} side={p.side} />
-              <span className="truncate text-base">{p.name}</span>
-              <span className="text-caption text-ink-muted">+ Add</span>
-            </button>
-          ))}
-        </div>}
-      </>)}
 
       <span className={divider} />
       <span className={eyebrow}>EXPORT</span>

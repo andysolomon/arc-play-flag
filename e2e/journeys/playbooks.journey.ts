@@ -19,21 +19,29 @@ test("a coach makes a playbook, adds plays, reorders them, and the order survive
   const name = page.getByRole("textbox", { name: "Playbook name" });
   await expect(name).toHaveValue("Playbook 1");
   await name.fill("Otter Game Plan");
-  await expect(page.getByText("Empty. Add plays from the list below.")).toBeVisible();
+  await expect(page.getByText("Empty. Tap + Add plays to pick from your saved plays.")).toBeVisible();
 
-  await page.getByTitle("Add Otter Slant Left").click();
-  await page.getByTitle("Add Otter Wheel Right").click();
-  await page.getByTitle("Add Otter Cover Two").click();
-  await expect(items(page)).toHaveText([/Otter Slant Left/, /Otter Wheel Right/, /Otter Cover Two/]);
-  await expect(page.getByText("Every saved play is already in this playbook.")).toBeVisible();
+  await page.getByRole("button", { name: "+ Add plays" }).click();
+  const picker = page.getByRole("dialog", { name: "Add plays to “Otter Game Plan”" });
+  await picker.getByTitle("Add Otter Slant Left").click();
+  await picker.getByTitle("Add Otter Wheel Right").click();
+  await picker.getByTitle("Add Otter Cover Two").click();
+  await expect(picker.getByTitle("Remove Otter Cover Two")).toHaveAttribute("aria-pressed", "true");
+  await expect(picker.getByText("3 plays in this playbook")).toBeVisible();
+  // a second tap takes it back out, a third puts it back at the end
+  await picker.getByTitle("Remove Otter Slant Left").click();
+  await picker.getByTitle("Add Otter Slant Left").click();
+  await picker.getByRole("button", { name: "Done" }).click();
+  await expect(picker).toBeHidden();
+  await expect(items(page)).toHaveText([/Otter Wheel Right/, /Otter Cover Two/, /Otter Slant Left/]);
 
   await items(page).nth(0).getByRole("button", { name: "Move down" }).click();
-  await expect(items(page)).toHaveText([/Otter Wheel Right/, /Otter Slant Left/, /Otter Cover Two/]);
+  await expect(items(page)).toHaveText([/Otter Cover Two/, /Otter Wheel Right/, /Otter Slant Left/]);
   await expect(items(page).nth(0).getByLabel("Play 1")).toBeVisible();
 
   await page.reload();
   await expect(name).toHaveValue("Otter Game Plan");
-  await expect(items(page)).toHaveText([/Otter Wheel Right/, /Otter Slant Left/, /Otter Cover Two/]);
+  await expect(items(page)).toHaveText([/Otter Cover Two/, /Otter Wheel Right/, /Otter Slant Left/]);
 
   await page.getByRole("button", { name: "Remove Otter Cover Two" }).click();
   await expect(items(page)).toHaveText([/Otter Wheel Right/, /Otter Slant Left/]);
