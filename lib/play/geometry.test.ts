@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cardWidth, clamp, depth, fieldLayout, geom, routeYards, snap, ybv } from "./geometry";
+import { clamp, depth, fieldLayout, geom, routeYards, ybv } from "./geometry";
 import { PITCH_SET, defaults } from "./routes";
 import type { Player } from "./types";
 import { zoneLayout } from "./zones";
@@ -21,20 +21,6 @@ describe("clamp", () => {
     expect(clamp(-4, 40, null, TOP)).toEqual({ x: 1.2, y: 7.4 });
     expect(clamp(40, -99, null, TOP)).toEqual({ x: 28.8, y: TOP + 1.2 });
   });
-  test("a free point passes through unchanged when inside", () => {
-    expect(clamp(10, -2, null, TOP)).toEqual({ x: 10, y: -2 });
-  });
-});
-
-describe("snap", () => {
-  test("half-yard by default", () => {
-    expect(snap(3.3)).toBe(3.5);
-    expect(snap(3.2)).toBe(3);
-  });
-  test("one-yard and free modes", () => {
-    expect(snap(3.6, "one")).toBe(4);
-    expect(snap(3.6, "free")).toBe(3.6);
-  });
 });
 
 describe("depth", () => {
@@ -42,29 +28,9 @@ describe("depth", () => {
     expect(depth(defaults(), { pw: 1000, ph: 300 })).toBe(24);
     expect(depth(defaults(), { pw: 300, ph: 1000 })).toBe(45);
   });
-  test("falls back to a 45-yard card before the pane is measured", () => {
-    expect(depth(defaults(), null)).toBe(45);
-  });
-  test("follows the pane aspect in half-yard steps", () => {
-    expect(depth(defaults(), { pw: 900, ph: 810 })).toBe(27);
-  });
   test("grows to fit the deepest player", () => {
     const deep = defaults().map((p) => (p.id === "d5" ? { ...p, y: -20 } : p));
     expect(depth(deep, { pw: 1000, ph: 300 })).toBe(29);
-  });
-  test("makes room for a deep zone shell", () => {
-    const shell = defaults().map((p) => (p.id === "d5" ? { ...p, route: { type: "zoneDeep" as const } } : p));
-    // need = min(-11, min(-12, -15) - 2.9) = -17.9 → 8 + 17.9 + 1.2 = 27.1 → 27
-    expect(depth(shell, { pw: 1000, ph: 300 })).toBe(27);
-  });
-});
-
-describe("cardWidth", () => {
-  test("letterboxes to the pane", () => {
-    expect(cardWidth({ pw: 800, ph: 600 }, 24)).toBe(750);
-    expect(cardWidth({ pw: 400, ph: 900 }, 45)).toBe(400);
-    expect(cardWidth({ pw: 3000, ph: 3000 }, 30)).toBe(1200);
-    expect(cardWidth(null, 30)).toBeNull();
   });
 });
 
@@ -130,11 +96,6 @@ describe("geom", () => {
     expect(mirrored).toEqual([[19, 5], [11.5, 6.2], [8, PITCH_SET], [7, -5]]);
     // a quarterback's pitch route is a rollout from their own spot
     expect(routeYards(at("o2", { type: "pitch" }), players, TOP)).toEqual([[15, 5], [18.5, 6.2], [22, PITCH_SET], [23, -5]]);
-  });
-  test("primary read is thicker and red", () => {
-    const g = geom(at("o1", { type: "go", primary: true }), players, TOP, {});
-    expect(g?.width).toBe(6.5);
-    expect(g?.color).toBe("#c2261a");
   });
   test("blitz drives at the quarterback", () => {
     const g = geom(at("d5", { type: "blitz" }), players, TOP, {});

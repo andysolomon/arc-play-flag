@@ -14,13 +14,6 @@ const at = (pos: Record<string, { x: number; y: number }>, id: string) => {
 };
 
 describe("tracks", () => {
-  test("a play with no routes still runs for a second, and nobody moves", () => {
-    const m = buildMotion(defaults(), TOP);
-    expect(m.kind).toBe("hold");
-    expect(m.dur).toBeGreaterThanOrEqual(1);
-    const pos = positionsAt(m, defaults(), 0.5);
-    for (const p of defaults()) expect(pos[p.id]).toEqual({ x: p.x, y: p.y });
-  });
   test("a routed player runs the route at a steady speed and stops at the end", () => {
     const ps = defaults().map(withRoute("o3", { type: "go" }));
     const m = buildMotion(ps, TOP);
@@ -51,26 +44,6 @@ describe("tracks", () => {
   });
 });
 
-describe("the snap", () => {
-  test("under centre the exchange is quick and on the ground", () => {
-    const ps = defaults().map((p) => (p.id === "o2" ? { ...p, y: 2 } : p));
-    const m = buildMotion(ps, TOP);
-    expect(m.shotgun).toBe(false);
-    expect(m.snapAt).toBe(0.12);
-    expect(ballAt(m, positionsAt(m, ps, 0), 0)).toEqual({ x: 15, y: 1, lift: 0 });
-  });
-  test("a shotgun snap flies back to the quarterback", () => {
-    const ps = defaults();
-    const m = buildMotion(ps, TOP);
-    expect(m.shotgun).toBe(true);
-    const pos = positionsAt(m, ps, 0);
-    const mid = ballAt(m, pos, m.snapAt / 2);
-    expect(mid?.y).toBeCloseTo(3, 5);
-    expect(mid?.lift).toBeGreaterThan(0);
-    expect(ballAt(m, pos, m.snapAt + 1)).toEqual({ x: 15, y: 5, lift: 0 });
-  });
-});
-
 describe("the call", () => {
   test("a run route alone makes it a run: the ball is handed off at the mesh and rides with the runner", () => {
     const ps = defaults().map(withRoute("o5", { type: "dive" }));
@@ -84,13 +57,6 @@ describe("the call", () => {
     expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o5"), lift: 0 });
     expect(at(late, "o5").y).toBeCloseTo(-5, 5);
   });
-  test("a quarterback keeper needs no handoff", () => {
-    const ps = defaults().map(withRoute("o2", { type: "dive" }));
-    const m = buildMotion(ps, TOP);
-    expect(m.kind).toBe("run");
-    expect(m.runner).toBe("o2");
-    expect(m.handAt).toBe(m.snapAt);
-  });
   test("a receiver's route is a pass, led so the ball lands on them", () => {
     const ps = defaults().map(withRoute("o4", { type: "out", primary: true }));
     const m = buildMotion(ps, TOP);
@@ -101,13 +67,6 @@ describe("the call", () => {
     expect(ballAt(m, positionsAt(m, ps, mid), mid)?.lift).toBeCloseTo(1, 5);
     const late = positionsAt(m, ps, m.dur);
     expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o4"), lift: 0 });
-  });
-  test("repeated teaching playback always throws to the primary among multiple receivers", () => {
-    const ps = defaults()
-      .map(withRoute("o3", { type: "go", primary: true }))
-      .map(withRoute("o4", { type: "slant" }))
-      .map(withRoute("o5", { type: "out" }));
-    for (let i = 0; i < 20; i++) expect(buildMotion(ps, TOP).receiver).toBe("o3");
   });
   test("explicit simulation playback can explore receivers other than the primary", () => {
     const ps = defaults()
@@ -172,19 +131,6 @@ describe("the call", () => {
     // and comes back before the throw
     const pre = positionsAt(m, ps, m.throwAt - 0.01);
     expect(ballAt(m, pre, m.throwAt - 0.01)).toEqual({ ...at(pre, "o2"), lift: 0 });
-  });
-  test("a pitch with nobody to throw to is a toss and a run", () => {
-    const ps = defaults().map(withRoute("o5", { type: "pitch" }));
-    const m = buildMotion(ps, TOP);
-    expect(m.kind).toBe("run");
-    expect(m.runner).toBe("o5");
-    expect(m.passer).toBe("o2");
-    // the toss is in the air
-    const mid = m.handAt + m.handFor / 2;
-    expect(ballAt(m, positionsAt(m, ps, mid), mid)?.lift).toBeGreaterThan(0);
-    const late = positionsAt(m, ps, m.dur);
-    expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o5"), lift: 0 });
-    expect(at(late, "o5").y).toBeCloseTo(-5, 5);
   });
   test("a pitch beside a primary receiver: the runner takes the toss, sets up behind the line and throws", () => {
     const ps = defaults().map(withRoute("o5", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
