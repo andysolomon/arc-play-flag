@@ -591,8 +591,10 @@ async function playbooks(d: ChapterDriver): Promise<void> {
   }, 260, ["Playbook creation"]);
 
   await d.say("Add plays, then put them in calling order");
+  await d.click(d.page.getByRole("button", { name: "+ Add plays", exact: true }), "+ Add plays", 200);
   await d.click(d.page.getByTitle(`Add ${QUICK_SLANT.name}`), `Add ${QUICK_SLANT.name}`, 200);
   await d.click(d.page.getByTitle(`Add ${PLAY_ACTION_WHEEL.name}`), `Add ${PLAY_ACTION_WHEEL.name}`, 300);
+  await d.click(d.page.getByRole("button", { name: "Done", exact: true }), "Done", 200);
   await d.click(items.nth(0).getByRole("button", { name: "Move down", exact: true }), "Move the opener down", 200);
   await d.expectState("The wheel now opens the playbook", async () => {
     await expect(items).toHaveText([new RegExp(PLAY_ACTION_WHEEL.name), new RegExp(QUICK_SLANT.name)], { timeout: ASSERT_TIMEOUT });

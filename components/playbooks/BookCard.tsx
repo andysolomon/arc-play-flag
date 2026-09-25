@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { deletePlaybook } from "@/lib/play/library";
@@ -8,6 +9,7 @@ import { failureMessage, kebab } from "@/lib/play/storage";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
 import { card, chip, pillDark } from "../ui";
+import { AddPlaysModal } from "./AddPlays";
 import { MoreMenu, menuItem, menuItemDanger } from "./MoreMenu";
 import type { Say } from "./PlaybooksScreen";
 import { ShareBookButton, useShareCount } from "./ShareBook";
@@ -22,6 +24,7 @@ type Props = { book: Playbook; plays: readonly SavedPlay[]; team: TeamSettings; 
 /** One playbook on the list: a stack of its first plays, name and count, then Open · Share · ⋯ */
 export function BookCard({ book: b, plays, team, say }: Props) {
   const links = useShareCount(b.id);
+  const [adding, setAdding] = useState(false);
   const inBook = b.plays.flatMap((id) => plays.find((p) => p.id === id) ?? []);
   const [cover, ...rest] = inBook;
   const href = `/playbooks?book=${b.id}`;
@@ -57,6 +60,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
         <ShareBookButton book={b} plays={plays} team={team} />
         <MoreMenu label={`More actions for ${b.name}`}>
           {(close) => (<>
+            <button type="button" className={menuItem} onClick={() => { close(); setAdding(true); }}>Add plays…</button>
             <button type="button" className={menuItem} onClick={() => {
               close();
               download(new Blob([encodePlaybookFile(b, inBook, team.name ? team : null)], { type: "application/json" }), `${kebab(b.name)}.playbook.json`);
@@ -71,6 +75,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
           </>)}
         </MoreMenu>
       </div>
+      {adding && <AddPlaysModal bookId={b.id} say={say} onClose={() => { setAdding(false); }} />}
     </div>
   );
 }
