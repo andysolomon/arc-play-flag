@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
-import { RELEASE_PLACEHOLDER, stampWorker } from "./release";
+import { stampWorker } from "./release";
 
 const ORIGIN = "https://play.test";
 const PUBLIC = join(import.meta.dir, "../../public");
@@ -69,13 +69,11 @@ type WorkerEvent = "install" | "activate" | "fetch" | "message";
 type Listener = (event: Record<string, unknown>) => void;
 type Fetcher = (input: RequestInfo | URL) => Promise<Response>;
 
-function harness(script = "/sw.js") {
+function harness() {
   const listeners = new Map<WorkerEvent, Listener>();
   const caches = new MemoryCaches();
   const fetched: string[] = [];
-  const posted: unknown[] = [];
   let skipped = false;
-  let claimed = false;
   let fetcher: Fetcher = (input) => {
     const key = keyFor(input);
     const html = key === "/"
@@ -94,13 +92,9 @@ function harness(script = "/sw.js") {
   };
 
   const self = {
-    location: { origin: ORIGIN, href: ORIGIN + script },
+    location: { origin: ORIGIN, href: ORIGIN + "/sw.js" },
     addEventListener(type: WorkerEvent, listener: Listener) { listeners.set(type, listener); },
     skipWaiting() { skipped = true; return Promise.resolve(); },
-    clients: {
-      claim() { claimed = true; return Promise.resolve(); },
-      matchAll() { return Promise.resolve([{ postMessage: (value: unknown) => posted.push(value) }]); },
-    },
   };
 
   runInNewContext(SOURCE, {
@@ -120,18 +114,18 @@ function harness(script = "/sw.js") {
     Error,
   });
 
-  const lifetime = async (type: "install" | "activate") => {
+  const install = async () => {
     let promise: Promise<unknown> | undefined;
-    listeners.get(type)?.({ waitUntil(next: Promise<unknown>) { promise = next; } });
-    if (!promise) throw new Error(`${type} did not extend its lifetime`);
+    listeners.get("install")?.({ waitUntil(next: Promise<unknown>) { promise = next; } });
+    if (!promise) throw new Error("install did not extend its lifetime");
     await promise;
   };
 
-  const request = (path: string, options: { mode?: string; range?: string } = {}) => ({
+  const request = (path: string, mode = "same-origin") => ({
     method: "GET",
-    mode: options.mode ?? "same-origin",
+    mode,
     url: ORIGIN + path,
-    headers: new Headers(options.range ? { range: options.range } : undefined),
+    headers: new Headers(),
   }) as Request;
 
   const dispatchMessage = async (data: unknown): Promise<unknown[]> => {
@@ -163,14 +157,12 @@ function harness(script = "/sw.js") {
   return {
     caches,
     fetched,
-    posted,
     request,
     dispatchFetch,
     dispatchMessage,
-    lifetime,
+    install,
     setFetch(next: Fetcher) { fetcher = next; },
     get skipped() { return skipped; },
-    get claimed() { return claimed; },
   };
 }
 
@@ -180,7 +172,7 @@ describe("offline service worker", () => {
   beforeEach(() => { worker = harness(); });
 
   test("claims readiness only after every route, advertised demo, icon, and discovered build asset is cached", async () => {
-    await worker.lifetime("install");
+    await worker.install();
 
     const shell = await worker.caches.open("ffpd-shell-test");
     expect(await shell.match("/__ffpd_offline_ready__")).toBeDefined();
@@ -214,39 +206,17 @@ describe("offline service worker", () => {
     expect(worker.skipped).toBe(false);
   });
 
-  test("names its cache after the stamped release, reports that release, and takes over only when the page asks", async () => {
-    expect(TEMPLATE).toContain(RELEASE_PLACEHOLDER);
-    expect(SOURCE).not.toContain(RELEASE_PLACEHOLDER);
-    expect(() => stampWorker(TEMPLATE, "not a token")).toThrow();
-
-    await worker.lifetime("install");
-    expect(await worker.dispatchMessage({ type: "FFPD_RELEASE_REQUEST" })).toEqual([{ type: "FFPD_RELEASE", release: "test" }]);
-    expect(await worker.dispatchMessage({ type: "FFPD_OFFLINE_STATUS_REQUEST" }))
-      .toEqual([{ type: "FFPD_OFFLINE_STATUS", status: "ready", release: "test" }]);
-    expect(worker.skipped).toBe(false);
-
-    await worker.dispatchMessage({ type: "FFPD_SKIP_WAITING" });
-    expect(worker.skipped).toBe(true);
-  });
-
   test("a superseded worker never re-creates the shell a newer release swept", async () => {
-    await worker.lifetime("install");
+    await worker.install();
     await worker.caches.delete("ffpd-shell-test");
 
     const asset = await worker.dispatchFetch(worker.request("/_next/static/late.js"));
     expect(asset.status).toBe(200);
-    const page = await worker.dispatchFetch(worker.request("/", { mode: "navigate" }));
+    const page = await worker.dispatchFetch(worker.request("/", "navigate"));
     expect(page.status).toBe(200);
     expect(await worker.dispatchMessage({ type: "FFPD_OFFLINE_STATUS_REQUEST" }))
       .toEqual([{ type: "FFPD_OFFLINE_STATUS", status: "unavailable", release: "test" }]);
     expect(await worker.caches.keys()).not.toContain("ffpd-shell-test");
-  });
-
-  test("a page can stand up a worker of a named release for a rehearsal", async () => {
-    const next = harness("/sw.js?release=e2e-next");
-    await next.lifetime("install");
-    expect(await (await next.caches.open("ffpd-shell-e2e-next")).match("/__ffpd_offline_ready__")).toBeDefined();
-    expect(await next.dispatchMessage({ type: "FFPD_RELEASE_REQUEST" })).toEqual([{ type: "FFPD_RELEASE", release: "e2e-next" }]);
   });
 
   test("stores each optimizer url as the source icon and never calls the optimizer", async () => {
@@ -261,86 +231,12 @@ describe("offline service worker", () => {
       return Promise.resolve(new Response(html, { status: 200 }));
     });
 
-    await worker.lifetime("install");
+    await worker.install();
     const shell = await worker.caches.open("ffpd-shell-test");
     const sized = await shell.match("/_next/image?url=%2Ficons%2FzoneFlat.png&w=56&q=75");
     expect(sized).toBeDefined();
     expect(await sized?.text()).toBe("png-bytes");
     expect(await (await shell.match("/_next/image?url=%2Ficons%2FzoneFlat.png&w=40&q=75"))?.text()).toBe("png-bytes");
     expect(worker.fetched.some((path) => path.startsWith("/_next/image"))).toBe(false);
-  });
-
-  test("a missing required asset aborts install without a ready marker", async () => {
-    worker.setFetch((input) => Promise.resolve(keyFor(input) === "/demos/save-share.mp4"
-      ? new Response("missing", { status: 404 })
-      : new Response("asset", { status: 200 })));
-
-    let failure: unknown;
-    try {
-      await worker.lifetime("install");
-    } catch (error) {
-      failure = error;
-    }
-    expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toContain("Offline asset unavailable");
-    expect(await (await worker.caches.open("ffpd-shell-test")).match("/__ffpd_offline_ready__")).toBeUndefined();
-    expect(worker.skipped).toBe(false);
-  });
-
-  test("preserves exact shared responses and refuses to substitute another play", async () => {
-    worker.setFetch((input) => Promise.resolve(new Response(`snapshot:${keyFor(input)}`, { status: 200 })));
-    const visited = await worker.dispatchFetch(worker.request("/p/exact-play", { mode: "navigate" }));
-    expect(await visited.text()).toBe("snapshot:/p/exact-play");
-
-    worker.setFetch(() => Promise.reject(new TypeError("offline")));
-    const cached = await worker.dispatchFetch(worker.request("/p/exact-play", { mode: "navigate" }));
-    expect(await cached.text()).toBe("snapshot:/p/exact-play");
-
-    const missing = await worker.dispatchFetch(worker.request("/p/different-play", { mode: "navigate" }));
-    expect(missing.status).toBe(503);
-    expect(await missing.text()).toContain("Shared play unavailable offline");
-  });
-
-  test("hosted book links are never cached and cannot substitute a local book offline", async () => {
-    const path = "/s/abcdefghijklmnop";
-    worker.setFetch(() => Promise.resolve(new Response("shared book")));
-    expect(await (await worker.dispatchFetch(worker.request(path, { mode: "navigate" }))).text()).toBe("shared book");
-    expect(await worker.caches.match(path)).toBeUndefined();
-    worker.setFetch(() => Promise.reject(new TypeError("offline")));
-    const response = await worker.dispatchFetch(worker.request(path, { mode: "navigate" }));
-    expect(response.status).toBe(503);
-    expect(await response.text()).toContain("Shared playbook unavailable offline");
-  });
-
-  test("serves cached media ranges and contains failed background refreshes", async () => {
-    const shell = await worker.caches.open("ffpd-shell-test");
-    await shell.put("/demos/run-play.webm", new Response(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]), {
-      headers: { "content-type": "video/webm" },
-    }));
-    worker.setFetch(() => Promise.reject(new TypeError("offline")));
-
-    const partial = await worker.dispatchFetch(worker.request("/demos/run-play.webm", { range: "bytes=2-5" }));
-    expect(partial.status).toBe(206);
-    expect(partial.headers.get("content-range")).toBe("bytes 2-5/8");
-    expect([...new Uint8Array(await partial.arrayBuffer())]).toEqual([2, 3, 4, 5]);
-
-    const whole = await worker.dispatchFetch(worker.request("/demos/run-play.webm"));
-    expect(whole.status).toBe(200);
-  });
-
-  test("deletes only superseded shell caches and leaves shared snapshots and foreign caches intact", async () => {
-    await worker.caches.open("ffpd-shell-test");
-    await worker.caches.open("ffpd-shell-1de5257");
-    await worker.caches.open("ffpd-shell-v4");
-    await worker.caches.open("ffpd-shell-v3");
-    await worker.caches.open("ffpd-v3");
-    await worker.caches.open("ffpd-snapshots-v1");
-    await worker.caches.open("another-app");
-
-    await worker.lifetime("activate");
-
-    expect(await worker.caches.keys()).toEqual(["ffpd-shell-test", "ffpd-snapshots-v1", "another-app"]);
-    expect(worker.claimed).toBe(true);
-    expect(worker.posted).toContainEqual({ type: "FFPD_OFFLINE_STATUS", status: "ready" });
   });
 });

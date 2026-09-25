@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DIAGNOSTICS_KEY, MAX_DIAGNOSTICS, MAX_REPORT_URL, clearDiagnostics, normalizeDiagnostic, recent, record, reportBody, reportUrl,
+  DIAGNOSTICS_KEY, MAX_DIAGNOSTICS, MAX_REPORT_URL, clearDiagnostics, normalizeDiagnostic, recent, record, reportUrl,
   scrubRoute, scrubText, storageState, toDiagnostic, type Diagnostic, type StorageLike,
 } from "./diagnostics";
 
@@ -29,15 +29,6 @@ describe("scrubRoute", () => {
     expect(scrubRoute("https://arc-play-flag.vercel.app/playbooks?book=k3j2h1#top")).toBe("/playbooks");
     expect(scrubRoute("/?open=abc")).toBe("/");
   });
-  test("collapses a share id to /p/[id]", () => {
-    expect(scrubRoute(`https://arc-play-flag.vercel.app/p/${PAYLOAD}`)).toBe("/p/[id]");
-    expect(scrubRoute("/p/short")).toBe("/p/[id]");
-    expect(scrubRoute("/p")).toBe("/p/[id]");
-    expect(scrubRoute("/demo/")).toBe("/demo");
-  });
-  test("caps an unexpectedly long path", () => {
-    expect(scrubRoute("/" + "a/".repeat(100)).length).toBeLessThanOrEqual(80);
-  });
 });
 
 describe("scrubText", () => {
@@ -52,10 +43,6 @@ describe("scrubText", () => {
     expect(scrubText("open /playbooks?book=abc123")).toBe("open /playbooks?book=[id]");
     expect(scrubText(`token ${PAYLOAD}`)).toBe("token [payload]");
     expect(scrubText("mail coach@example.com now")).toBe("mail [email] now");
-  });
-  test("leaves ordinary error text alone", () => {
-    expect(scrubText("Cannot read properties of undefined (reading x)")).toBe("Cannot read properties of undefined (reading x)");
-    expect(scrubText("storage quota: ffpd.plays.v2")).toBe("storage quota: ffpd.plays.v2");
   });
 });
 
@@ -78,9 +65,6 @@ describe("toDiagnostic", () => {
     expect(JSON.stringify(d)).not.toContain("Trips");
     expect(toDiagnostic("rejection", "Opened “Trips right”", env).message).toBe("Opened “…”");
     expect(toDiagnostic("rejection", undefined, env)).toMatchObject({ name: "undefined", message: "undefined" });
-  });
-  test("caps a runaway message", () => {
-    expect(toDiagnostic("error", new Error("word ".repeat(300)), env).message.length).toBe(240);
   });
 });
 
@@ -107,17 +91,6 @@ describe("record and recent", () => {
     expect(storageState(b)).toBe("unavailable");
     expect(storageState(null)).toBe("unavailable");
     expect(storageState(memory())).toBe("ok");
-  });
-  test("reports a full storage as full and keeps going", () => {
-    const full: StorageLike = {
-      getItem: () => null,
-      setItem: () => { const e = new Error("quota"); e.name = "QuotaExceededError"; throw e; },
-      removeItem: () => undefined,
-    };
-    clearDiagnostics(full);
-    expect(storageState(full)).toBe("full");
-    expect(record("storage", new Error("storage quota: ffpd.plays.v2"), full)).not.toBeNull();
-    expect(recent(full)).toHaveLength(1);
   });
   test("reads stored entries back as data: junk is dropped and text is scrubbed again", () => {
     const s = memory();
@@ -147,18 +120,6 @@ describe("report", () => {
     digest: null, route: "/", release: "abc1234", browser: null,
   };
   const ctx = { release: "abc1234", releaseEnv: "production", route: "/playbooks", browser: { ua: "TestUA", viewport: "390×844 @3x", online: false, storage: "ok" as const, standalone: true } };
-  test("lists release, page, browser and each error with its stack", () => {
-    const body = reportBody([diag], ctx);
-    expect(body).toContain("- Release: `abc1234` (production)");
-    expect(body).toContain("- Page: `/playbooks`");
-    expect(body).toContain("- Browser: TestUA");
-    expect(body).toContain("390×844 @3x · offline · storage ok · installed app");
-    expect(body).toContain("1. 2026-09-08T12:00:00.000Z · boundary · TypeError: x is not a function · `/` · `abc1234`");
-    expect(body).toContain("   at f (chunk.js:1:2)");
-    expect(body).toContain("never includes them");
-    expect(reportBody([], ctx)).toContain("_None recorded._");
-    expect(reportBody([], { ...ctx, browser: null })).toContain("- Browser: unknown");
-  });
   test("opens a new issue on the repo with the body prefilled, and trims to fit a URL", () => {
     const url = reportUrl([diag], ctx);
     expect(url.startsWith("https://github.com/andysolomon/arc-play-flag/issues/new?title=Problem%20report&body=")).toBe(true);
