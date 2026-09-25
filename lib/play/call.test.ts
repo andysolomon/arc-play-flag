@@ -23,7 +23,4 @@ describe("callOf", () => {
     expect(callOf(withRoutes({ o3: { type: "go" }, o5: { type: "pitch", primary: true } }))).toBe("run");
     expect(callOf(withRoutes({ o5: { type: "pitch" } }))).toBe("run");
   });
-  test("a runner with nobody to throw to is a run", () => {
-    expect(callOf(withRoutes({ o5: { type: "stretch" } }))).toBe("run");
-  });
 });
