@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { memo, useRef, type ChangeEvent } from "react";
 import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, mirrorable, tableFor } from "@/lib/play/routes";
 import { teamFill } from "@/lib/play/geometry";
@@ -8,6 +7,7 @@ import type { Player, RouteType } from "@/lib/play/types";
 import { Note } from "./Hint";
 import { IconTile } from "./IconTile";
 import { eyebrow, pill, tileGrid } from "./ui";
+import { Sticker } from "./Sticker";
 
 interface Props {
   selected: Player | null;
@@ -42,7 +42,7 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
       <span className={eyebrow}>ROUTES</span>
       {!sel && (
         <div className="flex flex-none flex-col items-center gap-[10px] rounded-tile border-2 border-dashed border-ink px-[10px] py-[18px]">
-          <Image src="/icons/football.png" alt="" width={56} height={56} sizes="56px" className="sticker block opacity-75" />
+          <Sticker icon="football" size={56} className="opacity-75" />
           <span className="text-center text-base leading-body text-ink-muted">
             Tap a player to give them a route or coverage.
             <br />

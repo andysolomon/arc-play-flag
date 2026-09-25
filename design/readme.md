@@ -32,15 +32,16 @@ Sources
 - **Motion:** playful and short — *boing* (360ms, overshoot cubic-bezier(.34,1.56,.64,1)) when a player is dropped; *pulse* ring (1.25s loop) on the selected player; routes *draw* on in 320ms ease-out; panels slide in 180ms.
 - **Transparency/blur:** none, apart from the 14% divider and the 75% empty state.
 - **Cards:** cream or white, ink border, 14px radius, hard shadow. A dashed ink border marks an empty state.
-- **Dark theme:** chalk on a dark board. The same tokens are redrawn: page `#1c1a16`, panels `#24221d`, controls `#2f2c26`, and ink becomes chalk `#f4efe2` (muted `#b3ad9f`), all ≥4.5:1. Yellow stays the highlighter, and anything on it keeps the light ink and paper (`on-yellow`). Hover and state tints darken (`--yellow-soft #4b3f14`, `--rose-soft #5b2d27`), and shadows turn black at 45%. Stickers get a 1px chalk die-cut edge so their black outlines still read. The field, thumbnails, printing and exports never change: route inks are tuned for turf. Auto follows the device; a coach can pin Light or Dark.
+- **Dark theme:** chalk on a dark board. The same tokens are redrawn: page `#1c1a16`, panels `#24221d`, controls `#2f2c26`, and ink becomes chalk `#f4efe2` (muted `#b3ad9f`), all ≥4.5:1. Yellow stays the highlighter, and anything on it keeps the light ink and paper (`on-yellow`). Hover and state tints darken (`--yellow-soft #4b3f14`, `--rose-soft #5b2d27`), and shadows turn black at 45%. Stickers swap to their chalk versions (`assets/icons-dark/`): white outlines, yellow routes, the same fills. The field, thumbnails, printing and exports never change: route inks are tuned for turf. Auto follows the device; a coach can pin Light or Dark.
 
 ## Iconography
 
 - Icons are **PNG stickers** with transparent backgrounds, 192×192px, shown at 40px in tiles, 26px in the header, 56px in the empty state. They were cut from owner-supplied sheets; there is no icon font, no SVG set, no emoji.
 - Style: thick black outlines, flat red/blue fills, light-blue zone blobs, hand-drawn feel — matching Patrick Hand.
+- **Dark board set** (`assets/icons-dark/`, same names): the owner's dark sheets, cut by `scripts/cut-stickers.ts`. Chalk outlines, yellow route lines and arrows, navy zone blobs, the same red/blue/brown fills. Paper icons (save, export, duplicate) keep a cream body with a chalk die-cut edge. The app shows this set whenever the dark theme is on; print always uses the ink set. Four extras from the sheets (`menu`, `block`, `lightMode`, `darkMode`) are kept here but not shipped.
 - Naming mirrors the app's route keys: `go out in slant corner post curl flat cross wheel handoff dive stretch counter reverse delay pitch customOff deselectOff` (offense), `man zoneDeep zoneFlat curlFlat midRead blitz spy customDef deselectDef` (defense), `football save duplicate export flip clear reset offOnly defOnly notes playbook` (tools).
 - Printed output (wristband inserts, binder pages, cards) uses no stickers: number badges are yellow discs, the field is the same SVG as the app, and every route must still read on a mono printer (weight and dash, never hue alone). Cut lines are faint dashes for scissors.
-- Missing glyphs: Undo/Redo, panel toggles and Mirror/Primary use unicode (↶ ↷ ‹ › ⇄ ★ ☆). Ask the owner for stickers if these need to match.
+- Missing glyphs: panel toggles and Mirror/Primary use unicode (‹ › ⇄ ★ ☆). Ask the owner for stickers if these need to match.
 - Never draw new icons by hand; request a sticker in the same style.
 
 ## Intentional additions
@@ -52,7 +53,8 @@ Sources
 ## Index
 
 - `styles.css` → `tokens/fonts.css`, `colors.css`, `typography.css`, `spacing.css`, `effects.css`
-- `assets/icons/` — 32 sticker PNGs
+- `assets/icons/` — 45 sticker PNGs, ink on paper
+- `assets/icons-dark/` — the same stickers for the dark board, plus four unshipped extras
 - `guidelines/` — specimen cards: colors (surfaces, accent, teams, routes), type (family, scale), spacing, borders/shadows, motion, icons (offense, defense, tools), brand (voice, mark)
 - `components/core/` — Button, IconTile + TileGrid, SectionLabel + Divider
 - `components/forms/` — TextInput, Select

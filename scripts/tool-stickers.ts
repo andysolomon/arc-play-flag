@@ -1,10 +1,11 @@
 // Draws the new, notes, playbook, undo and redo tool stickers in the style of the design's icons, into
-// design/assets/icons. Then run `bun run icons`.
+// design/assets/icons. New, notes and playbook also get the dark board's version in design/assets/icons-dark
+// (undo and redo came on the owner's dark sheet). Then run `bun run icons`.
 // Run with `node scripts/tool-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
 import path from "node:path";
 import sharp from "sharp";
 
-const INK = "#1b1a17", YELLOW = "#f2b705", OFF = "#e5675e", DEF = "#4a8fe0", CREAM = "#fffdf6";
+const INK = "#1b1a17", CHALK = "#f4efe2", YELLOW = "#f2b705", OFF = "#e5675e", DEF = "#4a8fe0", CREAM = "#fffdf6";
 const W = "512";
 const svg = (body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${body}</svg>`;
@@ -55,8 +56,24 @@ const stickers: Record<string, string> = {
   redo: svg(`<g transform="translate(512 0) scale(-1 1)">${takeBack(DEF)}</g>`),
 };
 
-const out = path.resolve("design/assets/icons");
+/**
+ * The dark board's version: the same sticker over its own chalk silhouette, a die-cut edge like the
+ * dark sheets give their paper icons, so the ink outlines still read on a dark tile.
+ */
+const onDarkBoard = (sticker: string): string => {
+  const [, open, body] = /^(<svg[^>]*>)(.*)<\/svg>$/s.exec(sticker) ?? [];
+  if (!open || !body) throw new Error("not a sticker");
+  const silhouette = body
+    .replace(/(fill|stroke)="#[0-9a-f]{6}"/g, `$1="${CHALK}"`)
+    .replace(/stroke-width="(\d+)"/g, (_, w: string) => `stroke-width="${String(Number(w) + 18)}"`);
+  return `${open}${silhouette}${body}</svg>`;
+};
+
+const dark = ["new", "notes", "playbook"];
 for (const [name, s] of Object.entries(stickers)) {
-  await sharp(Buffer.from(s)).png().toFile(path.join(out, `${name}.png`));
+  await sharp(Buffer.from(s)).png().toFile(path.resolve("design/assets/icons", `${name}.png`));
   console.log("wrote", name);
+  if (!dark.includes(name)) continue;
+  await sharp(Buffer.from(onDarkBoard(s))).png().toFile(path.resolve("design/assets/icons-dark", `${name}.png`));
+  console.log("wrote", `${name} (dark)`);
 }

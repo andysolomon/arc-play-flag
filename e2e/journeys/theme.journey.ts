@@ -52,6 +52,26 @@ test("yellow highlights keep dark ink on the dark board, and printing still puts
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
 });
 
+test("stickers are chalk on the dark board and ink on paper, and each look is kept as a picture", async ({ page }, testInfo) => {
+  const d = new Designer(page);
+  await d.goto();
+  await d.tools();
+  const tools = page.locator("#play-sidebar");
+  const save = tools.getByRole("button", { name: "Save", exact: true });
+  // every tile carries both stickers; the dark board shows the chalk one alone
+  await expect(save.locator("img")).toHaveCount(2);
+  await expect(save.locator("img:visible")).toHaveCount(1);
+  await expect(save.locator("img:visible")).toHaveAttribute("src", /save-dark\.png/);
+  await expect(d.undo.locator("img:visible")).toHaveAttribute("src", /undo-dark\.png/);
+  await tools.screenshot({ path: `test-results/theme-stickers-${testInfo.project.name}-dark.png` });
+
+  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await expect(save.locator("img:visible")).toHaveCount(1);
+  await expect(save.locator("img:visible")).toHaveAttribute("src", /save\.png/);
+  await expect(d.undo.locator("img:visible")).toHaveAttribute("src", /undo\.png/);
+  await tools.screenshot({ path: `test-results/theme-stickers-${testInfo.project.name}-light.png` });
+});
+
 test("a theme picked in playbook settings redraws the designer open in another tab", async ({ page, context }) => {
   const d = new Designer(page);
   await d.goto();

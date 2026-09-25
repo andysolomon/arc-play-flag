@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useRef, useState, useSyncExternalStore } from "react";
@@ -8,6 +7,7 @@ import { Hint } from "../Hint";
 import { pillSm } from "../ui";
 import { BookEditor } from "./BookEditor";
 import { Home } from "./Home";
+import { Sticker } from "../Sticker";
 
 export type Say = (text: string, ms?: number) => void;
 
@@ -30,7 +30,7 @@ export function PlaybooksScreen() {
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
         <Link href="/" className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ Designer</Link>
-        <Image src="/icons/playbook.png" alt="" width={26} height={26} sizes="26px" className="sticker block flex-none" priority />
+        <Sticker icon="playbook" size={26} className="flex-none" priority />
         <h1 className="min-w-0 truncate text-header font-normal">Playbooks</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">5v5 flag</span>
       </header>

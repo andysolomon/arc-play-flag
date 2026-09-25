@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
 import type { Player, Team } from "@/lib/play/types";
 import { Field } from "./Field";
 import { pillSm } from "./ui";
+import { Sticker } from "./Sticker";
 
 interface Props {
   id: string;
@@ -24,7 +24,7 @@ export function SharedPlay({ id, name, players, side }: Props) {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 print:hidden">
-        <Image src="/icons/football.png" alt="" width={26} height={26} sizes="26px" className="sticker block flex-none" priority />
+        <Sticker icon="football" size={26} className="flex-none" priority />
         <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot</span>
         <span className="flex-1" />
