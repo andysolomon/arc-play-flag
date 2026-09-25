@@ -331,7 +331,7 @@ export function App() {
       </div>
       <Hint text={toast ?? hint} />
       {shareOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-3" role="presentation">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-3" role="presentation">
           <section
             role="dialog"
             aria-modal="true"

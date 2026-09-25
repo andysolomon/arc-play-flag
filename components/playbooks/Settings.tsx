@@ -8,13 +8,14 @@ import {
 import { download } from "@/lib/export/raster";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, refresh, setTeam, subscribe } from "@/lib/play/library";
 import { StorageError, failureMessage } from "@/lib/play/storage";
+import { ThemePicker } from "../ThemePicker";
 import { card, divider, eyebrow, input, pill, pillDark } from "../ui";
 import { PreviewModal } from "./PreviewModal";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
 /**
- * Team identity and device backup: set once, rarely touched, so they live behind one button
+ * Team identity, theme and device backup: set once, rarely touched, so they live behind one button
  * instead of above the plays. The button shows the team's colour and name so it still reads as "you".
  */
 export function SettingsButton() {
@@ -26,10 +27,10 @@ export function SettingsButton() {
         className={`${pill} inline-flex min-h-11 max-w-[220px] items-center gap-2 px-3 text-small`}>
         <span aria-hidden className="h-4 w-4 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} />
         <span className="truncate">{team.name || "Team"}</span>
-        <span className="sr-only"> · team &amp; backup settings</span>
+        <span className="sr-only"> · team, theme &amp; backup settings</span>
         <span aria-hidden className="text-ink-muted">⚙</span>
       </button>
-      {open && <PreviewModal title="Team & backup" onClose={() => { setOpen(false); }}><SettingsPanel /></PreviewModal>}
+      {open && <PreviewModal title="Team, theme & backup" onClose={() => { setOpen(false); }}><SettingsPanel /></PreviewModal>}
     </>
   );
 }
@@ -88,6 +89,11 @@ function SettingsPanel() {
         </label>
       </div>
       <span className="text-caption leading-note text-ink-muted">Shown on cards and printed pages. Nothing else changes.</span>
+
+      <span className={divider} />
+      <span className={eyebrow}>THEME</span>
+      <ThemePicker className="max-w-[320px]" />
+      <span className="text-caption leading-note text-ink-muted">Auto follows this device. Printed pages and exports stay ink on paper.</span>
 
       <span className={divider} />
       <span className={eyebrow}>ON-DEVICE BACKUP</span>

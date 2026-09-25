@@ -30,7 +30,7 @@ export function DemoClip({ demo, index }: { demo: DemoChapter; index: number }) 
           <source src={`/demos/${demo.slug}.mp4`} type="video/mp4" />
           Your browser cannot play this demonstration.
         </video>
-        <span className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-ink bg-yellow text-base" aria-hidden>
+        <span className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-hidden>
           {index + 1}
         </span>
       </div>

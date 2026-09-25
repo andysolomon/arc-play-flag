@@ -5,6 +5,7 @@ import { MAX_NOTES } from "@/lib/play/storage";
 import type { Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { Support } from "./Support";
+import { ThemePicker } from "./ThemePicker";
 import { divider, eyebrow, input, pill, tileGrid } from "./ui";
 
 interface Props {
@@ -130,6 +131,9 @@ function PlaySidebarImpl({
           <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the defense. Tap a player to give them a coverage.</span>
         </>
       )}
+      <span className={divider} />
+      <span className={eyebrow}>THEME</span>
+      <ThemePicker className="flex-none" />
       <span className={divider} />
       <Support />
     </>

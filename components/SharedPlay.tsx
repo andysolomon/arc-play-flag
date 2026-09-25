@@ -24,7 +24,7 @@ export function SharedPlay({ id, name, players, side }: Props) {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 print:hidden">
-        <Image src="/icons/football.png" alt="" width={26} height={26} sizes="26px" className="block flex-none" priority />
+        <Image src="/icons/football.png" alt="" width={26} height={26} sizes="26px" className="sticker block flex-none" priority />
         <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot</span>
         <span className="flex-1" />

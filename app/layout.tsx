@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { Patrick_Hand } from "next/font/google";
 import { OfflineStatus } from "@/components/OfflineStatus";
+import { themeScript } from "@/lib/theme";
 import "./globals.css";
 
 const patrickHand = Patrick_Hand({
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fffdf6",
+  // no themeColor: the inline theme script owns that tag, so it can follow a chosen theme too
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -26,7 +27,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${patrickHand.variable} h-full`}>
+    // data-theme is set by the inline script before hydration, so the server's <html> never has it
+    <html lang="en" className={`${patrickHand.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="h-full">
         {children}
         {process.env.NODE_ENV === "production" ? <OfflineStatus /> : null}

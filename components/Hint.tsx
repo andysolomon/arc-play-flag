@@ -14,6 +14,6 @@ export function Hint({ text }: { text: string | null }) {
 /** Yellow sticky note used for the same hint inside the Routes panel. */
 export function Note({ text }: { text: string }) {
   return (
-    <span className="flex-none rounded-note border-2 border-ink bg-yellow px-[10px] py-1.5 text-base leading-note">{text}</span>
+    <span className="flex-none rounded-note border-2 border-ink bg-yellow on-yellow px-[10px] py-1.5 text-base leading-note">{text}</span>
   );
 }

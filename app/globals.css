@@ -19,6 +19,9 @@
   --color-turf: #c1f0c1;
   --color-turf-endzone: #a7e5a7;
   --color-divider: rgb(27 26 23 / 0.14);
+  --color-scrim: rgb(27 26 23 / 0.35);
+  --color-link: #c2513f;
+  --color-link-hover: #8f3529;
   --color-transparent: transparent;
 
   --radius-*: initial;
@@ -28,10 +31,11 @@
   --radius-field: 7px;
   --radius-full: 50%;
 
+  /* --shadow-ink is set only by the dark theme; light keeps the prototype's exact tints */
   --shadow-*: initial;
-  --shadow-tile: 0 3px 0 rgb(27 26 23 / 0.14);
-  --shadow-toast: 0 4px 0 rgb(27 26 23 / 0.15);
-  --shadow-field: 0 7px 0 rgb(27 26 23 / 0.13);
+  --shadow-tile: 0 3px 0 var(--shadow-ink, rgb(27 26 23 / 0.14));
+  --shadow-toast: 0 4px 0 var(--shadow-ink, rgb(27 26 23 / 0.15));
+  --shadow-field: 0 7px 0 var(--shadow-ink, rgb(27 26 23 / 0.13));
 
   --font-*: initial;
   --font-hand: var(--font-patrick-hand), ui-rounded, "Comic Sans MS", cursive, sans-serif;
@@ -87,12 +91,67 @@
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   input, button, select { font-family: inherit; color: inherit; }
-  a { color: #c2513f; text-decoration: underline; }
-  a:hover { color: #8f3529; }
+  a { color: var(--color-link); text-decoration: underline; }
+  a:hover { color: var(--color-link-hover); }
   :focus-visible { outline: 3px solid var(--color-yellow); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) {
     .motion-loop { animation: none !important; }
   }
+
+  /*
+   * Dark: chalk on a dark board. The same tokens, redrawn, so every control follows; yellow
+   * stays the highlighter. <html data-theme> is set before first paint by lib/theme.ts.
+   * Screen only, so printing from a dark screen still puts ink on paper. The field keeps its
+   * turf and inks in both themes: route colours are tuned for turf, and exports draw the same picture.
+   */
+  @media screen {
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --color-paper: #1c1a16;
+      --color-paper-2: #211f1a;
+      --color-cream: #24221d; /* THEME_COLOR.dark */
+      --color-white: #2f2c26;
+      --color-ink: #f4efe2;
+      --color-ink-2: #d8d1c0;
+      --color-ink-muted: #b3ad9f;
+      --color-ink-faint: #75706a;
+      --color-yellow-soft: #4b3f14;
+      --color-rose-soft: #5b2d27;
+      --color-divider: rgb(244 239 226 / 0.16);
+      --color-scrim: rgb(0 0 0 / 0.55);
+      --color-link: #f0907c;
+      --color-link-hover: #ffb7a8;
+      --shadow-ink: rgb(0 0 0 / 0.45);
+    }
+    /* the stickers' black outlines vanish on a dark tile, so they get a die-cut chalk edge */
+    :root[data-theme="dark"] .sticker {
+      filter: drop-shadow(1px 0 0 var(--color-ink)) drop-shadow(-1px 0 0 var(--color-ink))
+        drop-shadow(0 1px 0 var(--color-ink)) drop-shadow(0 -1px 0 var(--color-ink));
+    }
+  }
+}
+
+/*
+ * Yellow is a highlighter in both themes, so whatever sits on it keeps the light theme's ink
+ * and paper. Pair it with every yellow fill, including state ones (data-[active=true]:on-yellow).
+ * It sets the text colour too: inherited colour is already resolved, so the tokens alone can't reach it.
+ */
+@utility on-yellow {
+  color: var(--color-ink);
+  --color-paper: --theme(--color-paper inline);
+  --color-paper-2: --theme(--color-paper-2 inline);
+  --color-cream: --theme(--color-cream inline);
+  --color-white: --theme(--color-white inline);
+  --color-ink: --theme(--color-ink inline);
+  --color-ink-2: --theme(--color-ink-2 inline);
+  --color-ink-muted: --theme(--color-ink-muted inline);
+  --color-ink-faint: --theme(--color-ink-faint inline);
+  --color-yellow-soft: --theme(--color-yellow-soft inline);
+  --color-rose-soft: --theme(--color-rose-soft inline);
+  --color-divider: --theme(--color-divider inline);
+  --color-link: --theme(--color-link inline);
+  --color-link-hover: --theme(--color-link-hover inline);
+  --shadow-ink: initial;
 }
 
 /* Print: the field fills a letter page, play name as the title. */

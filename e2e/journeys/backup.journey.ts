@@ -5,7 +5,7 @@ import {
 } from "../support/fixtures";
 
 const restoreInput = (page: import("@playwright/test").Page) => page.getByLabel("Restore a device backup");
-const openSettings = (page: import("@playwright/test").Page) => page.getByRole("button", { name: /team & backup settings/ }).click();
+const openSettings = (page: import("@playwright/test").Page) => page.getByRole("button", { name: /team, theme & backup settings/ }).click();
 
 test("a complete device backup waits for an explicit merge or replace choice", async ({ page }) => {
   const custom = play("fx-custom", "Otter Custom", { o3: { type: "custom", pts: [[8, -2], [19, -12]], primary: true } }, "Read the safety.");

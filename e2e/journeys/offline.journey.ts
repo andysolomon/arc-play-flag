@@ -57,7 +57,7 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
 
   await page.goto("/playbooks");
   await expect(page.getByRole("heading", { name: "Playbooks" })).toBeVisible();
-  await page.getByRole("button", { name: /team & backup settings/ }).click();
+  await page.getByRole("button", { name: /team, theme & backup settings/ }).click();
   const [backupDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Download backup" }).click(),

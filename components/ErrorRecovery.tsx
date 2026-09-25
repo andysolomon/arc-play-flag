@@ -79,7 +79,7 @@ export function ErrorRecovery({ error, retry }: Props) {
       <div role="alert" className={`${card} flex w-full max-w-[420px] flex-col gap-3 leading-body`}>
         <span className={eyebrow}>SOMETHING BROKE</span>
         <h1 className="m-0 text-header font-normal">This screen stopped working.</h1>
-        <div className="rounded-note border-2 border-ink bg-yellow px-[10px] py-2 text-base leading-note">
+        <div className="rounded-note border-2 border-ink bg-yellow on-yellow px-[10px] py-2 text-base leading-note">
           {draft
             ? <>The play you were drawing (“{draft.name || "Untitled play"}”) is still in this browser&apos;s autosave, but it may not be saved to your plays. Download it first, just in case.</>
             : <>Unsaved work may be at risk. Plays you saved are still in this browser.</>}
