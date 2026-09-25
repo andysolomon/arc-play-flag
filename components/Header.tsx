@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { memo } from "react";
 import type { Team } from "@/lib/play/types";
 import { pillMd, pillSm } from "./ui";
+import { Sticker } from "./Sticker";
 
 interface Props {
   /** offensive play or defensive call */
@@ -71,16 +71,16 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           title={kind.title}
           className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
         >
-          <Image src={`/icons/${side}.png`} alt="" width={22} height={22} sizes="22px" className="sticker block shrink-0" />
+          <Sticker icon={side} size={22} className="shrink-0" />
           <span className="max-[479px]:hidden">{kind.label}</span>
         </span>
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
-          <Image src="/icons/undo.png" alt="" width={24} height={24} sizes="24px" className={`sticker block shrink-0 ${canUndo ? "" : "opacity-40"}`} />
+          <Sticker icon="undo" size={24} className={`shrink-0 ${canUndo ? "" : "opacity-40"}`} />
           <span className="max-[479px]:hidden">Undo</span>
         </button>
         <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${round}`}>
           <span className="max-[479px]:hidden">Redo</span>
-          <Image src="/icons/redo.png" alt="" width={24} height={24} sizes="24px" className={`sticker block shrink-0 ${canRedo ? "" : "opacity-40"}`} />
+          <Sticker icon="redo" size={24} className={`shrink-0 ${canRedo ? "" : "opacity-40"}`} />
         </button>
         <button
           type="button"
@@ -90,7 +90,7 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           aria-label="Clear routes"
           className={`${pillMd} ${round}`}
         >
-          <Image src="/icons/clear.png" alt="" width={22} height={22} sizes="22px" className={`sticker block shrink-0 ${canClear ? "" : "opacity-40"}`} />
+          <Sticker icon="clear" size={22} className={`shrink-0 ${canClear ? "" : "opacity-40"}`} />
           <span className="max-[479px]:hidden">Clear</span>
         </button>
       </div>

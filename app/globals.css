@@ -98,6 +98,10 @@
     .motion-loop { animation: none !important; }
   }
 
+  /* Every sticker is in the page twice, ink and chalk; the dark block below picks. Print is always ink on paper. */
+  .sticker-light { display: block; }
+  .sticker-dark { display: none; }
+
   /*
    * Dark: chalk on a dark board. The same tokens, redrawn, so every control follows; yellow
    * stays the highlighter. <html data-theme> is set before first paint by lib/theme.ts.
@@ -123,11 +127,9 @@
       --color-link-hover: #ffb7a8;
       --shadow-ink: rgb(0 0 0 / 0.45);
     }
-    /* the stickers' black outlines vanish on a dark tile, so they get a die-cut chalk edge */
-    :root[data-theme="dark"] .sticker {
-      filter: drop-shadow(1px 0 0 var(--color-ink)) drop-shadow(-1px 0 0 var(--color-ink))
-        drop-shadow(0 1px 0 var(--color-ink)) drop-shadow(0 -1px 0 var(--color-ink));
-    }
+    /* the dark board gets the chalk stickers (components/Sticker.tsx carries both) */
+    :root[data-theme="dark"] .sticker-light { display: none; }
+    :root[data-theme="dark"] .sticker-dark { display: block; }
   }
 }
 
