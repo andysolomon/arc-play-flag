@@ -35,6 +35,7 @@ First time only: `bunx playwright install chromium`.
 | A release that lands while the app is open is offered as **Update ready**; **Update now** reloads onto it, the reloaded page takes over its own worker quietly, plays survive | `update` |
 | First visit: the draw-and-run hint, the editable example that never replaces a draft, Demo from the collapsed layout | `first-use` |
 | A device backup waits for merge or replace; an invalid one changes nothing | `backup` |
+| A dark device gets the dark theme; a picked theme outlasts a reload and reaches other tabs; Auto follows the device; yellow keeps dark ink; printing stays ink on paper | `theme` |
 | A 100-play library searches, filters and sorts; a playbook fits 320px; open from an entry, add from the designer | `library-discovery` |
 | Offline: the shells, exact shared plays and demo media are ready before it says so, imports and exports work offline, a first install says **Offline updating…** until the whole shell is verified, a broken release never takes over, and a sound one keeps the shared play | `offline` |
 

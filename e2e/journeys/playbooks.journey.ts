@@ -155,7 +155,7 @@ test("a bad file is refused with a reason and changes nothing; a good one lands 
 
   // the file's team is taken on a device that had none
   await page.getByRole("link", { name: "‹ All playbooks" }).click();
-  await page.getByRole("button", { name: /Riverside Otters · team & backup settings/ }).click();
+  await page.getByRole("button", { name: /Riverside Otters · team, theme & backup settings/ }).click();
   await expect(page.getByRole("textbox", { name: "Team name" })).toHaveValue("Riverside Otters");
 });
 
@@ -178,7 +178,7 @@ test("a playbook file downloaded on one device imports whole on another", async 
   expect(await storedPlays(page2)).toEqual(await storedPlays(page));
   expect(await storedPlaybooks(page2)).toEqual(await storedPlaybooks(page));
   await page2.getByRole("link", { name: "‹ All playbooks" }).click();
-  await page2.getByRole("button", { name: /Riverside Otters · team & backup settings/ }).click();
+  await page2.getByRole("button", { name: /Riverside Otters · team, theme & backup settings/ }).click();
   await expect(page2.getByRole("textbox", { name: "Team name" })).toHaveValue("Riverside Otters");
   await other.close();
 });

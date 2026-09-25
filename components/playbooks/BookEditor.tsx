@@ -90,7 +90,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
         <ol className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-3">
           {items.map((it, i) => (
             <li key={it.play.id} className={`${card} flex items-center gap-3`}>
-              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow text-base" aria-label={`Play ${String(it.n)}`}>
+              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-label={`Play ${String(it.n)}`}>
                 {it.n}
               </span>
               <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} side={it.play.side} /></div>

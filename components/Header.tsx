@@ -59,7 +59,7 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
         aria-expanded={leftOpen}
         aria-controls="play-sidebar"
         data-active={leftOpen}
-        className={`${pillSm} ${round} data-[active=true]:bg-yellow`}
+        className={`${pillSm} ${round} data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
       >
         <MenuIcon /><span className="max-[479px]:hidden">Play</span>
       </button>
@@ -71,16 +71,16 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           title={kind.title}
           className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
         >
-          <Image src={`/icons/${side}.png`} alt="" width={22} height={22} sizes="22px" className="block shrink-0" />
+          <Image src={`/icons/${side}.png`} alt="" width={22} height={22} sizes="22px" className="sticker block shrink-0" />
           <span className="max-[479px]:hidden">{kind.label}</span>
         </span>
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
-          <Image src="/icons/undo.png" alt="" width={24} height={24} sizes="24px" className={`block shrink-0 ${canUndo ? "" : "opacity-40"}`} />
+          <Image src="/icons/undo.png" alt="" width={24} height={24} sizes="24px" className={`sticker block shrink-0 ${canUndo ? "" : "opacity-40"}`} />
           <span className="max-[479px]:hidden">Undo</span>
         </button>
         <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${round}`}>
           <span className="max-[479px]:hidden">Redo</span>
-          <Image src="/icons/redo.png" alt="" width={24} height={24} sizes="24px" className={`block shrink-0 ${canRedo ? "" : "opacity-40"}`} />
+          <Image src="/icons/redo.png" alt="" width={24} height={24} sizes="24px" className={`sticker block shrink-0 ${canRedo ? "" : "opacity-40"}`} />
         </button>
         <button
           type="button"
@@ -90,7 +90,7 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           aria-label="Clear routes"
           className={`${pillMd} ${round}`}
         >
-          <Image src="/icons/clear.png" alt="" width={22} height={22} sizes="22px" className={`block shrink-0 ${canClear ? "" : "opacity-40"}`} />
+          <Image src="/icons/clear.png" alt="" width={22} height={22} sizes="22px" className={`sticker block shrink-0 ${canClear ? "" : "opacity-40"}`} />
           <span className="max-[479px]:hidden">Clear</span>
         </button>
       </div>
@@ -102,7 +102,7 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
         aria-expanded={rightOpen}
         aria-controls="route-sidebar"
         data-active={rightOpen}
-        className={`${pillSm} ${round} data-[active=true]:bg-yellow`}
+        className={`${pillSm} ${round} data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
       >
         <span className="max-[479px]:hidden">Routes</span><Chevron dir={rightOpen ? "right" : "left"} />
       </button>

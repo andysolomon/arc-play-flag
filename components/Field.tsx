@@ -433,7 +433,7 @@ function FieldImpl({
         <div className="relative">
         {draft && !readOnly && (
           <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
-            <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow`}>
+            <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow on-yellow`}>
               Finish
             </button>
             <button type="button" onClick={() => { dispatch({ type: "draftPointRemove" }); }} disabled={draft.pts.length === 0} title="Remove last waypoint (Delete)" aria-keyshortcuts="Delete Backspace" className={`${pillMd} min-h-11`}>

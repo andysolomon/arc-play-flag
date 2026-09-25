@@ -9,13 +9,13 @@ export function DemoScreen() {
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
         <Link href="/" className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ Designer</Link>
-        <Image src="/icons/demo.png" alt="" width={26} height={26} sizes="26px" className="block flex-none" priority />
+        <Image src="/icons/demo.png" alt="" width={26} height={26} sizes="26px" className="sticker block flex-none" priority />
         <h1 className="min-w-0 truncate text-header font-normal">Demo</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">Complete tour</span>
       </header>
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 px-3 py-4 sm:px-5 sm:py-6">
-          <section className="grid gap-3 rounded-tile border-2 border-ink bg-yellow p-4 shadow-tile sm:grid-cols-[1fr_auto] sm:items-end">
+          <section className="grid gap-3 rounded-tile border-2 border-ink bg-yellow on-yellow p-4 shadow-tile sm:grid-cols-[1fr_auto] sm:items-end">
             <div>
               <span className="text-eyebrow tracking-eyebrow">START HERE</span>
               <h2 className="mt-1 text-[28px] leading-tight">Learn the whole play designer in {DEMOS.length} short clips.</h2>

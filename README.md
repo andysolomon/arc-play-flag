@@ -4,6 +4,8 @@ A 5v5 flag-football whiteboard. Drag players on a green field, tap one to give i
 
 Saved plays go into **playbooks** (`/playbooks`), which print without any server: wristband inserts (one per position, that route bold), binder pages (one detailed play per page, or four simple per page), two-sided postcards (two-up with cut lines, or one per 4 × 6 in sheet), a one-page flyer of six featured plays, and a playbook file to hand to an assistant coach. The **demo tour** (`/demo`) covers the full workflow in seven short clips, each one focused enough to watch on a phone. PDFs and JSON files are written locally and work offline. Creating a short playbook share link explicitly uploads that book as a snapshot; recipients can preview and import it without downloading a file. Individual plays export as `.play.json` files.
 
+The app follows the device's light or dark setting. **Theme** in Play tools (or playbook settings) pins Light or Dark on that device. The dark theme is chalk on a dark board; the field, printed pages and exports stay ink on paper in both.
+
 The design system and functional prototype live in [`design/`](design/readme.md); the app is a faithful port of `design/Flag Football Play Designer.dc.html`.
 
 ## Develop
@@ -37,6 +39,7 @@ bunx vercel --prod
 - `components/` — Header, PlaySidebar, RouteSidebar, Field, PlayerToken, RouteLayer, Hint, PlayThumb; `components/playbooks/` holds the playbook list, book editor and export panel, while `components/demo/` defines the tour chapters and player cards.
 - `lib/play/` — pure domain code (routes, geometry, zones, history, storage, library, the derived call) with `bun test` coverage. Plays are keyed by a generated id (`ffpd.plays.v2`); the prototype's name-keyed `ffpd.plays.v1` is migrated on first read.
 - `e2e/` — Playwright browser journeys (`*.journey.ts`) that drive the production build through the saving, history, playbook, import, sharing and export flows with fictional fixtures; they run on every pull request.
+- `lib/theme.ts` — the Auto / Light / Dark choice (`ffpd.theme.v1`) and the inline script the root layout runs before first paint, so a dark device never sees a flash of paper. The dark palette itself is the `data-theme="dark"` block in `app/globals.css`.
 - `lib/render/` — the play as static SVG markup, drawn from the same geometry as the live field (thumbnails, cards, printed pages).
 - `lib/export/` — page composition in points, the zero-dependency PDF writer, the rasteriser, and the wristband, binder, card, postcard, flyer and playbook-file formats. Export code is loaded on demand. `video.ts` records a 4:5 clip from the designer with a 1.5-second formation still, deterministic completed run, and 1.5-second final hold. The play name and selected playbook number stay visible; the browser records WebM or MP4. Keep the tab visible during recording; exports can be cancelled.
 - `public/icons/` — the sticker PNGs, pre-optimised (≤ 8 KB each). New tool stickers are drawn by `scripts/tool-stickers.ts` (run with `node`).

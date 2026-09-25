@@ -20,7 +20,7 @@ function PlayButtonImpl({ playing, onClick }: ButtonProps) {
       className={
         "absolute bottom-3 right-3 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full " +
         "border-2 border-ink bg-yellow text-[22px] leading-none text-ink shadow-tile transition-transform duration-[120ms] " +
-        "hover:-translate-y-0.5 data-[active=true]:bg-white print:hidden motion-reduce:transition-none"
+        "hover:-translate-y-0.5 data-[active=false]:on-yellow data-[active=true]:bg-white print:hidden motion-reduce:transition-none"
       }
     >
       {playing ? (

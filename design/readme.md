@@ -32,6 +32,7 @@ Sources
 - **Motion:** playful and short — *boing* (360ms, overshoot cubic-bezier(.34,1.56,.64,1)) when a player is dropped; *pulse* ring (1.25s loop) on the selected player; routes *draw* on in 320ms ease-out; panels slide in 180ms.
 - **Transparency/blur:** none, apart from the 14% divider and the 75% empty state.
 - **Cards:** cream or white, ink border, 14px radius, hard shadow. A dashed ink border marks an empty state.
+- **Dark theme:** chalk on a dark board. The same tokens are redrawn: page `#1c1a16`, panels `#24221d`, controls `#2f2c26`, and ink becomes chalk `#f4efe2` (muted `#b3ad9f`), all ≥4.5:1. Yellow stays the highlighter, and anything on it keeps the light ink and paper (`on-yellow`). Hover and state tints darken (`--yellow-soft #4b3f14`, `--rose-soft #5b2d27`), and shadows turn black at 45%. Stickers get a 1px chalk die-cut edge so their black outlines still read. The field, thumbnails, printing and exports never change: route inks are tuned for turf. Auto follows the device; a coach can pin Light or Dark.
 
 ## Iconography
 
