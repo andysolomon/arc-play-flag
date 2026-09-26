@@ -9,7 +9,7 @@ describe("share links", () => {
     );
     const id = encodeShare({ name: "Trips right — go!", players });
     expect(id).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(decodeShare(id)).toEqual({ name: "Trips right — go!", players, side: "offense" });
+    expect(decodeShare(id)).toEqual({ name: "Trips right — go!", players, side: "offense", noRunZones: true });
     expect(decodeShare(id)?.players.filter((p) => p.team === "defense")).toHaveLength(5);
   });
   test("keeps every player from older links that chose a visible side", () => {
@@ -17,7 +17,7 @@ describe("share links", () => {
     const legacy = Buffer.from(JSON.stringify({ name: "Old play", players })).toString("base64url");
     const offenseOnly = Buffer.from(JSON.stringify({ name: "Future play", players, vis: "offense" })).toString("base64url");
     const unknown = Buffer.from(JSON.stringify({ name: "Future play", players, vis: "coaches" })).toString("base64url");
-    expect(decodeShare(legacy)).toEqual({ name: "Old play", players, side: "offense" });
+    expect(decodeShare(legacy)).toEqual({ name: "Old play", players, side: "offense", noRunZones: true });
     expect(decodeShare(offenseOnly)?.players).toEqual(players);
     expect(decodeShare(unknown)?.players).toEqual(players);
   });
@@ -35,7 +35,7 @@ describe("play side in links", () => {
     const offense = encodeShare({ name: "Trips", players, side: "offense" });
     expect(offense).toBe(encodeShare({ name: "Trips", players }));
     const defense = encodeShare({ name: "Cover 2", players, side: "defense" });
-    expect(decodeShare(defense)).toEqual({ name: "Cover 2", players, side: "defense" });
+    expect(decodeShare(defense)).toEqual({ name: "Cover 2", players, side: "defense", noRunZones: true });
     expect(decodeShare(defense)?.players.filter((p) => p.team === "offense")).toHaveLength(5);
   });
   test("an old link to a defense-only diagram opens as a defensive call", () => {

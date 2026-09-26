@@ -25,5 +25,5 @@ export default async function SharedPlayPage({ params }: Props) {
   const { id } = await params;
   const rec = decodeShare(id);
   if (!rec) notFound();
-  return <SharedPlay id={id} name={rec.name} players={rec.players} side={rec.side} />;
+  return <SharedPlay id={id} name={rec.name} players={rec.players} side={rec.side} noRunZones={rec.noRunZones} />;
 }
