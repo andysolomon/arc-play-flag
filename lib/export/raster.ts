@@ -1,5 +1,7 @@
 import { FONT } from "@/lib/render/play-svg";
 import type { PdfImage } from "./pdf";
+import { PPTX_TYPE } from "./pptx";
+import { clean } from "./xml";
 
 /** Points per inch. */
 export const PT = 72;
@@ -44,10 +46,15 @@ export async function ensureFont(): Promise<void> {
   } catch { /* measured with the fallback face */ }
 }
 
-/** Draws standalone SVG markup into a canvas of the given pixel size. */
+/**
+ * Draws standalone SVG markup into a canvas of the given pixel size. Characters XML forbids go
+ * first: `fit()` and `wrap()` slice by code unit and can leave a lone surrogate, which
+ * `encodeURIComponent` throws on, and a stored control character stops the image loading.
+ */
 export async function rasterise(svg: string, width: number, height: number, background = "#ffffff"): Promise<HTMLCanvasElement> {
+  const markup = clean(svg);
   const css = await embeddedFontCss();
-  const doc = css ? svg.replace(/^(<svg[^>]*>)/, `$1<style>${css}</style>`) : svg;
+  const doc = css ? markup.replace(/^(<svg[^>]*>)/, `$1<style>${css}</style>`) : markup;
   const src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(doc);
   const img = new Image();
   await new Promise<void>((resolve, reject) => {
@@ -90,6 +97,13 @@ export async function toPdfImage(c: HTMLCanvasElement): Promise<PdfImage> {
   return { width, height, filter: "DCTDecode", data: new Uint8Array(await blob.arrayBuffer()) };
 }
 
+/** A canvas as PNG bytes, read once. */
+export async function toPng(c: HTMLCanvasElement): Promise<Uint8Array> {
+  const blob = await new Promise<Blob | null>((resolve) => { c.toBlob(resolve, "image/png"); });
+  if (!blob) throw new Error("The slide could not be encoded.");
+  return new Uint8Array(await new Response(blob).arrayBuffer());
+}
+
 let measurer: CanvasRenderingContext2D | null = null;
 
 /** Width of a run of text in the hand face at `size` px. */
@@ -130,7 +144,8 @@ export function wrap(text: string, maxWidth: number, size: number, maxLines = In
 }
 
 export function download(bytes: Uint8Array | Blob, filename: string): void {
-  const type = filename.endsWith(".pdf") ? "application/pdf" : filename.endsWith(".json") ? "application/json" : "application/octet-stream";
+  // iOS 13+ will not sniff octet-stream, so every format we write names its type
+  const type = filename.endsWith(".pdf") ? "application/pdf" : filename.endsWith(".json") ? "application/json" : filename.endsWith(".pptx") ? PPTX_TYPE : "application/octet-stream";
   const blob = bytes instanceof Blob ? bytes : new Blob([bytes as BlobPart], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

@@ -9,7 +9,8 @@ import { PAPERS, defaultPaper, type PaperKey } from "@/lib/export/pages";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
 import { POSTCARD_SIZES, postcardPages, type PostcardSize } from "@/lib/export/postcard";
 import { download } from "@/lib/export/raster";
-import { exportPdf } from "@/lib/export/run";
+import { exportPdf, exportSlides } from "@/lib/export/run";
+import { slideCount, slidePlans } from "@/lib/export/slides";
 import { BAND_PRESETS, wristbandPages, type BandSize } from "@/lib/export/wristband";
 import { hasNoRunZones, kebab } from "@/lib/play/storage";
 import type { Playbook, TeamSettings } from "@/lib/play/types";
@@ -52,11 +53,11 @@ export function ExportPanel({ book, items, team, say }: Props) {
     setSize((s) => ({ ...s, [k]: Math.max(lo, Math.min(hi, v)) }));
   };
 
-  const run = (label: string, job: (progress: (done: number, total: number) => void) => Promise<void> | void) => {
+  const run = (label: string, job: (progress: (done: number, total: number) => void) => Promise<void> | void, unit = "page") => {
     if (busy || none) return;
     setBusy(true);
     say(`${label}…`, 0);
-    Promise.resolve().then(() => { return job((done, total) => { say(`${label}… page ${String(Math.min(done + 1, total))} of ${String(total)}`, 0); }); })
+    Promise.resolve().then(() => { return job((done, total) => { say(`${label}… ${unit} ${String(Math.min(done + 1, total))} of ${String(total)}`, 0); }); })
       .then(() => { say("Saved"); }, (e: unknown) => { record("export", e); say("That export failed. Try again on a bigger screen."); })
       .finally(() => { setBusy(false); });
   };
@@ -87,6 +88,9 @@ export function ExportPanel({ book, items, team, say }: Props) {
       const sheet = flyerPage(flyerPicks, { paper, bookName: book.name, team });
       await exportPdf([sheet], `${kebab(book.name)}-flyer.pdf`, `${book.name} - flyer`, { dpi: 220, onProgress: progress });
     });
+  };
+  const onSlides = () => {
+    run("Drawing slides", (progress) => exportSlides(() => slidePlans(items, { bookName: book.name, team }), `${kebab(book.name)}-slides.pptx`, { onProgress: progress }), "slide");
   };
   const onFile = () => {
     run("Writing the file", () => {
@@ -145,6 +149,15 @@ export function ExportPanel({ book, items, team, say }: Props) {
           <option value="four">Four per page · simple</option>
         </select>
         <button type="button" onClick={onBinder} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download binder PDF</button>
+      </div>
+
+      <div className={`${card} flex flex-col gap-2`}>
+        <span className={eyebrow}>SLIDES</span>
+        <span className="text-caption leading-note text-ink-muted">One play per slide for your team meeting, with your notes and every player&apos;s job in the speaker notes.</span>
+        <span className="text-caption text-ink-muted">
+          {none ? "Opens in PowerPoint, Keynote and Google Slides." : `${String(slideCount(items.length))} slides · opens in PowerPoint, Keynote and Google Slides`}
+        </span>
+        <button type="button" onClick={onSlides} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download slides</button>
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>

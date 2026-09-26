@@ -57,9 +57,10 @@ test("exports are disabled for an empty book, download as real files for a full 
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [empty, road], team: OTTERS });
 
   await page.goto("/playbooks?book=fx-empty");
-  for (const label of ["Download wristbands PDF", "Download binder PDF", "Download postcards PDF", "Download flyer PDF", "Download playbook file"]) {
+  for (const label of ["Download wristbands PDF", "Download binder PDF", "Download postcards PDF", "Download flyer PDF", "Download slides", "Download playbook file"]) {
     await expect(page.getByRole("button", { name: label })).toBeDisabled();
   }
+  await expect(page.getByText("Opens in PowerPoint, Keynote and Google Slides.")).toBeVisible();
 
   await page.goto("/playbooks?book=fx-road");
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download playbook file" }).click()]);
