@@ -12,7 +12,7 @@ import { download } from "@/lib/export/raster";
 import { exportPdf, exportSlides } from "@/lib/export/run";
 import { slideCount, slidePlans } from "@/lib/export/slides";
 import { BAND_PRESETS, wristbandPages, type BandSize } from "@/lib/export/wristband";
-import { kebab } from "@/lib/play/storage";
+import { hasNoRunZones, kebab } from "@/lib/play/storage";
 import type { Playbook, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { card, eyebrow, input, pill, select } from "../ui";
@@ -111,7 +111,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
               role="img"
               aria-label="Playbook PDF preview"
               className="w-full max-w-[240px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: items[0].play.side, box: { pw: 660, ph: 280 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: items[0].play.side, noRunZones: hasNoRunZones(team), box: { pw: 660, ph: 280 } }) }}
             />
             <span className="text-caption leading-note text-ink-muted">
               Preview: {items[0].play.name}. Each play is drawn from its own side. A front shown while drawing stays off the page.

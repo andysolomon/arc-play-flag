@@ -217,8 +217,11 @@ export interface FieldLayout {
   texts: FieldText[];
 }
 
-/** Yard lines, hatched no-run bands, end zone and labels for a given depth. */
-export function fieldLayout(depthYards: number, showYardNumbers = true): FieldLayout {
+/**
+ * Yard lines, hatched no-run bands, end zone and labels for a given depth. A league that
+ * plays without no-run zones gets the same field with no bands (and no NO-RUN labels).
+ */
+export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZones = true): FieldLayout {
   const top = ybv(depthYards), vh = depthYards * S;
   const clipRect = (y1: number, y2: number): Band | null => {
     const a = Math.max(y1, top), b2 = Math.min(y2, 8);
@@ -226,7 +229,7 @@ export function fieldLayout(depthYards: number, showYardNumbers = true): FieldLa
     return { y: py(a, top), h: (b2 - a) * S };
   };
   // the 5 yards before midfield (the 20) and before the goal line (the 40)
-  const bands = [clipRect(-15, -10), clipRect(-35, -30)].filter((b): b is Band => b !== null);
+  const bands = noRunZones ? [clipRect(-15, -10), clipRect(-35, -30)].filter((b): b is Band => b !== null) : [];
   const endZone = clipRect(-37, -35);
   const lines: YardLine[] = [];
   for (let y = 5; y >= -35; y -= 5) {

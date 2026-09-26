@@ -13,6 +13,7 @@ import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types"
 import { zoneLayout } from "@/lib/play/zones";
 import { Football, PlayButton } from "./Playback";
 import { PlayerToken } from "./PlayerToken";
+import { FIELD } from "./fieldPaint";
 import { RouteLayer } from "./RouteLayer";
 import { pillMd } from "./ui";
 
@@ -29,6 +30,8 @@ interface Props {
   svgRef: RefObject<SVGSVGElement | null>;
   snapMode?: SnapMode;
   showYardNumbers?: boolean;
+  /** the hatched no-run bands; off for a team whose league plays without them */
+  noRunZones?: boolean;
   /** share page: draw only, no interaction */
   readOnly?: boolean;
   /** printed above the field; also shown on screen when `showTitle` is set */
@@ -76,7 +79,7 @@ const TITLE_CHROME = 24;
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
-  readOnly = false, title, showTitle = false, status,
+  noRunZones = true, readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -125,7 +128,7 @@ function FieldImpl({
     };
   }), [players, live, liveWaypoint]);
   const d = depth(effective, pane);
-  const layout = useMemo(() => fieldLayout(d, showYardNumbers), [d, showYardNumbers]);
+  const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones), [d, showYardNumbers, noRunZones]);
   const top = layout.top;
   const width = cardWidth(pane, d);
   const topRef = useRef(top);
@@ -466,7 +469,7 @@ function FieldImpl({
           viewBox={layout.viewBox}
           onClick={readOnly ? undefined : onFieldClick}
           onDoubleClick={readOnly ? undefined : () => { if (draft) dispatch({ type: "draftFinishDoubleTap" }); }}
-          className="block h-auto w-full touch-pan-y rounded-field border-[3px] border-ink bg-turf shadow-field"
+          className="block h-auto w-full touch-pan-y rounded-field border-[3px] border-ink bg-(--field-turf) shadow-field"
           role={readOnly ? "img" : "group"}
           tabIndex={!readOnly && draft ? 0 : undefined}
           aria-keyshortcuts={!readOnly && draft ? "Enter Escape Delete Backspace" : undefined}
@@ -475,19 +478,19 @@ function FieldImpl({
           <desc>{readOnly ? "Flag football play diagram" : "Interactive flag football play diagram. Tab to players and custom waypoints."}</desc>
           <defs>
             <pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="11" stroke="#1b1a17" strokeWidth="1.6" opacity="0.19" />
+              <line x1="0" y1="0" x2="0" y2="11" stroke="#1b1a17" style={{ stroke: FIELD.line }} strokeWidth="1.6" opacity="0.19" />
             </pattern>
           </defs>
           <g>
-            {layout.endZone && <rect x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)} fill="#a7e5a7" />}
+            {layout.endZone && <rect x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)} fill="#a7e5a7" style={{ fill: FIELD.endzone }} />}
             {layout.bands.map((b) => (
               <rect key={b.y} x="0" y={b.y.toFixed(1)} width="660" height={b.h.toFixed(1)} fill="url(#ffhatch)" />
             ))}
             {layout.lines.map((l) => (
-              <line key={l.y} x1="0" y1={l.y.toFixed(1)} x2="660" y2={l.y.toFixed(1)} stroke="#1b1a17" strokeWidth={l.w} opacity={l.o} />
+              <line key={l.y} x1="0" y1={l.y.toFixed(1)} x2="660" y2={l.y.toFixed(1)} stroke="#1b1a17" style={{ stroke: FIELD.line }} strokeWidth={l.w} opacity={l.o} />
             ))}
             {layout.texts.length > 0 && (
-              <g fontFamily="var(--font-hand)" fontSize={17} fill="#1b1a17" fillOpacity={0.5}>
+              <g fontFamily="var(--font-hand)" fontSize={17} fill="#1b1a17" style={{ fill: FIELD.line }} fillOpacity={0.5}>
                 {layout.texts.map((t) => (
                   <text key={t.key} x={t.x} y={t.y.toFixed(1)} letterSpacing={t.letterSpacing}>{t.t}</text>
                 ))}
@@ -518,8 +521,8 @@ function FieldImpl({
                 data-export="skip"
               >
                 <circle r={34} fill="transparent" />
-                <circle r={active ? 11 : 9} fill="#fffdf6" stroke="#1b1a17" strokeWidth={3} />
-                <circle r={15} fill="none" stroke="#f2b705" strokeWidth={4} className="opacity-0 group-focus-visible:opacity-100" />
+                <circle r={active ? 11 : 9} fill="#fffdf6" stroke="#1b1a17" style={{ fill: FIELD.waypoint, stroke: FIELD.outline }} strokeWidth={3} />
+                <circle r={15} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={4} className="opacity-0 group-focus-visible:opacity-100" />
               </g>
             );
           })}

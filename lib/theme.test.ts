@@ -67,7 +67,7 @@ afterEach(() => {
 });
 
 describe("theme choice", () => {
-  test("only light and dark are kept; anything else follows the device", () => {
+  test("only themes the app draws are kept; anything else follows the device", () => {
     expect(parseThemeChoice("light")).toBe("light");
     expect(parseThemeChoice("dark")).toBe("dark");
     for (const raw of [null, "", "auto", "Dark", "system", 1, {}]) expect(parseThemeChoice(raw)).toBe("auto");

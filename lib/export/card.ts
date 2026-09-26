@@ -2,6 +2,7 @@ import { CALL_LABEL, callOf } from "@/lib/play/call";
 import type { Level, Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
 import { ybv } from "@/lib/play/geometry";
+import { hasNoRunZones } from "@/lib/play/storage";
 import { fitField } from "./binder";
 import { INK, MUTED, appMark, badge, field, page, pill, text, type SvgPage } from "./pages";
 import { measure } from "./raster";
@@ -62,6 +63,7 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
     ...frame,
     ball: vis === "defense" ? null : frame.ball,
     show: vis,
+    noRunZones: hasNoRunZones(o.team),
   }, 5));
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));

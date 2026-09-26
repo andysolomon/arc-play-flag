@@ -93,9 +93,35 @@
   input, button, select { font-family: inherit; color: inherit; }
   a { color: var(--color-link); text-decoration: underline; }
   a:hover { color: var(--color-link-hover); }
-  :focus-visible { outline: 3px solid var(--color-yellow); outline-offset: 2px; }
+  /* --color-focus is set by the light premium themes, whose highlighter is too pale to ring a control on paper */
+  :focus-visible { outline: 3px solid var(--color-focus, var(--color-yellow)); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) {
     .motion-loop { animation: none !important; }
+  }
+
+  /*
+   * The live field's paint (components/Field.tsx, PlayerToken.tsx, RouteLayer.tsx). These are the
+   * standard green field's colours, the ones lib/render/play-svg.ts writes into every export, card
+   * and thumbnail; only the "Themed field" option below repaints them, and only on screen.
+   */
+  :root {
+    --field-turf: #c1f0c1;
+    --field-endzone: #a7e5a7;
+    --field-line: #1b1a17;
+    --field-outline: #1b1a17;
+    --field-label: #1b1a17;
+    --field-offense: #e5675e;
+    --field-defense: #4a8fe0;
+    --field-route: #4a3728;
+    --field-primary: #c2261a;
+    --field-deep: #1d4fbe;
+    --field-flat: #0e7175;
+    --field-curl: #6a34b8;
+    --field-mid: #7a5a07;
+    --field-blitz: #b3261e;
+    --field-cover: #4a8fe0;
+    --field-waypoint: #fffdf6;
+    --field-ring: #f2b705;
   }
 
   /* Every sticker is in the page twice, ink and chalk; the dark block below picks. Print is always ink on paper. */
@@ -106,7 +132,7 @@
    * Dark: chalk on a dark board. The same tokens, redrawn, so every control follows; yellow
    * stays the highlighter. <html data-theme> is set before first paint by lib/theme.ts.
    * Screen only, so printing from a dark screen still puts ink on paper. The field keeps its
-   * turf and inks in both themes: route colours are tuned for turf, and exports draw the same picture.
+   * turf and inks (the --field-* tokens) unless a premium theme's "Themed field" option repaints it.
    */
   @media screen {
     :root[data-theme="dark"] {
@@ -127,24 +153,361 @@
       --color-link-hover: #ffb7a8;
       --shadow-ink: rgb(0 0 0 / 0.45);
     }
-    /* the dark board gets the chalk stickers (components/Sticker.tsx carries both) */
-    :root[data-theme="dark"] .sticker-light { display: none; }
-    :root[data-theme="dark"] .sticker-dark { display: block; }
+
+    /*
+     * Premium themes, after Omarchy's collection (omarchy.us/themes), unlocked by a coach's first
+     * playbook (components/ThemePicker.tsx). Each redraws the same tokens as dark does, from the
+     * palette it is named for, and every pair a coach reads clears WCAG AA: ink, muted ink and links
+     * on paper, cream and white; cream on an ink pill; --color-accent-ink on the highlighter
+     * (e2e/journeys/premium-themes.journey.ts measures each one). --color-yellow is the theme's
+     * highlighter, whatever its hue. Not :root-only, so a swatch in the picker can wear its own
+     * theme. Colours for the browser chrome: PREMIUM_THEMES in lib/theme.ts.
+     */
+    [data-theme="tokyo-night"] {
+      color-scheme: dark;
+      --color-paper: #1a1b26;
+      --color-paper-2: #16161e;
+      --color-cream: #1f2335;
+      --color-white: #24283b;
+      --color-ink: #c0caf5;
+      --color-ink-2: #a9b1d6;
+      --color-ink-muted: #9aa5ce;
+      --color-ink-faint: #565f89;
+      --color-yellow: #7aa2f7;
+      --color-accent-ink: #16161e;
+      --color-yellow-soft: #2e3a5c;
+      --color-rose-soft: #4a2635;
+      --color-divider: rgb(192 202 245 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.6);
+      --color-link: #7dcfff;
+      --color-link-hover: #b4f9f8;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="catppuccin"] {
+      color-scheme: dark;
+      --color-paper: #1e1e2e;
+      --color-paper-2: #181825;
+      --color-cream: #181825;
+      --color-white: #313244;
+      --color-ink: #cdd6f4;
+      --color-ink-2: #bac2de;
+      --color-ink-muted: #a6adc8;
+      --color-ink-faint: #6c7086;
+      --color-yellow: #cba6f7;
+      --color-accent-ink: #11111b;
+      --color-yellow-soft: #45385e;
+      --color-rose-soft: #4f2c3d;
+      --color-divider: rgb(205 214 244 / 0.14);
+      --color-scrim: rgb(17 17 27 / 0.65);
+      --color-link: #f5c2e7;
+      --color-link-hover: #f5e0dc;
+      --shadow-ink: rgb(17 17 27 / 0.6);
+    }
+    [data-theme="gruvbox"] {
+      color-scheme: dark;
+      --color-paper: #282828;
+      --color-paper-2: #1d2021;
+      --color-cream: #32302f;
+      --color-white: #3c3836;
+      --color-ink: #ebdbb2;
+      --color-ink-2: #d5c4a1;
+      --color-ink-muted: #bdae93;
+      --color-ink-faint: #7c6f64;
+      --color-yellow: #fabd2f;
+      --color-accent-ink: #1d2021;
+      --color-yellow-soft: #524321;
+      --color-rose-soft: #5c2b26;
+      --color-divider: rgb(235 219 178 / 0.15);
+      --color-scrim: rgb(0 0 0 / 0.55);
+      --color-link: #fe8019;
+      --color-link-hover: #fabd2f;
+      --shadow-ink: rgb(0 0 0 / 0.45);
+    }
+    [data-theme="nord"] {
+      color-scheme: dark;
+      --color-paper: #2e3440;
+      --color-paper-2: #292e39;
+      --color-cream: #3b4252;
+      --color-white: #434c5e;
+      --color-ink: #eceff4;
+      --color-ink-2: #e5e9f0;
+      --color-ink-muted: #c2cad8;
+      --color-ink-faint: #7b88a1;
+      --color-yellow: #88c0d0;
+      --color-accent-ink: #2e3440;
+      --color-yellow-soft: #3e5566;
+      --color-rose-soft: #5b3f4a;
+      --color-divider: rgb(236 239 244 / 0.14);
+      --color-scrim: rgb(26 30 37 / 0.6);
+      --color-link: #88c0d0;
+      --color-link-hover: #8fbcbb;
+      --shadow-ink: rgb(26 30 37 / 0.5);
+    }
+    [data-theme="kanagawa"] {
+      color-scheme: dark;
+      --color-paper: #1f1f28;
+      --color-paper-2: #16161d;
+      --color-cream: #2a2a37;
+      --color-white: #363646;
+      --color-ink: #dcd7ba;
+      --color-ink-2: #c8c093;
+      --color-ink-muted: #a6a69c;
+      --color-ink-faint: #727169;
+      --color-yellow: #e6c384;
+      --color-accent-ink: #16161d;
+      --color-yellow-soft: #49443a;
+      --color-rose-soft: #43242b;
+      --color-divider: rgb(220 215 186 / 0.14);
+      --color-scrim: rgb(22 22 29 / 0.6);
+      --color-link: #7e9cd8;
+      --color-link-hover: #7fb4ca;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="matte-black"] {
+      color-scheme: dark;
+      --color-paper: #121212;
+      --color-paper-2: #0d0d0d;
+      --color-cream: #1a1a1a;
+      --color-white: #222222;
+      --color-ink: #bebebe;
+      --color-ink-2: #a8a8a8;
+      --color-ink-muted: #8a8a8d;
+      --color-ink-faint: #595959;
+      --color-yellow: #f59e0b;
+      --color-accent-ink: #121212;
+      --color-yellow-soft: #3a2a0e;
+      --color-rose-soft: #3d1f1f;
+      --color-divider: rgb(190 190 190 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.65);
+      --color-link: #fbbf24;
+      --color-link-hover: #ffd97a;
+      --shadow-ink: rgb(0 0 0 / 0.6);
+    }
+    [data-theme="rose-pine"] {
+      color-scheme: light;
+      --color-paper: #faf4ed;
+      --color-paper-2: #f2e9e1;
+      --color-cream: #fffaf3;
+      --color-white: #fffcf8;
+      --color-ink: #575279;
+      --color-ink-2: #6e6a8e;
+      --color-ink-muted: #6e6a86;
+      --color-ink-faint: #9893a5;
+      --color-yellow: #d7827e;
+      --color-accent-ink: #26233a;
+      --color-focus: #b4637a;
+      --color-yellow-soft: #f6ddd6;
+      --color-rose-soft: #f0d3da;
+      --color-divider: rgb(87 82 121 / 0.16);
+      --color-scrim: rgb(38 35 58 / 0.35);
+      --color-link: #286983;
+      --color-link-hover: #1c4f63;
+      --shadow-ink: rgb(87 82 121 / 0.18);
+    }
+    [data-theme="flexoki"] {
+      color-scheme: light;
+      --color-paper: #f2f0e5;
+      --color-paper-2: #e6e4d9;
+      --color-cream: #fffcf0;
+      --color-white: #fffcf0;
+      --color-ink: #100f0f;
+      --color-ink-2: #403e3c;
+      --color-ink-muted: #66655f;
+      --color-ink-faint: #b7b5ac;
+      --color-yellow: #d0a215;
+      --color-accent-ink: #100f0f;
+      --color-focus: #bc5215;
+      --color-yellow-soft: #faeec6;
+      --color-rose-soft: #ffe1d5;
+      --color-divider: rgb(16 15 15 / 0.14);
+      --color-scrim: rgb(16 15 15 / 0.35);
+      --color-link: #205ea6;
+      --color-link-hover: #1a4f8c;
+      --shadow-ink: rgb(16 15 15 / 0.15);
+    }
+
+    /*
+     * "Themed field" (a per-device option, lib/theme.ts): a premium theme repaints the live field
+     * too. Tuned per theme so every route ink clears 4.5:1 on its turf and 3:1 on its end zone,
+     * player labels 4.5:1 on their fill, and each token and the selection ring 3:1 on the turf
+     * (e2e/journeys/premium-themes.journey.ts measures them). Screen only: printing the designer,
+     * and every export, stay on the standard green field.
+     */
+    :root[data-field="themed"][data-theme="tokyo-night"] {
+      --field-turf: #1c2b2d;
+      --field-endzone: #223638;
+      --field-line: #c0caf5;
+      --field-outline: #16161e;
+      --field-label: #16161e;
+      --field-offense: #f7768e;
+      --field-defense: #7aa2f7;
+      --field-route: #c0caf5;
+      --field-primary: #ff9e64;
+      --field-deep: #7aa2f7;
+      --field-flat: #73daca;
+      --field-curl: #bb9af7;
+      --field-mid: #e0af68;
+      --field-blitz: #ff757f;
+      --field-cover: #7dcfff;
+      --field-waypoint: #c0caf5;
+      --field-ring: #e0af68;
+    }
+    :root[data-field="themed"][data-theme="catppuccin"] {
+      --field-turf: #1f2d2a;
+      --field-endzone: #263832;
+      --field-line: #cdd6f4;
+      --field-outline: #11111b;
+      --field-label: #11111b;
+      --field-offense: #f38ba8;
+      --field-defense: #89b4fa;
+      --field-route: #cdd6f4;
+      --field-primary: #fab387;
+      --field-deep: #89b4fa;
+      --field-flat: #94e2d5;
+      --field-curl: #cba6f7;
+      --field-mid: #f9e2af;
+      --field-blitz: #eba0ac;
+      --field-cover: #74c7ec;
+      --field-waypoint: #cdd6f4;
+      --field-ring: #f9e2af;
+    }
+    :root[data-field="themed"][data-theme="gruvbox"] {
+      --field-turf: #282c1c;
+      --field-endzone: #323824;
+      --field-line: #ebdbb2;
+      --field-outline: #1d2021;
+      --field-label: #1d2021;
+      --field-offense: #fb4934;
+      --field-defense: #83a598;
+      --field-route: #ebdbb2;
+      --field-primary: #fe8019;
+      --field-deep: #83a598;
+      --field-flat: #8ec07c;
+      --field-curl: #d3869b;
+      --field-mid: #fabd2f;
+      --field-blitz: #fc6d5c;
+      --field-cover: #7daea3;
+      --field-waypoint: #ebdbb2;
+      --field-ring: #fabd2f;
+    }
+    :root[data-field="themed"][data-theme="nord"] {
+      --field-turf: #283331;
+      --field-endzone: #303d39;
+      --field-line: #eceff4;
+      --field-outline: #2e3440;
+      --field-label: #2e3440;
+      --field-offense: #de8f96;
+      --field-defense: #81a1c1;
+      --field-route: #eceff4;
+      --field-primary: #d08770;
+      --field-deep: #81a1c1;
+      --field-flat: #8fbcbb;
+      --field-curl: #b48ead;
+      --field-mid: #ebcb8b;
+      --field-blitz: #e0959c;
+      --field-cover: #88c0d0;
+      --field-waypoint: #eceff4;
+      --field-ring: #ebcb8b;
+    }
+    :root[data-field="themed"][data-theme="kanagawa"] {
+      --field-turf: #242b21;
+      --field-endzone: #2d3529;
+      --field-line: #dcd7ba;
+      --field-outline: #16161d;
+      --field-label: #16161d;
+      --field-offense: #e46876;
+      --field-defense: #7e9cd8;
+      --field-route: #dcd7ba;
+      --field-primary: #ffa066;
+      --field-deep: #7e9cd8;
+      --field-flat: #7aa89f;
+      --field-curl: #a594c8;
+      --field-mid: #e6c384;
+      --field-blitz: #e46876;
+      --field-cover: #7fb4ca;
+      --field-waypoint: #dcd7ba;
+      --field-ring: #ff9e3b;
+    }
+    :root[data-field="themed"][data-theme="matte-black"] {
+      --field-turf: #1a1d1a;
+      --field-endzone: #222622;
+      --field-line: #bebebe;
+      --field-outline: #121212;
+      --field-label: #121212;
+      --field-offense: #e5675e;
+      --field-defense: #5a9ae8;
+      --field-route: #bebebe;
+      --field-primary: #f59e0b;
+      --field-deep: #6ea8ff;
+      --field-flat: #4fd1c5;
+      --field-curl: #b794f4;
+      --field-mid: #e8c547;
+      --field-blitz: #f07167;
+      --field-cover: #63b3ed;
+      --field-waypoint: #bebebe;
+      --field-ring: #f59e0b;
+    }
+    :root[data-field="themed"][data-theme="rose-pine"] {
+      --field-turf: #e2e9dc;
+      --field-endzone: #d3dfcb;
+      --field-line: #464261;
+      --field-outline: #575279;
+      --field-label: #26233a;
+      --field-offense: #d7827e;
+      --field-defense: #6aa6b0;
+      --field-route: #575279;
+      --field-primary: #9e4d65;
+      --field-deep: #286983;
+      --field-flat: #2f6f6a;
+      --field-curl: #6d5a8a;
+      --field-mid: #8a5a12;
+      --field-blitz: #9d3f56;
+      --field-cover: #336683;
+      --field-waypoint: #fffaf3;
+      --field-ring: #b4637a;
+    }
+    :root[data-field="themed"][data-theme="flexoki"] {
+      --field-turf: #e9ebcf;
+      --field-endzone: #dde2b2;
+      --field-line: #100f0f;
+      --field-outline: #100f0f;
+      --field-label: #100f0f;
+      --field-offense: #da5f53;
+      --field-defense: #4385be;
+      --field-route: #403e3c;
+      --field-primary: #af3029;
+      --field-deep: #205ea6;
+      --field-flat: #1c6c66;
+      --field-curl: #5e409d;
+      --field-mid: #7a5e00;
+      --field-blitz: #a3460e;
+      --field-cover: #2a62a0;
+      --field-waypoint: #fffcf0;
+      --field-ring: #bc5215;
+    }
+
+    /* the dark boards get the chalk stickers (components/Sticker.tsx carries both) */
+    :root:is([data-theme="dark"], [data-theme="tokyo-night"], [data-theme="catppuccin"], [data-theme="gruvbox"],
+      [data-theme="nord"], [data-theme="kanagawa"], [data-theme="matte-black"]) {
+      .sticker-light { display: none; }
+      .sticker-dark { display: block; }
+    }
   }
 }
 
 /*
- * Yellow is a highlighter in both themes, so whatever sits on it keeps the light theme's ink
+ * Yellow is a highlighter in every theme, so whatever sits on it keeps the light theme's ink
  * and paper. Pair it with every yellow fill, including state ones (data-[active=true]:on-yellow).
  * It sets the text colour too: inherited colour is already resolved, so the tokens alone can't reach it.
  */
 @utility on-yellow {
   color: var(--color-ink);
+  /* a premium theme names the ink its highlighter was tuned for */
+  --color-ink: var(--color-accent-ink, --theme(--color-ink inline));
   --color-paper: --theme(--color-paper inline);
   --color-paper-2: --theme(--color-paper-2 inline);
   --color-cream: --theme(--color-cream inline);
   --color-white: --theme(--color-white inline);
-  --color-ink: --theme(--color-ink inline);
   --color-ink-2: --theme(--color-ink-2 inline);
   --color-ink-muted: --theme(--color-ink-muted inline);
   --color-ink-faint: --theme(--color-ink-faint inline);

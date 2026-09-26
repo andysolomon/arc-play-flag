@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { teamFill } from "@/lib/play/geometry";
 import type { Player } from "@/lib/play/types";
+import { FIELD, teamPaint } from "./fieldPaint";
 
 interface Props {
   player: Player;
@@ -53,7 +54,7 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
           {/* 68 SVG units gives the token an approximately 44px target at the common phone field width. */}
           <circle r={34} fill="transparent" stroke="none" />
           {/* keyboard focus shows the same yellow ring as selection */}
-          <circle r={33} fill="none" stroke="#f2b705" strokeWidth={5} className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
+          <circle r={33} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={5} className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
           {ringR > 0 && (
             <circle
               r={ringR}
@@ -61,11 +62,11 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
               stroke="#f2b705"
               strokeWidth={5}
               strokeDasharray={target && !selected ? "6 6" : undefined}
-              style={centred}
+              style={{ ...centred, stroke: FIELD.ring }}
               className={selected ? "motion-loop animate-pulse-ring" : undefined}
             />
           )}
-          <circle r={23} fill={teamFill(p.team)} stroke="#1b1a17" strokeWidth={2.5} />
+          <circle r={23} fill={teamFill(p.team)} stroke="#1b1a17" style={{ fill: teamPaint(p.team), stroke: FIELD.outline }} strokeWidth={2.5} />
           {p.label && (
             <text
               y={1}
@@ -73,6 +74,7 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
               dominantBaseline="central"
               fontSize={p.label.length > 2 ? 15 : 18}
               fill="#1b1a17"
+              style={{ fill: FIELD.label }}
               className="pointer-events-none select-none"
             >
               {p.label}

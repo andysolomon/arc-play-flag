@@ -7,10 +7,10 @@ import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import type { RouteType, Team } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
-import { getPlays, playById, savePlay } from "@/lib/play/library";
+import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute } from "@/lib/play/routes";
-import { StorageError, failureMessage, newId, readDraft, writeDraft } from "@/lib/play/storage";
+import { StorageError, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
 import { Header } from "./Header";
@@ -49,6 +49,9 @@ function useMedia(query: string): boolean {
 
 export function App() {
   const [s, dispatch] = useReducer(reducer, undefined, initialState);
+  // a league rule, so it is the team's: the same field for every play, on screen and on paper
+  const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
+  const noRunZones = hasNoRunZones(team);
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -250,8 +253,12 @@ export function App() {
     say("New play");
   }, [say]);
   const shareUrl = useCallback(() =>
-    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, players: [...s.players] })}`,
-  [s.name, s.side, s.players]);
+    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, players: [...s.players] }, noRunZones)}`,
+  [s.name, s.side, s.players, noRunZones]);
+  const onNoRunZones = useCallback((on: boolean) => {
+    const r = setTeam({ ...getTeam(), noRunZones: on });
+    if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
+  }, [say]);
   const copyShare = useCallback(() => {
     const url = shareUrl();
     setShareOpen(false);
@@ -301,6 +308,8 @@ export function App() {
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}
             onReset={(team) => { dispatch({ type: "resetFormation", team }); }}
             onShadow={(on) => { dispatch({ type: "setShadow", on }); }}
+            noRunZones={noRunZones}
+            onNoRunZones={onNoRunZones}
           />
         </Sidebar>
         <Field
@@ -316,6 +325,7 @@ export function App() {
           title={s.name || "Untitled play"}
           showTitle
           status={persistenceLabel[persistence]}
+          noRunZones={noRunZones}
         />
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
           <RouteSidebar
@@ -350,7 +360,7 @@ export function App() {
               role="img"
               aria-label={`${s.side === "defense" ? "Defense" : "Offense"} snapshot preview`}
               className="mx-auto w-full max-w-[360px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.side, box: { pw: 660, ph: 360 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.side, noRunZones, box: { pw: 660, ph: 360 } }) }}
             />
             <button type="button" className={`${pillSm} self-start px-4 py-1`} onClick={copyShare}>Copy snapshot link</button>
           </section>

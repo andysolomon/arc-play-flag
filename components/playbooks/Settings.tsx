@@ -7,7 +7,7 @@ import {
 } from "@/lib/export/backup";
 import { download } from "@/lib/export/raster";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, refresh, setTeam, subscribe } from "@/lib/play/library";
-import { StorageError, failureMessage } from "@/lib/play/storage";
+import { StorageError, failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { ThemePicker } from "../ThemePicker";
 import { card, divider, eyebrow, input, pill, pillDark } from "../ui";
 import { PreviewModal } from "./PreviewModal";
@@ -89,6 +89,12 @@ function SettingsPanel() {
         </label>
       </div>
       <span className="text-caption leading-note text-ink-muted">Shown on cards and printed pages. Nothing else changes.</span>
+      <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small">
+        <input type="checkbox" checked={hasNoRunZones(team)} onChange={(e) => { onTeam({ ...team, noRunZones: e.target.checked }); }}
+          className="h-5 w-5 flex-none cursor-pointer accent-ink" />
+        No-run zones
+      </label>
+      <span className="text-caption leading-note text-ink-muted">Turn off if your league plays without them. The field, pictures and printouts leave them off.</span>
 
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
