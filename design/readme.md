@@ -40,7 +40,7 @@ Sources
 - Style: thick black outlines, flat red/blue fills, light-blue zone blobs, hand-drawn feel — matching Patrick Hand.
 - **Dark board set** (`assets/icons-dark/`, same names): the owner's dark sheets, cut by `scripts/cut-stickers.ts`. Chalk outlines, yellow route lines and arrows, navy zone blobs, the same red/blue/brown fills. Paper icons (save, export, duplicate) keep a cream body with a chalk die-cut edge. The app shows this set whenever the dark theme is on; print always uses the ink set. Four extras from the sheets (`menu`, `block`, `lightMode`, `darkMode`) are kept here but not shipped.
 - Naming mirrors the app's route keys: `go out in slant corner post curl flat cross wheel handoff dive stretch counter reverse delay pitch customOff deselectOff` (offense), `man zoneDeep zoneFlat curlFlat midRead blitz spy customDef deselectDef` (defense), `football save duplicate export flip clear reset offOnly defOnly notes playbook` (tools).
-- Printed output (wristband inserts, binder pages, cards) uses no stickers: number badges are yellow discs, the field is the same SVG as the app, and every route must still read on a mono printer (weight and dash, never hue alone). Cut lines are faint dashes for scissors.
+- Printed output (wristband inserts, binder pages, cards, slides) uses no stickers: number badges are yellow discs, the field is the same SVG as the app, and every route must still read on a mono printer (weight and dash, never hue alone). Cut lines are faint dashes for scissors.
 - Missing glyphs: panel toggles and Mirror/Primary use unicode (‹ › ⇄ ★ ☆). Ask the owner for stickers if these need to match.
 - Never draw new icons by hand; request a sticker in the same style.
 

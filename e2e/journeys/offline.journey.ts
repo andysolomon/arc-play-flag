@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { Designer, downloadText } from "../support/designer";
+import { Designer, downloadBytes, downloadText } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
 import { KEYS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook } from "../support/fixtures";
+import { readZip } from "../support/pptx";
 
 test("a direct demo mount prepares the shells, exact shared plays, and advertised media", async ({ context, page }) => {
   await page.goto("/demo");
@@ -54,6 +55,17 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
   ]);
   const playbookJson = await downloadText(playbookDownload);
   expect(JSON.parse(playbookJson)).toMatchObject({ kind: "ffpd.playbook", playbook: { id: "offline-book" } });
+
+  // the slide deck draws and packs with the network off; one play needs no glance slide
+  const [slidesDownload] = await Promise.all([
+    page.waitForEvent("download", { timeout: 40_000 }),
+    page.getByRole("button", { name: "Download slides" }).click(),
+  ]);
+  await expect(page.locator("div[role='status']")).toHaveText("Saved", { timeout: 40_000 });
+  expect(slidesDownload.suggestedFilename()).toBe("offline-book-slides.pptx");
+  const deck = await downloadBytes(slidesDownload);
+  expect(deck.subarray(0, 4).toString("latin1")).toBe("PK\x03\x04");
+  expect(readZip(deck).map((i) => i.name).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))).toEqual(["ppt/slides/slide1.xml", "ppt/slides/slide2.xml"]);
 
   await page.goto("/playbooks");
   await expect(page.getByRole("heading", { name: "Playbooks" })).toBeVisible();

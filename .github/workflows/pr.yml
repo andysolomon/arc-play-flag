@@ -70,6 +70,14 @@ jobs:
         run: bun run build
       - name: Run the browser journeys against the production build
         run: bun run test:e2e
+      - name: Upload the slide decks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-decks
+          path: test-results/slides-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
