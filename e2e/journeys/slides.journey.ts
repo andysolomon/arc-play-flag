@@ -10,7 +10,7 @@ import {
   COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
   corruptStoredText, playbook, seed,
 } from "../support/fixtures";
-import { PINNED, keepDeck, packageProblems, pngSize, readDeck, readZip } from "../support/pptx";
+import { PINNED, keepDeck, keepFile, packageProblems, pngSize, readDeck, readZip } from "../support/pptx";
 
 const PLAYS = [SLANT_LEFT, WHEEL_RIGHT, HOOK_LADDER, COVER_TWO_D, FAKE_DIVE, PITCH_OPTION, WALKTHROUGH];
 const BOOK = playbook("fx-meeting", "Otter Meeting Book", PLAYS);
@@ -116,12 +116,18 @@ test("a coach downloads the playbook as slides for a team meeting: every slide, 
   await expect(page.getByText("SLIDES", { exact: true })).toBeVisible();
   await expect(page.getByText("One play per slide for your team meeting, with your notes and every player's job in the speaker notes.")).toBeVisible();
   await expect(page.getByText("10 slides · opens in PowerPoint, Keynote and Google Slides")).toBeVisible();
+  // the faces embed the hand face by fetching its woff2; without it they quietly fall back to cursive
+  const faceFetches: number[] = [];
+  page.on("response", (r) => { if (r.request().resourceType() === "fetch" && /\.woff2(\?|$)/.test(r.url())) faceFetches.push(r.status()); });
   const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), slidesButton(page).click()]);
   await expect(toast(page)).toHaveText("Saved", { timeout: 60_000 });
   expect(d.suggestedFilename()).toBe("otter-meeting-book-slides.pptx");
+  expect(faceFetches.length, "the hand face was never fetched for the faces").toBeGreaterThan(0);
+  expect(faceFetches.every((status) => status === 200)).toBe(true);
 
-  // the ZIP: readZip has already refused any structural defect
+  // the ZIP, kept first so a failing run still leaves the file; readZip refuses any structural defect
   const raw = await downloadBytes(d);
+  await keepFile(testInfo, raw);
   const items = readZip(raw);
   expect(items.map((i) => i.name)).toEqual(NAMES);
   for (const i of items) {
@@ -132,6 +138,7 @@ test("a coach downloads the playbook as slides for a team meeting: every slide, 
 
   // the package, every part parsed by the browser
   const deck = await readDeck(page, items);
+  await keepDeck(testInfo, browser.version(), raw, items, deck);
   expect(packageProblems(deck, items)).toEqual([]);
   expect(deck.sldSz).toEqual({ cx: 12192000, cy: 6858000, type: null });
   expect(deck.notesSz).toBe(true);
@@ -177,6 +184,10 @@ test("a coach downloads the playbook as slides for a team meeting: every slide, 
     expect(cx * size.h).toBe(cy * size.w);
     expect(s.titleXfrm).toEqual(i === 1 ? TITLE_BOX : i <= 3 ? GLANCE_BOX : PLAY_BOX);
   }
+  // every face was really drawn: a flat or failed face is a few KB, a real one 100 KB or more
+  const faces = deck.slides.map((s) => part(s.media ?? ""));
+  for (const [n, f] of faces.entries()) expect(f.length, `face ${String(n + 1)} is nearly empty`).toBeGreaterThan(40_000);
+  expect(faces.filter((f, n) => faces.some((g, k) => k !== n && f.equals(g)))).toHaveLength(0);
   expect(deck.slides.map((s) => s.title)).toEqual(TITLES);
   expect(deck.slides.map((s) => s.descr)).toEqual(ALTS);
   expect(deck.slides.map((s) => s.notes)).toEqual(NOTES);
@@ -209,8 +220,6 @@ test("a coach downloads the playbook as slides for a team meeting: every slide, 
   const [d2] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), slidesButton(page).click()]);
   await expect(toast(page)).toHaveText("Saved", { timeout: 60_000 });
   expect((await downloadBytes(d2)).equals(raw)).toBe(true);
-
-  await keepDeck(testInfo, browser.version(), raw, items, deck);
 
   // opt in with SLIDES_SOFFICE=/path/to/soffice (LibreOffice with Impress)
   const soffice = process.env.SLIDES_SOFFICE;
