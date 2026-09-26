@@ -30,6 +30,19 @@ export const COVER_TWO = play("fx-cover-two", "Otter Cover Two", {
   d3: { type: "blitz" },
 });
 
+// the slides journey's book: every call type, both sides, idle and unlabelled players, a deleted man target (loading
+// drops that route, so the defender has no assignment), an empty side
+export const HOOK_LADDER = play("fx-hook-ladder", 'Otter "Hook" & <Ladder>', { o3: { type: "go" }, o4: { type: "post" }, o5: { type: "handoff", primary: true } }, 'Z takes it & runs <behind> the C.\n\nShout "hut" on two.');
+export const COVER_TWO_D = play("fx-cover-two-d", "Otter Cover Two D", { d1: { type: "zoneDeep" }, d4: { type: "zoneDeep" }, d2: { type: "man", target: "o3" }, d3: { type: "man", target: "fx-gone" } }, "Deep halves.\nNobody gets behind you.", "defense");
+export const FAKE_DIVE = play("fx-fake-dive", "Otter Fake Dive", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "curl" } });
+export const PITCH_OPTION: SavedPlay = (() => {
+  const p = play("fx-pitch-option", "Otter Pitch Option", { o5: { type: "pitch" }, o4: { type: "corner" }, o3: { type: "custom", pts: [[3, -6], [8, -10]] } });
+  return { ...p, players: p.players.map((q) => (q.id === "o3" ? { ...q, label: "" } : q)) };
+})();
+/** Longer than the panel's three reserved lines, so the face cuts it and the notes keep it whole. */
+export const WALKTHROUGH_NOTES = "Walk it at half speed, then at full speed. ".repeat(13).trim();
+export const WALKTHROUGH: SavedPlay = { ...play("fx-walkthrough", "Otter Walkthrough", {}, WALKTHROUGH_NOTES), players: formation().filter((p) => p.team === "defense") };
+
 export function playbook(id: string, name: string, plays: readonly SavedPlay[]): Playbook {
   return { id, name, plays: plays.map((p) => p.id) };
 }
@@ -60,6 +73,23 @@ export async function seed(page: Page, data: Seed): Promise<void> {
       if (d.draft) localStorage.setItem(keys.draft, JSON.stringify(d.draft));
     },
     [{ plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, draft: DRAFT_KEY }, data] as const,
+  );
+}
+
+/**
+ * Plants what an imported file could carry, inside the page (a lone surrogate may not survive
+ * CDP): \u0001 and a lone high surrogate on the name, \u000B in the notes.
+ */
+export async function corruptStoredText(page: Page, id: string): Promise<void> {
+  await page.evaluate(
+    ([key, playId]) => {
+      const lib = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, SavedPlay>;
+      const p = lib[playId];
+      if (!p) throw new Error(`no stored play ${playId}`);
+      lib[playId] = { ...p, name: p.name + "\u0001" + String.fromCharCode(0xd83e), notes: p.notes.replace("on two", "\u000Bon two") };
+      localStorage.setItem(key, JSON.stringify(lib));
+    },
+    [PLAYS_KEY, id] as const,
   );
 }
 

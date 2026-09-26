@@ -189,12 +189,13 @@ export type Sabotage = "quota" | "noCanvas";
 
 /**
  * Installed before any page script runs. Storage writes throw QuotaExceededError while
- * the quota flag is up, and canvases refuse a 2D context while the noCanvas flag is up,
- * so the tests can exercise the app's failure states without filling a real disk.
+ * the quota flag is up, and canvases refuse a 2D context while the noCanvas flag is up
+ * or once a canvas budget is spent, so the tests can exercise the app's failure states
+ * without filling a real disk or running a phone out of canvas memory.
  */
 export async function armSabotage(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const w = window as unknown as Record<string, boolean | undefined>;
+    const w = window as unknown as Record<string, unknown>;
     // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with .call below
     const setItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
@@ -203,8 +204,16 @@ export async function armSabotage(page: Page): Promise<void> {
     };
     // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with .apply below
     const getContext = HTMLCanvasElement.prototype.getContext as (this: HTMLCanvasElement, ...a: unknown[]) => unknown;
+    // only a full-page raster spends the budget, never the text measurer, and each canvas once
+    const granted = new WeakSet<HTMLCanvasElement>();
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...a: unknown[]) {
       if (w.__ffpdNoCanvas) return null;
+      const budget = w.__ffpdCanvasBudget;
+      if (typeof budget === "number" && this.width * this.height >= 1_000_000 && !granted.has(this)) {
+        if (budget <= 0) return null;
+        w.__ffpdCanvasBudget = budget - 1;
+        granted.add(this);
+      }
       return getContext.apply(this, a);
     } as typeof HTMLCanvasElement.prototype.getContext;
   });
@@ -215,6 +224,14 @@ export async function sabotage(page: Page, what: Sabotage, on: boolean): Promise
     ([k, v]) => { (window as unknown as Record<string, boolean>)[k] = v; },
     [what === "quota" ? "__ffpdQuota" : "__ffpdNoCanvas", on] as const,
   );
+}
+
+/**
+ * Lets the next `n` full-page canvases (1,000,000 px or more) draw and refuses every one
+ * after, as a phone out of canvas memory does; null lifts the budget. Needs `armSabotage`.
+ */
+export async function canvasBudget(page: Page, n: number | null): Promise<void> {
+  await page.evaluate((v) => { (window as unknown as Record<string, number | null>).__ffpdCanvasBudget = v; }, n);
 }
 
 /** Reads a download the app produced, as text. */
