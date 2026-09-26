@@ -133,7 +133,7 @@ function PlaySidebarImpl({
       )}
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
-      <ThemePicker className="flex-none" />
+      <ThemePicker className="flex-none" unlockHref="/playbooks" />
       <span className={divider} />
       <Support />
     </>

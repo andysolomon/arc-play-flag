@@ -1,16 +1,50 @@
 /**
  * Light or dark, chosen per device. "auto" follows the device's own setting
  * (prefers-color-scheme) and is what a coach gets until they pick one.
+ * Past those two sit the premium themes, after Omarchy's collection: each one
+ * redraws every token in app/globals.css, and a coach earns them by making a playbook.
  */
-export type ThemeChoice = "auto" | "light" | "dark";
-export type Theme = "light" | "dark";
+export type BaseTheme = "light" | "dark";
+
+export interface PremiumTheme {
+  readonly id: string;
+  readonly name: string;
+  /** which sticker set it wears: chalk on the dark ones, ink on the light ones */
+  readonly tone: BaseTheme;
+  /** its header colour (--color-cream), for the browser chrome */
+  readonly color: string;
+  readonly blurb: string;
+}
+
+/** Keep in step with the [data-theme] blocks in app/globals.css. */
+export const PREMIUM_THEMES = [
+  { id: "tokyo-night", name: "Tokyo Night", tone: "dark", color: "#1f2335", blurb: "City lights after dark: indigo board, electric blue highlighter" },
+  { id: "catppuccin", name: "Catppuccin", tone: "dark", color: "#181825", blurb: "Mocha: soft pastels on a deep base, mauve highlighter" },
+  { id: "gruvbox", name: "Gruvbox", tone: "dark", color: "#32302f", blurb: "Retro groove: warm earth tones, a gold highlighter" },
+  { id: "nord", name: "Nord", tone: "dark", color: "#3b4252", blurb: "Arctic slate with a frost-blue highlighter" },
+  { id: "kanagawa", name: "Kanagawa", tone: "dark", color: "#2a2a37", blurb: "The Great Wave: sumi ink, fuji white, carp yellow" },
+  { id: "matte-black", name: "Matte Black", tone: "dark", color: "#1a1a1a", blurb: "Near-black and quiet, one amber highlighter" },
+  { id: "rose-pine", name: "Rosé Pine", tone: "light", color: "#fffaf3", blurb: "Dawn: parchment, pine ink and a rose highlighter" },
+  { id: "flexoki", name: "Flexoki", tone: "light", color: "#fffcf0", blurb: "Inky paper for daylight, a mustard highlighter" },
+] as const satisfies readonly PremiumTheme[];
+
+export type PremiumThemeId = (typeof PREMIUM_THEMES)[number]["id"];
+export type Theme = BaseTheme | PremiumThemeId;
+export type ThemeChoice = "auto" | Theme;
 
 export const THEME_KEY = "ffpd.theme.v1";
-export const THEME_CHOICES: readonly ThemeChoice[] = ["auto", "light", "dark"];
+/** The segmented choices; the premium themes are listed apart, in PREMIUM_THEMES. */
+export const THEME_CHOICES = ["auto", "light", "dark"] as const satisfies readonly ThemeChoice[];
 /** The header's cream in each theme, for the browser and installed-app chrome. Keep in step with app/globals.css. */
-export const THEME_COLOR: Readonly<Record<Theme, string>> = { light: "#fffdf6", dark: "#24221d" };
+export const THEME_COLOR: Readonly<Record<Theme, string>> = {
+  light: "#fffdf6",
+  dark: "#24221d",
+  ...(Object.fromEntries(PREMIUM_THEMES.map((t) => [t.id, t.color])) as Record<PremiumThemeId, string>),
+};
 
-export const parseThemeChoice = (raw: unknown): ThemeChoice => (raw === "light" || raw === "dark" ? raw : "auto");
+/** A theme this app draws, or "auto" for anything else (a junk value, a theme a later release dropped). */
+export const parseThemeChoice = (raw: unknown): ThemeChoice =>
+  typeof raw === "string" && Object.prototype.hasOwnProperty.call(THEME_COLOR, raw) ? (raw as Theme) : "auto";
 
 /**
  * Marks <html> with the theme to draw and points the browser chrome at the matching colour.
@@ -18,12 +52,15 @@ export const parseThemeChoice = (raw: unknown): ThemeChoice => (raw === "light" 
  * and browser globals): the root layout inlines its source so the first paint is already right.
  * The theme-color tag is this function's alone: one React rendered would be re-added on hydration.
  */
-export function applyTheme(key: string, colors: Readonly<Record<Theme, string>>, chosen?: string | null): void {
+export function applyTheme(key: string, colors: Readonly<Record<string, string>>, chosen?: string | null): void {
   let choice = chosen;
   if (choice === undefined) {
     try { choice = localStorage.getItem(key); } catch { choice = null; }
   }
-  const theme = choice === "dark" || (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  // any theme with a colour is drawn as chosen; nothing, "auto" or junk follows the device
+  const theme = typeof choice === "string" && Object.prototype.hasOwnProperty.call(colors, choice)
+    ? choice
+    : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   document.documentElement.dataset.theme = theme;
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
@@ -31,11 +68,11 @@ export function applyTheme(key: string, colors: Readonly<Record<Theme, string>>,
     meta.setAttribute("name", "theme-color");
     document.head.append(meta);
   }
-  meta.setAttribute("content", colors[theme]);
+  meta.setAttribute("content", colors[theme] ?? "");
 }
 
 /** Applies the theme now, then again whenever the device setting or another tab's choice changes. */
-function bootTheme(apply: typeof applyTheme, key: string, colors: Readonly<Record<Theme, string>>): void {
+function bootTheme(apply: typeof applyTheme, key: string, colors: Readonly<Record<string, string>>): void {
   const run = (): void => { apply(key, colors); };
   run();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", run);

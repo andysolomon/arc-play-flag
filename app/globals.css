@@ -93,7 +93,8 @@
   input, button, select { font-family: inherit; color: inherit; }
   a { color: var(--color-link); text-decoration: underline; }
   a:hover { color: var(--color-link-hover); }
-  :focus-visible { outline: 3px solid var(--color-yellow); outline-offset: 2px; }
+  /* --color-focus is set by the light premium themes, whose highlighter is too pale to ring a control on paper */
+  :focus-visible { outline: 3px solid var(--color-focus, var(--color-yellow)); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) {
     .motion-loop { animation: none !important; }
   }
@@ -127,24 +128,201 @@
       --color-link-hover: #ffb7a8;
       --shadow-ink: rgb(0 0 0 / 0.45);
     }
-    /* the dark board gets the chalk stickers (components/Sticker.tsx carries both) */
-    :root[data-theme="dark"] .sticker-light { display: none; }
-    :root[data-theme="dark"] .sticker-dark { display: block; }
+
+    /*
+     * Premium themes, after Omarchy's collection (omarchy.us/themes), unlocked by a coach's first
+     * playbook (components/ThemePicker.tsx). Each redraws the same tokens as dark does, from the
+     * palette it is named for, and every pair a coach reads clears WCAG AA: ink, muted ink and links
+     * on paper, cream and white; cream on an ink pill; --color-accent-ink on the highlighter
+     * (e2e/journeys/premium-themes.journey.ts measures each one). --color-yellow is the theme's
+     * highlighter, whatever its hue. Not :root-only, so a swatch in the picker can wear its own
+     * theme. Colours for the browser chrome: PREMIUM_THEMES in lib/theme.ts.
+     */
+    [data-theme="tokyo-night"] {
+      color-scheme: dark;
+      --color-paper: #1a1b26;
+      --color-paper-2: #16161e;
+      --color-cream: #1f2335;
+      --color-white: #24283b;
+      --color-ink: #c0caf5;
+      --color-ink-2: #a9b1d6;
+      --color-ink-muted: #9aa5ce;
+      --color-ink-faint: #565f89;
+      --color-yellow: #7aa2f7;
+      --color-accent-ink: #16161e;
+      --color-yellow-soft: #2e3a5c;
+      --color-rose-soft: #4a2635;
+      --color-divider: rgb(192 202 245 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.6);
+      --color-link: #7dcfff;
+      --color-link-hover: #b4f9f8;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="catppuccin"] {
+      color-scheme: dark;
+      --color-paper: #1e1e2e;
+      --color-paper-2: #181825;
+      --color-cream: #181825;
+      --color-white: #313244;
+      --color-ink: #cdd6f4;
+      --color-ink-2: #bac2de;
+      --color-ink-muted: #a6adc8;
+      --color-ink-faint: #6c7086;
+      --color-yellow: #cba6f7;
+      --color-accent-ink: #11111b;
+      --color-yellow-soft: #45385e;
+      --color-rose-soft: #4f2c3d;
+      --color-divider: rgb(205 214 244 / 0.14);
+      --color-scrim: rgb(17 17 27 / 0.65);
+      --color-link: #f5c2e7;
+      --color-link-hover: #f5e0dc;
+      --shadow-ink: rgb(17 17 27 / 0.6);
+    }
+    [data-theme="gruvbox"] {
+      color-scheme: dark;
+      --color-paper: #282828;
+      --color-paper-2: #1d2021;
+      --color-cream: #32302f;
+      --color-white: #3c3836;
+      --color-ink: #ebdbb2;
+      --color-ink-2: #d5c4a1;
+      --color-ink-muted: #bdae93;
+      --color-ink-faint: #7c6f64;
+      --color-yellow: #fabd2f;
+      --color-accent-ink: #1d2021;
+      --color-yellow-soft: #524321;
+      --color-rose-soft: #5c2b26;
+      --color-divider: rgb(235 219 178 / 0.15);
+      --color-scrim: rgb(0 0 0 / 0.55);
+      --color-link: #fe8019;
+      --color-link-hover: #fabd2f;
+      --shadow-ink: rgb(0 0 0 / 0.45);
+    }
+    [data-theme="nord"] {
+      color-scheme: dark;
+      --color-paper: #2e3440;
+      --color-paper-2: #292e39;
+      --color-cream: #3b4252;
+      --color-white: #434c5e;
+      --color-ink: #eceff4;
+      --color-ink-2: #e5e9f0;
+      --color-ink-muted: #c2cad8;
+      --color-ink-faint: #7b88a1;
+      --color-yellow: #88c0d0;
+      --color-accent-ink: #2e3440;
+      --color-yellow-soft: #3e5566;
+      --color-rose-soft: #5b3f4a;
+      --color-divider: rgb(236 239 244 / 0.14);
+      --color-scrim: rgb(26 30 37 / 0.6);
+      --color-link: #88c0d0;
+      --color-link-hover: #8fbcbb;
+      --shadow-ink: rgb(26 30 37 / 0.5);
+    }
+    [data-theme="kanagawa"] {
+      color-scheme: dark;
+      --color-paper: #1f1f28;
+      --color-paper-2: #16161d;
+      --color-cream: #2a2a37;
+      --color-white: #363646;
+      --color-ink: #dcd7ba;
+      --color-ink-2: #c8c093;
+      --color-ink-muted: #a6a69c;
+      --color-ink-faint: #727169;
+      --color-yellow: #e6c384;
+      --color-accent-ink: #16161d;
+      --color-yellow-soft: #49443a;
+      --color-rose-soft: #43242b;
+      --color-divider: rgb(220 215 186 / 0.14);
+      --color-scrim: rgb(22 22 29 / 0.6);
+      --color-link: #7e9cd8;
+      --color-link-hover: #7fb4ca;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="matte-black"] {
+      color-scheme: dark;
+      --color-paper: #121212;
+      --color-paper-2: #0d0d0d;
+      --color-cream: #1a1a1a;
+      --color-white: #222222;
+      --color-ink: #bebebe;
+      --color-ink-2: #a8a8a8;
+      --color-ink-muted: #8a8a8d;
+      --color-ink-faint: #595959;
+      --color-yellow: #f59e0b;
+      --color-accent-ink: #121212;
+      --color-yellow-soft: #3a2a0e;
+      --color-rose-soft: #3d1f1f;
+      --color-divider: rgb(190 190 190 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.65);
+      --color-link: #fbbf24;
+      --color-link-hover: #ffd97a;
+      --shadow-ink: rgb(0 0 0 / 0.6);
+    }
+    [data-theme="rose-pine"] {
+      color-scheme: light;
+      --color-paper: #faf4ed;
+      --color-paper-2: #f2e9e1;
+      --color-cream: #fffaf3;
+      --color-white: #fffcf8;
+      --color-ink: #575279;
+      --color-ink-2: #6e6a8e;
+      --color-ink-muted: #6e6a86;
+      --color-ink-faint: #9893a5;
+      --color-yellow: #d7827e;
+      --color-accent-ink: #26233a;
+      --color-focus: #b4637a;
+      --color-yellow-soft: #f6ddd6;
+      --color-rose-soft: #f0d3da;
+      --color-divider: rgb(87 82 121 / 0.16);
+      --color-scrim: rgb(38 35 58 / 0.35);
+      --color-link: #286983;
+      --color-link-hover: #1c4f63;
+      --shadow-ink: rgb(87 82 121 / 0.18);
+    }
+    [data-theme="flexoki"] {
+      color-scheme: light;
+      --color-paper: #f2f0e5;
+      --color-paper-2: #e6e4d9;
+      --color-cream: #fffcf0;
+      --color-white: #fffcf0;
+      --color-ink: #100f0f;
+      --color-ink-2: #403e3c;
+      --color-ink-muted: #66655f;
+      --color-ink-faint: #b7b5ac;
+      --color-yellow: #d0a215;
+      --color-accent-ink: #100f0f;
+      --color-focus: #bc5215;
+      --color-yellow-soft: #faeec6;
+      --color-rose-soft: #ffe1d5;
+      --color-divider: rgb(16 15 15 / 0.14);
+      --color-scrim: rgb(16 15 15 / 0.35);
+      --color-link: #205ea6;
+      --color-link-hover: #1a4f8c;
+      --shadow-ink: rgb(16 15 15 / 0.15);
+    }
+
+    /* the dark boards get the chalk stickers (components/Sticker.tsx carries both) */
+    :root:is([data-theme="dark"], [data-theme="tokyo-night"], [data-theme="catppuccin"], [data-theme="gruvbox"],
+      [data-theme="nord"], [data-theme="kanagawa"], [data-theme="matte-black"]) {
+      .sticker-light { display: none; }
+      .sticker-dark { display: block; }
+    }
   }
 }
 
 /*
- * Yellow is a highlighter in both themes, so whatever sits on it keeps the light theme's ink
+ * Yellow is a highlighter in every theme, so whatever sits on it keeps the light theme's ink
  * and paper. Pair it with every yellow fill, including state ones (data-[active=true]:on-yellow).
  * It sets the text colour too: inherited colour is already resolved, so the tokens alone can't reach it.
  */
 @utility on-yellow {
   color: var(--color-ink);
+  /* a premium theme names the ink its highlighter was tuned for */
+  --color-ink: var(--color-accent-ink, --theme(--color-ink inline));
   --color-paper: --theme(--color-paper inline);
   --color-paper-2: --theme(--color-paper-2 inline);
   --color-cream: --theme(--color-cream inline);
   --color-white: --theme(--color-white inline);
-  --color-ink: --theme(--color-ink inline);
   --color-ink-2: --theme(--color-ink-2 inline);
   --color-ink-muted: --theme(--color-ink-muted inline);
   --color-ink-faint: --theme(--color-ink-faint inline);

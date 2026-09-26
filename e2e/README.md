@@ -36,6 +36,7 @@ First time only: `bunx playwright install chromium`.
 | First visit: the draw-and-run hint, the editable example that never replaces a draft, Demo from the collapsed layout | `first-use` |
 | A device backup waits for merge or replace; an invalid one changes nothing | `backup` |
 | A dark device gets the dark theme; a picked theme outlasts a reload and reaches other tabs; Auto follows the device; yellow keeps dark ink; printing stays ink on paper; stickers are chalk on the dark board and ink on paper, with a screenshot of each in `test-results/` | `theme` |
+| Premium themes are locked until this device holds a playbook, then unlock in place; a pick redraws the app, tints the browser chrome with the header it shows, wears the right stickers and outlasts a reload; every theme's text pairs clear WCAG AA, measured in the page; printing stays ink on paper; a theme in use survives its playbooks being deleted. Leaves a contrast report (`premium-themes-contrast-<device>.json`) and a screenshot of each theme and the locked picker in `test-results/` | `premium-themes` |
 | A 100-play library searches, filters and sorts; a playbook fits 320px; open from an entry, add from the designer | `library-discovery` |
 | Offline: the shells, exact shared plays and demo media are ready before it says so, imports and exports work offline, a first install says **Offline updating…** until the whole shell is verified, a broken release never takes over, and a sound one keeps the shared play | `offline` |
 
