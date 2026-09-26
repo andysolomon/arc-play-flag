@@ -71,16 +71,37 @@ export function applyTheme(key: string, colors: Readonly<Record<string, string>>
   meta.setAttribute("content", colors[theme] ?? "");
 }
 
-/** Applies the theme now, then again whenever the device setting or another tab's choice changes. */
-function bootTheme(apply: typeof applyTheme, key: string, colors: Readonly<Record<string, string>>): void {
-  const run = (): void => { apply(key, colors); };
+/**
+ * The field under a premium theme: "themed" repaints the live field in the theme's own turf, inks
+ * and team colours (app/globals.css); anything else keeps the standard green field. Screen only,
+ * and never an export: lib/render/play-svg.ts draws every card, PDF and thumbnail on the green.
+ */
+export type FieldChoice = "standard" | "themed";
+export const FIELD_KEY = "ffpd.field.v1";
+
+/** Marks <html> with the field to paint. Self-contained, like applyTheme, for the same inlining. */
+export function applyField(key: string, chosen?: string | null): void {
+  let choice = chosen;
+  if (choice === undefined) {
+    try { choice = localStorage.getItem(key); } catch { choice = null; }
+  }
+  document.documentElement.dataset.field = choice === "themed" ? "themed" : "standard";
+}
+
+/** Applies the theme and field now, then again whenever the device setting or another tab's choice changes. */
+function bootTheme(
+  apply: typeof applyTheme, key: string, colors: Readonly<Record<string, string>>, paintField: typeof applyField, fieldKey: string,
+): void {
+  const run = (): void => { apply(key, colors); paintField(fieldKey); };
   run();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", run);
-  addEventListener("storage", (e: StorageEvent) => { if (e.key === key || e.key === null) run(); });
+  addEventListener("storage", (e: StorageEvent) => { if (e.key === key || e.key === fieldKey || e.key === null) run(); });
 }
 
 /** Inlined at the top of every page, before any bundle loads, so a dark-mode visit never flashes paper. */
-export const themeScript = `(${bootTheme.toString()})(${applyTheme.toString()},${JSON.stringify(THEME_KEY)},${JSON.stringify(THEME_COLOR)})`;
+export const themeScript =
+  `(${bootTheme.toString()})(${applyTheme.toString()},${JSON.stringify(THEME_KEY)},${JSON.stringify(THEME_COLOR)},` +
+  `${applyField.toString()},${JSON.stringify(FIELD_KEY)})`;
 
 const listeners = new Set<() => void>();
 // storage can be blocked (private mode, site data off); the choice then lasts until the page closes
@@ -111,6 +132,37 @@ export function subscribeThemeChoice(onChange: () => void): () => void {
   addEventListener("storage", onStorage);
   return () => {
     listeners.delete(onChange);
+    removeEventListener("storage", onStorage);
+  };
+}
+
+const fieldListeners = new Set<() => void>();
+let unsavedField: FieldChoice | null = null;
+
+export function getFieldChoice(): FieldChoice {
+  if (unsavedField) return unsavedField;
+  try { return localStorage.getItem(FIELD_KEY) === "themed" ? "themed" : "standard"; } catch { return "standard"; }
+}
+
+/** Keeps the field choice on this device and repaints; "standard" forgets it. */
+export function setFieldChoice(choice: FieldChoice): void {
+  try {
+    if (choice === "standard") localStorage.removeItem(FIELD_KEY);
+    else localStorage.setItem(FIELD_KEY, choice);
+    unsavedField = null;
+  } catch {
+    unsavedField = choice;
+  }
+  applyField(FIELD_KEY, choice);
+  fieldListeners.forEach((l) => { l(); });
+}
+
+export function subscribeFieldChoice(onChange: () => void): () => void {
+  const onStorage = (e: StorageEvent): void => { if (e.key === FIELD_KEY || e.key === null) onChange(); };
+  fieldListeners.add(onChange);
+  addEventListener("storage", onStorage);
+  return () => {
+    fieldListeners.delete(onChange);
     removeEventListener("storage", onStorage);
   };
 }

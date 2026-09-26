@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { PREMIUM_THEMES } from "../../lib/theme";
 import { Designer } from "../support/designer";
-import { OTTERS, SLANT_LEFT, playbook, seed } from "../support/fixtures";
+import { OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed } from "../support/fixtures";
 
 /*
  * Premium themes: locked until this device holds a playbook, then each one redraws the whole app.
@@ -14,6 +14,12 @@ import { OTTERS, SLANT_LEFT, playbook, seed } from "../support/fixtures";
  *  - words drop below WCAG AA: ink, muted ink, links, the dark pill, the highlighter's ink → test 2 (a JSON report + a screenshot per theme)
  *  - printing from a premium theme prints its colours                                      → test 3
  *  - deleting every playbook takes away the theme in use                                   → test 3
+ * The "Themed field" option (test 4):
+ *  - it can be switched on without a premium theme, or doesn't survive a reload
+ *  - the turf changes but a route, a player or the primary read keeps the standard colour
+ *  - a route ink, a player's letters or the selection ring become hard to read on the new turf
+ *  - it leaks into the pictures exports are drawn from, or into print
+ *  - it stays painted after switching back to Light
  */
 
 const THEME_KEY = "ffpd.theme.v1";
@@ -36,6 +42,22 @@ function contrast(a: string, b: string): number {
   const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
   return (hi + 0.05) / (lo + 0.05);
 }
+
+const STANDARD_TURF = "rgb(193, 240, 193)";
+const FIELD_INKS = ["route", "primary", "deep", "flat", "curl", "mid", "blitz", "cover"] as const;
+
+/** Every --field-* token as the browser resolves it right now. */
+const fieldTokens = (page: Page) => page.evaluate((names) => {
+  const probe = document.createElement("span");
+  document.body.append(probe);
+  const out: Record<string, string> = {};
+  for (const n of names) {
+    probe.style.color = `var(--field-${n})`;
+    out[n] = getComputedStyle(probe).color;
+  }
+  probe.remove();
+  return out;
+}, ["turf", "endzone", "line", "outline", "label", "offense", "defense", "waypoint", "ring", ...FIELD_INKS]);
 
 const toHex = (rgb: string): string =>
   "#" + (/rgba?\(([^)]+)\)/.exec(rgb)?.[1] ?? "").split(/[\s,]+/).slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
@@ -172,4 +194,95 @@ test("a premium theme prints ink on paper, and stays in use after its playbooks 
   await picker(page).getByRole("radio", { name: "Light" }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "light");
   await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeDisabled();
+});
+
+test("a themed field is an option under a premium theme: it repaints the live field, keeps every ink readable, and never reaches exports or print", async ({ page }, testInfo) => {
+  await seed(page, {
+    plays: [WHEEL_RIGHT], playbooks: [playbook("fx-field-book", "Otter Field Book", [WHEEL_RIGHT])], team: OTTERS,
+    draft: { name: WHEEL_RIGHT.name, players: WHEEL_RIGHT.players, side: "offense" },
+  });
+  const d = new Designer(page);
+  await d.goto();
+  await d.tools();
+  const themed = page.getByRole("switch", { name: /Themed field/ });
+  const svg = d.field;
+  const primary = d.primaryRoutes.first();
+  const offenseToken = page.getByRole("button", { name: /^Offense Z/ }).locator("circle[r='23']");
+
+  // not a premium theme yet: the option waits, and the field is the standard green
+  await expect(themed).toBeDisabled();
+  await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
+
+  await picker(page).getByRole("radio", { name: "Tokyo Night" }).check();
+  await expect(themed).toBeEnabled();
+  await expect(themed).not.toBeChecked();
+  await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
+  await themed.check();
+  await expect(html(page)).toHaveAttribute("data-field", "themed");
+  await expect(svg).toHaveCSS("background-color", "rgb(28, 43, 45)");
+  await page.reload();
+  await expect(html(page)).toHaveAttribute("data-field", "themed");
+  await expect(svg).toHaveCSS("background-color", "rgb(28, 43, 45)");
+  await d.tools();
+  await expect(themed).toBeChecked();
+
+  const report: Record<string, Record<string, number>> = {};
+  for (const t of PREMIUM_THEMES) {
+    await picker(page).getByRole("radio", { name: t.name }).check();
+    await expect(html(page)).toHaveAttribute("data-theme", t.id);
+    const f = await fieldTokens(page);
+    expect(f.turf, `${t.name} paints its own turf`).not.toBe(STANDARD_TURF);
+    // what the coach sees is the theme's paint, the primary read and the players included
+    await expect(svg).toHaveCSS("background-color", f.turf ?? "");
+    await expect(primary).toHaveCSS("stroke", f.primary ?? "");
+    await expect(offenseToken).toHaveCSS("fill", f.offense ?? "");
+
+    const pairs: Record<string, [string, string, number]> = {};
+    for (const ink of FIELD_INKS) {
+      pairs[`${ink} on turf`] = [f[ink] ?? "", f.turf ?? "", 4.5];
+      pairs[`${ink} on end zone`] = [f[ink] ?? "", f.endzone ?? "", 3];
+    }
+    pairs["letters on offense"] = [f.label ?? "", f.offense ?? "", 4.5];
+    pairs["letters on defense"] = [f.label ?? "", f.defense ?? "", 4.5];
+    pairs["selection ring on turf"] = [f.ring ?? "", f.turf ?? "", 3];
+    pairs["waypoint ring"] = [f.waypoint ?? "", f.outline ?? "", 3];
+    const offenseSeen = Math.max(contrast(f.offense ?? "", f.turf ?? ""), contrast(f.outline ?? "", f.turf ?? ""));
+    const defenseSeen = Math.max(contrast(f.defense ?? "", f.turf ?? ""), contrast(f.outline ?? "", f.turf ?? ""));
+    const ratios: Record<string, number> = {
+      ...Object.fromEntries(Object.entries(pairs).map(([k, [fg, bg]]) => [k, Math.round(contrast(fg, bg) * 100) / 100])),
+      "offense token on turf": Math.round(offenseSeen * 100) / 100,
+      "defense token on turf": Math.round(defenseSeen * 100) / 100,
+    };
+    report[t.id] = ratios;
+    for (const [pair, [, , min]] of Object.entries(pairs)) expect(ratios[pair], `${t.name}: ${pair}`).toBeGreaterThanOrEqual(min);
+    expect(offenseSeen, `${t.name}: offense token`).toBeGreaterThanOrEqual(3);
+    expect(defenseSeen, `${t.name}: defense token`).toBeGreaterThanOrEqual(3);
+
+    await svg.screenshot({ path: `test-results/premium-field-${testInfo.project.name}-${t.id}.png` });
+  }
+  const file = `test-results/premium-fields-contrast-${testInfo.project.name}.json`;
+  writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`);
+  await testInfo.attach("field contrast report", { path: file, contentType: "application/json" });
+
+  // printing the designer puts the standard field on paper
+  await picker(page).getByRole("radio", { name: "Gruvbox" }).check();
+  await expect(svg).not.toHaveCSS("background-color", STANDARD_TURF);
+  await page.emulateMedia({ media: "print" });
+  await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
+  await expect(primary).toHaveCSS("stroke", "rgb(194, 38, 26)");
+  await page.emulateMedia({ media: "screen" });
+
+  // Light has no field of its own: the option waits, still remembered, and the field is green again
+  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await expect(themed).toBeDisabled();
+  await expect(themed).toBeChecked();
+  await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
+
+  // exports are drawn by the same renderer as these cards: still the standard field under a themed one
+  await picker(page).getByRole("radio", { name: "Kanagawa" }).check();
+  await page.goto("/playbooks");
+  await expect(html(page)).toHaveAttribute("data-field", "themed");
+  const thumb = page.getByRole("img", { name: WHEEL_RIGHT.name }).first();
+  await expect(thumb.locator("rect").first()).toHaveCSS("fill", STANDARD_TURF);
+  await expect(thumb.locator("circle[r='23']").first()).toHaveCSS("fill", "rgb(229, 103, 94)");
 });

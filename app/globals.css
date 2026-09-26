@@ -99,6 +99,31 @@
     .motion-loop { animation: none !important; }
   }
 
+  /*
+   * The live field's paint (components/Field.tsx, PlayerToken.tsx, RouteLayer.tsx). These are the
+   * standard green field's colours, the ones lib/render/play-svg.ts writes into every export, card
+   * and thumbnail; only the "Themed field" option below repaints them, and only on screen.
+   */
+  :root {
+    --field-turf: #c1f0c1;
+    --field-endzone: #a7e5a7;
+    --field-line: #1b1a17;
+    --field-outline: #1b1a17;
+    --field-label: #1b1a17;
+    --field-offense: #e5675e;
+    --field-defense: #4a8fe0;
+    --field-route: #4a3728;
+    --field-primary: #c2261a;
+    --field-deep: #1d4fbe;
+    --field-flat: #0e7175;
+    --field-curl: #6a34b8;
+    --field-mid: #7a5a07;
+    --field-blitz: #b3261e;
+    --field-cover: #4a8fe0;
+    --field-waypoint: #fffdf6;
+    --field-ring: #f2b705;
+  }
+
   /* Every sticker is in the page twice, ink and chalk; the dark block below picks. Print is always ink on paper. */
   .sticker-light { display: block; }
   .sticker-dark { display: none; }
@@ -107,7 +132,7 @@
    * Dark: chalk on a dark board. The same tokens, redrawn, so every control follows; yellow
    * stays the highlighter. <html data-theme> is set before first paint by lib/theme.ts.
    * Screen only, so printing from a dark screen still puts ink on paper. The field keeps its
-   * turf and inks in both themes: route colours are tuned for turf, and exports draw the same picture.
+   * turf and inks (the --field-* tokens) unless a premium theme's "Themed field" option repaints it.
    */
   @media screen {
     :root[data-theme="dark"] {
@@ -299,6 +324,166 @@
       --color-link: #205ea6;
       --color-link-hover: #1a4f8c;
       --shadow-ink: rgb(16 15 15 / 0.15);
+    }
+
+    /*
+     * "Themed field" (a per-device option, lib/theme.ts): a premium theme repaints the live field
+     * too. Tuned per theme so every route ink clears 4.5:1 on its turf and 3:1 on its end zone,
+     * player labels 4.5:1 on their fill, and each token and the selection ring 3:1 on the turf
+     * (e2e/journeys/premium-themes.journey.ts measures them). Screen only: printing the designer,
+     * and every export, stay on the standard green field.
+     */
+    :root[data-field="themed"][data-theme="tokyo-night"] {
+      --field-turf: #1c2b2d;
+      --field-endzone: #223638;
+      --field-line: #c0caf5;
+      --field-outline: #16161e;
+      --field-label: #16161e;
+      --field-offense: #f7768e;
+      --field-defense: #7aa2f7;
+      --field-route: #c0caf5;
+      --field-primary: #ff9e64;
+      --field-deep: #7aa2f7;
+      --field-flat: #73daca;
+      --field-curl: #bb9af7;
+      --field-mid: #e0af68;
+      --field-blitz: #ff757f;
+      --field-cover: #7dcfff;
+      --field-waypoint: #c0caf5;
+      --field-ring: #e0af68;
+    }
+    :root[data-field="themed"][data-theme="catppuccin"] {
+      --field-turf: #1f2d2a;
+      --field-endzone: #263832;
+      --field-line: #cdd6f4;
+      --field-outline: #11111b;
+      --field-label: #11111b;
+      --field-offense: #f38ba8;
+      --field-defense: #89b4fa;
+      --field-route: #cdd6f4;
+      --field-primary: #fab387;
+      --field-deep: #89b4fa;
+      --field-flat: #94e2d5;
+      --field-curl: #cba6f7;
+      --field-mid: #f9e2af;
+      --field-blitz: #eba0ac;
+      --field-cover: #74c7ec;
+      --field-waypoint: #cdd6f4;
+      --field-ring: #f9e2af;
+    }
+    :root[data-field="themed"][data-theme="gruvbox"] {
+      --field-turf: #282c1c;
+      --field-endzone: #323824;
+      --field-line: #ebdbb2;
+      --field-outline: #1d2021;
+      --field-label: #1d2021;
+      --field-offense: #fb4934;
+      --field-defense: #83a598;
+      --field-route: #ebdbb2;
+      --field-primary: #fe8019;
+      --field-deep: #83a598;
+      --field-flat: #8ec07c;
+      --field-curl: #d3869b;
+      --field-mid: #fabd2f;
+      --field-blitz: #fc6d5c;
+      --field-cover: #7daea3;
+      --field-waypoint: #ebdbb2;
+      --field-ring: #fabd2f;
+    }
+    :root[data-field="themed"][data-theme="nord"] {
+      --field-turf: #283331;
+      --field-endzone: #303d39;
+      --field-line: #eceff4;
+      --field-outline: #2e3440;
+      --field-label: #2e3440;
+      --field-offense: #de8f96;
+      --field-defense: #81a1c1;
+      --field-route: #eceff4;
+      --field-primary: #d08770;
+      --field-deep: #81a1c1;
+      --field-flat: #8fbcbb;
+      --field-curl: #b48ead;
+      --field-mid: #ebcb8b;
+      --field-blitz: #e0959c;
+      --field-cover: #88c0d0;
+      --field-waypoint: #eceff4;
+      --field-ring: #ebcb8b;
+    }
+    :root[data-field="themed"][data-theme="kanagawa"] {
+      --field-turf: #242b21;
+      --field-endzone: #2d3529;
+      --field-line: #dcd7ba;
+      --field-outline: #16161d;
+      --field-label: #16161d;
+      --field-offense: #e46876;
+      --field-defense: #7e9cd8;
+      --field-route: #dcd7ba;
+      --field-primary: #ffa066;
+      --field-deep: #7e9cd8;
+      --field-flat: #7aa89f;
+      --field-curl: #a594c8;
+      --field-mid: #e6c384;
+      --field-blitz: #e46876;
+      --field-cover: #7fb4ca;
+      --field-waypoint: #dcd7ba;
+      --field-ring: #ff9e3b;
+    }
+    :root[data-field="themed"][data-theme="matte-black"] {
+      --field-turf: #1a1d1a;
+      --field-endzone: #222622;
+      --field-line: #bebebe;
+      --field-outline: #121212;
+      --field-label: #121212;
+      --field-offense: #e5675e;
+      --field-defense: #5a9ae8;
+      --field-route: #bebebe;
+      --field-primary: #f59e0b;
+      --field-deep: #6ea8ff;
+      --field-flat: #4fd1c5;
+      --field-curl: #b794f4;
+      --field-mid: #e8c547;
+      --field-blitz: #f07167;
+      --field-cover: #63b3ed;
+      --field-waypoint: #bebebe;
+      --field-ring: #f59e0b;
+    }
+    :root[data-field="themed"][data-theme="rose-pine"] {
+      --field-turf: #e2e9dc;
+      --field-endzone: #d3dfcb;
+      --field-line: #464261;
+      --field-outline: #575279;
+      --field-label: #26233a;
+      --field-offense: #d7827e;
+      --field-defense: #6aa6b0;
+      --field-route: #575279;
+      --field-primary: #9e4d65;
+      --field-deep: #286983;
+      --field-flat: #2f6f6a;
+      --field-curl: #6d5a8a;
+      --field-mid: #8a5a12;
+      --field-blitz: #9d3f56;
+      --field-cover: #336683;
+      --field-waypoint: #fffaf3;
+      --field-ring: #b4637a;
+    }
+    :root[data-field="themed"][data-theme="flexoki"] {
+      --field-turf: #e9ebcf;
+      --field-endzone: #dde2b2;
+      --field-line: #100f0f;
+      --field-outline: #100f0f;
+      --field-label: #100f0f;
+      --field-offense: #da5f53;
+      --field-defense: #4385be;
+      --field-route: #403e3c;
+      --field-primary: #af3029;
+      --field-deep: #205ea6;
+      --field-flat: #1c6c66;
+      --field-curl: #5e409d;
+      --field-mid: #7a5e00;
+      --field-blitz: #a3460e;
+      --field-cover: #2a62a0;
+      --field-waypoint: #fffcf0;
+      --field-ring: #bc5215;
     }
 
     /* the dark boards get the chalk stickers (components/Sticker.tsx carries both) */
