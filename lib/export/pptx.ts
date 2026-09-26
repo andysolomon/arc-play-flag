@@ -208,15 +208,19 @@ const VIEW_PROPS =
 const TABLE_STYLES =
   DECL + '<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>';
 
-/** The design's colours, and Arial for any text a coach adds: "Patrick Hand" is never named. */
+/**
+ * The design's colours, and Arial for any text a coach adds: "Patrick Hand" is never named.
+ * Ink is accent1, which PowerPoint fills an inserted shape, table header or SmartArt with under
+ * white text; on the highlighter, last, that text would not read.
+ */
 const THEME =
   DECL +
   '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Flag Football"><a:themeElements>' +
   '<a:clrScheme name="Flag Football"><a:dk1><a:srgbClr val="1B1A17"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>' +
-  '<a:dk2><a:srgbClr val="3A372F"/></a:dk2><a:lt2><a:srgbClr val="F4EFE2"/></a:lt2><a:accent1><a:srgbClr val="F2B705"/>' +
-  '</a:accent1><a:accent2><a:srgbClr val="E5675E"/></a:accent2><a:accent3><a:srgbClr val="4A8FE0"/></a:accent3>' +
-  '<a:accent4><a:srgbClr val="C1F0C1"/></a:accent4><a:accent5><a:srgbClr val="6F6C66"/></a:accent5><a:accent6>' +
-  '<a:srgbClr val="C2261A"/></a:accent6><a:hlink><a:srgbClr val="C2513F"/></a:hlink><a:folHlink><a:srgbClr val="8F3529"/>' +
+  '<a:dk2><a:srgbClr val="3A372F"/></a:dk2><a:lt2><a:srgbClr val="F4EFE2"/></a:lt2><a:accent1><a:srgbClr val="1B1A17"/>' +
+  '</a:accent1><a:accent2><a:srgbClr val="C2261A"/></a:accent2><a:accent3><a:srgbClr val="4A8FE0"/></a:accent3>' +
+  '<a:accent4><a:srgbClr val="E5675E"/></a:accent4><a:accent5><a:srgbClr val="6F6C66"/></a:accent5><a:accent6>' +
+  '<a:srgbClr val="F2B705"/></a:accent6><a:hlink><a:srgbClr val="C2513F"/></a:hlink><a:folHlink><a:srgbClr val="8F3529"/>' +
   '</a:folHlink></a:clrScheme><a:fontScheme name="Flag Football"><a:majorFont><a:latin typeface="Arial"/>' +
   '<a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Arial"/><a:ea typeface=""/>' +
   '<a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Flag Football"><a:fillStyleLst><a:solidFill>' +

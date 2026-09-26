@@ -126,7 +126,7 @@ function titleSlide(items: readonly Numbered[], bookTitle: string, teamName: str
   out.push(rect(42, 264, Math.min(864, measure(bk, 64)) + 12, 30, YELLOW));
   out.push(text(48, 290, 64, bk));
   const n = items.length, d = items.filter((i) => i.play.side === "defense").length;
-  const sub = nPlays(n) + (d > 0 ? ` · ${String(n - d)} offense, ${String(d)} defense` : "");
+  const sub = nPlays(n) + (d > 0 && d < n ? ` · ${String(n - d)} offense, ${String(d)} defense` : "");
   out.push(text(48, 350, 30, sub, { fill: MUTED }));
   out.push(text(48, 510, 16, "5v5 flag", { fill: MUTED }) + appMark(912, 510, 12));
   return {
@@ -227,9 +227,9 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show }, 3));
 
   // who does what
-  out.push(`<rect x="584" y="104" width="340" height="408" rx="14" fill="${INK}" opacity="0.14"/>`);
+  out.push(`<rect x="580" y="104" width="340" height="408" rx="14" fill="${INK}" opacity="0.14"/>`);
   out.push(`<rect x="580" y="100" width="340" height="408" rx="14" fill="${CREAM}" stroke="${INK}" stroke-width="2"/>`);
-  out.push(text(X0, 124, 15, "WHO DOES WHAT", { fill: MUTED }));
+  out.push(text(X0, 124, 15, "WHO DOES WHAT, LEFT TO RIGHT", { fill: MUTED }));
   const as = assignments(play);
   // with notes, three lines of them are kept: baselines at 436, 464 and 492
   const { s, rows, more } = panelRows(as, notes ? 244 : 356);
@@ -295,7 +295,7 @@ export function slidePlans(items: readonly Numbered[], o: SlidesOptions): DeckPl
       ...play,
       name: oneLine(play.name) || "Untitled play",
       notes: clean(play.notes).trim(),
-      players: play.players.map((p) => ({ ...p, label: clean(p.label) })),
+      players: play.players.map((p) => ({ ...p, label: oneLine(p.label) })),
     },
   }));
   const slides: SlidePlan[] = [];

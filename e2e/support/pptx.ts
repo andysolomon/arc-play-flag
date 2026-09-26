@@ -27,11 +27,11 @@ import type { Page, TestInfo } from "@playwright/test";
  *   without `a:off` and `a:ext`.
  * - P6 two shapes with one id in a part.
  * - P7, P8 a part that does not parse or lacks the declaration; a part with no content
- *   type, an Override for a missing part, Defaults other than rels, xml and png; a
- *   relationship that dangles, is not `rId<n>`, repeats, or reaches a part of the wrong
- *   type; an `r:id` or `r:embed` with no relationship; a part unreachable from
- *   `_rels/.rels`; a slide without exactly one layout, image and notes link; a one-way
- *   notes link.
+ *   type, an Override for a missing part or named without its leading `/`, Defaults
+ *   other than rels, xml and png; a relationship that dangles, is not `rId<n>`, repeats,
+ *   or reaches a part of the wrong type; an `r:id` or `r:embed` with no relationship; a
+ *   part unreachable from `_rels/.rels`; a slide without exactly one layout, image and
+ *   notes link; a one-way notes link.
  *
  * P9–P11 (titles, pictures, fonts) are facts `readDeck` and `pngSize` read out for the
  * journey to assert.
@@ -446,6 +446,7 @@ export function packageProblems(deck: DeckRead, items: readonly ZipItem[]): stri
 
   const ct = parts["[Content_Types].xml"];
   const defaults = new Map((ct?.defaults ?? []).map((d) => [d.ext.toLowerCase(), d.type]));
+  for (const o of ct?.overrides ?? []) if (!o.part.startsWith("/")) out.push(`the Override PartName ${o.part} does not start with /`);
   const overrides = new Map((ct?.overrides ?? []).map((o) => [o.part.replace(/^\//, ""), o.type]));
   // OPC extensions: `_rels/.rels` is a rels part, which path.extname would call extensionless
   const extOf = (name: string): string => { const base = posix.basename(name), dot = base.lastIndexOf("."); return dot < 0 ? "" : base.slice(dot + 1).toLowerCase(); };
@@ -536,6 +537,15 @@ export function packageProblems(deck: DeckRead, items: readonly ZipItem[]): stri
   return out;
 }
 
+/** The download exactly as it came, as `test-results/slides-<project>.pptx`, before anything reads it. */
+export async function keepFile(testInfo: TestInfo, raw: Buffer): Promise<string> {
+  const dir = testInfo.project.outputDir;
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, `slides-${testInfo.project.name}.pptx`);
+  await writeFile(path, raw);
+  return path;
+}
+
 /**
  * Keeps the deck as a verifiable, repeatable artifact in the output folder:
  * `slides-<project>.pptx` (the exact download), `slides-<project>.json` (sizes, CRCs and
@@ -549,11 +559,13 @@ export async function keepDeck(testInfo: TestInfo, browserVersion: string, raw: 
   const base = `slides-${project}`;
   const sha256 = (b: Buffer): string => createHash("sha256").update(b).digest("hex");
   const media = new Map(items.map((i) => [i.name, i.data]));
-  await mkdir(dir, { recursive: true });
+  const pptx = await keepFile(testInfo, raw);
   const slides: { title: string | null; alt: string | null; notes: string | null; media: string | null; width: number | null; height: number | null; sha256: string | null }[] = [];
   for (const [n, s] of deck.slides.entries()) {
     const png = media.get(s.media ?? "");
-    const size = png ? pngSize(png) : null;
+    // a broken picture is the journey's to report; the manifest just records it has no size
+    let size: { w: number; h: number } | null = null;
+    try { size = png ? pngSize(png) : null; } catch { /* left null */ }
     if (png) await writeFile(join(dir, `${base}-${String(n + 1)}.png`), png);
     slides.push({ title: s.title, alt: s.descr, notes: s.notes, media: s.media, width: size?.w ?? null, height: size?.h ?? null, sha256: png ? sha256(png) : null });
   }
@@ -568,8 +580,7 @@ export async function keepDeck(testInfo: TestInfo, browserVersion: string, raw: 
     entries: items.map((i) => ({ name: i.name, size: i.size, crc32: hex(i.crc), sha256: sha256(i.data) })),
     slides,
   };
-  const pptx = join(dir, `${base}.pptx`), json = join(dir, `${base}.json`);
-  await writeFile(pptx, raw);
+  const json = join(dir, `${base}.json`);
   await writeFile(json, JSON.stringify(manifest, null, 2) + "\n");
   await testInfo.attach(`${base}.pptx`, { path: pptx, contentType: PPTX_TYPE });
   await testInfo.attach(`${base}.json`, { path: json, contentType: "application/json" });
