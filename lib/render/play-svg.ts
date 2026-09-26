@@ -148,7 +148,7 @@ function routeLabel(
   if (!rt || rt.type === "custom") return null;
   const def = routeDef(p.team, rt.type);
   if (!def) return null;
-  if (zone) return { x: zone.cx, y: zone.cy + zone.ry - 8, text: def.label, anchor: "middle" };
+  if (zone) return { x: onField(zone.cx, "middle", def.label), y: zone.cy + zone.ry - 8, text: def.label, anchor: "middle" };
   const abs = routeYards(p, players, top);
   if (!abs || abs.length < 2) return null;
   const a = abs[abs.length - 2], b = abs[abs.length - 1];
@@ -162,7 +162,15 @@ function routeLabel(
   else if (ny > 0) { nx = -nx; ny = -ny; }
   const x = mx + nx * 16, y = my + ny * 16 + 5;
   const anchor: Label["anchor"] = Math.abs(nx) < 0.3 ? "middle" : nx < 0 ? "end" : "start";
-  return { x: Math.max(30, Math.min(VW - 30, x)), y: Math.max(16, y), text: def.label, anchor };
+  return { x: onField(x, anchor, def.label), y: Math.max(16, y), text: def.label, anchor };
+}
+
+/** The label's x, pulled in so the whole word stays inside the field, 4 units clear of each sideline. */
+function onField(x: number, anchor: Label["anchor"], text: string): number {
+  const w = text.length * 15 * 0.6; // wider than Patrick Hand (max 0.48 em measured) or its cursive fallback draws
+  const lo = anchor === "start" ? 4 : anchor === "end" ? 4 + w : 4 + w / 2;
+  const hi = anchor === "start" ? VW - 4 - w : anchor === "end" ? VW - 4 : VW - 4 - w / 2;
+  return Math.max(lo, Math.min(hi, x));
 }
 
 function hash(s: string): number {
