@@ -29,6 +29,8 @@ interface Props {
   svgRef: RefObject<SVGSVGElement | null>;
   snapMode?: SnapMode;
   showYardNumbers?: boolean;
+  /** the hatched no-run bands; off for a team whose league plays without them */
+  noRunZones?: boolean;
   /** share page: draw only, no interaction */
   readOnly?: boolean;
   /** printed above the field; also shown on screen when `showTitle` is set */
@@ -76,7 +78,7 @@ const TITLE_CHROME = 24;
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
-  readOnly = false, title, showTitle = false, status,
+  noRunZones = true, readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -125,7 +127,7 @@ function FieldImpl({
     };
   }), [players, live, liveWaypoint]);
   const d = depth(effective, pane);
-  const layout = useMemo(() => fieldLayout(d, showYardNumbers), [d, showYardNumbers]);
+  const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones), [d, showYardNumbers, noRunZones]);
   const top = layout.top;
   const width = cardWidth(pane, d);
   const topRef = useRef(top);

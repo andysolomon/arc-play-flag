@@ -1,6 +1,8 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useSyncExternalStore } from "react";
+import { getServerTeam, getTeam, subscribe } from "@/lib/play/library";
+import { hasNoRunZones } from "@/lib/play/storage";
 import type { Player, Team } from "@/lib/play/types";
 import { playArt } from "@/lib/render/play-svg";
 
@@ -14,7 +16,8 @@ interface Props {
 
 /** A small static picture of a play, drawn from the same geometry as the field. */
 function PlayThumbImpl({ players, name, side, className = "" }: Props) {
-  const art = useMemo(() => playArt(players, { showYardNumbers: false, show: side }), [players, side]);
+  const noRunZones = hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam));
+  const art = useMemo(() => playArt(players, { showYardNumbers: false, noRunZones, show: side }), [players, side, noRunZones]);
   return (
     <svg
       viewBox={art.viewBox}

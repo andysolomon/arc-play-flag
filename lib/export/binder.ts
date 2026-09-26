@@ -1,4 +1,5 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
+import { hasNoRunZones } from "@/lib/play/storage";
 import type { Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth } from "@/lib/render/play-svg";
 import { playShow, type Numbered } from "./numbered";
@@ -27,15 +28,17 @@ export function fitField(players: readonly Player[], w: number, h: number, show:
  * One simple play in a rectangular slot: its number, its name, and the largest field that
  * fits underneath them. The four-up binder page and the flyer both lay their grids out of these.
  */
-export function playSlot(item: Numbered, x: number, y: number, w: number, h: number, vis?: Vis, r = 10, nameSize = 17, border = 1.5): string {
-  const show = playShow(item.play, vis);
+export function playSlot(
+  item: Numbered, x: number, y: number, w: number, h: number, o: { vis?: Vis; team: TeamSettings }, r = 10, nameSize = 17, border = 1.5,
+): string {
+  const show = playShow(item.play, o.vis);
   const out: string[] = [];
   out.push(badge(x + r, y + r, r, item.n));
   const nameX = x + 2 * r + 6;
   out.push(text(nameX, y + r + Math.round(nameSize * 0.35), nameSize, fit(item.play.name, x + w - nameX, nameSize)));
   const top = y + 2 * r + 8;
   const f = fitField(item.play.players, w, y + h - top, show);
-  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show }, border));
+  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show, noRunZones: hasNoRunZones(o.team) }, border));
   return out.join("");
 }
 
@@ -72,7 +75,7 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const box = { w: cw, h: H - MARGIN - footerH - notesH - top };
   const f = fitField(play.players, box.w, box.h, vis);
   const fx = MARGIN + (cw - f.w) / 2;
-  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", show: vis }, 2));
+  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", show: vis, noRunZones: hasNoRunZones(o.team) }, 2));
 
   let y = top + f.h + 16 + notesSize;
   for (const l of lines) {
@@ -95,7 +98,7 @@ function fourUpPage(items: readonly Numbered[], o: BinderOptions): SvgPage {
   const out: string[] = [];
   items.forEach((item, i) => {
     const col = i % 2, row = Math.floor(i / 2);
-    out.push(playSlot(item, m + col * (cw + g), m + row * (ch + g), cw, ch, o.vis));
+    out.push(playSlot(item, m + col * (cw + g), m + row * (ch + g), cw, ch, o));
   });
   // cut lines through the gutters
   out.push(cutLine(W / 2, m - 8, W / 2, H - footerH - m + 8));

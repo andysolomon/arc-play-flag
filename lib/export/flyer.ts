@@ -33,7 +33,6 @@ const ROWS = FLYER_SLOTS / COLS;
 export function flyerPage(picks: readonly (Numbered | null)[], o: FlyerOptions): SvgPage {
   const p = PAPERS[o.paper];
   const W = p.w, H = p.h;
-  const vis = o.vis;
   const out: string[] = [];
 
   // team band: the colour reads across a room, the name and book read up close
@@ -49,7 +48,7 @@ export function flyerPage(picks: readonly (Numbered | null)[], o: FlyerOptions):
   picks.slice(0, FLYER_SLOTS).forEach((item, i) => {
     if (!item) return;
     const col = i % COLS, row = Math.floor(i / COLS);
-    out.push(playSlot(item, MARGIN + col * (cw + GAP), top + row * (ch + GAP), cw, ch, vis, 9, 15));
+    out.push(playSlot(item, MARGIN + col * (cw + GAP), top + row * (ch + GAP), cw, ch, o, 9, 15));
   });
 
   out.push(text(MARGIN, H - MARGIN + 10, 9, "Routes only — ask your coach for the rest.", { fill: MUTED }));

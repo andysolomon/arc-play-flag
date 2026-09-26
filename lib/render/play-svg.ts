@@ -21,6 +21,8 @@ export interface ArtOptions {
   /** which team is drawn; routes are still laid out against the whole play, as on the live field */
   show?: Vis;
   showYardNumbers?: boolean;
+  /** the hatched no-run bands; off for a team whose league plays without them */
+  noRunZones?: boolean;
   /**
    * The box the field will be fitted into: its aspect decides how much depth shows.
    * Null frames the play as tightly as the field allows (24 yards, deeper if the play needs it).
@@ -53,10 +55,10 @@ export const esc = (s: string): string =>
 const f1 = (n: number): string => n.toFixed(1);
 
 export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art {
-  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, box = null, minDepth = 24 } = opts;
+  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, noRunZones = true, box = null, minDepth = 24 } = opts;
   const shown = visible(players, show);
   const d = depth(shown, box ?? TIGHT, minDepth);
-  const layout = fieldLayout(d, showYardNumbers);
+  const layout = fieldLayout(d, showYardNumbers, noRunZones);
   const top = layout.top;
   const zones = zoneLayout(players, top);
   const uid = "h" + Math.abs(hash(players.map((p) => p.id + f1(p.x) + f1(p.y)).join())).toString(36);

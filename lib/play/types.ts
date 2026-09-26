@@ -87,6 +87,11 @@ export interface TeamSettings {
   name: string;
   /** an accent colour for exports, as #rrggbb */
   color: string;
+  /**
+   * false for a league that plays without no-run zones: the field and every export leave
+   * the hatched bands off. Stored only when false, so a team from before the choice reads the same.
+   */
+  noRunZones?: boolean;
 }
 
 /** How much an export shows: simple is diagram only, detailed adds names, the read and notes. */
