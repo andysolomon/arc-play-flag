@@ -2,8 +2,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { planTransfer, transferPlays, type Transfer } from "@/lib/export/transfer";
-import { applyImport, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, subscribe } from "@/lib/play/library";
-import { failureMessage } from "@/lib/play/storage";
+import { applyImport, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, subscribe } from "@/lib/play/library";
+import { failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { playSvg } from "@/lib/render/play-svg";
 import { card, pill } from "../ui";
@@ -14,6 +14,7 @@ export function ImportPreview({ file, skipped = 0, normalized = false, onCancel,
 }) {
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
+  const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [index, setIndex] = useState(0);
@@ -47,7 +48,7 @@ export function ImportPreview({ file, skipped = 0, normalized = false, onCancel,
         </label>}
         <h3 className="break-words text-title">{selected.name}</h3>
         <div role="img" aria-label={`${selected.name} snapshot preview`} className="overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-          dangerouslySetInnerHTML={{ __html: playSvg(selected.players, { show: "both", box: { pw: 660, ph: 360 } }) }} />
+          dangerouslySetInnerHTML={{ __html: playSvg(selected.players, { show: "both", noRunZones: hasNoRunZones(team), box: { pw: 660, ph: 360 } }) }} />
         <p className="whitespace-pre-wrap break-words text-small">{selected.notes || "No coaching notes."}</p>
         {items.length > 1 && <div className="flex items-center justify-between gap-2">
           <button type="button" className={`${pill} min-h-11 px-3`} disabled={index === 0} onClick={() => { setIndex(i => i - 1); }}>Previous play</button>

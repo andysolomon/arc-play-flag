@@ -359,8 +359,13 @@ export function removePlaybook(id: string, storage: StorageLike | null = browser
 export function normalizeTeam(raw: unknown): TeamSettings | null {
   if (!isRecord(raw)) return null;
   const color = typeof raw.color === "string" && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color.toLowerCase() : DEFAULT_TEAM.color;
-  return { name: typeof raw.name === "string" ? raw.name.slice(0, 40) : "", color };
+  const team: TeamSettings = { name: typeof raw.name === "string" ? raw.name.slice(0, 40) : "", color };
+  if (raw.noRunZones === false) team.noRunZones = false;
+  return team;
 }
+
+/** Whether this team's field has no-run zones: every team does unless it turned them off. */
+export const hasNoRunZones = (team: TeamSettings): boolean => team.noRunZones !== false;
 
 export function readTeam(storage: StorageLike | null = browserStorage()): TeamSettings {
   return normalizeTeam(parse(storage, TEAM_KEY)) ?? DEFAULT_TEAM;

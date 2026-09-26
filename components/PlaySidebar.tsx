@@ -31,11 +31,14 @@ interface Props {
   onClear: (team: Team) => void;
   onReset: (team: Team) => void;
   onShadow: (on: boolean) => void;
+  /** the team's field has the hatched no-run bands */
+  noRunZones: boolean;
+  onNoRunZones: (on: boolean) => void;
 }
 
 function PlaySidebarImpl({
   name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
-  savePanel, onFlip, onClear, onReset, onShadow,
+  savePanel, onFlip, onClear, onReset, onShadow, noRunZones, onNoRunZones,
 }: Props) {
   const [choosing, setChoosing] = useState(false);
   const start = (next: Team) => {
@@ -102,6 +105,16 @@ function PlaySidebarImpl({
         <IconTile icon="reset" label="Reset spots" onClick={() => { onReset(side); }} />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">Clear and reset only touch this play&apos;s team.</span>
+      <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
+        <input
+          type="checkbox"
+          checked={noRunZones}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => { onNoRunZones(e.target.checked); }}
+          className="h-5 w-5 flex-none cursor-pointer accent-ink"
+        />
+        No-run zones
+      </label>
+      <span className="flex-none text-caption leading-note text-ink-muted">Turn off if your league plays without them. Every play and printout follows.</span>
       <span className={divider} />
       <span className={eyebrow}>SHOW</span>
       {side === "defense" ? (
