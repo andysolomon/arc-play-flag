@@ -63,10 +63,10 @@ export function text(x: number, y: number, size: number, s: string, o: TextOpts 
 
 let clipSeq = 0;
 
-/** The play drawn into a box, letterboxed on turf inside a rounded ink border. */
 /**
- * One play's field in a box. The field's rules (no-run zones, the ball's yard line) are
- * required, so no page can fall back to the defaults and draw a different field from the designer.
+ * The play drawn into a box, letterboxed on turf inside a rounded ink border. The field's rules
+ * (no-run zones, the ball's yard line) are required, so no page can fall back to the defaults
+ * and draw a different field from the designer.
  */
 export function field(
   players: readonly Player[], x: number, y: number, w: number, h: number,

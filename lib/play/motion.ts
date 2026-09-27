@@ -34,6 +34,8 @@ export type PlayKind = "run" | "pass" | "hold";
 export interface Motion {
   /** total playback length in seconds, hold included */
   dur: number;
+  /** the card's top edge the play was laid out against: the end line once the ball is near their goal */
+  top: number;
   tracks: Record<string, Track>;
   kind: PlayKind;
   /** who snaps the ball and who takes it */
@@ -173,6 +175,7 @@ export function buildMotion(
 
   const m: Motion = {
     dur: run + HOLD,
+    top,
     tracks,
     kind: "hold",
     center: center && center.id !== qb?.id ? center.id : null,
@@ -267,7 +270,8 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
     if (target && now) {
       // close on the receiver's starting spot, then stick with them wherever they go
       const closing = tr.len > 0 ? cl((s * SPEED) / tr.len, 0, 1) : 1;
-      pos[p.id] = { x: here.x + (now.x - target.x) * closing, y: here.y + (now.y - target.y) * closing };
+      // trailing a deep route, they stop where a drag would, short of the card's top (the end line near their goal)
+      pos[p.id] = { x: here.x + (now.x - target.x) * closing, y: Math.max(m.top + 1.2, here.y + (now.y - target.y) * closing) };
     } else {
       pos[p.id] = here;
     }

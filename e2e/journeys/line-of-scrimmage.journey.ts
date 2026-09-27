@@ -6,7 +6,7 @@ import { readTransfer } from "../../lib/export/transfer";
 import type { SavedPlay } from "../../lib/play/types";
 import { Designer, downloadText } from "../support/designer";
 import {
-  GOAL_LINE_FADE, KEYS, OTTERS, RED_ZONE_FADE, SLANT_LEFT, formation, jsonUpload, playbook, seed, storedDraft, storedPlays,
+  GOAL_LINE_FADE, KEYS, OTTERS, RED_ZONE_FADE, SLANT_LEFT, formation, jsonUpload, play, playbook, seed, storedDraft, storedPlays,
 } from "../support/fixtures";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -182,6 +182,8 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
     await d.closeSidebars();
     await expect(async () => { expectField(await readField(d.field), los); }).toPass();
     const m = await readField(d.field);
+    // the card shows as much field as it did on the 5, up to the end line (at the 39 see below)
+    if (los !== 39) expect(m.top, "the card ends at the end line, or where it did on the 5").toBe(Math.max(los - END_LINE, at5.top));
     if (los === 12) expect(m.labels.slice(0, 4).map((l) => l.t)).toEqual(["LOS 12", "15", "20", "25"]);
     // past midfield the band before it lies behind the play, so it is left off
     if (los === 20) for (const [, bottom] of m.bands) expect(bottom).toBeLessThanOrEqual(0);
@@ -204,6 +206,8 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
   await expect.poll(() => fieldMarkup(d.field)).toBe(markup5);
   await expect.poll(async () => { const dr = await storedDraft(page); return dr !== null && !("los" in dr); }).toBe(true);
   await expect(status(page)).toHaveText("Saved");
+  // eight spot changes, and nothing to undo: the spot is the play's, like its name
+  await expect(d.undo).toBeDisabled();
 
   // their 10: it marks the play changed and autosaves; undo leaves the spot where it is
   await d.tools();
@@ -242,6 +246,14 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
   const copy = Object.values(await storedPlays(page)).find((p) => p.name === `${RED_ZONE_FADE.name} copy`);
   expect(copy?.los).toBe(30);
 
+  // a new play, started from the copy on their 10, goes back to the 5
+  await expect(losSelect(page)).toHaveValue("30");
+  await d.newPlay("Offense");
+  await expect(losSelect(page)).toHaveValue("5");
+  await expect(d.field.locator("text", { hasText: /^LOS$/ })).toHaveCount(1);
+  await expect.poll(async () => (await storedDraft(page))?.name).toBe("New play");
+  expect(await storedDraft(page)).not.toHaveProperty("los");
+
   // every other play stays on the 5, drawn exactly as before
   await d.openSaved(SLANT_LEFT.name);
   await d.tools();
@@ -249,13 +261,6 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
   await d.closeSidebars();
   await expect(async () => { expectField(await readField(d.field), 5); }).toPass();
   await expect.poll(() => fieldMarkup(d.field)).toBe(markup5);
-
-  // and so does a new one
-  await d.newPlay("Offense");
-  await expect(losSelect(page)).toHaveValue("5");
-  await expect(d.field.locator("text", { hasText: /^LOS$/ })).toHaveCount(1);
-  await expect.poll(async () => (await storedDraft(page))?.name).toBe("New play");
-  expect(await storedDraft(page)).not.toHaveProperty("los");
 
   await keep(testInfo, "line-of-scrimmage", {
     project,
@@ -422,9 +427,52 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
       thumbnails: { goalLine: goalArt, onThe5: slantArt },
       playbookFile: filePlays.map((p) => ({ id: p.id, keys: Object.keys(p), los: p.los ?? null })),
       shortLink: { normalized: shortLink.ok ? shortLink.normalized : null, los: 35 },
-      importedBeside: Object.values(lib).map((p) => ({ id: p.id === GOAL_LINE_FADE.id ? p.id : "(copy)", name: p.name, los: p.los ?? null })),
+      importedBeside: Object.values(lib).map((p) => ({ id: p.id === GOAL_LINE_FADE.id || p.id === SLANT_LEFT.id ? p.id : "(copy)", name: p.name, los: p.los ?? null })),
     });
   } finally {
     await other.close();
   }
+});
+
+test("near their goal, ▶ keeps every player on the field, a man defender included", async ({ page }, testInfo) => {
+  // a defensive call on their 5, so both teams are drawn: a Go with man coverage on it, and a corner
+  const call: SavedPlay = {
+    ...play("fx-goal-line-man", "Otter Goal Line Man", {
+      o3: { type: "go" }, o4: { type: "corner" }, d1: { type: "man", target: "o3" }, d4: { type: "man", target: "o4" },
+    }, "", "defense"),
+    los: 35,
+  };
+  await seed(page, { plays: [call] });
+  const d = new Designer(page);
+  await d.goto(`?open=${call.id}`);
+  await expect(page.getByRole("heading", { name: call.name })).toBeVisible();
+  await d.closeSidebars();
+  await expect(d.field.getByRole("button", { name: "Defense d1", exact: true })).toBeVisible();
+  const before = await readField(d.field);
+  expectField(before, 35);
+
+  // every frame of the run: the highest any player's centre gets, in SVG units from the card's top
+  const run = d.field.evaluate((svg) => new Promise<{ highest: number; frames: number }>((resolve) => {
+    let highest = Infinity, frames = 0, started = false;
+    const t0 = performance.now();
+    const tick = (): void => {
+      const stop = document.querySelector('[aria-label="Stop the play"]');
+      if (stop) started = true;
+      for (const g of svg.querySelectorAll('g[aria-label^="Offense "], g[aria-label^="Defense "]')) {
+        const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(g.getAttribute("transform") ?? "");
+        if (m) highest = Math.min(highest, Number(m[2]));
+      }
+      if (started) frames++;
+      if ((started && !stop) || performance.now() - t0 > 20_000) resolve({ highest, frames });
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+  await page.getByRole("button", { name: "Run the play" }).click();
+  const { highest, frames } = await run;
+  expect(frames, "the play ran").toBeGreaterThan(10);
+  // a token's radius is 23: every player stays whole on the card, short of the end line
+  expect(highest).toBeGreaterThanOrEqual(23);
+  await expect(page.getByRole("button", { name: "Run the play" })).toBeVisible();
+  await keep(testInfo, "line-of-scrimmage-playback", { project: testInfo.project.name, los: 35, viewBox: before.viewBox, highestTokenCentre: highest });
 });

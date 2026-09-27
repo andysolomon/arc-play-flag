@@ -32,12 +32,12 @@ export const losOf = (x: { los?: number }): number => readLos(x.los);
  * The record with its spot appended last, and only when it isn't the 5, so a record from
  * before plays had a spot reads, writes and compares exactly as it did.
  */
-export function withLos<T extends object>(rec: T, los: number): T & { los?: number } {
+export function withLos<T extends object>(rec: T, los: number): Omit<T, "los"> & { los?: number } {
   const out = { ...rec } as Record<string, unknown>;
   delete out.los;
   const spot = readLos(los);
   if (spot !== LOS_YARD) out.los = spot;
-  return out as T & { los?: number };
+  return out as Omit<T, "los"> & { los?: number };
 }
 
 /** The ball is spotted in a no-run zone: the 15 up to midfield, or the 35 and in. */

@@ -225,7 +225,8 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   // the field, on a hard shadow
   const los = losOf(play);
   const f = fitField(play.players, 520, 408, show, los);
-  const fx = 36 + (520 - f.w) / 2, fy = 100;
+  // centred in its box: a ball near their goal ends the field at the end line, shorter than the box
+  const fx = 36 + (520 - f.w) / 2, fy = 100 + (408 - f.h) / 2;
   out.push(`<rect x="${f2(fx)}" y="${f2(fy + 7)}" width="${f2(f.w)}" height="${f2(f.h)}" rx="6" fill="${INK}" opacity="0.14"/>`);
   out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show, noRunZones: hasNoRunZones(team), los }, 3));
 

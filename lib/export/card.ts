@@ -26,9 +26,12 @@ export interface CardOptions {
   los?: number;
 }
 
+/** The box the card's field fits into, between the title row and the footer. */
+const FIELD_W = CARD_W - 120, FIELD_H = CARD_H - 240 - 60 - 40;
+
 /** Shared viewport: animation must use exactly the same yards as the card art. */
 export function cardField(players: readonly Player[], vis: Vis = "both", los = LOS_YARD): { w: number; h: number; top: number } {
-  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40, vis, los);
+  const f = fitField(players, FIELD_W, FIELD_H, vis, los);
   return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis, MIN_DEPTH, los)) };
 }
 
@@ -62,7 +65,10 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   const vis = o.vis ?? "both";
   const los = losOf(o);
   const f = cardField(o.players, vis, los);
-  out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, {
+  // near their goal the card stops at the end line, so the field is shorter than its box: centre it
+  // rather than leave a blank band over the footer. On the 5 it fills the box and stays where it always was.
+  const fy = los === LOS_YARD ? top : top + (FIELD_H - f.h) / 2;
+  out.push(field(o.players, (W - f.w) / 2, fy, f.w, f.h, {
     level: o.level ?? "simple",
     ...frame,
     ball: vis === "defense" ? null : frame.ball,
