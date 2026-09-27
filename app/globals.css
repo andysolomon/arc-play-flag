@@ -887,7 +887,7 @@
   14%, 100% { opacity: 1; }
 }
 
-/* Great Wave: the swell rolls in band by band and the big wave breathes; a touchdown sends a huge wave surging through, flinging spray off the crests, as the sea heaves, the big wave rears and the seal rocks. Every touchdown animation is over by 3.3s, inside the 3.4s celebration. */
+/* Great Wave: the swell rolls in band by band and the big wave breathes; a touchdown sends a broader wave surging through, flinging spray off the crests, as the sea heaves, the big wave lunges and the seal rocks. Every touchdown animation is over by 3.3s, inside the 3.4s celebration. */
 .ez-great-wave-roll { animation: ez-great-wave-roll 16s linear infinite; }
 .ez-great-wave-big, .ez-great-wave-rear { transform-box: fill-box; transform-origin: 20% 100%; }
 .ez-great-wave-big { animation: ez-great-wave-breathe 7s ease-in-out infinite; }
@@ -895,7 +895,7 @@
 .ez-great-wave-fleck { animation: ez-great-wave-twinkle 5s ease-in-out infinite; }
 
 .ez-great-wave-party { --ez-great-wave-surge: 2.6s; }
-/* on a wrapper, so the big wave rears on top of its breathing rather than snapping out of it */
+/* on a wrapper, so the big wave lunges on top of its breathing rather than snapping out of it */
 .ez-great-wave-party .ez-great-wave-rear { animation: ez-great-wave-rear 1.6s ease-in-out 2; }
 .ez-great-wave-party .ez-great-wave-heave { animation: ez-great-wave-heave 1.05s ease-in-out 3; }
 .ez-great-wave-party .ez-great-wave-heave-near { animation-delay: 0.15s; }
@@ -916,10 +916,11 @@
   0%, 100% { opacity: 1; transform: translate(0, 0); }
   50% { opacity: 0.3; transform: translate(1px, 1.5px); }
 }
+/* the crest already brushes the band's top, so the wave gathers back and down, then throws itself forward, never up */
 @keyframes ez-great-wave-rear {
   0%, 100% { transform: scale(1, 1) rotate(0deg); }
-  35% { transform: scale(1.06, 1.14) rotate(-2.5deg); }
-  65% { transform: scale(0.98, 0.94) rotate(1deg); }
+  30% { transform: scale(0.97, 0.95) rotate(-1.5deg); }
+  62% { transform: scale(1.08, 0.99) rotate(4deg); }
 }
 @keyframes ez-great-wave-heave {
   0%, 100% { transform: translateY(0); }
