@@ -1,12 +1,13 @@
 "use client";
 
-import { memo, useState, type ReactNode, type ChangeEvent } from "react";
+import { memo, useId, useState, type ReactNode, type ChangeEvent } from "react";
+import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
 import { MAX_NOTES } from "@/lib/play/storage";
 import type { Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { Support } from "./Support";
 import { ThemePicker } from "./ThemePicker";
-import { divider, eyebrow, input, pill, tileGrid } from "./ui";
+import { divider, eyebrow, input, pill, select, tileGrid } from "./ui";
 
 interface Props {
   name: string;
@@ -37,14 +38,18 @@ interface Props {
   /** the team's field has the hatched no-run bands */
   noRunZones: boolean;
   onNoRunZones: (on: boolean) => void;
+  /** the yard line this play's ball is on, counted from the offense's own goal line */
+  los: number;
+  onLos: (los: number) => void;
 }
 
 function PlaySidebarImpl({
   name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
-  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones,
+  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, los, onLos,
 }: Props) {
   const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
+  const losId = useId(), losNote = useId();
   const start = (next: Team) => {
     onNew(next);
     setChoosing(false);
@@ -109,6 +114,21 @@ function PlaySidebarImpl({
         <IconTile icon="reset" label="Reset spots" onClick={() => { onReset(side); }} />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">Clear and reset only touch this play&apos;s team.</span>
+      <label htmlFor={losId} className="flex-none text-small">Line of scrimmage</label>
+      <select
+        id={losId}
+        value={String(los)}
+        aria-describedby={losNote}
+        onChange={(e: ChangeEvent<HTMLSelectElement>) => { onLos(Number(e.target.value)); }}
+        className={`${select} w-full flex-none`}
+      >
+        {LOS_CHOICES.map((n) => <option key={n} value={String(n)}>{losChoice(n)}</option>)}
+      </select>
+      <span id={losNote} aria-live="polite" className="flex-none text-caption leading-note text-ink-muted">
+        {noRunZones && inNoRunZone(los)
+          ? "Saved with this play. The ball is in a no-run zone, so no runs from here."
+          : "Saved with this play. Yards count from your own goal line: midfield is the 20, their goal line the 40."}
+      </span>
       <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
         <input
           type="checkbox"

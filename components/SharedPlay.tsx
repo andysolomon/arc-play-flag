@@ -18,12 +18,14 @@ interface Props {
   noRunZones: boolean;
   /** the play includes the other team, faded, in its pictures, so the snapshot does too */
   artShadow?: boolean;
+  /** the yard line the shared play's ball is on */
+  los: number;
 }
 
 const noop = (): void => undefined;
 
 /** Read-only view of a shared play, with a way back into the designer. */
-export function SharedPlay({ id, name, players, side, noRunZones, artShadow = false }: Props) {
+export function SharedPlay({ id, name, players, side, noRunZones, artShadow = false, los }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const cover = side === "defense" ? coverageOf(players) : null;
   // a defensive call says its coverage, as the stamp on its pictures does
@@ -56,6 +58,7 @@ export function SharedPlay({ id, name, players, side, noRunZones, artShadow = fa
           svgRef={svgRef}
           readOnly
           noRunZones={noRunZones}
+          los={los}
           title={name}
         />
       </div>

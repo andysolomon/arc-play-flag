@@ -35,6 +35,7 @@
  */
 
 import { assignmentLine, assignments, callLine, callName, headerLine, type Assignment } from "@/lib/play/assignments";
+import { losOf } from "@/lib/play/field";
 import { teamFill } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { Team, TeamSettings } from "@/lib/play/types";
@@ -222,10 +223,12 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   out.push(text(100, 70, 40, fit(play.name, right - 100, 40)));
 
   // the field, on a hard shadow
-  const f = fitField(play.players, 520, 408, view.show);
-  const fx = 36 + (520 - f.w) / 2, fy = 100;
+  const los = losOf(play);
+  const f = fitField(play.players, 520, 408, view.show, los);
+  // centred in its box: a ball near their goal ends the field at the end line, shorter than the box
+  const fx = 36 + (520 - f.w) / 2, fy = 100 + (408 - f.h) / 2;
   out.push(`<rect x="${f2(fx)}" y="${f2(fy + 7)}" width="${f2(f.w)}" height="${f2(f.h)}" rx="6" fill="${INK}" opacity="0.14"/>`);
-  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", ...view, noRunZones: hasNoRunZones(team) }, 3));
+  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", ...view, noRunZones: hasNoRunZones(team), los }, 3));
 
   // who does what
   out.push(`<rect x="580" y="104" width="340" height="408" rx="14" fill="${INK}" opacity="0.14"/>`);

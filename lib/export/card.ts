@@ -1,7 +1,8 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
+import { LOS_YARD, losOf } from "@/lib/play/field";
 import type { Level, Player, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
-import { ybv } from "@/lib/play/geometry";
+import { MIN_DEPTH, ybv } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
 import { fitField } from "./binder";
 import { INK, MUTED, appMark, badge, field, page, pill, text, type SvgPage } from "./pages";
@@ -23,12 +24,17 @@ export interface CardOptions {
   vis?: Vis;
   /** the play's own side: with both shown, the other team is faded, and a defensive call gets no ball or offensive call */
   side?: Team;
+  /** the play's ball spot (SavedPlay.los); the own 5 when left out */
+  los?: number;
 }
 
+/** The box the card's field fits into, between the title row and the footer. */
+const FIELD_W = CARD_W - 120, FIELD_H = CARD_H - 240 - 60 - 40;
+
 /** Shared viewport: animation must use exactly the same yards as the card art. */
-export function cardField(players: readonly Player[], vis: Vis = "both"): { w: number; h: number; top: number } {
-  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40, vis);
-  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis)) };
+export function cardField(players: readonly Player[], vis: Vis = "both", los = LOS_YARD): { w: number; h: number; top: number } {
+  const f = fitField(players, FIELD_W, FIELD_H, vis, los);
+  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis, MIN_DEPTH, los)) };
 }
 
 /** The card's own markup, in its 1080 x 1350 space, so a page can also nest it in a slot. */
@@ -59,14 +65,19 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
 
   const top = titleY + r + 36;
   const vis = o.vis ?? "both";
-  const f = cardField(o.players, vis);
-  out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, {
+  const los = losOf(o);
+  const f = cardField(o.players, vis, los);
+  // near their goal the card stops at the end line, so the field is shorter than its box: centre it
+  // rather than leave a blank band over the footer. On the 5 it fills the box and stays where it always was.
+  const fy = los === LOS_YARD ? top : top + (FIELD_H - f.h) / 2;
+  out.push(field(o.players, (W - f.w) / 2, fy, f.w, f.h, {
     level: o.level ?? "simple",
     ...frame,
     ball: vis === "defense" || o.side === "defense" ? null : frame.ball,
     show: vis,
     side: o.side,
     noRunZones: hasNoRunZones(o.team),
+    los,
   }, 5));
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));

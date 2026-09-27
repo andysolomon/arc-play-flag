@@ -14,15 +14,17 @@ interface Props {
   side: Team;
   /** the play draws the other team, faded, on its pictures */
   artShadow?: boolean;
+  /** where the play's ball is (SavedPlay.los); undefined is the own 5. Never optional, so no picture falls back to the 5 by accident */
+  los: number | undefined;
   className?: string;
 }
 
 /** A small static picture of a play, drawn from the same geometry as the field. */
-function PlayThumbImpl({ players, name, side, artShadow = false, className = "" }: Props) {
+function PlayThumbImpl({ players, name, side, artShadow = false, los, className = "" }: Props) {
   const noRunZones = hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam));
   const art = useMemo(
-    () => playArt(players, { showYardNumbers: false, noRunZones, show: artShadow ? "both" : side, side }),
-    [players, side, artShadow, noRunZones],
+    () => playArt(players, { showYardNumbers: false, noRunZones, los, show: artShadow ? "both" : side, side }),
+    [players, side, artShadow, noRunZones, los],
   );
   // what the stamp and the fade show, in words, for a named picture
   const cover = side === "defense" ? coverageOf(players) : null;

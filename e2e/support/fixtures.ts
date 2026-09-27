@@ -39,6 +39,9 @@ export const PITCH_OPTION: SavedPlay = (() => {
   const p = play("fx-pitch-option", "Otter Pitch Option", { o5: { type: "pitch" }, o4: { type: "corner" }, o3: { type: "custom", pts: [[3, -6], [8, -10]] } });
   return { ...p, players: p.players.map((q) => (q.id === "o3" ? { ...q, label: "" } : q)) };
 })();
+// the line-of-scrimmage journey: the same call from the 5 and, carrying a ball spot, from their 5 (the 35)
+export const RED_ZONE_FADE = play("fx-red-zone-fade", "Otter Red Zone Fade", { o3: { type: "go", primary: true }, o4: { type: "corner" } });
+export const GOAL_LINE_FADE: SavedPlay = { ...play("fx-goal-line-fade", "Otter Goal Line Fade", { o3: { type: "go", primary: true }, o4: { type: "corner" } }), los: 35 };
 /** Longer than the panel's three reserved lines, so the face cuts it and the notes keep it whole. */
 export const WALKTHROUGH_NOTES = "Walk it at half speed, then at full speed. ".repeat(13).trim();
 export const WALKTHROUGH: SavedPlay = { ...play("fx-walkthrough", "Otter Walkthrough", {}, WALKTHROUGH_NOTES), players: formation().filter((p) => p.team === "defense") };

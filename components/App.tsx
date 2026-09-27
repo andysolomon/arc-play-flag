@@ -5,6 +5,7 @@ import { install, record } from "@/lib/diagnostics";
 import { initialState, reducer, selected, unsaved } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
+import { withLos } from "@/lib/play/field";
 import type { RouteType, Team } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -65,7 +66,7 @@ export function App() {
   const [saveFailure, setSaveFailure] = useState<StorageError | null>(null);
   const draftBroken = useRef(false);
   const [draftWrite, setDraftWrite] = useState<{ fingerprint: string; ok: boolean } | null>(null);
-  const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
+  const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const restoredDraft = useRef(false);
   const toastTimer = useRef(0);
   const say = useCallback((text: string, ms = 1600) => {
@@ -150,7 +151,7 @@ export function App() {
     if (!hydratedRef.current) return;
     let writeOk = true;
     try {
-      writeDraft({ id: s.id, name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] });
+      writeDraft(withLos({ id: s.id, name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] }, s.los));
       draftBroken.current = false;
     } catch (e) {
       if (!(e instanceof StorageError)) throw e;
@@ -161,13 +162,13 @@ export function App() {
     let active = true;
     queueMicrotask(() => { if (active) setDraftWrite({ fingerprint: draftFingerprint, ok: writeOk }); });
     return () => { active = false; };
-  }, [draftFingerprint, say, s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
+  }, [draftFingerprint, say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   useEffect(() => {
     const d = readDraft();
     let firstUseTimer = 0;
     let openToolsTimer = 0;
     restoredDraft.current = d !== null;
-    if (d) dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, side: d.side, artShadow: d.artShadow, players: d.players });
+    if (d) dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, side: d.side, artShadow: d.artShadow, los: d.los, players: d.players });
     hydratedRef.current = true;
     try {
       if (!d && getPlays().length === 0 && window.localStorage.getItem(FIRST_USE_KEY) !== "done") {
@@ -182,7 +183,7 @@ export function App() {
     const shared = params.get("p");
     const rec = shared ? decodeShare(shared) : null;
     if (rec) {
-      dispatch({ type: "load", name: rec.name, side: rec.side, artShadow: rec.artShadow, players: rec.players, shadow: true });
+      dispatch({ type: "load", name: rec.name, side: rec.side, artShadow: rec.artShadow, los: rec.los, players: rec.players, shadow: true });
       // A formation/share payload is an intentional handoff into the designer;
       // keep the tools visible so the coach can immediately inspect or name it.
       openToolsTimer = window.setTimeout(() => { setLeftOpen(true); }, 0);
@@ -191,7 +192,9 @@ export function App() {
     // "Open" from the playbook gallery: /?open=<play id>
     const saved = playById(params.get("open"));
     if (saved) {
-      dispatch({ type: "load", id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, artShadow: saved.artShadow, players: saved.players });
+      dispatch({
+        type: "load", id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, artShadow: saved.artShadow, los: saved.los, players: saved.players,
+      });
       window.history.replaceState(null, "", "/");
     }
     return () => {
@@ -201,28 +204,30 @@ export function App() {
   }, []);
 
   const onSave = useCallback(() => {
-    const r = savePlay({ id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] });
+    const r = savePlay({
+      id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players],
+    });
     if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved");
-  }, [say, s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
+  }, [say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
-    const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] });
+    const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] });
     if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
     dispatch({ type: "setName", name: n });
     dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved a copy");
-  }, [say, s.name, s.notes, s.side, s.artShadow, s.players]);
+  }, [say, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   // the way out when the device won't keep the play: a one-play playbook file that "Import a file…" takes back
   const onDownload = useCallback(() => {
-    const play = { id: s.id ?? newId(), name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] };
+    const play = withLos({ id: s.id ?? newId(), name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] }, s.los);
     const file = encodeRecoveryFile(play);
     download(new Blob([file.json], { type: "application/json" }), file.filename);
-  }, [s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
+  }, [s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const dirty = unsaved(s, playById(s.id));
   const persistence = saveFailure
     ? "failed"
@@ -253,8 +258,10 @@ export function App() {
     say("New play");
   }, [say]);
   const shareUrl = useCallback(() =>
-    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, ...artShadow(s.artShadow), players: [...s.players] }, noRunZones)}`,
-  [s.name, s.side, s.artShadow, s.players, noRunZones]);
+    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] }, noRunZones)}`,
+  [s.name, s.side, s.artShadow, s.los, s.players, noRunZones]);
+  // where this play's ball is spotted: saved with the play, never undone (like its name)
+  const onLos = useCallback((los: number) => { dispatch({ type: "setLos", los }); }, []);
   const onNoRunZones = useCallback((on: boolean) => {
     const r = setTeam({ ...getTeam(), noRunZones: on });
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
@@ -314,6 +321,8 @@ export function App() {
             onArtShadow={onArtShadow}
             noRunZones={noRunZones}
             onNoRunZones={onNoRunZones}
+            los={s.los}
+            onLos={onLos}
           />
         </Sidebar>
         <Field
@@ -330,6 +339,7 @@ export function App() {
           showTitle
           status={persistenceLabel[persistence]}
           noRunZones={noRunZones}
+          los={s.los}
         />
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
           <RouteSidebar
@@ -364,7 +374,7 @@ export function App() {
               role="img"
               aria-label={`${s.side === "defense" ? "Defense" : "Offense"} snapshot preview${s.artShadow ? `, the ${other} faded` : ""}`}
               className="mx-auto w-full max-w-[360px] flex-none overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.artShadow ? "both" : s.side, side: s.side, noRunZones, box: { pw: 660, ph: 360 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.artShadow ? "both" : s.side, side: s.side, noRunZones, los: s.los, box: { pw: 660, ph: 360 } }) }}
             />
             <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
               <input
