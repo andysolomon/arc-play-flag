@@ -169,7 +169,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
           <button type="button" onClick={() => { setEditingNotes(true); }} disabled={busy || none} className={`${pill} px-3 py-1 text-small`}>Edit notes</button>
           <button type="button" onClick={onSlides} disabled={busy || none} className={`${pill} px-3 py-1 text-small`}>Download slides</button>
         </div>
-        {editingNotes && <EditNotesModal bookName={book.name} items={items} say={say} onClose={() => { setEditingNotes(false); }} />}
+        {editingNotes && <EditNotesModal bookName={book.name} items={items} onClose={() => { setEditingNotes(false); }} />}
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>

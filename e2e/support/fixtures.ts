@@ -43,6 +43,16 @@ export const PITCH_OPTION: SavedPlay = (() => {
 export const WALKTHROUGH_NOTES = "Walk it at half speed, then at full speed. ".repeat(13).trim();
 export const WALKTHROUGH: SavedPlay = { ...play("fx-walkthrough", "Otter Walkthrough", {}, WALKTHROUGH_NOTES), players: formation().filter((p) => p.team === "defense") };
 
+/** Seven on offense, with a note: its job rows need the room the note would take on the slide. */
+export const CROWDED: SavedPlay = {
+  ...play("fx-crowded", "Otter Crowded Set", {}, "Crowd the middle, then clear it."),
+  players: [
+    ...formation({ o3: { type: "go" }, o4: { type: "go" }, o5: { type: "flat" } }),
+    { id: "o6", team: "offense", label: "H", x: 8, y: 1, route: { type: "slant" } },
+    { id: "o7", team: "offense", label: "F", x: 22, y: 1, route: { type: "out" } },
+  ],
+};
+
 export function playbook(id: string, name: string, plays: readonly SavedPlay[]): Playbook {
   return { id, name, plays: plays.map((p) => p.id) };
 }

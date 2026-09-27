@@ -1,5 +1,6 @@
 import {
-  StorageError, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
+  StorageError, hasTeam, importAll, newId, readAll, readDraft, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook,
+  writeDraft, writeTeam,
 } from "./storage";
 import { isRun } from "./routes";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
@@ -121,6 +122,29 @@ export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): 
     emit();
     return rec;
   });
+}
+
+/**
+ * Saves only a play's notes, written from outside the designer (the playbook screen's notes
+ * editor). The rest of the play is taken as stored now, not from this tab's snapshot, so a
+ * rename or route made in another tab since is kept, and a play deleted meanwhile is not
+ * brought back: the snapshot is refreshed and the value is null. The designer's draft of
+ * the play follows the new notes unless its own notes were changed there and not saved.
+ */
+export function savePlayNotes(id: string, notes: string): Written<SavedPlay | null> {
+  const current = readAll()[id];
+  if (!current) {
+    refresh();
+    return { ok: true, value: null };
+  }
+  const r = savePlay({ ...current, notes });
+  if (r.ok) {
+    try {
+      const draft = readDraft();
+      if (draft?.id === id && (draft.notes ?? "") === current.notes) writeDraft({ ...draft, notes: r.value.notes });
+    } catch { /* the draft is a courtesy; the play itself is saved */ }
+  }
+  return r;
 }
 
 /** Playbooks a play appears in. */

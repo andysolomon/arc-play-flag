@@ -5,10 +5,10 @@ import { promisify } from "node:util";
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { DIAGNOSTICS_KEY } from "../../lib/diagnostics";
 import { playSvg } from "../../lib/render/play-svg";
-import { armSabotage, canvasBudget, downloadBytes, sabotage } from "../support/designer";
+import { Designer, armSabotage, canvasBudget, downloadBytes, sabotage } from "../support/designer";
 import {
-  COVER_TWO, COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
-  corruptStoredText, playbook, seed, storedPlays,
+  COVER_TWO, COVER_TWO_D, CROWDED, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
+  corruptStoredText, playbook, seed, storedDraft, storedPlays,
 } from "../support/fixtures";
 import { PINNED, keepDeck, keepFile, packageProblems, pngSize, readDeck, readZip } from "../support/pptx";
 
@@ -276,19 +276,22 @@ test("a coach edits the notes from the slides card and hides them from the room:
   test.setTimeout(120_000);
   await page.clock.setFixedTime(new Date(PINNED.clock));
   await armSabotage(page);
-  const book = playbook("fx-notes", "Otter Notes Book", [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO]);
-  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [book], team: OTTERS });
+  const PLAYS_HERE = [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO, CROWDED];
+  await seed(page, { plays: PLAYS_HERE, playbooks: [playbook("fx-notes", "Otter Notes Book", PLAYS_HERE)], team: OTTERS });
+  // Slant Left is open in the designer, so its autosaved draft holds the old notes
+  const designer = new Designer(page);
+  await designer.goto("?open=fx-slant-left");
+  await expect.poll(async () => (await storedDraft(page))?.notes).toBe("X wins inside.");
   await page.goto("/playbooks?book=fx-notes");
 
-  // a full device keeps the words in the box and says so; the next keystroke saves
+  // a full device keeps the words in the box and says why there; the next keystroke saves
   await page.getByRole("button", { name: "Edit notes" }).click();
   const dialog = page.getByRole("dialog", { name: "Notes in “Otter Notes Book”" });
   const wheel = dialog.getByRole("textbox", { name: "Notes for 2 · Otter Wheel Right" });
   await expect(wheel).toHaveValue("");
   await sabotage(page, "quota", true);
   await wheel.fill("Z sells the out.");
-  await expect(toast(page)).toHaveText("Couldn't save: this browser's storage is full.");
-  await expect(dialog.getByText("Not saved. Your words are still here; try again.")).toBeVisible();
+  await expect(dialog.getByText("Couldn't save: this browser's storage is full. Your words are still here; try again.")).toBeVisible();
   await expect(wheel).toHaveValue("Z sells the out.");
   expect((await storedPlays(page))["fx-wheel-right"]?.notes).toBe("");
   await sabotage(page, "quota", false);
@@ -300,7 +303,20 @@ test("a coach edits the notes from the slides card and hides them from the room:
   await dialog.getByRole("button", { name: "Done" }).click();
   await expect(dialog).toBeHidden();
 
-  // only the notes changed, and they are the plays' own now
+  // straight to the deck, no reload: it carries what was just typed
+  const deckBytes = async (): Promise<Buffer> => {
+    const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), slidesButton(page).click()]);
+    await expect(toast(page)).toHaveText("Saved", { timeout: 60_000 });
+    return downloadBytes(d);
+  };
+  const shownRaw = await deckBytes();
+  const shownItems = readZip(shownRaw);
+  const shown = await readDeck(page, shownItems);
+  expect(shown.slides[2]?.notes).toContain("\n\nX wins inside.\nSell the go first.\n\n");
+  expect(shown.slides[2]?.descr).toBe("Play 1: Otter Slant Left.\nPass.\nLeft to right: X: Slant; C: Snap; QB: Throw; Z: No route; Y: Out.\nCoaching points: X wins inside. Sell the go first.");
+  expect(shown.slides[3]?.notes).toContain("\n\nZ sells the out, then turns it up.\n\n");
+
+  // only the notes changed, they are the plays' own now, and they outlast a reload
   const stored = await storedPlays(page);
   expect(stored["fx-wheel-right"]).toEqual({ ...WHEEL_RIGHT, notes: "Z sells the out, then turns it up." });
   expect(stored["fx-slant-left"]).toEqual({ ...SLANT_LEFT, notes: "X wins inside.\nSell the go first." });
@@ -310,40 +326,52 @@ test("a coach edits the notes from the slides card and hides them from the room:
   await expect(dialog.getByRole("textbox", { name: "Notes for 1 · Otter Slant Left" })).toHaveValue("X wins inside.\nSell the go first.");
   await dialog.getByRole("button", { name: "Close notes" }).click();
 
-  // the same book with the notes shown (the default), then hidden
-  const deckBytes = async (): Promise<Buffer> => {
-    const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), slidesButton(page).click()]);
-    await expect(toast(page)).toHaveText("Saved", { timeout: 60_000 });
-    return downloadBytes(d);
-  };
-  const shownRaw = await deckBytes();
+  // the designer's draft took the new notes, so they read as saved there and its Save keeps them
+  expect((await storedDraft(page))?.notes).toBe("X wins inside.\nSell the go first.");
+  await designer.goto();
+  await designer.clickTool("Notes");
+  const tools = page.locator("#play-sidebar");
+  await expect(tools.getByRole("textbox", { name: "Coaching points" })).toHaveValue("X wins inside.\nSell the go first.");
+  await expect(tools.getByText("Saved with the play.", { exact: true })).toBeVisible();
+  await designer.save();
+  await expect(designer.toast).toHaveText("Saved");
+  expect((await storedPlays(page))["fx-slant-left"]?.notes).toBe("X wins inside.\nSell the go first.");
+
+  // hidden: the same deck but for the faces and alt text of plays with notes
+  await page.goto("/playbooks?book=fx-notes");
   const notesBox = page.getByRole("checkbox", { name: "Show notes on the slides" });
   await expect(notesBox).toBeChecked();
   await notesBox.uncheck();
   await expect(page.getByText("Hidden from the room. They stay in the speaker notes.")).toBeVisible();
   const hiddenRaw = await deckBytes();
   await keepFile(testInfo, hiddenRaw, "slides-notes-hidden");
-  const shownItems = readZip(shownRaw), hiddenItems = readZip(hiddenRaw);
-  const shown = await readDeck(page, shownItems), hidden = await readDeck(page, hiddenItems);
+  const hiddenItems = readZip(hiddenRaw);
+  const hidden = await readDeck(page, hiddenItems);
   await keepDeck(testInfo, browser.version(), hiddenRaw, hiddenItems, hidden, "slides-notes-hidden");
   expect(packageProblems(hidden, hiddenItems)).toEqual([]);
-
-  // title, glance, then the three plays
-  expect(hidden.slides.map((s) => s.title)).toEqual(["Otter Notes Book", "Plays at a glance · 1–3", "1 · Otter Slant Left", "2 · Otter Wheel Right", "3 · Otter Cover Two"]);
+  expect(hidden.slides.map((s) => s.title)).toEqual([
+    "Otter Notes Book", "Plays at a glance · 1–4", "1 · Otter Slant Left", "2 · Otter Wheel Right", "3 · Otter Cover Two", "4 · Otter Crowded Set",
+  ]);
   // the presenter keeps every word either way
   expect(hidden.slides.map((s) => s.notes)).toEqual(shown.slides.map((s) => s.notes));
-  expect(hidden.slides[2]?.notes).toBe("1 · Otter Slant Left · Pass\n\nPass.\n\nX wins inside.\nSell the go first.\n\nLeft to right:\nX: Slant\nC: Snap\nQB: Throw\nZ: No route\nY: Out");
-  expect(hidden.slides[3]?.notes).toContain("\n\nZ sells the out, then turns it up.\n\n");
-  // the room sees them only when shown, and the alt text says what the face shows
-  expect(shown.slides[2]?.descr).toBe("Play 1: Otter Slant Left.\nPass.\nLeft to right: X: Slant; C: Snap; QB: Throw; Z: No route; Y: Out.\nCoaching points: X wins inside. Sell the go first.");
+  // the room sees the notes only when shown, and the alt text says what the face shows
   expect(hidden.slides[2]?.descr).toBe("Play 1: Otter Slant Left.\nPass.\nLeft to right: X: Slant; C: Snap; QB: Throw; Z: No route; Y: Out.");
   expect(hidden.slides.map((s) => s.descr ?? "").filter((d) => d.includes("Coaching points"))).toEqual([]);
   expect(hidden.slides.map((s) => s.descr)).toEqual(shown.slides.map((s) => s.descr?.replace(/\nCoaching points: .*$/, "") ?? null));
-  // only the faces of plays with notes changed; a play with none draws the same face
+  // only the faces of plays with notes change; a play with none draws the same face
   const face = (items: readonly { name: string; data: Buffer }[], i: number): Buffer => {
     const hit = items.find((it) => it.name === `ppt/media/image${String(i)}.png`);
     if (!hit) throw new Error(`no face ${String(i)}`);
     return hit.data;
   };
-  expect([1, 2, 3, 4, 5].map((i) => face(shownItems, i).equals(face(hiddenItems, i)))).toEqual([true, true, false, false, true]);
+  expect([1, 2, 3, 4, 5, 6].map((i) => face(shownItems, i).equals(face(hiddenItems, i)))).toEqual([true, true, false, false, true, false]);
+
+  // and the job rows get the room: with its note cleared, the crowded play's face is the hidden one exactly
+  await notesBox.check();
+  await page.getByRole("button", { name: "Edit notes" }).click();
+  await dialog.getByRole("textbox", { name: "Notes for 4 · Otter Crowded Set" }).fill("");
+  await dialog.getByRole("button", { name: "Done" }).click();
+  const clearedItems = readZip(await deckBytes());
+  expect(face(clearedItems, 6).equals(face(hiddenItems, 6))).toBe(true);
+  expect(face(clearedItems, 6).equals(face(shownItems, 6))).toBe(false);
 });
