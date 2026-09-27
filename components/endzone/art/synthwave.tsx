@@ -180,17 +180,28 @@ function Beams({ cx, horizon, reach }: { cx: number; horizon: number; reach: num
   );
 }
 
-/** Shooting stars across the sky, only while a touchdown is celebrated; `scale` sizes them and their flight to the band. */
-function Meteors({ w, horizon, scale }: { w: number; horizon: number; scale: number }) {
+/**
+ * The shooting stars: where each starts, as fractions of the width and of the sky, how steeply it
+ * dives in degrees and when it sets off in seconds. The first three start a third of the width
+ * apart, so between them their flights cross the whole sky; a tall sky gets the fourth, lower down.
+ */
+const METEORS = [
+  { x: 0.03, y: 0.14, tilt: 7, at: 0 },
+  { x: 0.36, y: 0.08, tilt: 5, at: 0.35 },
+  { x: 0.66, y: 0.2, tilt: 6, at: 0.7 },
+  { x: 0.16, y: 0.4, tilt: 6, at: 0.5 },
+] as const;
+
+/**
+ * Shooting stars across the sky, only while a touchdown is celebrated. `scale` sizes them and their
+ * flight (about 210 units at 1); drawn in the sky, they pass behind the sun, the peaks and the palms.
+ */
+function Meteors({ w, horizon, scale, count }: { w: number; horizon: number; scale: number; count: number }) {
   return (
     <g>
-      {[
-        { x: 0.08, y: 0.14, tilt: 7 },
-        { x: 0.58, y: 0.1, tilt: 5 },
-        { x: 0.3, y: 0.24, tilt: 8 },
-      ].map((m, k) => (
+      {METEORS.slice(0, count).map((m) => (
         <g key={m.x} transform={`translate(${num(w * m.x)} ${num(horizon * m.y)}) rotate(${String(m.tilt)}) scale(${num(scale)})`}>
-          <g className="ez-synthwave-meteor" style={delay(k * 0.35)} opacity={0}>
+          <g className="ez-synthwave-meteor" style={delay(m.at)} opacity={0}>
             <path d="M0 -1.5L-64 0L0 1.5Z" fill="#ffffff" />
             <circle r={2.1} fill="#ffffff" />
           </g>
@@ -244,7 +255,9 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
   const horizon = h * 0.6;
   const sun = Math.min(horizon * 0.92, w * 0.16);
   const tall = h >= 24;
-  const palm = Math.min(h * 0.98, w * 0.19);
+  // the band's depth, a flatter rise past about 56 and the width's cap, so a crown's fronds keep
+  // clear of the top edge in any band: 43 at 44, 102 at 132, 125 at 220
+  const palm = Math.min(w * 0.19, h * 0.98, 20 + h * 0.62);
   const peaks = { x0: palm * 0.8, x1: cx - sun * 0.55, tall: horizon * 0.34 };
   return (
     <g className={celebrate ? "ez-synthwave-party" : undefined}>
@@ -280,6 +293,8 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
         <>
           <rect className="ez-synthwave-afterglow" width={w} height={num(horizon)} fill="none" opacity={0} style={{ fill: `url(#${id}-flare)` }} />
           <Beams cx={cx} horizon={horizon} reach={Math.max(w * 0.45, h * 2)} />
+          {/* sized to the band only so far: past about 62 deep they would swell into bars, so a tall sky gets one more instead */}
+          {tall && <Meteors w={w} horizon={horizon} scale={Math.min(h / 44, 1.4)} count={h > 90 ? 4 : 3} />}
         </>
       )}
       <Sun id={id} cx={cx} horizon={horizon} r={sun} />
@@ -293,7 +308,6 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
       <Grid w={w} h={h} cx={cx} horizon={horizon} celebrate={celebrate} />
       <rect y={num(horizon)} width={w} height={num(h - horizon)} fill="none" style={{ fill: `url(#${id}-haze)` }} />
       <rect y={num(horizon - 0.6)} width={w} height={1.2} fill="#ffd0a8" />
-      {celebrate && tall && <Meteors w={w} horizon={horizon} scale={h / 44} />}
       {tall && (
         <>
           <Palm x={palm * 0.45} base={h} height={palm} lean={palm * 0.2} i={0} />
