@@ -1,4 +1,5 @@
-import { S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
+import { LOS_YARD, readLos } from "@/lib/play/field";
+import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { routeDef } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
@@ -23,6 +24,8 @@ export interface ArtOptions {
   showYardNumbers?: boolean;
   /** the hatched no-run bands; off for a team whose league plays without them */
   noRunZones?: boolean;
+  /** the yard line this play's ball is on (SavedPlay.los); the own 5 when left out */
+  los?: number;
   /**
    * The box the field will be fitted into: its aspect decides how much depth shows.
    * Null frames the play as tightly as the field allows (24 yards, deeper if the play needs it).
@@ -55,10 +58,11 @@ export const esc = (s: string): string =>
 const f1 = (n: number): string => n.toFixed(1);
 
 export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art {
-  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, noRunZones = true, box = null, minDepth = 24 } = opts;
+  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, noRunZones = true, box = null, minDepth = MIN_DEPTH } = opts;
+  const los = readLos(opts.los);
   const shown = visible(players, show);
-  const d = depth(shown, box ?? TIGHT, minDepth);
-  const layout = fieldLayout(d, showYardNumbers, noRunZones);
+  const d = depth(shown, box ?? TIGHT, minDepth, los);
+  const layout = fieldLayout(d, showYardNumbers, noRunZones, los);
   const top = layout.top;
   const zones = zoneLayout(players, top);
   const uid = "h" + Math.abs(hash(players.map((p) => p.id + f1(p.x) + f1(p.y)).join())).toString(36);
@@ -191,8 +195,8 @@ export function playSvg(players: readonly Player[], opts: ArtOptions = {}): stri
 }
 
 /** Yards of depth the art shows, for callers sizing a box around it. */
-export function artDepth(players: readonly Player[], box: Pane | null, show: Vis = "both", minDepth = 24): number {
-  return depth(visible(players, show), box ?? TIGHT, minDepth);
+export function artDepth(players: readonly Player[], box: Pane | null, show: Vis = "both", minDepth = MIN_DEPTH, los = LOS_YARD): number {
+  return depth(visible(players, show), box ?? TIGHT, minDepth, los);
 }
 
 export { S };

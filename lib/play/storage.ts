@@ -1,3 +1,4 @@
+import { readLos, withLos } from "./field";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, routeDef } from "./routes";
 import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
@@ -18,6 +19,8 @@ export interface DraftRecord {
   notes?: string;
   /** offensive play or defensive call; a draft from before the choice existed is read as inferred from its routes */
   side?: Team;
+  /** the play's ball spot (see SavedPlay.los); written only when it is not the 5 */
+  los?: number;
 }
 
 export interface StorageLike {
@@ -152,13 +155,13 @@ export function normalizeSavedPlay(raw: unknown, fallbackId = newId()): SavedPla
   if (!isRecord(raw)) return null;
   const players = normalizePlayers(raw.players);
   if (!players.length) return null;
-  return {
+  return withLos({
     id: typeof raw.id === "string" && raw.id ? raw.id.slice(0, 40) : fallbackId,
     name: cleanName(raw.name, "Untitled play"),
     players,
     notes: cleanNotes(raw.notes),
     side: readSide(raw.side, players),
-  };
+  }, readLos(raw.los));
 }
 
 function parse(storage: StorageLike | null, key: string): unknown {
@@ -386,13 +389,13 @@ export function normalizeDraft(raw: unknown): DraftRecord | null {
   if (!isRecord(raw) || !Array.isArray(raw.players)) return null;
   const players = normalizePlayers(raw.players);
   if (!players.length) return null;
-  return {
+  return withLos({
     name: typeof raw.name === "string" ? raw.name : "New play",
     players,
     id: typeof raw.id === "string" ? raw.id : null,
     notes: cleanNotes(raw.notes),
     side: readSide(raw.side, players),
-  };
+  }, readLos(raw.los));
 }
 
 export function readDraft(storage: StorageLike | null = browserStorage()): DraftRecord | null {

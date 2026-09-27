@@ -1,3 +1,4 @@
+import { LOS_YARD, losOf, readLos, withLos } from "./field";
 import { normalizePlayers, readSide, type DraftRecord } from "./storage";
 import type { Player, Team } from "./types";
 
@@ -45,14 +46,16 @@ export interface SharedRecord extends DraftRecord {
  * Both teams always travel in the payload. The snapshot view draws only this play's
  * side; "Open in designer" restores the other team as the faded shadow. `side` is
  * written only for a defensive call, so an offensive play's link is unchanged from
- * before plays had a side. No-run zones are written only when they are off, for the
- * same reason. A `vis` field from an older link is ignored: those links still carry
- * every player.
+ * before plays had a side. No-run zones are written only when they are off, and the
+ * ball spot only when it is off the 5, for the same reason. A `vis` field from an older
+ * link is ignored: those links still carry every player.
  */
 export function encodeShare(rec: DraftRecord, noRunZones = true): string {
-  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false } = { name: rec.name, players: rec.players.map(compact) };
+  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false; los?: number } = { name: rec.name, players: rec.players.map(compact) };
   if (rec.side === "defense") payload.side = "defense";
   if (!noRunZones) payload.noRunZones = false;
+  const los = losOf(rec);
+  if (los !== LOS_YARD) payload.los = los;
   return toBase64Url(JSON.stringify(payload));
 }
 
@@ -69,7 +72,8 @@ export function decodeShare(id: string): SharedRecord | null {
     // links without a side predate the choice: read the side off the routes, as storage does
     const side = readSide("side" in parsed ? parsed.side : undefined, players);
     const noRunZones = !("noRunZones" in parsed) || parsed.noRunZones !== false;
-    return { name, players, side, noRunZones };
+    // links without a spot predate the choice, and every one of them was drawn on the 5
+    return withLos({ name, players, side, noRunZones }, readLos("los" in parsed ? parsed.los : undefined));
   } catch {
     return null;
   }

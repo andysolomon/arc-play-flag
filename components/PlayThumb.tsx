@@ -11,13 +11,15 @@ interface Props {
   name: string;
   /** the play's own side: the other team is left off playbook pictures */
   side: Team;
+  /** where the play's ball is (SavedPlay.los); undefined is the own 5. Never optional, so no picture falls back to the 5 by accident */
+  los: number | undefined;
   className?: string;
 }
 
 /** A small static picture of a play, drawn from the same geometry as the field. */
-function PlayThumbImpl({ players, name, side, className = "" }: Props) {
+function PlayThumbImpl({ players, name, side, los, className = "" }: Props) {
   const noRunZones = hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam));
-  const art = useMemo(() => playArt(players, { showYardNumbers: false, noRunZones, show: side }), [players, side, noRunZones]);
+  const art = useMemo(() => playArt(players, { showYardNumbers: false, noRunZones, los, show: side }), [players, side, noRunZones, los]);
   return (
     <svg
       viewBox={art.viewBox}

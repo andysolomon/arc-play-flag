@@ -15,12 +15,14 @@ interface Props {
   side: Team;
   /** as the coach's field had them when they shared */
   noRunZones: boolean;
+  /** the yard line the shared play's ball is on */
+  los: number;
 }
 
 const noop = (): void => undefined;
 
 /** Read-only view of a shared play, with a way back into the designer. */
-export function SharedPlay({ id, name, players, side, noRunZones }: Props) {
+export function SharedPlay({ id, name, players, side, noRunZones, los }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const kind = side === "defense" ? "Defensive call" : "Offensive play";
   return (
@@ -50,6 +52,7 @@ export function SharedPlay({ id, name, players, side, noRunZones }: Props) {
           svgRef={svgRef}
           readOnly
           noRunZones={noRunZones}
+          los={los}
           title={name}
         />
       </div>

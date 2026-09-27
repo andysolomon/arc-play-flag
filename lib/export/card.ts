@@ -1,7 +1,8 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
+import { LOS_YARD, losOf } from "@/lib/play/field";
 import type { Level, Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
-import { ybv } from "@/lib/play/geometry";
+import { MIN_DEPTH, ybv } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
 import { fitField } from "./binder";
 import { INK, MUTED, appMark, badge, field, page, pill, text, type SvgPage } from "./pages";
@@ -21,12 +22,14 @@ export interface CardOptions {
   level?: Level;
   /** which side is present in the saved picture or clip */
   vis?: Vis;
+  /** the play's ball spot (SavedPlay.los); the own 5 when left out */
+  los?: number;
 }
 
 /** Shared viewport: animation must use exactly the same yards as the card art. */
-export function cardField(players: readonly Player[], vis: Vis = "both"): { w: number; h: number; top: number } {
-  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40, vis);
-  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis)) };
+export function cardField(players: readonly Player[], vis: Vis = "both", los = LOS_YARD): { w: number; h: number; top: number } {
+  const f = fitField(players, CARD_W - 120, CARD_H - 240 - 60 - 40, vis, los);
+  return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis, MIN_DEPTH, los)) };
 }
 
 /** The card's own markup, in its 1080 x 1350 space, so a page can also nest it in a slot. */
@@ -57,13 +60,15 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
 
   const top = titleY + r + 36;
   const vis = o.vis ?? "both";
-  const f = cardField(o.players, vis);
+  const los = losOf(o);
+  const f = cardField(o.players, vis, los);
   out.push(field(o.players, (W - f.w) / 2, top, f.w, f.h, {
     level: o.level ?? "simple",
     ...frame,
     ball: vis === "defense" ? null : frame.ball,
     show: vis,
     noRunZones: hasNoRunZones(o.team),
+    los,
   }, 5));
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));

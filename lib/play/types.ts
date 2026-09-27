@@ -74,6 +74,12 @@ export interface SavedPlay {
   notes: string;
   /** which side of the ball this play is drawn for: an offensive play or a defensive call */
   side: Team;
+  /**
+   * The yard line the ball is on for this play, counted from the offense's own goal line
+   * (5 is the own 5, 20 midfield, 35 their 5; see lib/play/field.ts). Stored only when it is
+   * not the 5, where every drive starts, so a play from before the choice reads and draws the same.
+   */
+  los?: number;
 }
 
 /** A named, ordered list of plays. Numbers on exports are positions in this list. */

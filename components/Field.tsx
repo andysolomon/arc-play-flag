@@ -4,7 +4,8 @@ import {
   memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
-import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
+import { LOS_YARD } from "@/lib/play/field";
+import { MIN_DEPTH, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
@@ -32,6 +33,8 @@ interface Props {
   showYardNumbers?: boolean;
   /** the hatched no-run bands; off for a team whose league plays without them */
   noRunZones?: boolean;
+  /** the yard line this play's ball is on (SavedPlay.los); the own 5 when left out */
+  los?: number;
   /** share page: draw only, no interaction */
   readOnly?: boolean;
   /** printed above the field; also shown on screen when `showTitle` is set */
@@ -79,7 +82,7 @@ const TITLE_CHROME = 24;
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, readOnly = false, title, showTitle = false, status,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -127,8 +130,8 @@ function FieldImpl({
       },
     };
   }), [players, live, liveWaypoint]);
-  const d = depth(effective, pane);
-  const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones), [d, showYardNumbers, noRunZones]);
+  const d = depth(effective, pane, MIN_DEPTH, los);
+  const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;
   const width = cardWidth(pane, d);
   const topRef = useRef(top);

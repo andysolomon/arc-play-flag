@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SharedPlay } from "@/components/SharedPlay";
+import { losOf } from "@/lib/play/field";
 import { decodeShare } from "@/lib/play/share";
 
 interface Props {
@@ -25,5 +26,5 @@ export default async function SharedPlayPage({ params }: Props) {
   const { id } = await params;
   const rec = decodeShare(id);
   if (!rec) notFound();
-  return <SharedPlay id={id} name={rec.name} players={rec.players} side={rec.side} noRunZones={rec.noRunZones} />;
+  return <SharedPlay id={id} name={rec.name} players={rec.players} side={rec.side} noRunZones={rec.noRunZones} los={losOf(rec)} />;
 }

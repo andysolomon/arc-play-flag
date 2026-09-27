@@ -1,4 +1,6 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
+import { LOS_YARD, losOf } from "@/lib/play/field";
+import { MIN_DEPTH } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth } from "@/lib/render/play-svg";
@@ -18,8 +20,8 @@ export interface BinderOptions {
 }
 
 /** The largest field that fits a box without letterboxing, given how deep the play needs to be. */
-export function fitField(players: readonly Player[], w: number, h: number, show: Vis = "both"): { w: number; h: number } {
-  const ratio = (artDepth(players, { pw: w, ph: h }, show) * 22) / 660;
+export function fitField(players: readonly Player[], w: number, h: number, show: Vis = "both", los = LOS_YARD): { w: number; h: number } {
+  const ratio = (artDepth(players, { pw: w, ph: h }, show, MIN_DEPTH, los) * 22) / 660;
   const fh = Math.min(h, w * ratio);
   return { w: fh / ratio, h: fh };
 }
@@ -37,8 +39,9 @@ export function playSlot(
   const nameX = x + 2 * r + 6;
   out.push(text(nameX, y + r + Math.round(nameSize * 0.35), nameSize, fit(item.play.name, x + w - nameX, nameSize)));
   const top = y + 2 * r + 8;
-  const f = fitField(item.play.players, w, y + h - top, show);
-  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show, noRunZones: hasNoRunZones(o.team) }, border));
+  const los = losOf(item.play);
+  const f = fitField(item.play.players, w, y + h - top, show, los);
+  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show, noRunZones: hasNoRunZones(o.team), los }, border));
   return out.join("");
 }
 
@@ -73,9 +76,10 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const footerH = 24;
   const top = MARGIN + 2 * r + 16;
   const box = { w: cw, h: H - MARGIN - footerH - notesH - top };
-  const f = fitField(play.players, box.w, box.h, vis);
+  const los = losOf(play);
+  const f = fitField(play.players, box.w, box.h, vis, los);
   const fx = MARGIN + (cw - f.w) / 2;
-  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", show: vis, noRunZones: hasNoRunZones(o.team) }, 2));
+  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", show: vis, noRunZones: hasNoRunZones(o.team), los }, 2));
 
   let y = top + f.h + 16 + notesSize;
   for (const l of lines) {

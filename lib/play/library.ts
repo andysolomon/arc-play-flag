@@ -1,6 +1,7 @@
 import {
   StorageError, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
 } from "./storage";
+import { losOf, withLos } from "./field";
 import { isRun } from "./routes";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
 
@@ -115,7 +116,8 @@ export function playbookById(id: string | null | undefined): Playbook | null {
 
 /** Saves a play (new id when none is given) and returns the record as stored. */
 export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): Written<SavedPlay> {
-  const rec: SavedPlay = { id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side };
+  // the ball spot goes last and only off the 5, as normalizeSavedPlay reads it back
+  const rec: SavedPlay = withLos({ id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side }, losOf(play));
   return attempt(() => {
     plays = Object.values(store(rec));
     emit();

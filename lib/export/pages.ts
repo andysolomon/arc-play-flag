@@ -64,7 +64,14 @@ export function text(x: number, y: number, size: number, s: string, o: TextOpts 
 let clipSeq = 0;
 
 /** The play drawn into a box, letterboxed on turf inside a rounded ink border. */
-export function field(players: readonly Player[], x: number, y: number, w: number, h: number, opts: ArtOptions = {}, border = 1.5): string {
+/**
+ * One play's field in a box. The field's rules (no-run zones, the ball's yard line) are
+ * required, so no page can fall back to the defaults and draw a different field from the designer.
+ */
+export function field(
+  players: readonly Player[], x: number, y: number, w: number, h: number,
+  opts: ArtOptions & Required<Pick<ArtOptions, "noRunZones" | "los">>, border = 1.5,
+): string {
   const art = playArt(players, { ...opts, box: { pw: w, ph: h } });
   const id = `c${String(++clipSeq)}`;
   const r = Math.min(6, w * 0.04);
