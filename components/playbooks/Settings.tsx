@@ -8,6 +8,7 @@ import {
 import { download } from "@/lib/export/raster";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, refresh, setTeam, subscribe } from "@/lib/play/library";
 import { StorageError, failureMessage, hasNoRunZones } from "@/lib/play/storage";
+import { EndZonePicker } from "../endzone/EndZonePicker";
 import { ThemePicker } from "../ThemePicker";
 import { card, divider, eyebrow, input, pill, pillDark } from "../ui";
 import { PreviewModal } from "./PreviewModal";
@@ -100,6 +101,10 @@ function SettingsPanel() {
       <span className={eyebrow}>THEME</span>
       <ThemePicker className="max-w-[320px]" />
       <span className="text-caption leading-note text-ink-muted">Auto follows this device. Printed pages and exports stay ink on paper.</span>
+
+      <span className={divider} />
+      <span className={eyebrow}>END ZONE</span>
+      <EndZonePicker className="max-w-[320px]" />
 
       <span className={divider} />
       <span className={eyebrow}>ON-DEVICE BACKUP</span>

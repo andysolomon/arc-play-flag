@@ -30,5 +30,11 @@ export const segment =
   "has-[:checked]:hover:bg-yellow";
 /** The radio inside a `segment`: invisible, covering the whole label. */
 export const segmentInput = "absolute inset-0 h-full w-full cursor-pointer opacity-0";
+/** A picker swatch (a theme, an end zone): the frame is drawn in the page's theme, everything inside it in the swatch's own. */
+export const swatch =
+  "relative flex cursor-pointer flex-col overflow-hidden rounded-tile border-2 border-ink shadow-tile transition-transform duration-[120ms] " +
+  "hover:-translate-y-0.5 has-[:checked]:shadow-[0_0_0_3px_var(--color-yellow)] has-[:disabled]:cursor-not-allowed " +
+  "has-[:disabled]:hover:translate-y-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink " +
+  "motion-reduce:transition-none";
 /** Small yellow sticker for a state word, e.g. "Shared". */
 export const chip = "inline-flex items-center rounded-pill border-2 border-ink bg-yellow-soft px-2 py-px text-caption leading-tight text-ink";

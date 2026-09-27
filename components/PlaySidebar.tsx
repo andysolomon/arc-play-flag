@@ -2,6 +2,7 @@
 
 import { memo, useState, type ReactNode, type ChangeEvent } from "react";
 import { MAX_NOTES } from "@/lib/play/storage";
+import { EndZonePicker } from "./endzone/EndZonePicker";
 import type { Team, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { Support } from "./Support";
@@ -161,6 +162,9 @@ function PlaySidebarImpl({
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
       <ThemePicker className="flex-none" unlockHref="/playbooks" />
+      <span className={divider} />
+      <span className={eyebrow}>END ZONE</span>
+      <EndZonePicker className="flex-none" />
       <span className={divider} />
       <Support />
     </>

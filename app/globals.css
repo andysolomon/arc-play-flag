@@ -519,6 +519,93 @@
   --shadow-ink: initial;
 }
 
+/*
+ * End zones (lib/endzone.ts, components/endzone). Each design animates with its own keyframes on
+ * transform and opacity, and is drawn complete without them: the picker's swatches (.ez-still) and
+ * reduced motion hold every design still. None of it prints (the field marks it print:hidden).
+ */
+@layer components {
+  .ez-still, .ez-still * { animation: none !important; }
+
+  /* A touchdown's confetti: Celebration places and times each piece with the --ez-* variables. */
+  .ez-piece {
+    position: absolute;
+    left: var(--ez-x);
+    top: 0;
+    width: calc(7px * var(--ez-size));
+    height: calc(13px * var(--ez-size));
+    border-radius: 1px;
+    background: currentColor;
+    animation: ez-fall var(--ez-time) cubic-bezier(0.3, 0.1, 0.7, 1) var(--ez-delay) both;
+    will-change: transform, opacity;
+  }
+  .ez-piece[data-confetti="dot"] { width: calc(8px * var(--ez-size)); height: calc(8px * var(--ez-size)); border-radius: 50%; }
+  .ez-piece[data-confetti="petal"] { width: calc(13px * var(--ez-size)); height: calc(10px * var(--ez-size)); border-radius: 80% 0 80% 0; }
+  .ez-piece[data-confetti="star"] {
+    width: calc(14px * var(--ez-size));
+    height: calc(14px * var(--ez-size));
+    clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  }
+  .ez-piece[data-confetti="pixel"] { width: calc(9px * var(--ez-size)); height: calc(9px * var(--ez-size)); border-radius: 0; animation-timing-function: steps(16); }
+  .ez-piece[data-confetti="spark"] { width: 3px; height: calc(16px * var(--ez-size)); border-radius: 2px; box-shadow: 0 0 6px currentColor; }
+  .ez-piece[data-confetti="glyph"] {
+    width: auto;
+    height: auto;
+    background: none;
+    font: 700 calc(15px * var(--ez-size)) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-shadow: 0 0 6px currentColor;
+  }
+  [data-motion="drift"] > .ez-piece { animation-name: ez-drift; animation-timing-function: ease-in-out; }
+  [data-motion="rain"] > .ez-piece { animation-name: ez-rain; animation-timing-function: linear; }
+  [data-motion="burst"] > .ez-piece {
+    top: var(--ez-origin);
+    left: 50%;
+    animation-name: ez-burst;
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.35, 1);
+  }
+
+  .ez-banner {
+    transform: translate(-50%, -50%);
+    animation: ez-banner 3400ms ease-out both;
+  }
+  .ez-banner-word { font-size: clamp(26px, 11cqw, 60px); letter-spacing: 0.04em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-ez-art], [data-ez-art] * { animation: none !important; }
+    .ez-piece { display: none; }
+    .ez-banner { animation: none; }
+  }
+}
+
+@keyframes ez-fall {
+  from { transform: translate3d(0, -8cqh, 0) rotate(0deg); }
+  to { transform: translate3d(var(--ez-sway), 108cqh, 0) rotate(var(--ez-spin)); }
+}
+@keyframes ez-drift {
+  0% { transform: translate3d(0, -8cqh, 0) rotate(0deg); }
+  35% { transform: translate3d(var(--ez-sway), 30cqh, 0) rotate(calc(var(--ez-spin) * 0.4)); }
+  70% { transform: translate3d(calc(var(--ez-sway) * -0.5), 70cqh, 0) rotate(calc(var(--ez-spin) * 0.75)); }
+  100% { transform: translate3d(calc(var(--ez-sway) * 0.4), 108cqh, 0) rotate(var(--ez-spin)); }
+}
+@keyframes ez-rain {
+  0% { transform: translate3d(0, -8cqh, 0); opacity: 0; }
+  8%, 85% { opacity: 1; }
+  100% { transform: translate3d(0, 108cqh, 0); opacity: 0; }
+}
+@keyframes ez-burst {
+  0% { transform: translate3d(-50%, -50%, 0) scale(0.3) rotate(0deg); opacity: 1; }
+  45% { transform: translate3d(calc(-50% + var(--ez-dx)), calc(-50% + var(--ez-dy)), 0) scale(1) rotate(calc(var(--ez-spin) * 0.5)); opacity: 1; }
+  100% { transform: translate3d(calc(-50% + var(--ez-dx) * 1.15), calc(-50% + var(--ez-dy) + 22cqh), 0) scale(0.9) rotate(var(--ez-spin)); opacity: 0; }
+}
+@keyframes ez-banner {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  9% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  15%, 86% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.96); opacity: 0; }
+}
+
+/* End zone designs: each one's keyframes and classes, prefixed ez-<id>-. */
+
 /* Print: the field fills a letter page, play name as the title. */
 @media print {
   @page { size: letter; margin: 0.5in; }

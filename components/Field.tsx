@@ -1,17 +1,22 @@
 "use client";
 
 import {
-  memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+  memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
+import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
 import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
+import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
 import { manTags, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
+import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
+import { CELEBRATION_MS, Celebration } from "./endzone/Celebration";
+import { EndZoneArt } from "./endzone/EndZoneArt";
 import { Football, PlayButton } from "./Playback";
 import { PlayerToken } from "./PlayerToken";
 import { FIELD } from "./fieldPaint";
@@ -78,6 +83,8 @@ const STEP: Record<string, readonly [number, number]> = {
 
 /** Name + status line above the diagram; subtracted from the pane so the field still fits. */
 const TITLE_CHROME = 24;
+/** The clip that keeps a route's turf-coloured lane inside a designed end zone. */
+const LANE_CLIP = "ffez-lane";
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
@@ -97,6 +104,12 @@ function FieldImpl({
   // playback: the plan plus seconds into it, or null when the whiteboard is still
   const [run, setRun] = useState<{ motion: Motion; t: number } | null>(null);
   const playRef = useRef(0);
+  // a touchdown pass: which one this is on the device (it seeds the confetti) and what it opened
+  const [party, setParty] = useState<{ seed: number; unlocked: EndZone | null } | null>(null);
+  const endZone = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
+  const team = useSyncExternalStore(subscribeLibrary, getTeam, getServerTeam);
+  // classic is the band the field has always drawn; any other end zone paints its own design over it
+  const designed = endZone !== "classic";
 
   // measure only stores the pane; all field geometry derives from it
   useLayoutEffect(() => {
@@ -413,11 +426,20 @@ function FieldImpl({
   const play = useCallback(() => {
     endDrag();
     dispatch({ type: "select", id: null });
+    setParty(null);
     const motion = buildMotion(players, topRef.current, simulationPlayback(Math.random));
+    // the moment a caught pass is first over the goal line, if it ever is: a touchdown
+    const td = touchdownAt(motion, players);
+    let scored = false;
     let t0 = -1;
     const tick = (now: number) => {
       if (t0 < 0) t0 = now;
       const t = (now - t0) / 1000;
+      if (td !== null && !scored && t >= td) {
+        scored = true;
+        const { touchdowns, unlocked } = recordTouchdown();
+        setParty({ seed: touchdowns, unlocked });
+      }
       if (t >= motion.dur) { playRef.current = 0; setRun(null); return; }
       setRun({ motion, t });
       playRef.current = requestAnimationFrame(tick);
@@ -426,6 +448,11 @@ function FieldImpl({
     playRef.current = requestAnimationFrame(tick);
   }, [dispatch, endDrag, players]);
   useEffect(() => stop, [stop]);
+  useEffect(() => {
+    if (!party) return;
+    const t = window.setTimeout(() => { setParty(null); }, CELEBRATION_MS);
+    return () => { window.clearTimeout(t); };
+  }, [party]);
   useEffect(() => {
     if (!playing) return;
     const key = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") stop(); };
@@ -497,9 +524,23 @@ function FieldImpl({
             <pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="11" stroke="#1b1a17" style={{ stroke: FIELD.line }} strokeWidth="1.6" opacity="0.19" />
             </pattern>
+            {designed && layout.endZone && (
+              <clipPath id={LANE_CLIP}>
+                <rect x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)} />
+              </clipPath>
+            )}
           </defs>
           <g>
             {layout.endZone && <rect x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)} fill="#a7e5a7" style={{ fill: FIELD.endzone }} />}
+            {/* the chosen end zone's design, on screen only: print and every export keep the classic band under it */}
+            {designed && layout.endZone && (
+              <svg
+                x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)}
+                overflow="hidden" aria-hidden className="pointer-events-none print:hidden"
+              >
+                <EndZoneArt id={endZone} w={660} h={layout.endZone.h} label={layout.endZone.h > 30} celebrate={party !== null} />
+              </svg>
+            )}
             {layout.bands.map((b) => (
               <rect key={b.y} x="0" y={b.y.toFixed(1)} width="660" height={b.h.toFixed(1)} fill="url(#ffhatch)" />
             ))}
@@ -508,13 +549,19 @@ function FieldImpl({
             ))}
             {layout.texts.length > 0 && (
               <g fontFamily="var(--font-hand)" fontSize={17} fill="#1b1a17" style={{ fill: FIELD.line }} fillOpacity={0.5}>
+                {/* a designed end zone letters itself; the plain words come back for print */}
                 {layout.texts.map((t) => (
-                  <text key={t.key} x={t.x} y={t.y.toFixed(1)} letterSpacing={t.letterSpacing}>{t.t}</text>
+                  <text
+                    key={t.key} x={t.x} y={t.y.toFixed(1)} letterSpacing={t.letterSpacing}
+                    className={designed && t.key === "ez" ? "hidden print:inline" : undefined}
+                  >
+                    {t.t}
+                  </text>
                 ))}
               </g>
             )}
           </g>
-          <RouteLayer routes={routes} draftD={draftD} />
+          <RouteLayer routes={routes} draftD={draftD} lane={designed && layout.endZone ? LANE_CLIP : null} />
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;
             return (
@@ -564,6 +611,19 @@ function FieldImpl({
           {!playing && <ManTagLayer tags={tags} />}
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
+        {party && (
+          <Celebration
+            key={party.seed}
+            zone={endZone}
+            teamColor={team.color}
+            seed={party.seed}
+            unlocked={party.unlocked}
+            originY={layout.endZone ? (layout.endZone.y + layout.endZone.h / 2) / layout.vh : 0}
+          />
+        )}
+        <span className="sr-only" aria-live="polite">
+          {party ? `Touchdown!${party.unlocked ? ` The ${party.unlocked.name} end zone is open.` : ""}` : ""}
+        </span>
         <PlayButton playing={playing} onClick={playing ? stop : play} />
         </div>
       </div>

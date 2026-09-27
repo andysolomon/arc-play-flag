@@ -7,7 +7,7 @@ import {
   PREMIUM_THEMES, THEME_CHOICES, getFieldChoice, getThemeChoice, setFieldChoice, setThemeChoice, subscribeFieldChoice, subscribeThemeChoice,
   type FieldChoice, type ThemeChoice,
 } from "@/lib/theme";
-import { eyebrow, segment, segmentInput, segmented } from "./ui";
+import { eyebrow, segment, segmentInput, segmented, swatch } from "./ui";
 
 const COPY: Record<(typeof THEME_CHOICES)[number], { label: string; title: string }> = {
   auto: { label: "Auto", title: "Match this device's light or dark setting" },
@@ -19,13 +19,6 @@ const COPY: Record<(typeof THEME_CHOICES)[number], { label: string; title: strin
 const serverChoice = (): ThemeChoice => "auto";
 const serverField = (): FieldChoice => "standard";
 
-/** A swatch: the frame is drawn in the page's theme, everything inside it in the swatch's own. */
-const swatch =
-  "relative flex cursor-pointer flex-col overflow-hidden rounded-tile border-2 border-ink shadow-tile transition-transform duration-[120ms] " +
-  "hover:-translate-y-0.5 has-[:checked]:shadow-[0_0_0_3px_var(--color-yellow)] has-[:disabled]:cursor-not-allowed " +
-  "has-[:disabled]:hover:translate-y-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink " +
-  "motion-reduce:transition-none";
-
 /** A checkbox drawn as a switch: the track fills with the highlighter and the knob slides across. */
 const toggle =
   "relative h-7 w-12 flex-none cursor-pointer appearance-none rounded-pill border-2 border-ink bg-white transition-colors duration-[120ms] " +
@@ -33,7 +26,7 @@ const toggle =
   "before:transition-transform before:duration-[120ms] checked:bg-yellow checked:before:translate-x-5 " +
   "disabled:cursor-not-allowed disabled:bg-paper-2 disabled:before:bg-paper-2 motion-reduce:transition-none motion-reduce:before:transition-none";
 
-function Lock() {
+export function Lock() {
   return (
     <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth={2} strokeLinecap="round">
       <rect x="3" y="7" width="10" height="7.5" rx="1.5" />

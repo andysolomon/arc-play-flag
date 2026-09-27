@@ -8,6 +8,8 @@ export const VW = 660;
 export const FIELD_YARDS = 30;
 /** The yard line the line of scrimmage sits on: every drive starts on the 5. */
 export const LOS_YARD = 5;
+/** The goal line, in yards from the line of scrimmage (the 40); the end zone lies beyond it, up to -37. */
+export const GOAL_LINE = -35;
 
 export function px(x: number): number {
   return x * S;
@@ -230,7 +232,7 @@ export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZon
   };
   // the 5 yards before midfield (the 20) and before the goal line (the 40)
   const bands = noRunZones ? [clipRect(-15, -10), clipRect(-35, -30)].filter((b): b is Band => b !== null) : [];
-  const endZone = clipRect(-37, -35);
+  const endZone = clipRect(GOAL_LINE - 2, GOAL_LINE);
   const lines: YardLine[] = [];
   for (let y = 5; y >= -35; y -= 5) {
     if (y < top - 0.01 || y > 8) continue;
