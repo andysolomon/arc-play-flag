@@ -40,7 +40,7 @@ import { hasNoRunZones } from "@/lib/play/storage";
 import type { Team, TeamSettings } from "@/lib/play/types";
 import { esc } from "@/lib/render/play-svg";
 import { fitField, playSlot } from "./binder";
-import { playShow, type Numbered } from "./numbered";
+import { artView, type Numbered } from "./numbered";
 import { CREAM, INK, MUTED, YELLOW, appMark, badge, f2, field, page, pill, rect, text, type SvgPage } from "./pages";
 import type { Box } from "./pptx";
 import { measure, wrap } from "./raster";
@@ -207,7 +207,7 @@ function panelRows(as: readonly Assignment[], budget: number): { s: number; rows
 }
 
 function playSlide(item: Numbered, bookTitle: string, teamName: string, band: string, team: TeamSettings): SlidePlan {
-  const play = item.play, show = playShow(play), notes = play.notes;
+  const play = item.play, view = artView(play), notes = play.notes;
   const out: string[] = [paper(band)];
 
   // header, centred on y = 56: number, name, the call
@@ -222,10 +222,10 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   out.push(text(100, 70, 40, fit(play.name, right - 100, 40)));
 
   // the field, on a hard shadow
-  const f = fitField(play.players, 520, 408, show);
+  const f = fitField(play.players, 520, 408, view.show);
   const fx = 36 + (520 - f.w) / 2, fy = 100;
   out.push(`<rect x="${f2(fx)}" y="${f2(fy + 7)}" width="${f2(f.w)}" height="${f2(f.h)}" rx="6" fill="${INK}" opacity="0.14"/>`);
-  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show, noRunZones: hasNoRunZones(team) }, 3));
+  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", ...view, noRunZones: hasNoRunZones(team) }, 3));
 
   // who does what
   out.push(`<rect x="580" y="104" width="340" height="408" rx="14" fill="${INK}" opacity="0.14"/>`);

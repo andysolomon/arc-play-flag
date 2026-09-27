@@ -3,6 +3,7 @@ import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, legalSpot, mirrorRou
 import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 export interface PlayState extends Doc, History {
+  artShadow: boolean;
   /** the saved play this one came from, so Save updates it instead of adding another */
   id: string | null;
   selectedId: string | null;
@@ -34,16 +35,18 @@ export type Action =
   | { type: "resetFormation"; team: Team | null }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[]; shadow?: boolean }
+  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; artShadow?: boolean; players: Player[]; shadow?: boolean }
   /** a fresh, unsaved play on the default formation. History from the play you left is dropped. */
   | { type: "newPlay"; side: Team }
-  | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; players: Player[] }
+  | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; artShadow?: boolean; players: Player[] }
   | { type: "setName"; name: string }
   | { type: "setNotes"; notes: string }
   /** after a save: remember which record this play now is */
   | { type: "saved"; id: string }
   /** show or hide the other team, faded, as a formation reference */
-  | { type: "setShadow"; on: boolean };
+  | { type: "setShadow"; on: boolean }
+  /** draw the other team, faded, on this play's pictures too; showing it on the field as well */
+  | { type: "setArtShadow"; on: boolean };
 
 export function initialState(): PlayState {
   return {
@@ -51,6 +54,7 @@ export function initialState(): PlayState {
     name: "New play",
     notes: "",
     side: "offense",
+    artShadow: false,
     players: defaults(),
     selectedId: null,
     targeting: false,
@@ -67,10 +71,10 @@ export function selected(s: PlayState): Player | null {
 /** Whether the document holds work its saved record doesn't (or, never saved, anything past a blank new play). */
 export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
   if (saved) {
-    return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side
+    return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
       || JSON.stringify(s.players) !== JSON.stringify(saved.players);
   }
-  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || (s.name !== "New play" && s.name !== "");
+  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow || (s.name !== "New play" && s.name !== "");
 }
 
 /** Whether a player is drawn under the current Show filter. */
@@ -110,9 +114,18 @@ function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
   return { vis: visFor(doc.side, s) };
 }
 
+/**
+ * The incoming play's own pictures choice, never the one from the play you left. A play whose
+ * pictures include the other team opens with it on the field, so the coach sees what prints.
+ */
+function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "vis"> {
+  const artShadow = doc.artShadow === true;
+  return { artShadow, ...(artShadow ? { vis: "both" } : follow(s, doc)) };
+}
+
 /** Replaces the whole document and drops undo and redo, which belong to the play you left. */
 function openPlay(s: PlayState, doc: Doc): PlayState {
-  return { ...s, ...emptyHistory, ...doc, ...follow(s, doc), ...cleared };
+  return { ...s, ...emptyHistory, ...doc, ...opened(s, doc), ...cleared };
 }
 
 function step(s: PlayState, st: HistoryStep | null): PlayState {
@@ -279,15 +292,17 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "redo":
       return step(s, redoStep(s, s));
     case "newPlay":
-      return openPlay(s, { id: null, name: "New play", notes: "", side: a.side, players: defaults() });
+      return openPlay(s, { id: null, name: "New play", notes: "", side: a.side, artShadow: false, players: defaults() });
     case "load": {
-      const next = openPlay(s, { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players });
+      const next = openPlay(s, {
+        id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, players: a.players,
+      });
       // A shared snapshot opens with the other team faded, whichever side this play is.
       return a.shadow && next.vis !== "both" ? { ...next, vis: "both" } : next;
     }
     case "hydrate": {
-      const doc: Doc = { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", players: a.players };
-      return { ...s, ...doc, ...follow(s, doc) };
+      const doc: Doc = { id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, players: a.players };
+      return { ...s, ...doc, ...opened(s, doc) };
     }
     case "setName":
       return { ...s, name: a.name };
@@ -303,6 +318,10 @@ export function reducer(s: PlayState, a: Action): PlayState {
       if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: false, draft: null };
       return { ...s, vis };
     }
+    case "setArtShadow":
+      // not an edit to the diagram, so not undoable, like the name; it never hides the field's shadow
+      if (a.on === s.artShadow) return s;
+      return { ...s, artShadow: a.on, vis: a.on ? "both" : s.vis };
   }
 }
 

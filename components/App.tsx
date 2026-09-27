@@ -10,7 +10,7 @@ import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute } from "@/lib/play/routes";
-import { StorageError, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
+import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
 import { Header } from "./Header";
@@ -65,7 +65,7 @@ export function App() {
   const [saveFailure, setSaveFailure] = useState<StorageError | null>(null);
   const draftBroken = useRef(false);
   const [draftWrite, setDraftWrite] = useState<{ fingerprint: string; ok: boolean } | null>(null);
-  const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.players]);
+  const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
   const restoredDraft = useRef(false);
   const toastTimer = useRef(0);
   const say = useCallback((text: string, ms = 1600) => {
@@ -150,7 +150,7 @@ export function App() {
     if (!hydratedRef.current) return;
     let writeOk = true;
     try {
-      writeDraft({ id: s.id, name: s.name, notes: s.notes, side: s.side, players: [...s.players] });
+      writeDraft({ id: s.id, name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] });
       draftBroken.current = false;
     } catch (e) {
       if (!(e instanceof StorageError)) throw e;
@@ -161,13 +161,13 @@ export function App() {
     let active = true;
     queueMicrotask(() => { if (active) setDraftWrite({ fingerprint: draftFingerprint, ok: writeOk }); });
     return () => { active = false; };
-  }, [draftFingerprint, say, s.id, s.name, s.notes, s.side, s.players]);
+  }, [draftFingerprint, say, s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
   useEffect(() => {
     const d = readDraft();
     let firstUseTimer = 0;
     let openToolsTimer = 0;
     restoredDraft.current = d !== null;
-    if (d) dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, side: d.side, players: d.players });
+    if (d) dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, side: d.side, artShadow: d.artShadow, players: d.players });
     hydratedRef.current = true;
     try {
       if (!d && getPlays().length === 0 && window.localStorage.getItem(FIRST_USE_KEY) !== "done") {
@@ -182,7 +182,7 @@ export function App() {
     const shared = params.get("p");
     const rec = shared ? decodeShare(shared) : null;
     if (rec) {
-      dispatch({ type: "load", name: rec.name, side: rec.side, players: rec.players, shadow: true });
+      dispatch({ type: "load", name: rec.name, side: rec.side, artShadow: rec.artShadow, players: rec.players, shadow: true });
       // A formation/share payload is an intentional handoff into the designer;
       // keep the tools visible so the coach can immediately inspect or name it.
       openToolsTimer = window.setTimeout(() => { setLeftOpen(true); }, 0);
@@ -191,7 +191,7 @@ export function App() {
     // "Open" from the playbook gallery: /?open=<play id>
     const saved = playById(params.get("open"));
     if (saved) {
-      dispatch({ type: "load", id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, players: saved.players });
+      dispatch({ type: "load", id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, artShadow: saved.artShadow, players: saved.players });
       window.history.replaceState(null, "", "/");
     }
     return () => {
@@ -201,28 +201,28 @@ export function App() {
   }, []);
 
   const onSave = useCallback(() => {
-    const r = savePlay({ id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, players: [...s.players] });
+    const r = savePlay({ id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] });
     if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved");
-  }, [say, s.id, s.name, s.notes, s.side, s.players]);
+  }, [say, s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
-    const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, players: [...s.players] });
+    const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] });
     if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
     dispatch({ type: "setName", name: n });
     dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved a copy");
-  }, [say, s.name, s.notes, s.side, s.players]);
+  }, [say, s.name, s.notes, s.side, s.artShadow, s.players]);
   // the way out when the device won't keep the play: a one-play playbook file that "Import a file…" takes back
   const onDownload = useCallback(() => {
-    const play = { id: s.id ?? newId(), name: s.name, notes: s.notes, side: s.side, players: [...s.players] };
+    const play = { id: s.id ?? newId(), name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] };
     const file = encodeRecoveryFile(play);
     download(new Blob([file.json], { type: "application/json" }), file.filename);
-  }, [s.id, s.name, s.notes, s.side, s.players]);
+  }, [s.id, s.name, s.notes, s.side, s.artShadow, s.players]);
   const dirty = unsaved(s, playById(s.id));
   const persistence = saveFailure
     ? "failed"
@@ -253,8 +253,8 @@ export function App() {
     say("New play");
   }, [say]);
   const shareUrl = useCallback(() =>
-    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, players: [...s.players] }, noRunZones)}`,
-  [s.name, s.side, s.players, noRunZones]);
+    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, ...artShadow(s.artShadow), players: [...s.players] }, noRunZones)}`,
+  [s.name, s.side, s.artShadow, s.players, noRunZones]);
   const onNoRunZones = useCallback((on: boolean) => {
     const r = setTeam({ ...getTeam(), noRunZones: on });
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
@@ -265,6 +265,8 @@ export function App() {
     navigator.clipboard.writeText(url).then(() => { say("Link copied"); }, () => { window.prompt("Copy this link", url); });
   }, [say, shareUrl]);
   const openShare = useCallback(() => { setShareOpen(true); }, []);
+  const onArtShadow = useCallback((on: boolean) => { dispatch({ type: "setArtShadow", on }); }, []);
+  const other = s.side === "defense" ? "offense" : "defense";
   // errors nobody caught are remembered (scrubbed, on this device only) for "Report a problem"
   useEffect(() => install(), []);
   const sel = selected(s);
@@ -308,6 +310,8 @@ export function App() {
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}
             onReset={(team) => { dispatch({ type: "resetFormation", team }); }}
             onShadow={(on) => { dispatch({ type: "setShadow", on }); }}
+            artShadow={s.artShadow}
+            onArtShadow={onArtShadow}
             noRunZones={noRunZones}
             onNoRunZones={onNoRunZones}
           />
@@ -354,14 +358,24 @@ export function App() {
               <button type="button" className={`${pillSm} !text-ink`} onClick={() => { setShareOpen(false); }} aria-label="Close share dialog">✕</button>
             </div>
             <p className="text-small leading-note text-ink-muted">
-              It is a snapshot of this play now, not a live view; later edits are not added to it. The other team is saved with the link and appears, faded, when the play is opened in the designer.
+              It is a snapshot of this play now, not a live view; later edits are not added to it. The other team is always saved with the link and appears, faded, when the play is opened in the designer.
             </p>
             <div
               role="img"
-              aria-label={`${s.side === "defense" ? "Defense" : "Offense"} snapshot preview`}
+              aria-label={`${s.side === "defense" ? "Defense" : "Offense"} snapshot preview${s.artShadow ? `, the ${other} faded` : ""}`}
               className="mx-auto w-full max-w-[360px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.side, noRunZones, box: { pw: 660, ph: 360 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.artShadow ? "both" : s.side, side: s.side, noRunZones, box: { pw: 660, ph: 360 } }) }}
             />
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small">
+              <input
+                type="checkbox"
+                checked={s.artShadow}
+                onChange={(e) => { onArtShadow(e.target.checked); }}
+                className="h-5 w-5 flex-none cursor-pointer accent-ink"
+              />
+              {other === "offense" ? "Offense" : "Defense"} in play art
+            </label>
+            <span className="-mt-2 text-caption leading-note text-ink-muted">Draws the {other} faded in the snapshot, and on this play&apos;s thumbnail and printouts.</span>
             <button type="button" className={`${pillSm} self-start px-4 py-1`} onClick={copyShare}>Copy snapshot link</button>
           </section>
         </div>

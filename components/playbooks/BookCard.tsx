@@ -35,11 +35,11 @@ export function BookCard({ book: b, plays, team, say }: Props) {
         <div className="relative m-1 transition-transform duration-[120ms] group-hover:-translate-y-0.5 motion-reduce:transition-none">
           {rest.slice(0, 2).map((p, i) => (
             <div key={p.id} aria-hidden className={`absolute inset-0 ${behind[i] ?? ""}`}>
-              <PlayThumb players={p.players} name="" side={p.side} className="opacity-90" />
+              <PlayThumb players={p.players} name="" side={p.side} artShadow={p.artShadow} className="opacity-90" />
             </div>
           ))}
           {cover ? (
-            <PlayThumb players={cover.players} name={cover.name} side={cover.side} className="relative" />
+            <PlayThumb players={cover.players} name={cover.name} side={cover.side} artShadow={cover.artShadow} className="relative" />
           ) : (
             <div className="relative">
               {/* an empty field keeps the cover the same size as a full one */}
