@@ -32,6 +32,9 @@
  * - L6 route labels clipped at the sideline: play-svg.ts keeps them on the field.
  * - L7 measuring before the face has loaded: `slidePlans` measures, so it runs inside the
  *   thunk `exportSlides` calls after `ensureFont()`.
+ * - L8 notes the coach hid showing anyway: with `notesOnSlides` off, the face leaves them
+ *   out and so does its alt text, which describes the face; the rows get the room; the
+ *   speaker notes keep every word.
  */
 
 import { assignmentLine, assignments, callLine, callName, headerLine, type Assignment } from "@/lib/play/assignments";
@@ -57,6 +60,8 @@ const RED = "#c2261a";
 export interface SlidesOptions {
   bookName: string;
   team: TeamSettings;
+  /** the coach's notes on the play slides; off, they are kept for the speaker notes only. Default on. */
+  notesOnSlides?: boolean;
 }
 
 export interface SlidePlan {
@@ -206,8 +211,10 @@ function panelRows(as: readonly Assignment[], budget: number): { s: number; rows
   return { s: 22, rows: one.slice(0, k), more: one.length - k };
 }
 
-function playSlide(item: Numbered, bookTitle: string, teamName: string, band: string, team: TeamSettings): SlidePlan {
+function playSlide(item: Numbered, bookTitle: string, teamName: string, band: string, o: SlidesOptions): SlidePlan {
   const play = item.play, show = playShow(play), notes = play.notes;
+  // what the audience sees; the speaker notes always carry the whole of `notes`
+  const shown = o.notesOnSlides === false ? "" : notes;
   const out: string[] = [paper(band)];
 
   // header, centred on y = 56: number, name, the call
@@ -225,15 +232,15 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   const f = fitField(play.players, 520, 408, show);
   const fx = 36 + (520 - f.w) / 2, fy = 100;
   out.push(`<rect x="${f2(fx)}" y="${f2(fy + 7)}" width="${f2(f.w)}" height="${f2(f.h)}" rx="6" fill="${INK}" opacity="0.14"/>`);
-  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show, noRunZones: hasNoRunZones(team) }, 3));
+  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show, noRunZones: hasNoRunZones(o.team) }, 3));
 
   // who does what
   out.push(`<rect x="580" y="104" width="340" height="408" rx="14" fill="${INK}" opacity="0.14"/>`);
   out.push(`<rect x="580" y="100" width="340" height="408" rx="14" fill="${CREAM}" stroke="${INK}" stroke-width="2"/>`);
   out.push(text(X0, 124, 15, "WHO DOES WHAT, LEFT TO RIGHT", { fill: MUTED }));
   const as = assignments(play);
-  // with notes, three lines of them are kept: baselines at 436, 464 and 492
-  const { s, rows, more } = panelRows(as, notes ? 244 : 356);
+  // with notes shown, three lines of them are kept: baselines at 436, 464 and 492
+  const { s, rows, more } = panelRows(as, shown ? 244 : 356);
   const r = s === 26 ? 16 : 14, lead = s + 6, tx = X0 + 2 * r + 12;
   let y = TOP;
   if (!as.length) {
@@ -251,11 +258,11 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
     out.push(text(X0, y + 24, 22, `+${String(more)} more in the speaker notes`, { fill: MUTED }));
     y += 36;
   }
-  if (notes) {
+  if (shown) {
     y += 14;
     out.push(text(X0, y + 12, 15, "COACHING POINTS", { fill: MUTED }));
     const b0 = y + 42;
-    wrap(notes, XR - X0, 22, Math.floor((BOTTOM - b0) / 28) + 1).forEach((l, i) => { out.push(text(X0, b0 + i * 28, 22, l)); });
+    wrap(shown, XR - X0, 22, Math.floor((BOTTOM - b0) / 28) + 1).forEach((l, i) => { out.push(text(X0, b0 + i * 28, 22, l)); });
   }
   out.push(footer(teamName, bookTitle));
 
@@ -270,7 +277,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
       `Play ${String(item.n)}: ${play.name}.`,
       cl,
       lines.length ? `Left to right: ${lines.join("; ")}.` : "Nobody on this side yet.",
-      notes ? `Coaching points: ${notes.replace(/\s+/g, " ")}` : null,
+      shown ? `Coaching points: ${shown.replace(/\s+/g, " ")}` : null,
     ].filter((l) => l !== null).join("\n"),
     notes: [
       headerLine(item),
@@ -305,7 +312,7 @@ export function slidePlans(items: readonly Numbered[], o: SlidesOptions): DeckPl
     if (book.length > 1) {
       for (let i = 0; i < book.length; i += GLANCE) slides.push(glanceSlide(book.slice(i, i + GLANCE), book.length, bookTitle, teamName, band, o.team));
     }
-    for (const item of book) slides.push(playSlide(item, bookTitle, teamName, band, o.team));
+    for (const item of book) slides.push(playSlide(item, bookTitle, teamName, band, o));
   }
   return { title: bookTitle, band, slides };
 }

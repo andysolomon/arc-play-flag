@@ -7,8 +7,8 @@ import { DIAGNOSTICS_KEY } from "../../lib/diagnostics";
 import { playSvg } from "../../lib/render/play-svg";
 import { armSabotage, canvasBudget, downloadBytes, sabotage } from "../support/designer";
 import {
-  COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
-  corruptStoredText, playbook, seed,
+  COVER_TWO, COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
+  corruptStoredText, playbook, seed, storedPlays,
 } from "../support/fixtures";
 import { PINNED, keepDeck, keepFile, packageProblems, pngSize, readDeck, readZip } from "../support/pptx";
 
@@ -270,4 +270,80 @@ test("a slide that cannot be drawn, first or halfway through the deck, is a fail
   await expect(toast(page)).toHaveText("Saved", { timeout: 60_000 });
   expect(downloads).toHaveLength(1);
   expect(readZip(await downloadBytes(d))).toHaveLength(67);
+});
+
+test("a coach edits the notes from the slides card and hides them from the room: every note saves with its play, and hidden notes leave the faces but stay in the speaker notes", async ({ page, browser }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.clock.setFixedTime(new Date(PINNED.clock));
+  await armSabotage(page);
+  const book = playbook("fx-notes", "Otter Notes Book", [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO]);
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [book], team: OTTERS });
+  await page.goto("/playbooks?book=fx-notes");
+
+  // a full device keeps the words in the box and says so; the next keystroke saves
+  await page.getByRole("button", { name: "Edit notes" }).click();
+  const dialog = page.getByRole("dialog", { name: "Notes in “Otter Notes Book”" });
+  const wheel = dialog.getByRole("textbox", { name: "Notes for 2 · Otter Wheel Right" });
+  await expect(wheel).toHaveValue("");
+  await sabotage(page, "quota", true);
+  await wheel.fill("Z sells the out.");
+  await expect(toast(page)).toHaveText("Couldn't save: this browser's storage is full.");
+  await expect(dialog.getByText("Not saved. Your words are still here; try again.")).toBeVisible();
+  await expect(wheel).toHaveValue("Z sells the out.");
+  expect((await storedPlays(page))["fx-wheel-right"]?.notes).toBe("");
+  await sabotage(page, "quota", false);
+  await wheel.fill("Z sells the out, then turns it up.");
+  await expect(dialog.getByText("Saved with the play.")).toBeVisible();
+  const slant = dialog.getByRole("textbox", { name: "Notes for 1 · Otter Slant Left" });
+  await expect(slant).toHaveValue("X wins inside.");
+  await slant.fill("X wins inside.\nSell the go first.");
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toBeHidden();
+
+  // only the notes changed, and they are the plays' own now
+  const stored = await storedPlays(page);
+  expect(stored["fx-wheel-right"]).toEqual({ ...WHEEL_RIGHT, notes: "Z sells the out, then turns it up." });
+  expect(stored["fx-slant-left"]).toEqual({ ...SLANT_LEFT, notes: "X wins inside.\nSell the go first." });
+  expect(stored["fx-cover-two"]).toEqual(COVER_TWO);
+  await page.reload();
+  await page.getByRole("button", { name: "Edit notes" }).click();
+  await expect(dialog.getByRole("textbox", { name: "Notes for 1 · Otter Slant Left" })).toHaveValue("X wins inside.\nSell the go first.");
+  await dialog.getByRole("button", { name: "Close notes" }).click();
+
+  // the same book with the notes shown (the default), then hidden
+  const deckBytes = async (): Promise<Buffer> => {
+    const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), slidesButton(page).click()]);
+    await expect(toast(page)).toHaveText("Saved", { timeout: 60_000 });
+    return downloadBytes(d);
+  };
+  const shownRaw = await deckBytes();
+  const notesBox = page.getByRole("checkbox", { name: "Show notes on the slides" });
+  await expect(notesBox).toBeChecked();
+  await notesBox.uncheck();
+  await expect(page.getByText("Hidden from the room. They stay in the speaker notes.")).toBeVisible();
+  const hiddenRaw = await deckBytes();
+  await keepFile(testInfo, hiddenRaw, "slides-notes-hidden");
+  const shownItems = readZip(shownRaw), hiddenItems = readZip(hiddenRaw);
+  const shown = await readDeck(page, shownItems), hidden = await readDeck(page, hiddenItems);
+  await keepDeck(testInfo, browser.version(), hiddenRaw, hiddenItems, hidden, "slides-notes-hidden");
+  expect(packageProblems(hidden, hiddenItems)).toEqual([]);
+
+  // title, glance, then the three plays
+  expect(hidden.slides.map((s) => s.title)).toEqual(["Otter Notes Book", "Plays at a glance · 1–3", "1 · Otter Slant Left", "2 · Otter Wheel Right", "3 · Otter Cover Two"]);
+  // the presenter keeps every word either way
+  expect(hidden.slides.map((s) => s.notes)).toEqual(shown.slides.map((s) => s.notes));
+  expect(hidden.slides[2]?.notes).toBe("1 · Otter Slant Left · Pass\n\nPass.\n\nX wins inside.\nSell the go first.\n\nLeft to right:\nX: Slant\nC: Snap\nQB: Throw\nZ: No route\nY: Out");
+  expect(hidden.slides[3]?.notes).toContain("\n\nZ sells the out, then turns it up.\n\n");
+  // the room sees them only when shown, and the alt text says what the face shows
+  expect(shown.slides[2]?.descr).toBe("Play 1: Otter Slant Left.\nPass.\nLeft to right: X: Slant; C: Snap; QB: Throw; Z: No route; Y: Out.\nCoaching points: X wins inside. Sell the go first.");
+  expect(hidden.slides[2]?.descr).toBe("Play 1: Otter Slant Left.\nPass.\nLeft to right: X: Slant; C: Snap; QB: Throw; Z: No route; Y: Out.");
+  expect(hidden.slides.map((s) => s.descr ?? "").filter((d) => d.includes("Coaching points"))).toEqual([]);
+  expect(hidden.slides.map((s) => s.descr)).toEqual(shown.slides.map((s) => s.descr?.replace(/\nCoaching points: .*$/, "") ?? null));
+  // only the faces of plays with notes changed; a play with none draws the same face
+  const face = (items: readonly { name: string; data: Buffer }[], i: number): Buffer => {
+    const hit = items.find((it) => it.name === `ppt/media/image${String(i)}.png`);
+    if (!hit) throw new Error(`no face ${String(i)}`);
+    return hit.data;
+  };
+  expect([1, 2, 3, 4, 5].map((i) => face(shownItems, i).equals(face(hiddenItems, i)))).toEqual([true, true, false, false, true]);
 });

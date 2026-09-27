@@ -537,29 +537,30 @@ export function packageProblems(deck: DeckRead, items: readonly ZipItem[]): stri
   return out;
 }
 
-/** The download exactly as it came, as `test-results/slides-<project>.pptx`, before anything reads it. */
-export async function keepFile(testInfo: TestInfo, raw: Buffer): Promise<string> {
+/** The download exactly as it came, as `test-results/<name>-<project>.pptx`, before anything reads it. */
+export async function keepFile(testInfo: TestInfo, raw: Buffer, name = "slides"): Promise<string> {
   const dir = testInfo.project.outputDir;
   await mkdir(dir, { recursive: true });
-  const path = join(dir, `slides-${testInfo.project.name}.pptx`);
+  const path = join(dir, `${name}-${testInfo.project.name}.pptx`);
   await writeFile(path, raw);
   return path;
 }
 
 /**
  * Keeps the deck as a verifiable, repeatable artifact in the output folder:
- * `slides-<project>.pptx` (the exact download), `slides-<project>.json` (sizes, CRCs and
+ * `<name>-<project>.pptx` (the exact download), `<name>-<project>.json` (sizes, CRCs and
  * sha256 of the file and every entry, and each slide's title, alt text, notes and face)
- * and `slides-<project>-<i>.png` (every face, straight from `ppt/media`). The XML hashes
- * never depend on font metrics; the PNG hashes hold per Chromium build, which is recorded.
+ * and `<name>-<project>-<i>.png` (every face, straight from `ppt/media`). The name starts
+ * with `slides`, so CI's `slides-*` upload takes it. The XML hashes never depend on font
+ * metrics; the PNG hashes hold per Chromium build, which is recorded.
  */
-export async function keepDeck(testInfo: TestInfo, browserVersion: string, raw: Buffer, items: readonly ZipItem[], deck: DeckRead): Promise<void> {
+export async function keepDeck(testInfo: TestInfo, browserVersion: string, raw: Buffer, items: readonly ZipItem[], deck: DeckRead, name = "slides"): Promise<void> {
   const project = testInfo.project.name;
   const dir = testInfo.project.outputDir;
-  const base = `slides-${project}`;
+  const base = `${name}-${project}`;
   const sha256 = (b: Buffer): string => createHash("sha256").update(b).digest("hex");
   const media = new Map(items.map((i) => [i.name, i.data]));
-  const pptx = await keepFile(testInfo, raw);
+  const pptx = await keepFile(testInfo, raw, name);
   const slides: { title: string | null; alt: string | null; notes: string | null; media: string | null; width: number | null; height: number | null; sha256: string | null }[] = [];
   for (const [n, s] of deck.slides.entries()) {
     const png = media.get(s.media ?? "");

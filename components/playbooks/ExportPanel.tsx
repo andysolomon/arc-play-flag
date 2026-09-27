@@ -16,6 +16,7 @@ import { hasNoRunZones, kebab } from "@/lib/play/storage";
 import type { Playbook, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { card, eyebrow, input, pill, select } from "../ui";
+import { EditNotesModal } from "./EditNotes";
 import type { Say } from "./PlaybooksScreen";
 
 interface Props {
@@ -37,6 +38,8 @@ export function ExportPanel({ book, items, team, say }: Props) {
   const [postcardPlay, setPostcardPlay] = useState("");
   // null until the coach picks: the flyer follows the book's first six until then
   const [chosen, setChosen] = useState<string[] | null>(null);
+  const [notesOnSlides, setNotesOnSlides] = useState(true);
+  const [editingNotes, setEditingNotes] = useState(false);
   const [busy, setBusy] = useState(false);
   const none = items.length === 0;
   const slots = useMemo(() => flyerDefault(items).map((i) => i?.play.id ?? ""), [items]);
@@ -90,7 +93,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
     });
   };
   const onSlides = () => {
-    run("Drawing slides", (progress) => exportSlides(() => slidePlans(items, { bookName: book.name, team }), `${kebab(book.name)}-slides.pptx`, { onProgress: progress }), "slide");
+    run("Drawing slides", (progress) => exportSlides(() => slidePlans(items, { bookName: book.name, team, notesOnSlides }), `${kebab(book.name)}-slides.pptx`, { onProgress: progress }), "slide");
   };
   const onFile = () => {
     run("Writing the file", () => {
@@ -157,7 +160,16 @@ export function ExportPanel({ book, items, team, say }: Props) {
         <span className="text-caption text-ink-muted">
           {none ? "Opens in PowerPoint, Keynote and Google Slides." : `${String(slideCount(items.length))} slides · opens in PowerPoint, Keynote and Google Slides`}
         </span>
-        <button type="button" onClick={onSlides} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download slides</button>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small">
+          <input type="checkbox" checked={notesOnSlides} onChange={(e) => { setNotesOnSlides(e.target.checked); }} className="h-5 w-5 flex-none cursor-pointer accent-ink" />
+          Show notes on the slides
+        </label>
+        {!notesOnSlides && <span className="text-caption leading-note text-ink-muted">Hidden from the room. They stay in the speaker notes.</span>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setEditingNotes(true); }} disabled={busy || none} className={`${pill} px-3 py-1 text-small`}>Edit notes</button>
+          <button type="button" onClick={onSlides} disabled={busy || none} className={`${pill} px-3 py-1 text-small`}>Download slides</button>
+        </div>
+        {editingNotes && <EditNotesModal bookName={book.name} items={items} say={say} onClose={() => { setEditingNotes(false); }} />}
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>
