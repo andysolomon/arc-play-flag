@@ -10,7 +10,8 @@ interface Props {
   /**
    * A clipPath id over a designed end zone, or null. Inside it every route runs in a lane of the
    * field's own turf, so its ink reads the same as anywhere else on the field whatever the design
-   * under it. The lanes carry their paint in style, never in the attributes the routes are found by.
+   * under it. The lanes carry their paint in style, never in the attributes the routes are found by,
+   * and stay off paper, where the end zone is the classic band.
    */
   lane?: string | null;
 }
@@ -24,7 +25,7 @@ function RouteLayerImpl({ routes, draftD, lane = null }: Props) {
       {routes.map((r) => (
         <g key={r.id} className={r.faded ? "opacity-40" : undefined}>
           {lane && (
-            <g clipPath={`url(#${lane})`} data-lane>
+            <g clipPath={`url(#${lane})`} className="print:hidden" data-lane>
               <path d={r.d} fill="none" stroke="#c1f0c1" style={turf} strokeWidth={r.width + LANE} />
               {r.arrow && <polygon points={r.arrow} fill="#c1f0c1" stroke="#c1f0c1" style={{ ...turf, fill: FIELD.turf }} strokeWidth={2.5 + LANE} />}
               {r.zone && (
@@ -55,7 +56,7 @@ function RouteLayerImpl({ routes, draftD, lane = null }: Props) {
         </g>
       ))}
       {draftD && lane && (
-        <path d={draftD} fill="none" stroke="#c1f0c1" style={turf} strokeWidth={3 + LANE} clipPath={`url(#${lane})`} data-lane />
+        <path d={draftD} fill="none" stroke="#c1f0c1" style={turf} strokeWidth={3 + LANE} clipPath={`url(#${lane})`} className="print:hidden" data-lane />
       )}
       {draftD && (
         <path d={draftD} fill="none" stroke="#1b1a17" style={{ stroke: FIELD.line }} strokeWidth={3} strokeDasharray="7 7" strokeLinejoin="round" opacity={0.65} />
