@@ -74,6 +74,11 @@ export interface SavedPlay {
   notes: string;
   /** which side of the ball this play is drawn for: an offensive play or a defensive call */
   side: Team;
+  /**
+   * The other team is drawn, faded, on this play's pictures: thumbnails, the share snapshot and
+   * every printout. Stored only when true, so a play from before the choice reads and writes the same.
+   */
+  artShadow?: true;
 }
 
 /** A named, ordered list of plays. Numbers on exports are positions in this list. */

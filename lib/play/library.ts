@@ -1,5 +1,5 @@
 import {
-  StorageError, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
+  StorageError, artShadow, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
 } from "./storage";
 import { isRun } from "./routes";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
@@ -57,6 +57,7 @@ export function formationTemplate(play: SavedPlay): SavedPlay {
     name: play.name,
     notes: "",
     side: play.side,
+    ...artShadow(play.artShadow),
     players: play.players.map((player) => ({ ...player, route: null })),
   };
 }
@@ -115,7 +116,9 @@ export function playbookById(id: string | null | undefined): Playbook | null {
 
 /** Saves a play (new id when none is given) and returns the record as stored. */
 export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): Written<SavedPlay> {
-  const rec: SavedPlay = { id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side };
+  const rec: SavedPlay = {
+    id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side, ...artShadow(play.artShadow),
+  };
   return attempt(() => {
     plays = Object.values(store(rec));
     emit();

@@ -43,6 +43,29 @@ export const PITCH_OPTION: SavedPlay = (() => {
 export const WALKTHROUGH_NOTES = "Walk it at half speed, then at full speed. ".repeat(13).trim();
 export const WALKTHROUGH: SavedPlay = { ...play("fx-walkthrough", "Otter Walkthrough", {}, WALKTHROUGH_NOTES), players: formation().filter((p) => p.team === "defense") };
 
+/** A play with some players moved (and relabelled), keyed by id. */
+export function moved(p: SavedPlay, spots: Record<string, { x?: number; y?: number; label?: string }>): SavedPlay {
+  return { ...p, players: p.players.map((q) => ({ ...q, ...spots[q.id] })) };
+}
+
+// the call from the coach's snapshot: a deep safety, three defenders in man (on X, the C and Y) and a blitzer
+export const COVER_ONE_D = moved(play("fx-cover-one-d", "Otter Cover One", {
+  d5: { type: "zoneDeep" },
+  d1: { type: "man", target: "o3" },
+  d2: { type: "man", target: "o1" },
+  d4: { type: "man", target: "o4" },
+  d3: { type: "blitz" },
+}, "Eyes on your man.", "defense"), { d3: { y: -8 } });
+
+// man defenders bunched at the sideline, one on an unlabelled receiver, beside a flat bubble
+export const BUNCH_MAN_D = moved(play("fx-bunch-man-d", "Otter Bunch Man", {
+  d1: { type: "man", target: "o3" },
+  d2: { type: "man", target: "o5" },
+  d3: { type: "man", target: "o4" },
+  d4: { type: "zoneFlat" },
+  d5: { type: "man", target: "o1" },
+}, "", "defense"), { d1: { x: 28.8, y: -2 }, d2: { x: 26.5, y: -2.5 }, d3: { x: 24.5, y: -2 }, d4: { x: 27, y: -6 }, d5: { x: 15, y: -1 }, o5: { label: "" } });
+
 export function playbook(id: string, name: string, plays: readonly SavedPlay[]): Playbook {
   return { id, name, plays: plays.map((p) => p.id) };
 }

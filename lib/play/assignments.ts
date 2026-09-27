@@ -21,6 +21,7 @@
 
 import type { Numbered } from "@/lib/export/numbered";
 import { CALL_LABEL, callOf } from "./call";
+import { COVERAGE_WORDS, coverageOf } from "./coverage";
 import { isPitch, isRun, routeDef } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
@@ -41,7 +42,7 @@ export interface Assignment {
 export const byLine = (a: Player, b: Player): number => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /** Every player's name: the label, else "Player k" (offense) / "Defender k" (defense), k counted left to right among that team's unlabelled players. */
-export function names(play: SavedPlay): Map<string, string> {
+export function names(play: { readonly players: readonly Player[] }): Map<string, string> {
   const out = new Map<string, string>();
   for (const team of ["offense", "defense"] as const) {
     let k = 0;
@@ -92,9 +93,12 @@ export function callName(play: SavedPlay): string | null {
   return call ? CALL_LABEL[call] : null;
 }
 
-/** The call in a sentence: where the ball goes, and the primary read. */
+/** The call in a sentence: where the ball goes and the primary read, or the defense's coverage. */
 export function callLine(play: SavedPlay): string | null {
-  if (play.side === "defense") return "Defense.";
+  if (play.side === "defense") {
+    const cover = coverageOf(play.players);
+    return cover ? `Defense, ${COVERAGE_WORDS[cover]} coverage.` : "Defense.";
+  }
   const call = callOf(play.players);
   if (!call) return null;
   const who = namer(play);

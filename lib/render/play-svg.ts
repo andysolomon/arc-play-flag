@@ -1,6 +1,8 @@
+import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
-import { routeDef } from "@/lib/play/routes";
-import type { Level, Pane, Player, Pt, Vis } from "@/lib/play/types";
+import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
+import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
+import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 
 /**
@@ -30,6 +32,12 @@ export interface ArtOptions {
   box?: Pane | null;
   /** the shallowest field to show; the live field uses 24, a wristband cell can go tighter */
   minDepth?: number;
+  /**
+   * The play's own side. With `show` "both", the other team is drawn beneath it at the live
+   * shadow's fade and can't be highlighted; a defensive call also gets its coverage stamp.
+   * Unset, "both" draws everyone alike.
+   */
+  side?: Team;
 }
 
 export interface Art {
@@ -45,6 +53,9 @@ export const TURF = "#c1f0c1";
 export const END_ZONE = "#a7e5a7";
 export const YELLOW = "#f2b705";
 export const FONT = "'Patrick Hand', 'Comic Sans MS', cursive";
+/** the other team, when a play includes it: the same fade as the live field's shadow */
+export const SHADOW_OPACITY = 0.4;
+const PAPER_TEXT = "#fffdf6";
 const TIGHT: Pane = { pw: 1000, ph: 1 };
 
 const visible = (players: readonly Player[], show: Vis): readonly Player[] =>
@@ -53,9 +64,10 @@ const visible = (players: readonly Player[], show: Vis): readonly Player[] =>
 export const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const f1 = (n: number): string => n.toFixed(1);
+const fade = (o: number): string => (o === 1 ? "" : ` opacity="${String(Number(o.toFixed(3)))}"`);
 
 export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art {
-  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, noRunZones = true, box = null, minDepth = 24 } = opts;
+  const { level = "simple", highlight = null, show = "both", showYardNumbers = true, noRunZones = true, box = null, minDepth = 24, side } = opts;
   const shown = visible(players, show);
   const d = depth(shown, box ?? TIGHT, minDepth);
   const layout = fieldLayout(d, showYardNumbers, noRunZones);
@@ -83,14 +95,29 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
     out.push("</g>");
   }
 
-  // routes: faded ones first so the highlighted route sits on top
-  const routed = shown.flatMap((p) => { const g = geom(p, players, top, zones); return g ? [{ p, g }] : []; });
-  const isHi = (p: Player): boolean => highlight === null || p.id === highlight;
-  routed.sort((a, b) => Number(isHi(a.p)) - Number(isHi(b.p)));
+  const drawn = new Set(shown.map((p) => p.id));
+  // the other team, when the play includes it: beneath the play's own side, and never highlighted
+  const context = (p: Player): boolean => side !== undefined && show === "both" && p.team !== side;
+  const isHi = (p: Player): boolean => highlight === null || (p.id === highlight && !context(p));
+  const opacity = (p: Player): number => (context(p) ? SHADOW_OPACITY : 1) * (isHi(p) ? 1 : 0.28);
+  // like a Madden card: a defensive call is stamped with its coverage in the empty backfield
+  const cover = side === "defense" ? coverageOf(players) : null;
+  const stamp = cover ? stampBox(COVERAGE_TAG[cover], shown, top, layout.vh) : null;
+  // a man defender whose receiver isn't drawn wears a name tag, never an arrow to nobody;
+  // none while the players move, since the tags would stay behind
+  const tags = opts.positions ? [] : manTags(shown, players, top, layout.vh, zones, stamp ? [stamp] : []);
+
+  // routes: the other team's first, then faded ones, so the highlighted route sits on top
+  const routed = shown.flatMap((p) => {
+    if (tagged(p, drawn)) return [];
+    const g = geom(p, players, top, zones);
+    return g ? [{ p, g }] : [];
+  });
+  routed.sort((a, b) => Number(!context(a.p)) - Number(!context(b.p)) || Number(isHi(a.p)) - Number(isHi(b.p)));
   for (const { p, g } of routed) {
     const hi = isHi(p);
     const width = hi && highlight !== null ? g.width + 2 : g.width;
-    out.push(hi ? "<g>" : `<g opacity="0.28">`);
+    out.push(`<g${fade(opacity(p))}>`);
     out.push(
       `<path d="${g.d}" fill="none" stroke="${g.color}" stroke-width="${String(width)}" stroke-linecap="round" stroke-linejoin="round"` +
       (g.dash !== "900" ? ` stroke-dasharray="${g.dash}"` : "") + "/>",
@@ -102,7 +129,7 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
         ` stroke="${g.color}" stroke-width="2.5" stroke-dasharray="9 7"/>`,
       );
     }
-    if (level === "detailed" && hi) {
+    if (level === "detailed" && hi && !context(p)) {
       const lbl = routeLabel(p, players, top, g.zone);
       if (lbl) {
         out.push(
@@ -114,21 +141,42 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
     out.push("</g>");
   }
 
-  for (const p of shown) {
+  if (cover && stamp) {
+    out.push(
+      `<g data-coverage="${cover}" aria-hidden="true"><rect x="${f1(stamp.x)}" y="${f1(stamp.y)}" width="${f1(stamp.w)}" height="${f1(stamp.h)}" rx="6" fill="${INK}"/>` +
+      `<text x="${f1(stamp.x + stamp.w / 2)}" y="${f1(stamp.y + stamp.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
+      ` font-size="${String(STAMP_FONT)}" letter-spacing="${String(STAMP_SPACING)}" fill="${PAPER_TEXT}">${esc(COVERAGE_TAG[cover])}</text></g>`,
+    );
+  }
+
+  // the other team's players first, so the play's own side sits on top
+  const tokens = [...shown].sort((a, b) => Number(!context(a)) - Number(!context(b)));
+  for (const p of tokens) {
     const spot = opts.positions?.[p.id] ?? p;
     const x = px(spot.x), y = py(spot.y, top);
-    out.push(`<g transform="translate(${f1(x)},${f1(y)})">`);
-    if (highlight === p.id) out.push(`<circle r="33" fill="none" stroke="${YELLOW}" stroke-width="5"/>`);
+    out.push(`<g transform="translate(${f1(x)},${f1(y)})"${fade(context(p) ? SHADOW_OPACITY : 1)}>`);
+    if (highlight === p.id && !context(p)) out.push(`<circle r="33" fill="none" stroke="${YELLOW}" stroke-width="5"/>`);
     out.push(`<circle r="23" fill="${teamFill(p.team)}" stroke="${INK}" stroke-width="2.5"/>`);
     if (p.label) {
       out.push(
         `<text y="1" text-anchor="middle" dominant-baseline="central" font-size="${p.label.length > 2 ? "15" : "18"}" fill="${INK}">${esc(p.label)}</text>`,
       );
     }
-    if (level === "detailed" && p.route?.primary && p.team === "offense") {
+    if (level === "detailed" && p.route?.primary && p.team === "offense" && !context(p)) {
       out.push(`<text x="26" y="-22" font-size="26" fill="#c2261a" paint-order="stroke" stroke="${TURF}" stroke-width="4">★</text>`);
     }
     out.push("</g>");
+  }
+
+  // over the tokens, hanging off each defender's ring, and faded with them under a highlight
+  for (const t of tags) {
+    const p = shown.find((q) => q.id === t.id);
+    out.push(
+      `<g data-man-tag="${esc(t.id)}" data-place="${t.place}" aria-hidden="true"${fade(p ? opacity(p) : 1)}>` +
+      `<rect x="${f1(t.x)}" y="${f1(t.y)}" width="${f1(t.w)}" height="${f1(t.h)}" rx="${f1(t.h / 2)}" fill="${ROUTE_INK.man}"/>` +
+      `<text x="${f1(t.x + t.w / 2)}" y="${f1(t.y + t.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
+      ` font-size="${String(TAG_FONT)}" fill="${PAPER_TEXT}">${esc(t.text)}</text></g>`,
+    );
   }
 
   if (opts.ball && opts.footballHref) {
