@@ -431,8 +431,9 @@ function FieldImpl({
     dispatch({ type: "select", id: null });
     setParty(null);
     const motion = buildMotion(players, topRef.current, simulationPlayback(Math.random));
-    // the moment a caught pass is first over the goal line, if it ever is: a touchdown
-    const td = touchdownAt(motion, players, los);
+    // the moment a caught pass is first over the goal line, if it ever is: a touchdown. Only the
+    // play's own offense scores; on a defensive call a completion by the shadow offense is being scored on
+    const td = side === "offense" ? touchdownAt(motion, players, los) : null;
     let scored = false;
     let t0 = -1;
     const tick = (now: number) => {
@@ -449,8 +450,9 @@ function FieldImpl({
     };
     setRun({ motion, t: 0 });
     playRef.current = requestAnimationFrame(tick);
-  }, [dispatch, endDrag, los, players]);
-  useEffect(() => stop, [stop]);
+  }, [dispatch, endDrag, los, players, side]);
+  // a playback, and the touchdown it is watching for, belong to the spot it started on: moving the ball ends it
+  useEffect(() => stop, [stop, los]);
   useEffect(() => {
     if (!party) return;
     const t = window.setTimeout(() => { setParty(null); }, CELEBRATION_MS);
