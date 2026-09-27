@@ -16,8 +16,11 @@ import type { ZoneMap } from "./zones";
  * - M1 a defender wears a tag and an arrow, or neither: `tagged` is the one rule both use.
  * - M2 a tag runs off the field: every spot is clamped to the art, and sides that would not fit are skipped.
  * - M3 a tag sits on another tag, M4 on another player, M5 on a zone bubble or the coverage stamp:
- *   each is an obstacle, and the first clear spot wins (below, inward, outward, above).
- * - M6 a tag floats free of its defender: every spot overlaps the defender's own ring.
+ *   each is an obstacle, and the first clear spot wins (below, inward, outward, above). When none
+ *   is clear, the spot that does least harm wins: grazing a ring beats covering a player, and
+ *   covering a player's centre (and label) is the worst of all.
+ * - M6 a tag floats free of its defender: every spot tucks under the defender's own ring, which is
+ *   drawn over it, so the ring, and a selection or highlight around it, stays whole.
  * - M7 an unlabelled receiver reads "on Player 2", as the slides name them; a receiver who is gone reads "Man".
  * - M8 a label breaks the markup: callers escape `text`.
  * - M9 the layout depends on storage order: defenders are laid out left to right (byLine).
@@ -48,6 +51,8 @@ export const STAMP_H = 32;
 export const STAMP_FONT = 22;
 export const STAMP_SPACING = 1.5;
 const TOKEN_R = 23;
+/** how far a tag tucks under its own defender's ring */
+const TUCK = 4;
 /** tags keep this far inside the art's edges */
 const EDGE = 4;
 /** and this far off anything else */
@@ -65,10 +70,15 @@ export function tagged(p: Player, drawn: ReadonlySet<string>): boolean {
 
 const inflate = (b: Box, d: number): Box => ({ x: b.x - d, y: b.y - d, w: b.w + 2 * d, h: b.h + 2 * d });
 const hitsBox = (a: Box, b: Box): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const overlap = (a: Box, b: Box): number =>
+  Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+/** How far a point is from a box, 0 inside it. */
+const reach = (b: Box, cx: number, cy: number): number =>
+  Math.hypot(Math.max(b.x, Math.min(cx, b.x + b.w)) - cx, Math.max(b.y, Math.min(cy, b.y + b.h)) - cy);
 
 function hitsCircle(b: Box, cx: number, cy: number, r: number): boolean {
-  const nx = Math.max(b.x, Math.min(cx, b.x + b.w)), ny = Math.max(b.y, Math.min(cy, b.y + b.h));
-  return (nx - cx) ** 2 + (ny - cy) ** 2 < r * r;
+  return reach(b, cx, cy) < r;
 }
 
 interface Ellipse { cx: number; cy: number; rx: number; ry: number }
@@ -115,29 +125,34 @@ export function manTags(
     const w = tagWidth(text), h = TAG_H;
     const cx = px(p.x), cy = py(p.y, top);
     const inward = cx <= VW / 2 ? 1 : -1;
-    const across = (s: number): number => (s > 0 ? cx + TOKEN_R - 4 : cx - TOKEN_R + 4 - w);
+    const across = (s: number): number => (s > 0 ? cx + TOKEN_R - TUCK : cx - TOKEN_R + TUCK - w);
     const centred = Math.max(EDGE, Math.min(VW - EDGE - w, cx - w / 2));
     const spots: { place: TagPlace; x: number; y: number }[] = [
       // hanging off the bottom of the ring like a name plate, clear of the defender's own label
-      { place: "below", x: centred, y: cy + TOKEN_R - 6 },
+      { place: "below", x: centred, y: cy + TOKEN_R - TUCK },
       { place: "inside", x: across(inward), y: cy - h / 2 },
       { place: "outside", x: across(-inward), y: cy - h / 2 },
-      { place: "above", x: centred, y: cy - TOKEN_R + 6 - h },
+      { place: "above", x: centred, y: cy - TOKEN_R + TUCK - h },
     ];
-    let best: ManTag | null = null, fewest = Infinity;
+    let best: ManTag | null = null, least = Infinity;
     for (const s of spots) {
       const box: Box = { x: s.x, y: s.y, w, h };
       if (box.x < EDGE - 0.01 || box.x + w > VW - EDGE + 0.01 || box.y < EDGE || box.y + h > vh - EDGE) continue;
       const near = inflate(box, PAD);
-      const hits =
-        tokens.filter((t) => t.id !== p.id && hitsCircle(near, t.cx, t.cy, TOKEN_R)).length +
-        placed.filter((t) => hitsBox(near, t)).length +
-        bubbles.filter((e) => hitsEllipse(near, e)).length +
-        avoid.filter((b) => hitsBox(near, b)).length;
-      if (hits < fewest) { best = { id: p.id, text, place: s.place, ...box }; fewest = hits; }
-      if (hits === 0) break;
+      // harm, not a count: a ring grazed by a unit is nearly nothing, a player's centre covered is the worst
+      let harm = 0;
+      for (const t of tokens) {
+        if (t.id === p.id) continue;
+        const d = reach(near, t.cx, t.cy);
+        if (d < TOKEN_R) harm += TOKEN_R - d + (d === 0 ? 400 : 0);
+      }
+      for (const t of placed) if (hitsBox(near, t)) harm += 200 + overlap(near, t) / 10;
+      for (const b of avoid) if (hitsBox(near, b)) harm += 200 + overlap(near, b) / 10;
+      for (const e of bubbles) if (hitsEllipse(near, e)) harm += 30;
+      if (harm < least) { best = { id: p.id, text, place: s.place, ...box }; least = harm; }
+      if (harm === 0) break;
     }
-    placed.push(best ?? { id: p.id, text, place: "below", x: centred, y: cy + TOKEN_R - 6, w, h });
+    placed.push(best ?? { id: p.id, text, place: "below", x: centred, y: cy + TOKEN_R - TUCK, w, h });
   }
   return placed;
 }

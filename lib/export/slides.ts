@@ -269,6 +269,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
     alt: [
       `Play ${String(item.n)}: ${play.name}.`,
       cl,
+      play.artShadow ? `The ${play.side === "defense" ? "offense" : "defense"} is drawn faded.` : null,
       lines.length ? `Left to right: ${lines.join("; ")}.` : "Nobody on this side yet.",
       notes ? `Coaching points: ${notes.replace(/\s+/g, " ")}` : null,
     ].filter((l) => l !== null).join("\n"),

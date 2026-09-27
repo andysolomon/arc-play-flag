@@ -8,7 +8,6 @@ import { cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } f
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
-import { names } from "@/lib/play/assignments";
 import { manTags, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
@@ -147,10 +146,13 @@ function FieldImpl({
   // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
   const onField = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
   const tags = useMemo(() => manTags(visible, effective, top, layout.vh, zones), [visible, effective, top, layout.vh, zones]);
-  // and a screen reader hears the same: "Man coverage: Defender 2 on X."
+  // and a screen reader hears the same, naming each defender as their token announces itself
   const tagWords = useMemo(() => {
-    const who = names({ players: effective });
-    return tags.length ? ` Man coverage: ${tags.map((t) => `${who.get(t.id) ?? ""} ${t.text}`).join("; ")}.` : "";
+    const who = (id: string): string => {
+      const p = effective.find((q) => q.id === id);
+      return `Defense ${p?.label || id}`;
+    };
+    return tags.length ? ` Man coverage: ${tags.map((t) => `${who(t.id)} ${t.text}`).join("; ")}.` : "";
   }, [tags, effective]);
   const routes = useMemo(
     () => {
@@ -488,7 +490,7 @@ function FieldImpl({
           aria-label="Play diagram"
         >
           <desc>
-            {readOnly ? "Flag football play diagram" : "Interactive flag football play diagram. Tab to players and custom waypoints."}
+            {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
           </desc>
           <defs>
@@ -541,6 +543,8 @@ function FieldImpl({
               </g>
             );
           })}
+          {/* under the tokens, so rings stay whole; none while the players run, since they would stay behind */}
+          {!playing && <ManTagLayer tags={tags} />}
           {visible.map((p) => (
             <PlayerToken
               key={p.id}
@@ -558,8 +562,6 @@ function FieldImpl({
               onKeyDown={onKey}
             />
           ))}
-          {/* the tags would stay behind while the players run */}
-          {!playing && <ManTagLayer tags={tags} />}
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
         <PlayButton playing={playing} onClick={playing ? stop : play} />

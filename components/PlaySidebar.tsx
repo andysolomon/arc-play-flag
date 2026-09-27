@@ -157,7 +157,7 @@ function PlaySidebarImpl({
         />
         {other === "offense" ? "Offense" : "Defense"} in play art
       </label>
-      <span className="flex-none text-caption leading-note text-ink-muted">Draws the {other} faded on this play&apos;s thumbnail, snapshot and printouts. Saved with the play.</span>
+      <span className="flex-none text-caption leading-note text-ink-muted">Draws the {other} faded on this play&apos;s thumbnail, snapshot and printouts. Save keeps it with the play.</span>
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
       <ThemePicker className="flex-none" unlockHref="/playbooks" />

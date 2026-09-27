@@ -107,6 +107,15 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
   // none while the players move, since the tags would stay behind
   const tags = opts.positions ? [] : manTags(shown, players, top, layout.vh, zones, stamp ? [stamp] : []);
 
+  // under the routes, so it never hides the end of one
+  if (cover && stamp) {
+    out.push(
+      `<g data-coverage="${cover}" aria-hidden="true"><rect x="${f1(stamp.x)}" y="${f1(stamp.y)}" width="${f1(stamp.w)}" height="${f1(stamp.h)}" rx="6" fill="${INK}"/>` +
+      `<text x="${f1(stamp.x + stamp.w / 2)}" y="${f1(stamp.y + stamp.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
+      ` font-size="${String(STAMP_FONT)}" letter-spacing="${String(STAMP_SPACING)}" fill="${PAPER_TEXT}">${esc(COVERAGE_TAG[cover])}</text></g>`,
+    );
+  }
+
   // routes: the other team's first, then faded ones, so the highlighted route sits on top
   const routed = shown.flatMap((p) => {
     if (tagged(p, drawn)) return [];
@@ -141,11 +150,14 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
     out.push("</g>");
   }
 
-  if (cover && stamp) {
+  // tucked under each defender's ring (and a highlight round it), and faded with them under a highlight
+  for (const t of tags) {
+    const p = shown.find((q) => q.id === t.id);
     out.push(
-      `<g data-coverage="${cover}" aria-hidden="true"><rect x="${f1(stamp.x)}" y="${f1(stamp.y)}" width="${f1(stamp.w)}" height="${f1(stamp.h)}" rx="6" fill="${INK}"/>` +
-      `<text x="${f1(stamp.x + stamp.w / 2)}" y="${f1(stamp.y + stamp.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
-      ` font-size="${String(STAMP_FONT)}" letter-spacing="${String(STAMP_SPACING)}" fill="${PAPER_TEXT}">${esc(COVERAGE_TAG[cover])}</text></g>`,
+      `<g data-man-tag="${esc(t.id)}" data-place="${t.place}" aria-hidden="true"${fade(p ? opacity(p) : 1)}>` +
+      `<rect x="${f1(t.x)}" y="${f1(t.y)}" width="${f1(t.w)}" height="${f1(t.h)}" rx="${f1(t.h / 2)}" fill="${ROUTE_INK.man}"/>` +
+      `<text x="${f1(t.x + t.w / 2)}" y="${f1(t.y + t.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
+      ` font-size="${String(TAG_FONT)}" fill="${PAPER_TEXT}">${esc(t.text)}</text></g>`,
     );
   }
 
@@ -166,17 +178,6 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
       out.push(`<text x="26" y="-22" font-size="26" fill="#c2261a" paint-order="stroke" stroke="${TURF}" stroke-width="4">★</text>`);
     }
     out.push("</g>");
-  }
-
-  // over the tokens, hanging off each defender's ring, and faded with them under a highlight
-  for (const t of tags) {
-    const p = shown.find((q) => q.id === t.id);
-    out.push(
-      `<g data-man-tag="${esc(t.id)}" data-place="${t.place}" aria-hidden="true"${fade(p ? opacity(p) : 1)}>` +
-      `<rect x="${f1(t.x)}" y="${f1(t.y)}" width="${f1(t.w)}" height="${f1(t.h)}" rx="${f1(t.h / 2)}" fill="${ROUTE_INK.man}"/>` +
-      `<text x="${f1(t.x + t.w / 2)}" y="${f1(t.y + t.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
-      ` font-size="${String(TAG_FONT)}" fill="${PAPER_TEXT}">${esc(t.text)}</text></g>`,
-    );
   }
 
   if (opts.ball && opts.footballHref) {
