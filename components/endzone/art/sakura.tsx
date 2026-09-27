@@ -14,8 +14,8 @@ const BUD = "#ea6f93";
 const PLUM = "#5a1a36";
 const MIST = "#fffaf5";
 const SEAL = "#c63a31";
-/** the loose petals, after the celebration's confetti (lib/endzone.ts) */
-const DRIFT = ["#ffb0c1", "#ff8fab", "#f9a3b8", "#f48fb1"] as const;
+/** the loose petals: the celebration's confetti pinks (lib/endzone.ts), less the palest, which vanish on the blush */
+const DRIFT = ["#ffb7c5", "#ff8fab", "#f06292"] as const;
 /** Patrick Hand's capitals stand this much of an em above the baseline */
 const CAP = 0.68;
 /** a blossom's radius in its <defs>, scaled to each one's size where it's used */
@@ -28,6 +28,7 @@ type Band = readonly [x0: number, x1: number, y: number, d: number];
 const num = (n: number): string => String(Math.round(n * 100) / 100);
 const px = (n: number): string => `${num(n)}px`;
 const secs = (n: number): string => `${num(n)}s`;
+const deg = (n: number): string => `${num(n)}deg`;
 
 /** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
 function rand(i: number, salt: number): number {
@@ -148,8 +149,8 @@ const RIGHT: Sprig = {
   buds: [[0.92, 0.66], [0.54, 0.28], [0.24, 0.86], [0.8, 0.08], [0.1, 0.32]],
 };
 
-/** The two kinds of blossom, drawn once: pink, and the paler kind blushing at the heart. */
-function BlossomDefs({ id }: { id: string }) {
+/** The sky, and the two kinds of blossom drawn once: pink, and the paler kind blushing at the heart. */
+function Defs({ id }: { id: string }) {
   const stamens = [18, 90, 162, 234, 306].map((d) => petal(0, 0, UNIT * 0.42, d)).join("");
   const kind = (name: string, outer: string, inner: string, innerOpacity: number) => (
     <g id={`${id}-${name}`}>
@@ -161,6 +162,10 @@ function BlossomDefs({ id }: { id: string }) {
   );
   return (
     <defs>
+      <linearGradient id={`${id}-sky`} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor={CREAM} />
+        <stop offset="1" stopColor={BLUSH} />
+      </linearGradient>
       {kind("pink", PETAL, PALE, 0.7)}
       {kind("pale", PALE, PETAL, 0.75)}
     </defs>
@@ -207,16 +212,38 @@ function Bough({ id, sprig, w, reach, depth, k, flip, celebrate }: { id: string;
   );
 }
 
+/** Where the band is too shallow for the boughs: a stub of bark in each top corner, flowering. */
+function Twigs({ id, w, h }: { id: string; w: number; h: number }) {
+  return (
+    <g>
+      {[false, true].map((flip) => {
+        const x = (u: number): number => (flip ? w - u * h : u * h);
+        return (
+          <g key={String(flip)}>
+            <path d={limb([[x(-0.3), -h * 0.15, h * 0.38], [x(0.9), h * 0.32, h * 0.26], [x(2), h * 0.18, h * 0.16], [x(3.1), h * 0.36, h * 0.08]])} fill={BARK} />
+            <path d={bud(x(3.1), h * 0.36, h * 0.32, flip ? -75 : 75)} fill={BUD} stroke={PETAL_EDGE} strokeWidth={num(h * 0.02)} strokeLinejoin="round" />
+            <Blossom id={id} x={x(2.3)} y={h * 0.36} r={h * 0.3} deg={flip ? 40 : 25} pale={!flip} />
+            <Blossom id={id} x={x(1.35)} y={h * 0.5} r={h * 0.42} deg={flip ? 20 : 0} pale={flip} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 interface Drifter {
   x: number;
   y: number;
   d: string;
   color: string;
   style: Vars;
-  variant: "a" | "b";
 }
 
-/** Loose petals crossing the band on the breeze, each placed where its drift passes at time zero so a still frame is the same scene. */
+/**
+ * Loose petals crossing the band on the breeze. Each turns round a pivot a little above or below
+ * it (towards the band's middle), so it bobs and tumbles as it goes, and each is placed where its
+ * drift passes at time zero, upright, so a still frame is the same scene.
+ */
 function drifters(w: number, h: number, scale: number): { far: Drifter[]; near: Drifter[] } {
   const n = Math.max(4, Math.min(12, Math.round(w / 55)));
   const far: Drifter[] = [];
@@ -225,21 +252,26 @@ function drifters(w: number, h: number, scale: number): { far: Drifter[]; near: 
     const back = i % 3 === 2;
     const len = scale * (back ? 5.5 : 7.5) * (0.85 + rand(i, 3) * 0.35);
     const x = (w * (i + 0.5 + (rand(i, 1) - 0.5) * 0.7)) / n;
-    const margin = len * 2 + 8;
+    const y = h * (0.16 + rand(i, 2) * 0.66);
+    const pivot = h * (0.07 + rand(i, 6) * 0.07) * (y > h / 2 ? -1 : 1);
+    const margin = len * 2 + Math.abs(pivot) + 8;
     const span = w + margin * 2;
+    const turn = (720 + rand(i, 7) * 540) * (i % 2 ? 1 : -1);
     const dur = back ? 24 + rand(i, 5) * 6 : 15 + rand(i, 5) * 6;
+    const at = (x + margin) / span;
     (back ? far : near).push({
       x,
-      y: h * (0.16 + rand(i, 2) * 0.66),
+      y,
       d: loose(0, 0, len, rand(i, 4) * 360),
-      color: DRIFT[i % DRIFT.length] ?? PETAL,
-      variant: i % 2 ? "a" : "b",
+      color: DRIFT[Math.floor(rand(i, 8) * DRIFT.length)] ?? PETAL,
       style: {
         "--ez-sakura-from": px(-(x + margin)),
-        "--ez-sakura-span": px(span),
-        "--ez-sakura-bob": px(h * (0.07 + rand(i, 6) * 0.07)),
+        "--ez-sakura-to": px(span - (x + margin)),
+        "--ez-sakura-tilt": deg(-turn * at),
+        "--ez-sakura-end": deg(turn * (1 - at)),
+        transformOrigin: `50% calc(50% + ${px(pivot)})`,
         animationDuration: secs(dur),
-        animationDelay: secs(-((x + margin) / span) * dur),
+        animationDelay: secs(-at * dur),
       },
     });
   }
@@ -251,7 +283,7 @@ function Petals({ list, opacity }: { list: readonly Drifter[]; opacity: number }
     <g opacity={opacity} stroke={PETAL_EDGE} strokeWidth={0.4} strokeLinejoin="round">
       {list.map((p) => (
         <g key={p.x} transform={`translate(${num(p.x)} ${num(p.y)})`}>
-          <path className={`ez-sakura-drift ez-sakura-drift-${p.variant}`} style={p.style} d={p.d} fill={p.color} />
+          <path className="ez-sakura-drift" style={p.style} d={p.d} fill={p.color} />
         </g>
       ))}
     </g>
@@ -292,31 +324,9 @@ function Mist({ bands, fill, opacity }: { bands: readonly Band[]; fill: string; 
   );
 }
 
-/** A touchdown's wind: two streaks, each curling at its tail, sweeping across behind the boughs and the lettering. */
-function Wind({ w, h }: { w: number; h: number }) {
-  const len = Math.min(w * 0.32, 170);
-  const a = h * 0.08;
-  const c = h * 0.13;
-  const d =
-    `M0 0C${num(len * 0.3)} ${num(-a)} ${num(len * 0.6)} ${num(a)} ${num(len)} 0` +
-    `c${num(c * 0.7)} ${num(-c * 0.3)} ${num(c * 0.9)} ${num(-c * 1.3)} ${num(c * 0.1)} ${num(-c * 1.4)}c${num(-c * 0.6)} ${num(-c * 0.1)} ${num(-c * 0.7)} ${num(c * 0.6)} ${num(-c * 0.15)} ${num(c * 0.7)}`;
-  return (
-    <g fill="none" stroke="#ffffff" strokeWidth={num(Math.max(1.6, h * 0.06))}>
-      {[0.32, 0.7].map((v, i) => {
-        const style: Vars = { "--ez-sakura-span": px(w + len + 40), animationDelay: secs(i * 0.3), strokeLinecap: "round" };
-        return (
-          <g key={v} transform={`translate(${num(-len - 20)} ${num(h * v)})`}>
-            <path className="ez-sakura-wind" style={style} d={d} />
-          </g>
-        );
-      })}
-    </g>
-  );
-}
-
-/** A touchdown's gust: clumps of petals shaken off both boughs and blown in from the left, whirling away across the band. */
+/** A touchdown's gust: clumps of petals shaken off both boughs and blown in from the left, looping as they whirl away across the band. */
 function Gust({ w, h, reach, depth, scale }: { w: number; h: number; reach: number; depth: number; scale: number }) {
-  const n = Math.max(6, Math.round(w / 47));
+  const n = Math.max(6, Math.round(w / 55));
   return (
     <g stroke={PETAL_EDGE} strokeWidth={0.5} strokeLinejoin="round">
       {Array.from({ length: n }, (_, i) => {
@@ -326,25 +336,30 @@ function Gust({ w, h, reach, depth, scale }: { w: number; h: number; reach: numb
         const x = fromBough ? (i % 2 ? u * reach : w - u * reach) : -12;
         const y = fromBough ? depth * (0.2 + rand(i, 12) * 0.5) : h * (0.2 + rand(i, 12) * 0.6);
         const len = scale * 8.5 * (0.8 + rand(i, 13) * 0.4);
-        // four petals round the clump's middle, so its spin whirls them round each other
+        const span = w - x + 40;
+        // the pivot it loops round, on the side towards the band's middle so the loop stays in the band
+        const loop = h * (0.14 + rand(i, 23) * 0.1) * (y > h / 2 ? -1 : 1);
+        // petals round the clump's middle, so its spin whirls them round each other
         const at = (j: number): string => {
-          const a = ((j * 90 + rand(i * 4 + j, 19) * 50) * Math.PI) / 180;
-          const r = len * (0.7 + rand(i * 4 + j, 20) * 0.6);
-          return loose(Math.cos(a) * r, Math.sin(a) * r, len * (0.8 + rand(i * 4 + j, 22) * 0.35), rand(i * 4 + j, 18) * 360);
+          const a = ((j * 72 + rand(i * 5 + j, 19) * 40) * Math.PI) / 180;
+          const r = len * (0.7 + rand(i * 5 + j, 20) * 0.6);
+          return loose(Math.cos(a) * r, Math.sin(a) * r, len * (0.8 + rand(i * 5 + j, 22) * 0.35), rand(i * 5 + j, 18) * 360);
         };
         const style: Vars = {
-          "--ez-sakura-span": px(w - x + 40),
-          "--ez-sakura-loop": px(h * (0.12 + rand(i, 14) * 0.12)),
+          "--ez-sakura-whirl": px(fromBough ? h * (0.3 + rand(i, 14) * 0.3) : span * 0.3),
+          "--ez-sakura-span": px(span),
           "--ez-sakura-bob": px(h * (rand(i, 15) - 0.45) * 0.5),
+          "--ez-sakura-turn": deg(600 + rand(i, 21) * 240),
+          transformOrigin: `50% calc(50% + ${px(loop)})`,
           // every clump is gone by 3.3 s, inside the celebration
           animationDuration: secs(2 + rand(i, 16) * 0.7),
           animationDelay: secs(rand(i, 17) * 0.4 + (Math.max(0, x) / w) * 0.2),
         };
         return (
           <g key={i} transform={`translate(${num(x)} ${num(y)})`}>
-            <g className="ez-sakura-gust" style={style}>
-              <path d={at(0) + at(2)} fill={DRIFT[i % DRIFT.length] ?? PETAL} />
-              <path d={at(1) + at(3)} fill={DRIFT[(i + 2) % DRIFT.length] ?? PETAL} />
+            <g className="ez-sakura-gust" style={style} opacity={0}>
+              <path d={at(0) + at(2) + at(4)} fill={DRIFT[i % DRIFT.length] ?? PETAL} />
+              <path d={at(1) + at(3)} fill={DRIFT[(i + 1) % DRIFT.length] ?? PETAL} />
             </g>
           </g>
         );
@@ -391,8 +406,8 @@ function Lettering({ cx, cy, fs, sun }: { cx: number; cy: number; fs: number; su
  * Sakura: a spring end zone. A cream sky blushing down to a petal-strewn ground, gnarled boughs
  * reaching in from both top corners heavy with five-petal blossom, END ZONE in plum on a bank of
  * mist with a red seal, and loose petals drifting across on the breeze, tumbling as they go. A
- * touchdown blows a gust through it: wind streaks across, the boughs shake, the blossom bounces,
- * buds burst open, the seal stamps down and clumps of petals whirl off the branches and away.
+ * touchdown blows a gust through it: the boughs shake, the blossom bounces, buds burst open, the
+ * seal stamps down and clumps of petals loop off the branches and whirl away.
  */
 export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
   const id = useArtId("sakura");
@@ -406,24 +421,19 @@ export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
   const { far, near } = drifters(w, h, scale);
   return (
     <g className={celebrate ? "ez-sakura-party" : undefined}>
-      <defs>
-        <linearGradient id={`${id}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={CREAM} />
-          <stop offset="1" stopColor={BLUSH} />
-        </linearGradient>
-      </defs>
-      {boughs && <BlossomDefs id={id} />}
+      <Defs id={id} />
       <rect width={w} height={h} fill={CREAM} style={{ fill: `url(#${id}-sky)` }} />
       {boughs && w > 400 && <Mist fill="#ffffff" opacity={0.5} bands={[...cloud([w * 0.26, w * 0.37, h * 0.76, h * 0.15]), ...cloud([w * 0.63, w * 0.74, h * 0.22, h * 0.13])]} />}
       {boughs && <Grove w={w} h={h} />}
       <Fallen w={w} h={h} scale={scale} />
       <Petals list={far} opacity={0.65} />
-      {celebrate && <Wind w={w} h={h} />}
-      {boughs && (
+      {boughs ? (
         <>
           <Bough id={id} sprig={LEFT} w={w} reach={reach} depth={depth} k={k} flip={false} celebrate={celebrate} />
           <Bough id={id} sprig={RIGHT} w={w} reach={reach} depth={depth} k={k} flip celebrate={celebrate} />
         </>
+      ) : (
+        <Twigs id={id} w={w} h={h} />
       )}
       <Petals list={near} opacity={1} />
       {label && <Lettering cx={w / 2} cy={h / 2 + Math.max(0, h - 44) * 0.25} fs={fs} sun={boughs} />}
