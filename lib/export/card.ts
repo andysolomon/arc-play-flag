@@ -1,6 +1,6 @@
 import { CALL_LABEL, callOf } from "@/lib/play/call";
 import { LOS_YARD, losOf } from "@/lib/play/field";
-import type { Level, Player, TeamSettings, Vis } from "@/lib/play/types";
+import type { Level, Player, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
 import { MIN_DEPTH, ybv } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
@@ -22,6 +22,8 @@ export interface CardOptions {
   level?: Level;
   /** which side is present in the saved picture or clip */
   vis?: Vis;
+  /** the play's own side: with both shown, the other team is faded, and a defensive call gets no ball or offensive call */
+  side?: Team;
   /** the play's ball spot (SavedPlay.los); the own 5 when left out */
   los?: number;
 }
@@ -52,7 +54,7 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   let x = m;
   if (o.n) { out.push(badge(m + r, titleY, r, o.n)); x = m + 2 * r + 20; }
   let right = W - m;
-  const call = callOf(o.players);
+  const call = o.side === "defense" ? null : callOf(o.players);
   if (call) {
     const label = CALL_LABEL[call];
     const pw = measure(label, 28) + 48;
@@ -71,8 +73,9 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   out.push(field(o.players, (W - f.w) / 2, fy, f.w, f.h, {
     level: o.level ?? "simple",
     ...frame,
-    ball: vis === "defense" ? null : frame.ball,
+    ball: vis === "defense" || o.side === "defense" ? null : frame.ball,
     show: vis,
+    side: o.side,
     noRunZones: hasNoRunZones(o.team),
     los,
   }, 5));

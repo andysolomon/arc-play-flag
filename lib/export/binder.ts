@@ -4,7 +4,7 @@ import { MIN_DEPTH } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { Player, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth } from "@/lib/render/play-svg";
-import { playShow, type Numbered } from "./numbered";
+import { artView, type Numbered } from "./numbered";
 import { IN, MUTED, PAPERS, appMark, badge, cutLine, field, page, pill, text, type PaperKey, type SvgPage } from "./pages";
 import { measure, wrap } from "./raster";
 import { fit } from "./wristband";
@@ -33,15 +33,15 @@ export function fitField(players: readonly Player[], w: number, h: number, show:
 export function playSlot(
   item: Numbered, x: number, y: number, w: number, h: number, o: { vis?: Vis; team: TeamSettings }, r = 10, nameSize = 17, border = 1.5,
 ): string {
-  const show = playShow(item.play, o.vis);
+  const view = artView(item.play, o.vis);
   const out: string[] = [];
   out.push(badge(x + r, y + r, r, item.n));
   const nameX = x + 2 * r + 6;
   out.push(text(nameX, y + r + Math.round(nameSize * 0.35), nameSize, fit(item.play.name, x + w - nameX, nameSize)));
   const top = y + 2 * r + 8;
   const los = losOf(item.play);
-  const f = fitField(item.play.players, w, y + h - top, show, los);
-  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", show, noRunZones: hasNoRunZones(o.team), los }, border));
+  const f = fitField(item.play.players, w, y + h - top, view.show, los);
+  out.push(field(item.play.players, x + (w - f.w) / 2, top, f.w, f.h, { level: "simple", ...view, noRunZones: hasNoRunZones(o.team), los }, border));
   return out.join("");
 }
 
@@ -53,8 +53,9 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const cw = W - 2 * MARGIN;
   const out: string[] = [];
   const play = item.play;
-  const vis = playShow(play, o.vis);
-  const call = callOf(play.players);
+  const view = artView(play, o.vis);
+  // the offense's call; a defensive call is stamped with its coverage in the picture instead
+  const call = play.side === "offense" ? callOf(play.players) : null;
 
   // header: number, name, the call
   const r = 15;
@@ -77,9 +78,9 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const top = MARGIN + 2 * r + 16;
   const box = { w: cw, h: H - MARGIN - footerH - notesH - top };
   const los = losOf(play);
-  const f = fitField(play.players, box.w, box.h, vis, los);
+  const f = fitField(play.players, box.w, box.h, view.show, los);
   const fx = MARGIN + (cw - f.w) / 2;
-  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", show: vis, noRunZones: hasNoRunZones(o.team), los }, 2));
+  out.push(field(play.players, fx, top, f.w, f.h, { level: "detailed", ...view, noRunZones: hasNoRunZones(o.team), los }, 2));
 
   let y = top + f.h + 16 + notesSize;
   for (const l of lines) {

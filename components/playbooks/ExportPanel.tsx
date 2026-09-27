@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { record } from "@/lib/diagnostics";
 import { binderPages } from "@/lib/export/binder";
 import { flyerDefault, flyerPage } from "@/lib/export/flyer";
-import type { Numbered } from "@/lib/export/numbered";
+import { artView, type Numbered } from "@/lib/export/numbered";
 import { PAPERS, defaultPaper, type PaperKey } from "@/lib/export/pages";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
 import { POSTCARD_SIZES, postcardPages, type PostcardSize } from "@/lib/export/postcard";
@@ -111,10 +111,10 @@ export function ExportPanel({ book, items, team, say }: Props) {
               role="img"
               aria-label="Playbook PDF preview"
               className="w-full max-w-[240px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { show: items[0].play.side, noRunZones: hasNoRunZones(team), los: items[0].play.los, box: { pw: 660, ph: 280 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { ...artView(items[0].play), noRunZones: hasNoRunZones(team), los: items[0].play.los, box: { pw: 660, ph: 280 } }) }}
             />
             <span className="text-caption leading-note text-ink-muted">
-              Preview: {items[0].play.name}. Each play is drawn from its own side. A front shown while drawing stays off the page.
+              Preview: {items[0].play.name}. Each play is drawn from its own side. The other team is printed, faded, only on plays that include it in their play art.
             </span>
           </div>
         </div>

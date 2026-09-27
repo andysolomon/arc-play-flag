@@ -19,6 +19,8 @@ export interface DraftRecord {
   notes?: string;
   /** offensive play or defensive call; a draft from before the choice existed is read as inferred from its routes */
   side?: Team;
+  /** the other team is drawn, faded, on the play's pictures; stored only when true */
+  artShadow?: true;
   /** the play's ball spot (see SavedPlay.los); written only when it is not the 5 */
   los?: number;
 }
@@ -161,8 +163,15 @@ export function normalizeSavedPlay(raw: unknown, fallbackId = newId()): SavedPla
     players,
     notes: cleanNotes(raw.notes),
     side: readSide(raw.side, players),
+    ...artShadow(raw.artShadow),
   }, readLos(raw.los));
 }
+
+/**
+ * The pictures' choice as it is stored: the key only when it is on, so a record from before
+ * the choice (or with it off) reads and writes byte for byte the same.
+ */
+export const artShadow = (v: unknown): { artShadow?: true } => (v === true ? { artShadow: true } : {});
 
 function parse(storage: StorageLike | null, key: string): unknown {
   if (!storage) return null;
@@ -395,6 +404,7 @@ export function normalizeDraft(raw: unknown): DraftRecord | null {
     id: typeof raw.id === "string" ? raw.id : null,
     notes: cleanNotes(raw.notes),
     side: readSide(raw.side, players),
+    ...artShadow(raw.artShadow),
   }, readLos(raw.los));
 }
 

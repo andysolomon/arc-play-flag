@@ -47,8 +47,8 @@ export function ImportPreview({ file, skipped = 0, normalized = false, onCancel,
           </select>
         </label>}
         <h3 className="break-words text-title">{selected.name}</h3>
-        <div role="img" aria-label={`${selected.name} snapshot preview`} className="overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-          dangerouslySetInnerHTML={{ __html: playSvg(selected.players, { show: "both", noRunZones: hasNoRunZones(team), los: selected.los, box: { pw: 660, ph: 360 } }) }} />
+        <div role="img" aria-label={`${selected.name} snapshot preview, the ${selected.side === "defense" ? "offense" : "defense"} faded`} className="overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+          dangerouslySetInnerHTML={{ __html: playSvg(selected.players, { show: "both", side: selected.side, noRunZones: hasNoRunZones(team), los: selected.los, box: { pw: 660, ph: 360 } }) }} />
         <p className="whitespace-pre-wrap break-words text-small">{selected.notes || "No coaching notes."}</p>
         {items.length > 1 && <div className="flex items-center justify-between gap-2">
           <button type="button" className={`${pill} min-h-11 px-3`} disabled={index === 0} onClick={() => { setIndex(i => i - 1); }}>Previous play</button>
@@ -60,7 +60,7 @@ export function ImportPreview({ file, skipped = 0, normalized = false, onCancel,
         <summary className="cursor-pointer py-2">Preview plays and notes</summary>
         {expanded && <ol className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-3 py-2">
           {items.map((play, i) => <li key={play.id} className="min-w-0">
-            <PlayThumb players={play.players} name={play.name} side={play.side} los={play.los} />
+            <PlayThumb players={play.players} name={play.name} side={play.side} artShadow={play.artShadow} los={play.los} />
             <p className="break-words">{i + 1}. {play.name}</p><p className="whitespace-pre-wrap break-words text-caption">{play.notes}</p>
           </li>)}
         </ol>}

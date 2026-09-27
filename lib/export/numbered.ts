@@ -1,8 +1,16 @@
-import type { Playbook, SavedPlay, Vis } from "@/lib/play/types";
+import type { Playbook, SavedPlay, Team, Vis } from "@/lib/play/types";
 
-/** Which team a playbook drawing shows: this play's side, unless a coach overrode it. */
+/**
+ * Which team a playbook drawing shows: this play's side, both teams when the play includes the
+ * other one (drawn faded), unless a coach overrode it.
+ */
 export function playShow(play: SavedPlay, vis?: Vis): Vis {
-  return vis ?? play.side;
+  return vis ?? (play.artShadow ? "both" : play.side);
+}
+
+/** The art options that draw a play as its pictures should: who is shown, and whose side it is. */
+export function artView(play: SavedPlay, vis?: Vis): { show: Vis; side: Team } {
+  return { show: playShow(play, vis), side: play.side };
 }
 
 /** A play with its number: its position in the playbook, counted from 1. */

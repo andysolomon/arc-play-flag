@@ -32,6 +32,9 @@ interface Props {
   onClear: (team: Team) => void;
   onReset: (team: Team) => void;
   onShadow: (on: boolean) => void;
+  /** the other team is drawn, faded, on this play's pictures */
+  artShadow: boolean;
+  onArtShadow: (on: boolean) => void;
   /** the team's field has the hatched no-run bands */
   noRunZones: boolean;
   onNoRunZones: (on: boolean) => void;
@@ -42,8 +45,9 @@ interface Props {
 
 function PlaySidebarImpl({
   name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
-  savePanel, onFlip, onClear, onReset, onShadow, noRunZones, onNoRunZones, los, onLos,
+  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, los, onLos,
 }: Props) {
+  const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
   const losId = useId(), losNote = useId();
   const start = (next: Team) => {
@@ -164,6 +168,16 @@ function PlaySidebarImpl({
           <span className="flex-none text-caption leading-note text-ink-muted">A faded look at the defense. Tap a player to give them a coverage.</span>
         </>
       )}
+      <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
+        <input
+          type="checkbox"
+          checked={artShadow}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => { onArtShadow(e.target.checked); }}
+          className="h-5 w-5 flex-none cursor-pointer accent-ink"
+        />
+        {other === "offense" ? "Offense" : "Defense"} in play art
+      </label>
+      <span className="flex-none text-caption leading-note text-ink-muted">Draws the {other} faded on this play&apos;s thumbnail, snapshot and printouts. Save keeps it with the play.</span>
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
       <ThemePicker className="flex-none" unlockHref="/playbooks" />

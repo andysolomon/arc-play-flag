@@ -26,7 +26,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
   return (
     <div className={`${card} flex flex-col gap-2.5`}>
       <Link href={`/?open=${p.id}`} aria-label={`Open ${p.name} in the designer`} className="group flex flex-col gap-2 !text-ink no-underline">
-        <PlayThumb players={p.players} name={p.name} side={p.side} los={p.los}
+        <PlayThumb players={p.players} name={p.name} side={p.side} artShadow={p.artShadow} los={p.los}
           className="transition-transform duration-[120ms] group-hover:-translate-y-0.5 motion-reduce:transition-none" />
         <span className="truncate text-title leading-tight" title={p.name}>{p.name}</span>
       </Link>

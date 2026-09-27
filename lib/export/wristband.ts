@@ -1,7 +1,7 @@
 import { losOf } from "@/lib/play/field";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { TeamSettings, Vis } from "@/lib/play/types";
-import { playerWithLabel, playShow, positionsOf, type Numbered } from "./numbered";
+import { artView, playerWithLabel, positionsOf, type Numbered } from "./numbered";
 import { IN, MUTED, PAPERS, badge, cutRect, field, page, text, type PaperKey, type SvgPage } from "./pages";
 import { measure } from "./raster";
 
@@ -96,7 +96,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   out.push(
     field(item.play.players, x + pad, fy, w - 2 * pad, y + h - pad - fy, {
       highlight: playerWithLabel(item.play, position),
-      show: playShow(item.play, o.vis),
+      ...artView(item.play, o.vis),
       showYardNumbers: false,
       noRunZones: hasNoRunZones(o.team),
       los: losOf(item.play),

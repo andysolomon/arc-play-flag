@@ -9,12 +9,14 @@ import { MIN_DEPTH, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, p
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
+import { manTags, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 import { Football, PlayButton } from "./Playback";
 import { PlayerToken } from "./PlayerToken";
 import { FIELD } from "./fieldPaint";
+import { ManTagLayer } from "./ManTagLayer";
 import { RouteLayer } from "./RouteLayer";
 import { pillMd } from "./ui";
 
@@ -144,16 +146,28 @@ function FieldImpl({
     () => effective.filter((p) => shown(p, vis) || (targeting && p.team === "offense")),
     [effective, targeting, vis],
   );
+  // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
+  const onField = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
+  const tags = useMemo(() => manTags(visible, effective, top, layout.vh, zones), [visible, effective, top, layout.vh, zones]);
+  // and a screen reader hears the same, naming each defender as their token announces itself
+  const tagWords = useMemo(() => {
+    const who = (id: string): string => {
+      const p = effective.find((q) => q.id === id);
+      return `Defense ${p?.label || id}`;
+    };
+    return tags.length ? ` Man coverage: ${tags.map((t) => `${who(t.id)} ${t.text}`).join("; ")}.` : "";
+  }, [tags, effective]);
   const routes = useMemo(
     () => {
       const list = visible.flatMap((p) => {
+        if (tagged(p, onField)) return [];
         const g = geom(p, effective, top, zones);
         return g ? [{ ...g, id: p.id, faded: isContext(p, side) }] : [];
       });
       // faded context sits under the play's own side
       return list.sort((a, b) => Number(b.faded) - Number(a.faded));
     },
-    [visible, effective, top, zones, side],
+    [visible, onField, effective, top, zones, side],
   );
   const draftD = useMemo(() => {
     if (!draft) return "";
@@ -478,7 +492,10 @@ function FieldImpl({
           aria-keyshortcuts={!readOnly && draft ? "Enter Escape Delete Backspace" : undefined}
           aria-label="Play diagram"
         >
-          <desc>{readOnly ? "Flag football play diagram" : "Interactive flag football play diagram. Tab to players and custom waypoints."}</desc>
+          <desc>
+            {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
+            {tagWords}
+          </desc>
           <defs>
             <pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="11" stroke="#1b1a17" style={{ stroke: FIELD.line }} strokeWidth="1.6" opacity="0.19" />
@@ -546,6 +563,8 @@ function FieldImpl({
               onKeyDown={onKey}
             />
           ))}
+          {/* over the players, so no neighbour hides one; none while they run, since the tags would stay behind */}
+          {!playing && <ManTagLayer tags={tags} />}
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
         <PlayButton playing={playing} onClick={playing ? stop : play} />
