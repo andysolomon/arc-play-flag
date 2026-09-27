@@ -698,11 +698,13 @@ test.describe("the end zones manifest", () => {
       if (designed) {
         await expect(art(d.field)).toHaveAttribute("data-ez-art", z.id);
         await expect(art(d.field)).toBeVisible();
-        // drawn in a box that is exactly the band
-        const box = await art(d.field).locator("xpath=..").boundingBox();
-        const b = await band(d.field).boundingBox();
-        if (!box || !b) throw new Error("the end zone has not laid out");
-        for (const k of ["x", "y", "width", "height"] as const) expect(Math.abs(box[k] - b[k]), `${z.id} ${k}`).toBeLessThan(1);
+        // drawn in a box that is exactly the band, which clips it (a design may reach past it, as a
+        // scrolling pattern does, so what counts is the box, not the bounds of what is drawn in it)
+        const box = art(d.field).locator("xpath=..");
+        await expect(box).toHaveAttribute("overflow", "hidden");
+        for (const k of ["x", "y", "width", "height"] as const) {
+          expect(await box.getAttribute(k), `${z.id} ${k}`).toBe(await band(d.field).getAttribute(k));
+        }
         await expect(plainLabel(d.field)).toBeHidden();
       } else {
         await expect(art(d.field)).toHaveCount(0);
