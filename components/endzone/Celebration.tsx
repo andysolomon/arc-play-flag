@@ -2,7 +2,7 @@
 
 import { memo, useMemo, type CSSProperties } from "react";
 import { END_ZONES, endZoneById, type ConfettiMotion, type ConfettiShape, type EndZone, type EndZoneId } from "@/lib/endzone";
-import { inkOn } from "./art/shared";
+import { contrast, inkOn } from "./art/shared";
 
 /** How long a celebration lasts on screen, pieces and banner together. */
 export const CELEBRATION_MS = 3400;
@@ -42,7 +42,8 @@ function pieces(zone: EndZone, team: string, seed: number, originY: number): Pie
     const vars: CSSProperties & Record<`--ez-${string}`, string> = {
       "--ez-x": `${(rand() * 100).toFixed(1)}%`,
       "--ez-delay": `${(motion === "rain" ? rand() * 1.4 : rand() * 0.6).toFixed(2)}s`,
-      "--ez-time": `${(motion === "rain" ? 0.9 + rand() * 0.8 : motion === "drift" ? 2.3 + rand() * 0.9 : 1.8 + rand() * 1.1).toFixed(2)}s`,
+      // every piece is gone before CELEBRATION_MS: a petal's drift has no fade, so it must finish falling
+      "--ez-time": `${(motion === "rain" ? 0.9 + rand() * 0.8 : motion === "drift" ? 2.3 + rand() * 0.5 : 1.8 + rand() * 1.1).toFixed(2)}s`,
       "--ez-sway": `${((rand() * 2 - 1) * (motion === "drift" ? 22 : 8)).toFixed(1)}cqw`,
       "--ez-spin": `${spin.toFixed(0)}deg`,
       // a burst sprays out and down from the end zone, and falls a little as it fades
@@ -53,6 +54,16 @@ function pieces(zone: EndZone, team: string, seed: number, originY: number): Pie
     };
     return { shape, color: color === "team" ? team : color, glyph, style: vars };
   });
+}
+
+/**
+ * Lettering for a banner in the team's colour: the palette's ink or cream, or pure black or white
+ * where neither reaches 4.5:1 on a mid-tone, so the small "New end zone" line reads as well as the big word.
+ */
+function bannerInk(fill: string): string {
+  const ink = inkOn(fill);
+  if (contrast(fill, ink) >= 4.5) return ink;
+  return contrast(fill, "#000000") >= contrast(fill, "#ffffff") ? "#000000" : "#ffffff";
 }
 
 interface Props {
@@ -77,7 +88,7 @@ function CelebrationImpl({ zone, teamColor, seed, unlocked, originY }: Props) {
   const z = endZoneById(zone);
   const list = useMemo(() => pieces(z, teamColor, seed, originY), [z, teamColor, seed, originY]);
   const fill = z.banner.fill === "team" ? teamColor : z.banner.fill;
-  const ink = z.banner.ink === "auto" ? inkOn(fill) : z.banner.ink === "team" ? teamColor : z.banner.ink;
+  const ink = z.banner.ink === "auto" ? bannerInk(fill) : z.banner.ink === "team" ? teamColor : z.banner.ink;
   const edge = z.banner.edge === "team" ? teamColor : z.banner.edge;
   return (
     <div

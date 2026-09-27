@@ -9,6 +9,9 @@ import { Lock } from "../ThemePicker";
 import { segmentInput, swatch } from "../ui";
 import { EndZoneArt } from "./EndZoneArt";
 
+/** The tick on the chosen swatch, or the lock and its count on a locked one, in the preview's corner. */
+const chip = "absolute right-1 top-1 inline-flex items-center gap-0.5 rounded-pill border-2 border-ink bg-cream px-1 text-caption leading-tight text-ink";
+
 /** A swatch's preview box, in the design's own units: wider than tall, like the band it previews. */
 const PREVIEW_W = 300;
 const PREVIEW_H = 84;
@@ -36,22 +39,24 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
             <label key={z.id} title={locked ? `${z.blurb}. Opens at ${needs}.` : z.blurb} className={swatch}>
               <input
                 type="radio" name={name} value={z.id} checked={choice === z.id} disabled={locked}
-                aria-describedby={locked ? hint : undefined}
+                aria-describedby={locked ? `${hint}-${z.id} ${hint}` : undefined}
                 onChange={() => { setEndZone(z.id); }}
                 className={`${segmentInput} disabled:cursor-not-allowed`}
               />
-              <svg aria-hidden viewBox={`0 0 ${String(PREVIEW_W)} ${String(PREVIEW_H)}`} className="block h-auto w-full">
-                <EndZoneArt id={z.id} w={PREVIEW_W} h={PREVIEW_H} label celebrate={false} still />
-              </svg>
-              <span className="flex items-center gap-1 border-t-2 border-divider bg-cream px-2 pb-1.5 pt-1 text-small leading-tight text-ink">
-                <span className="truncate">{z.name}</span>
-                {choice === z.id && <span aria-hidden className="ml-auto">✓</span>}
-                {locked && (
-                  <span aria-hidden className="ml-auto inline-flex flex-none items-center gap-0.5 text-caption text-ink-muted">
-                    <Lock />{z.unlock}
+              {/* one string, so a screen reader hears "Opens at 5 touchdown passes." whole */}
+              {locked && <span id={`${hint}-${z.id}`} hidden>{`Opens at ${needs}.`}</span>}
+              {/* the tick or the lock sits on the preview, leaving the name its whole row; taps pass through to the radio */}
+              <span className="pointer-events-none relative block">
+                <svg aria-hidden viewBox={`0 0 ${String(PREVIEW_W)} ${String(PREVIEW_H)}`} className="block h-auto w-full">
+                  <EndZoneArt id={z.id} w={PREVIEW_W} h={PREVIEW_H} label celebrate={false} still />
+                </svg>
+                {(locked || choice === z.id) && (
+                  <span aria-hidden className={chip}>
+                    {locked ? <><Lock /><span data-lock>{z.unlock}</span></> : "✓"}
                   </span>
                 )}
               </span>
+              <span className="truncate border-t-2 border-divider bg-cream px-2 pb-1.5 pt-1 text-small leading-tight text-ink">{z.name}</span>
             </label>
           );
         })}
@@ -61,7 +66,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
           ? `${String(open)} of ${String(END_ZONES.length)} open. Throw a touchdown pass on ▶ to open ${next.name}: a catch in the end zone, or one carried in.`
           : `All ${String(END_ZONES.length)} open.`}
         {touchdowns > 0 && ` ${scored} on this device.`}
-        {" "}It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green.
+        {" It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green."}
       </span>
     </div>
   );
