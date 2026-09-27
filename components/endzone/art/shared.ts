@@ -4,9 +4,10 @@ import type { TeamSettings } from "@/lib/play/types";
 /**
  * What every end zone design is given. It draws into the box (0, 0)–(w, h) in SVG units and
  * nowhere else; its caller clips it there. The live field passes the full 660 wide and the
- * visible depth of the end zone (44 at most, and as little as a sliver when the field is cut
- * short); a picker swatch passes a 300 × 84 preview box, lettering on. With every animation off
- * (reduced motion, the picker's previews) the design must still look finished.
+ * visible depth of the end zone: 11 to 220 in half-yard (11-unit) steps, 44 at most with the ball
+ * on the 5 and up to the whole 10-yard end zone (220) with it spotted near their goal, or a sliver
+ * when the field is cut short. A picker swatch passes a 300 × 84 preview box, lettering on. With
+ * every animation off (reduced motion, the picker's previews) the design must still look finished.
  */
 export interface ArtProps {
   w: number;
@@ -41,6 +42,21 @@ export const contrast = (a: string, b: string): number => {
 /** Ink or cream, whichever reads better on `fill`. */
 export const inkOn = (fill: string): string => (contrast(fill, "#1b1a17") >= contrast(fill, "#fffdf6") ? "#1b1a17" : "#fffdf6");
 
-/** Lays `count` evenly spaced motifs across a width, centred: the x of each one's middle. */
-export const spread = (w: number, count: number): number[] =>
-  Array.from({ length: Math.max(0, count) }, (_, i) => (w * (i + 0.5)) / count);
+/** A number for SVG markup, to two places: short, and the same on the server and in the browser. */
+export const num = (n: number): string => String(Math.round(n * 100) / 100);
+export const px = (n: number): string => `${num(n)}px`;
+export const secs = (n: number): string => `${num(n)}s`;
+
+/** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
+export function rand(i: number, salt: number): number {
+  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
+  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
+  x ^= x >>> 13;
+  return (x >>> 0) / 4294967296;
+}
+
+/** A four-point sparkle's outline, `r` to each point and `waist` between them. */
+export function sparkle(x: number, y: number, r: number, waist: number): string {
+  const t = r * waist;
+  return `M${num(x)} ${num(y - r)}L${num(x + t)} ${num(y - t)}L${num(x + r)} ${num(y)}L${num(x + t)} ${num(y + t)}L${num(x)} ${num(y + r)}L${num(x - t)} ${num(y + t)}L${num(x - r)} ${num(y)}L${num(x - t)} ${num(y - t)}Z`;
+}

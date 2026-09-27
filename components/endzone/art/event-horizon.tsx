@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useArtId, type ArtProps } from "./shared";
+import { num, px, rand, secs, sparkle, useArtId, type ArtProps } from "./shared";
 
 /** the void between the stars */
 const VOID = "#0b0a1a";
@@ -38,20 +38,8 @@ const NEBULAE: readonly { color: string; alpha: number; x: number; y: number; rx
 
 type Vars = CSSProperties & { [key: `--ez-event-horizon-${string}`]: string };
 
-const num = (n: number): string => String(Math.round(n * 100) / 100);
-const px = (n: number): string => `${num(n)}px`;
-const secs = (n: number): string => `${num(n)}s`;
-
 /** A twinkle's own period, `period` seconds, which a touchdown overrides, begun `delay` seconds in. */
 const beat = (period: number, delay: number): Vars => ({ "--ez-event-horizon-beat": secs(period), animationDelay: secs(delay) });
-
-/** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
-function rand(i: number, salt: number): number {
-  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
 
 /** The point `r` out from the origin at `deg` (clockwise from east, as SVG turns). */
 function polar(r: number, deg: number): string {
@@ -73,12 +61,6 @@ function crescent(r: number, a0: number, a1: number, thick: number): string {
   const sag = r - r * Math.cos(half) - Math.min(thick, r * (1 - Math.cos(half)) * 0.85);
   const flat = (sag * sag + chord * chord) / (2 * sag);
   return `M${polar(r, a0)}A${num(r)} ${num(r)} 0 0 1 ${polar(r, a1)}A${num(flat)} ${num(flat)} 0 0 0 ${polar(r, a0)}Z`;
-}
-
-/** A four-point sparkle's outline, `r` to each point and `waist` between them. */
-function sparkle(x: number, y: number, r: number, waist: number): string {
-  const t = r * waist;
-  return `M${num(x)} ${num(y - r)}L${num(x + t)} ${num(y - t)}L${num(x + r)} ${num(y)}L${num(x + t)} ${num(y + t)}L${num(x)} ${num(y + r)}L${num(x - t)} ${num(y + t)}L${num(x - r)} ${num(y)}L${num(x - t)} ${num(y - t)}Z`;
 }
 
 interface Box {

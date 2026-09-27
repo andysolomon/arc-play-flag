@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { ArtProps } from "./shared";
+import { num, type ArtProps } from "./shared";
 
 /** A sprite as rows of pixels, one letter per colour in PALETTE; anything else is clear. */
 type Sprite = readonly string[];
@@ -109,8 +109,6 @@ const MINI: Readonly<Record<string, Sprite>> = {
   U: ["#.#", "#.#", "#.#", "#.#", "###"],
   P: ["##.", "#.#", "##.", "#..", "#.."],
 };
-
-const num = (n: number): string => String(Math.round(n * 100) / 100);
 
 /**
  * Every pixel of each colour across the stamps, as path data keyed by colour: a run along a row

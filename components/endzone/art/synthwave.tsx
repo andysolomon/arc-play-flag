@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useArtId, type ArtProps } from "./shared";
+import { num, rand, sparkle, useArtId, type ArtProps } from "./shared";
 
 /** The SynthWave '84 palette the celebration's confetti uses (lib/endzone.ts). */
 const PINK = "#ff2a6d";
@@ -23,16 +23,6 @@ const SLANT = 0.21;
  * without a seam.
  */
 const STEP = 1.7;
-
-const num = (n: number): string => String(Math.round(n * 100) / 100);
-
-/** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
-function rand(i: number, salt: number): number {
-  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
 
 /** Distances from an edge, `STEP` apart geometrically, from `near` in towards the edge until they are too fine to see. */
 function recede(near: number, finest: number): number[] {
@@ -79,7 +69,7 @@ function Grid({ w, h, cx, horizon, celebrate }: { w: number; h: number; cx: numb
   );
 }
 
-/** A half sun on the horizon, cut by the slits of a retro sunset that drift down and widen as they go. */
+/** A half sun on the horizon, cut by the slits of a retro sunset, which run down and widen as they go during a touchdown. */
 function Sun({ id, cx, horizon, r }: { id: string; cx: number; horizon: number; r: number }) {
   const zone = r * 0.6;
   const top = horizon - zone;
@@ -112,12 +102,6 @@ function Sun({ id, cx, horizon, r }: { id: string; cx: number; horizon: number; 
       </g>
     </g>
   );
-}
-
-/** A four-point sparkle's outline, `r` to each point and `waist` between them. */
-function sparkle(x: number, y: number, r: number, waist: number): string {
-  const t = r * waist;
-  return `M${num(x)} ${num(y - r)}L${num(x + t)} ${num(y - t)}L${num(x + r)} ${num(y)}L${num(x + t)} ${num(y + t)}L${num(x)} ${num(y + r)}L${num(x - t)} ${num(y + t)}L${num(x - r)} ${num(y)}L${num(x - t)} ${num(y - t)}Z`;
 }
 
 function Star({ x, y, r, i }: { x: number; y: number; r: number; i: number }) {
@@ -244,8 +228,8 @@ function Lettering({ id, x, y, fs }: { id: string; x: number; y: number; fs: num
 /**
  * Synthwave '84: a neon sunset. A dusk sky over a half sun cut by slits, dark peaks and palms
  * either side, and a neon grid floor, cyan rails and pink rungs, rolling in towards the goal line
- * with END ZONE on it in italic chrome. The slits drift down, the sun breathes, the grid rolls on
- * and the stars twinkle; a touchdown races the grid and swaps its neon, pulses the sun, strobes the
+ * with END ZONE on it in italic chrome. The sun breathes, the grid rolls on and the stars twinkle;
+ * a touchdown races the grid and swaps its neon, pulses the sun and runs its slits down, strobes the
  * lettering, swings searchlights up from the horizon and sends shooting stars over the sky.
  */
 export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {

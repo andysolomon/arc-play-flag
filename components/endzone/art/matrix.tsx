@@ -1,5 +1,5 @@
-import type { SVGProps } from "react";
-import { useArtId, type ArtProps } from "./shared";
+import type { CSSProperties, SVGProps } from "react";
+import { num, rand, useArtId, type ArtProps } from "./shared";
 
 /** The Matrix's own palette: the black of the screen, the dim and bright code, and the near-white a falling drop leads with. */
 const BLACK = "#0d0208";
@@ -33,16 +33,6 @@ const CLOCKS = 34;
 const WAVE = 6;
 /** the scrambled code a letter decodes from during a touchdown: ez-matrix-reel drops this many through its cell */
 const REEL = 8;
-
-const num = (n: number): string => String(Math.round(n * 100) / 100);
-
-/** A fixed pseudo-random number in [0, 1) for item `i`: the same on the server and in the browser. */
-function rand(i: number, salt: number): number {
-  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
 
 const pick = (i: number, salt: number): string => CODE.charAt(Math.floor(rand(i, salt) * CODE.length));
 
@@ -133,10 +123,11 @@ function CodeStrings({ id, top, bottom }: { id: string; top: number; bottom: num
 }
 
 /** A touchdown's downpour: every column at once, a sheet of drops falling through the band, its heads a little ragged. */
-function Wave({ id, xs }: { id: string; xs: readonly number[] }) {
+function Wave({ id, xs, rows }: { id: string; xs: readonly number[]; rows: number }) {
   const lag = (j: number): number => Math.floor(rand(j, 21) * 3);
+  // the sheet falls its own depth, its lag and the band's rows, so every head and trail clears the goal line however deep the band
   return (
-    <g className="ez-matrix-wave">
+    <g className="ez-matrix-wave" style={{ "--ez-matrix-drop": `${String((rows + WAVE + 2) * ROW)}px` } as CSSProperties}>
       {[0, 1, 2].map((k) => {
         const cells = xs.filter((_, j) => lag(j) === k).flatMap((x) => Array.from({ length: WAVE }, (_, r): Cell => [x, r - WAVE]));
         return (
@@ -296,7 +287,7 @@ export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
             </g>
           ))}
         </g>
-        {celebrate && <Wave id={id} xs={xs} />}
+        {celebrate && <Wave id={id} xs={xs} rows={rows} />}
       </g>
       {celebrate && <rect className="ez-matrix-flash" width={w} height={h} fill={PHOSPHOR} opacity={0} />}
       {label && <Terminal id={id} w={w} h={h} celebrate={celebrate} />}

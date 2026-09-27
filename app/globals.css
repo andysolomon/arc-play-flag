@@ -662,10 +662,10 @@
   33.3% { opacity: 0; }
 }
 
-/* Synthwave '84: the grid rolls in towards the goal line, the sun's slits drift down as it breathes, stars twinkle, palms sway and the neon hums; a touchdown races the grid and swaps its neon, pulses the sun, strobes the lettering, swings searchlights and sends shooting stars. */
+/* Synthwave '84: the grid rolls in towards the goal line, the sun breathes, stars twinkle, palms sway and the neon hums; a touchdown races the grid and swaps its neon, pulses the sun and runs its slits down, strobes the lettering, swings searchlights and sends shooting stars. */
 .ez-synthwave-grid, .ez-synthwave-slits, .ez-synthwave-frond { transform-box: view-box; }
 .ez-synthwave-grid { animation: ez-synthwave-zoom 3s linear infinite; }
-.ez-synthwave-slits { animation: ez-synthwave-zoom 7s linear infinite; }
+/* the slits are mask content, which the browser repaints on the main thread for every frame they move: they run only during a touchdown */
 .ez-synthwave-frond { animation: ez-synthwave-sway 5.2s ease-in-out infinite alternate; }
 .ez-synthwave-halo, .ez-synthwave-star, .ez-synthwave-word, .ez-synthwave-glint { transform-box: fill-box; transform-origin: center; }
 .ez-synthwave-sun { transform-box: fill-box; transform-origin: 50% 100%; }
@@ -675,7 +675,7 @@
 .ez-synthwave-glint { animation: ez-synthwave-glint 6s ease-in-out infinite; }
 
 .ez-synthwave-party .ez-synthwave-grid { animation-duration: 0.42s; }
-.ez-synthwave-party .ez-synthwave-slits { animation-duration: 0.9s; }
+.ez-synthwave-party .ez-synthwave-slits { animation: ez-synthwave-zoom 0.9s linear infinite; }
 .ez-synthwave-party .ez-synthwave-frond { animation-duration: 0.45s; }
 .ez-synthwave-party .ez-synthwave-star { animation-duration: 0.7s; }
 .ez-synthwave-party .ez-synthwave-sun { animation: ez-synthwave-pulse 0.85s ease-in-out 4; }
@@ -855,11 +855,11 @@
   0% { opacity: 1; }
   50% { opacity: 0; }
 }
-/* WAVE (6 rows) of trail over a band at most 4 rows deep: 10 rows carries it right through */
+/* WAVE (6 rows) of trail, lagged up to 2 rows, falls the band's rows on top (--ez-matrix-drop, set in matrix.tsx) so it clears any depth */
 @keyframes ez-matrix-wave {
   0% { transform: translateY(0); opacity: 1; }
-  55% { transform: translateY(100px); opacity: 1; }
-  56%, 100% { transform: translateY(100px); opacity: 0; }
+  55% { transform: translateY(var(--ez-matrix-drop, 100px)); opacity: 1; }
+  56%, 100% { transform: translateY(var(--ez-matrix-drop, 100px)); opacity: 0; }
 }
 @keyframes ez-matrix-flash {
   0% { opacity: 0.45; }
