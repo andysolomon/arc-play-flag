@@ -549,11 +549,11 @@ function FieldImpl({
             ))}
             {layout.texts.length > 0 && (
               <g fontFamily="var(--font-hand)" fontSize={17} fill="#1b1a17" style={{ fill: FIELD.line }} fillOpacity={0.5}>
-                {/* a designed end zone letters itself; the plain words come back for print */}
+                {/* a designed end zone letters itself, and the goal line's yard number would sit on its art; both come back for print */}
                 {layout.texts.map((t) => (
                   <text
                     key={t.key} x={t.x} y={t.y.toFixed(1)} letterSpacing={t.letterSpacing}
-                    className={designed && t.key === "ez" ? "hidden print:inline" : undefined}
+                    className={designed && layout.endZone && t.y < layout.endZone.y + layout.endZone.h ? "hidden print:inline" : undefined}
                   >
                     {t.t}
                   </text>
