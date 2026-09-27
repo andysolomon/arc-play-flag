@@ -66,6 +66,11 @@ export const BUNCH_MAN_D = moved(play("fx-bunch-man-d", "Otter Bunch Man", {
   d5: { type: "man", target: "o1" },
 }, "", "defense"), { d1: { x: 28.8, y: -2 }, d2: { x: 26.5, y: -2.5 }, d3: { x: 24.5, y: -2 }, d4: { x: 27, y: -6 }, d5: { x: 15, y: -1 }, o5: { label: "" } });
 
+// zones only: two flats, a curl-flat, a mid-read and a deep middle
+export const ZONE_D = play("fx-zone-d", "Otter Zone", {
+  d1: { type: "zoneFlat" }, d4: { type: "zoneFlat" }, d2: { type: "curlFlat" }, d3: { type: "midRead" }, d5: { type: "zoneDeep" },
+}, "", "defense");
+
 export function playbook(id: string, name: string, plays: readonly SavedPlay[]): Playbook {
   return { id, name, plays: plays.map((p) => p.id) };
 }

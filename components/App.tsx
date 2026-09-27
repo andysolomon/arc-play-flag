@@ -352,21 +352,21 @@ export function App() {
             aria-labelledby="share-title"
             className="flex max-h-full w-full max-w-[440px] flex-col gap-3 overflow-y-auto rounded-tile border-2 border-ink bg-cream p-4 shadow-tile"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-none items-center gap-2">
               <h2 id="share-title" className="text-header font-normal">Share snapshot</h2>
               <span className="flex-1" />
               <button type="button" className={`${pillSm} !text-ink`} onClick={() => { setShareOpen(false); }} aria-label="Close share dialog">✕</button>
             </div>
-            <p className="text-small leading-note text-ink-muted">
+            <p className="flex-none text-small leading-note text-ink-muted">
               It is a snapshot of this play now, not a live view; later edits are not added to it. The other team is always saved with the link and appears, faded, when the play is opened in the designer.
             </p>
             <div
               role="img"
               aria-label={`${s.side === "defense" ? "Defense" : "Offense"} snapshot preview${s.artShadow ? `, the ${other} faded` : ""}`}
-              className="mx-auto w-full max-w-[360px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+              className="mx-auto w-full max-w-[360px] flex-none overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
               dangerouslySetInnerHTML={{ __html: playSvg(s.players, { show: s.artShadow ? "both" : s.side, side: s.side, noRunZones, box: { pw: 660, ph: 360 } }) }}
             />
-            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small">
+            <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
               <input
                 type="checkbox"
                 checked={s.artShadow}
@@ -375,8 +375,10 @@ export function App() {
               />
               {other === "offense" ? "Offense" : "Defense"} in play art
             </label>
-            <span className="-mt-2 text-caption leading-note text-ink-muted">Draws the {other} faded in the snapshot, and on this play&apos;s thumbnail and printouts.</span>
-            <button type="button" className={`${pillSm} self-start px-4 py-1`} onClick={copyShare}>Copy snapshot link</button>
+            <span className="-mt-2 flex-none text-caption leading-note text-ink-muted">
+              Draws the {other} faded in the snapshot, and on this play&apos;s thumbnail and printouts once it is saved.
+            </span>
+            <button type="button" className={`${pillSm} flex-none self-start px-4 py-1`} onClick={copyShare}>Copy snapshot link</button>
           </section>
         </div>
       )}

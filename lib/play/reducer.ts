@@ -4,6 +4,8 @@ import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from
 
 export interface PlayState extends Doc, History {
   artShadow: boolean;
+  /** the field's shadow is on only because ticking the pictures' choice put it there */
+  shadowForArt: boolean;
   /** the saved play this one came from, so Save updates it instead of adding another */
   id: string | null;
   selectedId: string | null;
@@ -55,6 +57,7 @@ export function initialState(): PlayState {
     notes: "",
     side: "offense",
     artShadow: false,
+    shadowForArt: false,
     players: defaults(),
     selectedId: null,
     targeting: false,
@@ -118,9 +121,16 @@ function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
  * The incoming play's own pictures choice, never the one from the play you left. A play whose
  * pictures include the other team opens with it on the field, so the coach sees what prints.
  */
-function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "vis"> {
+function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "shadowForArt" | "vis"> {
   const artShadow = doc.artShadow === true;
-  return { artShadow, ...(artShadow ? { vis: "both" } : follow(s, doc)) };
+  return { artShadow, shadowForArt: false, ...(artShadow ? { vis: "both" } : follow(s, doc)) };
+}
+
+/** The field's shadow shown or hidden; hiding it takes that player off the field, so stop editing them. */
+function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
+  const picked = selected(s);
+  if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: false, draft: null };
+  return { ...s, vis };
 }
 
 /** Replaces the whole document and drops undo and redo, which belong to the play you left. */
@@ -313,15 +323,15 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "setShadow": {
       const vis = a.on ? "both" as const : s.side;
       if (vis === s.vis) return s;
-      const picked = selected(s);
-      // hiding the shadow takes that player off the field, so stop editing them
-      if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: false, draft: null };
-      return { ...s, vis };
+      // the coach's own choice now, whatever put the shadow there
+      return withVis({ ...s, shadowForArt: false }, vis);
     }
     case "setArtShadow":
-      // not an edit to the diagram, so not undoable, like the name; it never hides the field's shadow
+      // not an edit to the diagram, so not undoable, like the name. Ticking shows the field's
+      // shadow so the coach sees what prints; unticking hides it again only if ticking showed it.
       if (a.on === s.artShadow) return s;
-      return { ...s, artShadow: a.on, vis: a.on ? "both" : s.vis };
+      if (a.on) return { ...s, artShadow: true, shadowForArt: s.vis !== "both", vis: "both" };
+      return withVis({ ...s, artShadow: false, shadowForArt: false }, s.shadowForArt ? s.side : s.vis);
   }
 }
 

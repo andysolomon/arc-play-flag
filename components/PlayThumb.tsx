@@ -24,13 +24,18 @@ function PlayThumbImpl({ players, name, side, artShadow = false, className = "" 
     () => playArt(players, { showYardNumbers: false, noRunZones, show: artShadow ? "both" : side, side }),
     [players, side, artShadow, noRunZones],
   );
-  // the coverage stamp in words, for a named picture of a defensive call
-  const cover = side === "defense" && name ? coverageOf(players) : null;
+  // what the stamp and the fade show, in words, for a named picture
+  const cover = side === "defense" ? coverageOf(players) : null;
+  const label = !name ? name : [
+    name,
+    cover ? `${COVERAGE_WORDS[cover]} coverage` : null,
+    artShadow ? `the ${side === "defense" ? "offense" : "defense"} faded` : null,
+  ].filter(Boolean).join(", ");
   return (
     <svg
       viewBox={art.viewBox}
       role="img"
-      aria-label={cover ? `${name}, ${COVERAGE_WORDS[cover]} coverage` : name}
+      aria-label={label}
       className={`block h-auto w-full rounded-field border-2 border-ink bg-turf ${className}`}
       dangerouslySetInnerHTML={{ __html: art.body }}
     />
