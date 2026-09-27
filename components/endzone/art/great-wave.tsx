@@ -429,7 +429,8 @@ export function GreatWaveArt({ w, h, label, celebrate }: ArtProps) {
       </defs>
       <rect width={w} height={h} fill={SKY} style={{ fill: `url(#${id}-sky)` }} />
       <rect y={num(horizon)} width={w} height={num(h - horizon)} fill={HAZE} />
-      <Fuji x={fujiX} base={horizon} fw={fw} fh={fh} />
+      {/* its foot sunk a little into the sea, so no seam of sky shows along it */}
+      <Fuji x={fujiX} base={horizon + h * 0.02} fw={fw} fh={fh} />
       <g className="ez-great-wave-heave">
         <Swell w={w} h={h} pitch={h * 1.5} trough={horizon + h * 0.1} rise={h * 0.16} body={BLUE} streak={null} dur={60} />
       </g>
