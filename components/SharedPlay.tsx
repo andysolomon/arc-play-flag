@@ -34,7 +34,7 @@ export function SharedPlay({ id, name, players, side, noRunZones, artShadow = fa
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 print:hidden">
         <Sticker icon="football" size={26} className="flex-none" priority />
         <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
-        <span className="min-w-0 truncate whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot</span>
+        <span className="min-w-0 shrink-[100] truncate whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot</span>
         <span className="flex-1" />
         <Link href={`/?p=${id}`} className={`${pillSm} inline-flex items-center !text-ink no-underline`}>
           Open in designer ›

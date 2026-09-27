@@ -543,8 +543,6 @@ function FieldImpl({
               </g>
             );
           })}
-          {/* under the tokens, so rings stay whole; none while the players run, since they would stay behind */}
-          {!playing && <ManTagLayer tags={tags} />}
           {visible.map((p) => (
             <PlayerToken
               key={p.id}
@@ -562,6 +560,8 @@ function FieldImpl({
               onKeyDown={onKey}
             />
           ))}
+          {/* over the players, so no neighbour hides one; none while they run, since the tags would stay behind */}
+          {!playing && <ManTagLayer tags={tags} />}
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>
         <PlayButton playing={playing} onClick={playing ? stop : play} />
