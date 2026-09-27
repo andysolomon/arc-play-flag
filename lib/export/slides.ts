@@ -36,6 +36,7 @@
 
 import { assignmentLine, assignments, callLine, callName, headerLine, type Assignment } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
+import { hasNoRunZones } from "@/lib/play/storage";
 import type { Team, TeamSettings } from "@/lib/play/types";
 import { esc } from "@/lib/render/play-svg";
 import { fitField, playSlot } from "./binder";
@@ -139,7 +140,7 @@ function titleSlide(items: readonly Numbered[], bookTitle: string, teamName: str
   };
 }
 
-function glanceSlide(slice: readonly Numbered[], total: number, bookTitle: string, teamName: string, band: string): SlidePlan {
+function glanceSlide(slice: readonly Numbered[], total: number, bookTitle: string, teamName: string, band: string, team: TeamSettings): SlidePlan {
   const a = slice[0]?.n ?? 0, b = slice[slice.length - 1]?.n ?? 0;
   const range = a === b ? String(a) : `${String(a)}–${String(b)}`;
   const out: string[] = [paper(band)];
@@ -147,7 +148,7 @@ function glanceSlide(slice: readonly Numbered[], total: number, bookTitle: strin
   out.push(text(924, 62, 22, `${range} of ${String(total)}`, { anchor: "end", fill: MUTED }));
   slice.forEach((item, i) => {
     const col = i % 3, row = Math.floor(i / 3);
-    out.push(playSlot(item, 36 + col * 304, 88 + row * 218, 280, 196, undefined, 16, 24, 2));
+    out.push(playSlot(item, 36 + col * 304, 88 + row * 218, 280, 196, { team }, 16, 24, 2));
   });
   out.push(footer(teamName, bookTitle));
   return {
@@ -205,7 +206,7 @@ function panelRows(as: readonly Assignment[], budget: number): { s: number; rows
   return { s: 22, rows: one.slice(0, k), more: one.length - k };
 }
 
-function playSlide(item: Numbered, bookTitle: string, teamName: string, band: string): SlidePlan {
+function playSlide(item: Numbered, bookTitle: string, teamName: string, band: string, team: TeamSettings): SlidePlan {
   const play = item.play, show = playShow(play), notes = play.notes;
   const out: string[] = [paper(band)];
 
@@ -224,7 +225,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   const f = fitField(play.players, 520, 408, show);
   const fx = 36 + (520 - f.w) / 2, fy = 100;
   out.push(`<rect x="${f2(fx)}" y="${f2(fy + 7)}" width="${f2(f.w)}" height="${f2(f.h)}" rx="6" fill="${INK}" opacity="0.14"/>`);
-  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show }, 3));
+  out.push(field(play.players, fx, fy, f.w, f.h, { level: "detailed", show, noRunZones: hasNoRunZones(team) }, 3));
 
   // who does what
   out.push(`<rect x="580" y="104" width="340" height="408" rx="14" fill="${INK}" opacity="0.14"/>`);
@@ -302,9 +303,9 @@ export function slidePlans(items: readonly Numbered[], o: SlidesOptions): DeckPl
   if (book.length) {
     slides.push(titleSlide(book, bookTitle, teamName, band));
     if (book.length > 1) {
-      for (let i = 0; i < book.length; i += GLANCE) slides.push(glanceSlide(book.slice(i, i + GLANCE), book.length, bookTitle, teamName, band));
+      for (let i = 0; i < book.length; i += GLANCE) slides.push(glanceSlide(book.slice(i, i + GLANCE), book.length, bookTitle, teamName, band, o.team));
     }
-    for (const item of book) slides.push(playSlide(item, bookTitle, teamName, band));
+    for (const item of book) slides.push(playSlide(item, bookTitle, teamName, band, o.team));
   }
   return { title: bookTitle, band, slides };
 }
