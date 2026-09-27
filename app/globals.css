@@ -519,6 +519,563 @@
   --shadow-ink: initial;
 }
 
+/*
+ * End zones (lib/endzone.ts, components/endzone). Each design animates with its own keyframes on
+ * transform and opacity, and is drawn complete without them: the picker's swatches (.ez-still) and
+ * reduced motion hold every design still. None of it prints (the field marks it print:hidden).
+ */
+@layer components {
+  .ez-still, .ez-still * { animation: none !important; }
+
+  /* A touchdown's confetti: Celebration places and times each piece with the --ez-* variables. */
+  .ez-piece {
+    position: absolute;
+    left: var(--ez-x);
+    top: 0;
+    width: calc(7px * var(--ez-size));
+    height: calc(13px * var(--ez-size));
+    border-radius: 1px;
+    background: currentColor;
+    animation: ez-fall var(--ez-time) cubic-bezier(0.3, 0.1, 0.7, 1) var(--ez-delay) both;
+    will-change: transform, opacity;
+  }
+  .ez-piece[data-confetti="dot"] { width: calc(8px * var(--ez-size)); height: calc(8px * var(--ez-size)); border-radius: 50%; }
+  .ez-piece[data-confetti="petal"] { width: calc(13px * var(--ez-size)); height: calc(10px * var(--ez-size)); border-radius: 80% 0 80% 0; }
+  .ez-piece[data-confetti="star"] {
+    width: calc(14px * var(--ez-size));
+    height: calc(14px * var(--ez-size));
+    clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  }
+  .ez-piece[data-confetti="pixel"] { width: calc(9px * var(--ez-size)); height: calc(9px * var(--ez-size)); border-radius: 0; animation-timing-function: steps(16); }
+  .ez-piece[data-confetti="spark"] { width: 3px; height: calc(16px * var(--ez-size)); border-radius: 2px; box-shadow: 0 0 6px currentColor; }
+  .ez-piece[data-confetti="glyph"] {
+    width: auto;
+    height: auto;
+    background: none;
+    font: 700 calc(15px * var(--ez-size)) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-shadow: 0 0 6px currentColor;
+  }
+  [data-motion="drift"] > .ez-piece { animation-name: ez-drift; animation-timing-function: ease-in-out; }
+  [data-motion="rain"] > .ez-piece { animation-name: ez-rain; animation-timing-function: linear; }
+  [data-motion="burst"] > .ez-piece {
+    top: var(--ez-origin);
+    left: 50%;
+    animation-name: ez-burst;
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.35, 1);
+  }
+
+  .ez-banner {
+    transform: translate(-50%, -50%);
+    animation: ez-banner 3400ms ease-out both;
+  }
+  .ez-banner-word { font-size: clamp(26px, 11cqw, 60px); letter-spacing: 0.04em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-ez-art], [data-ez-art] * { animation: none !important; }
+    .ez-piece { display: none; }
+    .ez-banner { animation: none; }
+  }
+}
+
+@keyframes ez-fall {
+  from { transform: translate3d(0, -8cqh, 0) rotate(0deg); }
+  to { transform: translate3d(var(--ez-sway), 108cqh, 0) rotate(var(--ez-spin)); }
+}
+@keyframes ez-drift {
+  0% { transform: translate3d(0, -8cqh, 0) rotate(0deg); }
+  35% { transform: translate3d(var(--ez-sway), 30cqh, 0) rotate(calc(var(--ez-spin) * 0.4)); }
+  70% { transform: translate3d(calc(var(--ez-sway) * -0.5), 70cqh, 0) rotate(calc(var(--ez-spin) * 0.75)); }
+  100% { transform: translate3d(calc(var(--ez-sway) * 0.4), 108cqh, 0) rotate(var(--ez-spin)); }
+}
+@keyframes ez-rain {
+  0% { transform: translate3d(0, -8cqh, 0); opacity: 0; }
+  8%, 85% { opacity: 1; }
+  100% { transform: translate3d(0, 108cqh, 0); opacity: 0; }
+}
+@keyframes ez-burst {
+  0% { transform: translate3d(-50%, -50%, 0) scale(0.3) rotate(0deg); opacity: 1; }
+  45% { transform: translate3d(calc(-50% + var(--ez-dx)), calc(-50% + var(--ez-dy)), 0) scale(1) rotate(calc(var(--ez-spin) * 0.5)); opacity: 1; }
+  100% { transform: translate3d(calc(-50% + var(--ez-dx) * 1.15), calc(-50% + var(--ez-dy) + 22cqh), 0) scale(0.9) rotate(var(--ez-spin)); opacity: 0; }
+}
+@keyframes ez-banner {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  9% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  15%, 86% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.96); opacity: 0; }
+}
+
+/* End zone designs: each one's keyframes and classes, prefixed ez-<id>-. */
+
+/* Home Team: pennants flap and a sheen passes now and then; a touchdown runs the stripes, pops and flashes the name, spins the stars, whips the pennants and chases bulbs round the border. */
+.ez-home-flag {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: ez-home-flap 2.8s ease-in-out infinite;
+}
+.ez-home-flip .ez-home-flag { animation-delay: -1.4s; }
+.ez-home-sheen { animation: ez-home-sheen 11s ease-in-out 1.5s infinite; }
+.ez-home-name, .ez-home-star { transform-box: fill-box; transform-origin: center; }
+.ez-home-party .ez-home-stripes { animation: ez-home-march 0.42s linear 8; }
+.ez-home-party .ez-home-name { animation: ez-home-pop 0.84s cubic-bezier(0.3, 1.5, 0.5, 1) 4; }
+.ez-home-party .ez-home-flag { animation: ez-home-whip 0.36s ease-in-out 9; }
+.ez-home-party .ez-home-flip .ez-home-flag { animation-delay: -0.18s; }
+.ez-home-party .ez-home-star { animation: ez-home-spin 0.8s cubic-bezier(0.4, 0, 0.3, 1) 4; }
+.ez-home-party .ez-home-sheen { animation: none; }
+.ez-home-flash { animation: ez-home-flash 0.3s steps(1, end) 10; }
+.ez-home-bulbs { animation: ez-home-chase 0.42s steps(1, end) 8; }
+.ez-home-bulbs-1 { animation-delay: -0.14s; }
+.ez-home-bulbs-2 { animation-delay: -0.28s; }
+
+@keyframes ez-home-flap {
+  0%, 100% { transform: skewY(0deg) scaleX(1); }
+  30% { transform: skewY(4deg) scaleX(0.94); }
+  65% { transform: skewY(-3deg) scaleX(0.97); }
+}
+@keyframes ez-home-whip {
+  0%, 100% { transform: skewY(0deg) scaleX(1); }
+  25% { transform: skewY(13deg) scaleX(0.84); }
+  75% { transform: skewY(-13deg) scaleX(0.9); }
+}
+@keyframes ez-home-sheen {
+  0% { transform: translateX(0); }
+  22%, 100% { transform: translateX(var(--ez-home-travel)); }
+}
+@keyframes ez-home-march {
+  to { transform: translateX(var(--ez-home-run)); }
+}
+@keyframes ez-home-pop {
+  0%, 100% { transform: scale(1); }
+  20% { transform: scale(1.18); }
+  42% { transform: scale(0.98); }
+}
+@keyframes ez-home-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.4); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes ez-home-flash {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes ez-home-chase {
+  0% { opacity: 1; }
+  33.3% { opacity: 0; }
+}
+
+/* Synthwave '84: the grid rolls in towards the goal line, the sun's slits drift down as it breathes, stars twinkle, palms sway and the neon hums; a touchdown races the grid and swaps its neon, pulses the sun, strobes the lettering, swings searchlights and sends shooting stars. */
+.ez-synthwave-grid, .ez-synthwave-slits, .ez-synthwave-frond { transform-box: view-box; }
+.ez-synthwave-grid { animation: ez-synthwave-zoom 3s linear infinite; }
+.ez-synthwave-slits { animation: ez-synthwave-zoom 7s linear infinite; }
+.ez-synthwave-frond { animation: ez-synthwave-sway 5.2s ease-in-out infinite alternate; }
+.ez-synthwave-halo, .ez-synthwave-star, .ez-synthwave-word, .ez-synthwave-glint { transform-box: fill-box; transform-origin: center; }
+.ez-synthwave-sun { transform-box: fill-box; transform-origin: 50% 100%; }
+.ez-synthwave-halo { animation: ez-synthwave-breathe 5s ease-in-out infinite; }
+.ez-synthwave-star { animation: ez-synthwave-twinkle 3.6s ease-in-out infinite; }
+.ez-synthwave-glow { animation: ez-synthwave-hum 9s linear infinite; }
+.ez-synthwave-glint { animation: ez-synthwave-glint 6s ease-in-out infinite; }
+
+.ez-synthwave-party .ez-synthwave-grid { animation-duration: 0.42s; }
+.ez-synthwave-party .ez-synthwave-slits { animation-duration: 0.9s; }
+.ez-synthwave-party .ez-synthwave-frond { animation-duration: 0.45s; }
+.ez-synthwave-party .ez-synthwave-star { animation-duration: 0.7s; }
+.ez-synthwave-party .ez-synthwave-sun { animation: ez-synthwave-pulse 0.85s ease-in-out 4; }
+.ez-synthwave-party .ez-synthwave-halo { animation: ez-synthwave-blaze 0.85s ease-in-out 4; }
+.ez-synthwave-party .ez-synthwave-word { animation: ez-synthwave-pop 0.85s cubic-bezier(0.3, 1.6, 0.5, 1) 4; }
+.ez-synthwave-party .ez-synthwave-glint { animation-duration: 0.85s; animation-iteration-count: 4; }
+.ez-synthwave-party .ez-synthwave-glow { animation: ez-synthwave-strobe 1.7s linear 2; }
+/* drawn only during a touchdown, hidden at rest, so reduced motion simply leaves them out */
+.ez-synthwave-afterglow { animation: ez-synthwave-afterglow 0.85s ease-in-out 4 both; }
+.ez-synthwave-ignite { animation: ez-synthwave-ignite 3.4s ease-out both; }
+.ez-synthwave-beam { animation: ez-synthwave-sweep 1.1s ease-in-out infinite alternate, ez-synthwave-fade 3.4s linear both; }
+.ez-synthwave-beam-1, .ez-synthwave-beam-3 { animation-name: ez-synthwave-sweep-back, ez-synthwave-fade; }
+.ez-synthwave-beam-2, .ez-synthwave-beam-3 { animation-duration: 1.45s, 3.4s; animation-delay: -0.6s, 0s; }
+.ez-synthwave-meteor { animation: ez-synthwave-meteor 1.3s cubic-bezier(0.3, 0.5, 0.6, 1) 2 both; }
+
+/* scales by STEP (1.7) in components/endzone/art/synthwave.tsx, in quarter powers so the roll keeps an even pace */
+@keyframes ez-synthwave-zoom {
+  0% { transform: scaleY(1); }
+  25% { transform: scaleY(1.14186); }
+  50% { transform: scaleY(1.30384); }
+  75% { transform: scaleY(1.48881); }
+  100% { transform: scaleY(1.7); }
+}
+@keyframes ez-synthwave-sway {
+  from { transform: rotate(-2.5deg); }
+  to { transform: rotate(2.5deg); }
+}
+@keyframes ez-synthwave-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.7; }
+}
+@keyframes ez-synthwave-twinkle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.55); opacity: 0.35; }
+}
+@keyframes ez-synthwave-hum {
+  0%, 90%, 92%, 94%, 100% { opacity: 1; }
+  91% { opacity: 0.5; }
+  93% { opacity: 0.7; }
+}
+@keyframes ez-synthwave-glint {
+  0%, 74% { transform: scale(1) rotate(0deg); }
+  86% { transform: scale(1.5) rotate(45deg); }
+  98%, 100% { transform: scale(1) rotate(90deg); }
+}
+@keyframes ez-synthwave-pulse {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.12); }
+}
+@keyframes ez-synthwave-blaze {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.45); opacity: 1; }
+}
+@keyframes ez-synthwave-pop {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.14); }
+  50% { transform: scale(0.98); }
+}
+@keyframes ez-synthwave-strobe {
+  0%, 9%, 16%, 30%, 38%, 60%, 64%, 100% { opacity: 1; }
+  6%, 12%, 34%, 62% { opacity: 0.15; }
+}
+@keyframes ez-synthwave-afterglow {
+  0%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+@keyframes ez-synthwave-ignite {
+  0% { opacity: 0; }
+  6%, 30%, 55% { opacity: 1; }
+  18%, 42% { opacity: 0.35; }
+  80% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+@keyframes ez-synthwave-sweep {
+  from { transform: rotate(-80deg); }
+  to { transform: rotate(-16deg); }
+}
+@keyframes ez-synthwave-sweep-back {
+  from { transform: rotate(80deg); }
+  to { transform: rotate(16deg); }
+}
+@keyframes ez-synthwave-fade {
+  0%, 100% { opacity: 0; }
+  10%, 80% { opacity: 0.42; }
+}
+@keyframes ez-synthwave-meteor {
+  0% { transform: translateX(-20px); opacity: 0; }
+  15%, 65% { opacity: 1; }
+  100% { transform: translateX(190px); opacity: 0; }
+}
+
+/* Sakura: loose petals drift across on the breeze, each tumbling round a pivot of its own (components/endzone/art/sakura.tsx sets the pivots and the turns), and the boughs sway; a touchdown blows a gust through it: the boughs shake, the blossom bounces, buds burst open, the seal stamps down and clumps of petals whirl off the branches and away. */
+.ez-sakura-bough { transform-box: view-box; animation: ez-sakura-sway 7s ease-in-out infinite; }
+.ez-sakura-bough-right { animation-delay: -3.4s; }
+.ez-sakura-drift, .ez-sakura-gust, .ez-sakura-bunch, .ez-sakura-bloom, .ez-sakura-seal { transform-box: fill-box; transform-origin: center; }
+.ez-sakura-drift { animation: ez-sakura-drift 18s linear infinite; }
+
+.ez-sakura-party .ez-sakura-bough { animation: ez-sakura-shake 3.1s ease-out; }
+/* the gust reaches the far bough a beat later */
+.ez-sakura-party .ez-sakura-bough-right { animation-delay: 0.2s; }
+.ez-sakura-party .ez-sakura-bunch { animation: ez-sakura-bounce 1.3s ease-out 2; }
+.ez-sakura-party .ez-sakura-seal { animation: ez-sakura-stamp 1.2s ease-out 0.25s both; }
+/* drawn only during a touchdown; the gust is hidden at rest, so reduced motion leaves it out and shows the opened buds still */
+.ez-sakura-gust { animation: ez-sakura-gust 2.4s ease-in both; }
+.ez-sakura-bloom { animation: ez-sakura-bloom 2.5s ease-out both; }
+
+@keyframes ez-sakura-sway {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(0.9deg); }
+  70% { transform: rotate(-0.7deg); }
+}
+@keyframes ez-sakura-shake {
+  0%, 100% { transform: rotate(0deg); }
+  6% { transform: rotate(3.2deg); }
+  13% { transform: rotate(-2.6deg); }
+  21% { transform: rotate(2.2deg); }
+  30% { transform: rotate(-1.6deg); }
+  41% { transform: rotate(1.1deg); }
+  55% { transform: rotate(-0.6deg); }
+  72% { transform: rotate(0.3deg); }
+}
+@keyframes ez-sakura-bounce {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  12% { transform: scale(1.3) rotate(-7deg); }
+  26% { transform: scale(0.92) rotate(4deg); }
+  40% { transform: scale(1.1) rotate(-2deg); }
+  56% { transform: scale(0.98) rotate(1deg); }
+  72% { transform: scale(1.03) rotate(0deg); }
+}
+@keyframes ez-sakura-bloom {
+  0% { transform: scale(0.1) rotate(-140deg); opacity: 0; }
+  16% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+  26%, 80% { transform: scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(0.4) rotate(40deg); opacity: 0; }
+}
+@keyframes ez-sakura-stamp {
+  0% { transform: scale(1); opacity: 1; }
+  12% { transform: scale(1.45) rotate(-12deg); opacity: 0.55; }
+  30% { transform: scale(0.88) rotate(0deg); opacity: 1; }
+  42% { transform: scale(1.06); }
+  56%, 100% { transform: scale(1); }
+}
+/* turning round a pivot off its middle, a petal bobs and tumbles as it crosses; it wraps out of sight */
+@keyframes ez-sakura-drift {
+  from { transform: translateX(var(--ez-sakura-from)) rotate(var(--ez-sakura-tilt)); }
+  to { transform: translateX(var(--ez-sakura-to)) rotate(var(--ez-sakura-end)); }
+}
+/* a clump bursts off the bough and loops round its pivot, then the wind takes it */
+@keyframes ez-sakura-gust {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; animation-timing-function: ease-out; }
+  8%, 80% { opacity: 1; }
+  35% { transform: translate(var(--ez-sakura-whirl), 0) rotate(calc(var(--ez-sakura-turn) * 0.6)); }
+  100% { transform: translate(var(--ez-sakura-span), var(--ez-sakura-bob)) rotate(var(--ez-sakura-turn)); opacity: 0; }
+}
+
+/* Matrix: code rains down a row at a time and the cursor blinks; a touchdown floods the band with a sheet of drops, rushes every column, flashes the screen and decodes the lettering from falling code. */
+.ez-matrix-fall, .ez-matrix-rush, .ez-matrix-wave, .ez-matrix-reel { transform-box: view-box; transform-origin: 0 0; }
+.ez-matrix-glitch { transform-box: fill-box; transform-origin: center; }
+/* PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next */
+.ez-matrix-fall { animation: ez-matrix-fall 6s steps(24) infinite; }
+.ez-matrix-cursor { animation: ez-matrix-blink 1.1s step-end infinite; }
+
+.ez-matrix-party .ez-matrix-rush { animation: ez-matrix-fall 0.8s steps(24) 4; }
+.ez-matrix-party .ez-matrix-cursor { animation-duration: 0.3s; }
+.ez-matrix-party .ez-matrix-glitch { animation: ez-matrix-glitch 3.4s linear both; }
+.ez-matrix-party .ez-matrix-frame { animation: ez-matrix-flicker 3.4s linear both; }
+/* drawn only during a touchdown, at rest where reduced motion leaves them: the wave and flash unseen, each letter landed */
+.ez-matrix-wave { animation: ez-matrix-wave 1.6s linear 2 both; }
+.ez-matrix-flash { animation: ez-matrix-flash 0.9s ease-out both; }
+.ez-matrix-reel { animation: ez-matrix-reel 1s steps(8) both; }
+
+@keyframes ez-matrix-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(240px); }
+}
+@keyframes ez-matrix-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+/* WAVE (6 rows) of trail over a band at most 4 rows deep: 10 rows carries it right through */
+@keyframes ez-matrix-wave {
+  0% { transform: translateY(0); opacity: 1; }
+  55% { transform: translateY(100px); opacity: 1; }
+  56%, 100% { transform: translateY(100px); opacity: 0; }
+}
+@keyframes ez-matrix-flash {
+  0% { opacity: 0.45; }
+  100% { opacity: 0; }
+}
+/* REEL (8) glyphs a plate's height (14.5) apart, falling through the letter's cell */
+@keyframes ez-matrix-reel {
+  from { transform: translateY(-116px); }
+  to { transform: translateY(0); }
+}
+@keyframes ez-matrix-glitch {
+  0%, 18%, 66%, 74%, 100% { transform: none; }
+  2% { transform: translateX(-3px) skewX(-8deg); }
+  5% { transform: translateX(2.5px); }
+  8% { transform: translateX(-1.5px) skewX(6deg); }
+  11% { transform: translateX(2px) scaleY(0.9); }
+  14% { transform: translateX(-1px); }
+  68% { transform: translateX(2px) skewX(-6deg); }
+  70% { transform: translateX(-2px); }
+  72% { transform: translateX(1px) skewX(4deg); }
+}
+@keyframes ez-matrix-flicker {
+  0%, 1.9%, 4%, 5.9%, 8%, 9.9%, 12%, 13.9% { opacity: 1; }
+  2%, 3.9%, 6%, 7.9%, 10%, 11.9% { opacity: 0.2; }
+  14%, 100% { opacity: 1; }
+}
+
+/* Great Wave: the swell rolls in band by band and the big wave breathes; a touchdown sends a broader wave surging through, flinging spray off the crests, as the sea heaves, the big wave lunges and the seal rocks. Every touchdown animation is over by 3.3s, inside the 3.4s celebration. */
+.ez-great-wave-roll { animation: ez-great-wave-roll 16s linear infinite; }
+.ez-great-wave-big, .ez-great-wave-rear { transform-box: fill-box; transform-origin: 20% 100%; }
+.ez-great-wave-big { animation: ez-great-wave-breathe 7s ease-in-out infinite; }
+.ez-great-wave-fleck, .ez-great-wave-seal { transform-box: fill-box; transform-origin: center; }
+.ez-great-wave-fleck { animation: ez-great-wave-twinkle 5s ease-in-out infinite; }
+
+.ez-great-wave-party { --ez-great-wave-surge: 2.6s; }
+/* on a wrapper, so the big wave lunges on top of its breathing rather than snapping out of it */
+.ez-great-wave-party .ez-great-wave-rear { animation: ez-great-wave-rear 1.6s ease-in-out 2; }
+.ez-great-wave-party .ez-great-wave-heave { animation: ez-great-wave-heave 1.05s ease-in-out 3; }
+.ez-great-wave-party .ez-great-wave-heave-near { animation-delay: 0.15s; }
+.ez-great-wave-party .ez-great-wave-seal { animation: ez-great-wave-rock 1.2s ease-in-out 0.9s 2; }
+/* drawn only during a touchdown and out of sight at rest, so reduced motion simply leaves them out */
+.ez-great-wave-surge { animation: ez-great-wave-surge var(--ez-great-wave-surge) linear both; }
+.ez-great-wave-spray { opacity: 0; transform-box: fill-box; transform-origin: 30% 100%; animation: ez-great-wave-spray 1s ease-out calc(var(--ez-great-wave-at) * var(--ez-great-wave-surge)) both; }
+
+@keyframes ez-great-wave-roll {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--ez-great-wave-tile)); }
+}
+@keyframes ez-great-wave-breathe {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); }
+  50% { transform: scale(1.015, 1.04) rotate(-0.6deg); }
+}
+@keyframes ez-great-wave-twinkle {
+  0%, 100% { opacity: 1; transform: translate(0, 0); }
+  50% { opacity: 0.3; transform: translate(1px, 1.5px); }
+}
+/* the crest already brushes the band's top, so the wave gathers back and down, then throws itself forward, never up */
+@keyframes ez-great-wave-rear {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); }
+  30% { transform: scale(0.97, 0.95) rotate(-1.5deg); }
+  62% { transform: scale(1.08, 0.99) rotate(4deg); }
+}
+@keyframes ez-great-wave-heave {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-3px); }
+  75% { transform: translateY(1px); }
+}
+@keyframes ez-great-wave-rock {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(-5deg) translateY(-2px); }
+  60% { transform: rotate(4deg) translateY(1px); }
+}
+@keyframes ez-great-wave-surge {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--ez-great-wave-run)); }
+}
+@keyframes ez-great-wave-spray {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.3); }
+  10%, 70% { opacity: 1; }
+  45% { transform: translate(calc(var(--ez-great-wave-dx) * 0.6), var(--ez-great-wave-dy)) scale(1); }
+  100% { transform: translate(var(--ez-great-wave-dx), calc(var(--ez-great-wave-dy) * -0.3)) scale(0.9) rotate(20deg); opacity: 0; }
+}
+
+/* 8-Bit: coins spin, ? blocks shimmer, clouds drift a pixel at a time and the 1UP blinks; a touchdown bumps the ? blocks and the title card, popping coins out, ripples the bricks, flickers END ZONE through a star's colours, spins the coins up and flashes the 1UP. */
+.ez-eight-bit-coin, .ez-eight-bit-flip, .ez-eight-bit-bump, .ez-eight-bit-ripple, .ez-eight-bit-pop, .ez-eight-bit-clouds { transform-box: fill-box; transform-origin: center; }
+.ez-eight-bit-coin { animation: ez-eight-bit-spin 1s steps(1, end) infinite; }
+/* CLOUD_REPEAT pixels in components/endzone/art/eight-bit.tsx, a pixel a step */
+.ez-eight-bit-clouds { animation: ez-eight-bit-drift 40s steps(120) infinite; }
+.ez-eight-bit-shimmer { animation: ez-eight-bit-shimmer 1.6s steps(3, end) infinite; }
+.ez-eight-bit-oneup { animation: ez-eight-bit-blink 1.4s steps(1, end) infinite; }
+
+.ez-eight-bit-party .ez-eight-bit-coin { animation-duration: 0.36s; }
+.ez-eight-bit-party .ez-eight-bit-shimmer { animation-duration: 0.4s; }
+.ez-eight-bit-party .ez-eight-bit-bump { animation: ez-eight-bit-bump 1s steps(1, end) 3; }
+.ez-eight-bit-party .ez-eight-bit-oneup { animation: ez-eight-bit-blink 0.2s steps(1, end) 17; }
+/* drawn only during a touchdown, so reduced motion simply leaves them still or unseen */
+.ez-eight-bit-ripple { animation: ez-eight-bit-bump 1s steps(1, end) 3; }
+.ez-eight-bit-pop { opacity: 0; animation: ez-eight-bit-pop 1s steps(4, end) 3 both; }
+.ez-eight-bit-flip { animation: ez-eight-bit-spin 0.24s steps(1, end) infinite; }
+.ez-eight-bit-star { animation: ez-eight-bit-star 0.32s steps(1, end) 10; }
+
+/* a coin's turn, a frame at a time: face on, narrowing to its edge, then its back */
+@keyframes ez-eight-bit-spin {
+  0% { transform: scaleX(1); }
+  25% { transform: scaleX(0.6); }
+  50% { transform: scaleX(0.2); }
+  75% { transform: scaleX(-0.6); }
+}
+@keyframes ez-eight-bit-drift {
+  to { transform: translateX(-120px); }
+}
+@keyframes ez-eight-bit-shimmer {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+@keyframes ez-eight-bit-blink {
+  50% { opacity: 0; }
+}
+@keyframes ez-eight-bit-star {
+  0% { opacity: 1; }
+  25%, 100% { opacity: 0; }
+}
+/* knocked up two pixels from below and dropped back */
+@keyframes ez-eight-bit-bump {
+  0%, 20%, 100% { transform: translateY(0); }
+  5%, 15% { transform: translateY(-1px); }
+  10% { transform: translateY(-2px); }
+}
+/* a coin's flight: a parabola peaking a third of the way out, in 16 frames a second */
+@keyframes ez-eight-bit-pop {
+  0% { opacity: 1; transform: translate(0, 0); }
+  15% { transform: translate(calc(var(--ez-eight-bit-dx) * 0.15), calc(var(--ez-eight-bit-rise) * 0.75)); }
+  30% { transform: translate(calc(var(--ez-eight-bit-dx) * 0.3), var(--ez-eight-bit-rise)); }
+  50% { transform: translate(calc(var(--ez-eight-bit-dx) * 0.5), calc(var(--ez-eight-bit-rise) * 0.92)); }
+  70% { opacity: 1; }
+  75% { transform: translate(calc(var(--ez-eight-bit-dx) * 0.75), calc(var(--ez-eight-bit-rise) * 0.59)); }
+  100% { opacity: 0; transform: translate(var(--ez-eight-bit-dx), 0); }
+}
+
+/* Event Horizon: the accretion disk swirls, inner streams faster, the stars twinkle and the lensed light shimmers; a touchdown flares the disk and spins it up, streaks the stars in at warp, ripples rings out from the hole and tugs the lettering towards it. */
+.ez-event-horizon-swirl, .ez-event-horizon-spin, .ez-event-horizon-halo, .ez-event-horizon-spark, .ez-event-horizon-hole, .ez-event-horizon-flare, .ez-event-horizon-ripple { transform-box: fill-box; transform-origin: center; }
+.ez-event-horizon-lens { animation: ez-event-horizon-shimmer 7s ease-in-out infinite; }
+.ez-event-horizon-word { transform-box: fill-box; }
+/* the disk turns so its left side swings towards us, the side that burns brighter */
+.ez-event-horizon-swirl { animation: ez-event-horizon-orbit 26s linear infinite; }
+.ez-event-horizon-inner { animation-duration: 8s; }
+/* each set of stars keeps its own beat, which a touchdown quickens to a frantic twinkle */
+.ez-event-horizon-twinkle { animation: ez-event-horizon-twinkle var(--ez-event-horizon-beat) ease-in-out infinite; }
+.ez-event-horizon-spark { animation: ez-event-horizon-glint var(--ez-event-horizon-beat) ease-in-out infinite; }
+.ez-event-horizon-halo { animation: ez-event-horizon-breathe 6s ease-in-out infinite; }
+
+.ez-event-horizon-party .ez-event-horizon-twinkle, .ez-event-horizon-party .ez-event-horizon-spark { animation-duration: 0.6s; }
+.ez-event-horizon-party .ez-event-horizon-spin { animation: ez-event-horizon-spinup 3.4s cubic-bezier(0.45, 0, 0.25, 1) both; }
+.ez-event-horizon-party .ez-event-horizon-halo { animation: ez-event-horizon-blaze 0.85s ease-in-out 4; }
+.ez-event-horizon-party .ez-event-horizon-lens { animation-duration: 0.85s; }
+.ez-event-horizon-party .ez-event-horizon-hole { animation: ez-event-horizon-gulp 0.85s cubic-bezier(0.3, 1.5, 0.5, 1) 4; }
+.ez-event-horizon-party .ez-event-horizon-word { animation: ez-event-horizon-tug 1.1s ease-in-out 3; }
+/* drawn only during a touchdown, hidden at rest, so reduced motion simply leaves them out */
+.ez-event-horizon-flare { animation: ez-event-horizon-flare 3.4s ease-out both; }
+.ez-event-horizon-warp { transform-box: fill-box; transform-origin: 0% 50%; animation: ez-event-horizon-warp 1.2s cubic-bezier(0.55, 0, 0.9, 0.6) 2 both; }
+.ez-event-horizon-ripple { animation: ez-event-horizon-ripple 1.2s ease-out 2 both; }
+
+@keyframes ez-event-horizon-orbit {
+  to { transform: rotate(-360deg); }
+}
+@keyframes ez-event-horizon-spinup {
+  to { transform: rotate(-1080deg); }
+}
+@keyframes ez-event-horizon-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes ez-event-horizon-glint {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: scale(0.45) rotate(45deg); opacity: 0.5; }
+}
+@keyframes ez-event-horizon-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.75; }
+}
+@keyframes ez-event-horizon-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+@keyframes ez-event-horizon-blaze {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.5); }
+}
+@keyframes ez-event-horizon-gulp {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.14); }
+  60% { transform: scale(0.97); }
+}
+@keyframes ez-event-horizon-tug {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  40% { transform: translateX(var(--ez-event-horizon-pull)) scaleX(1.12); }
+  70% { transform: translateX(0) scaleX(0.98); }
+}
+@keyframes ez-event-horizon-flare {
+  0% { transform: scale(1); opacity: 0; }
+  12% { transform: scale(1.3); opacity: 0.9; }
+  60% { transform: scale(1.12); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 0; }
+}
+@keyframes ez-event-horizon-warp {
+  0% { transform: translateX(0) scaleX(0.1); opacity: 0; }
+  20% { transform: translateX(calc(var(--ez-event-horizon-fall) * 0.1)) scaleX(1); opacity: 1; }
+  85% { transform: translateX(calc(var(--ez-event-horizon-fall) * 0.9)) scaleX(1.4); opacity: 0.9; }
+  100% { transform: translateX(var(--ez-event-horizon-fall)) scaleX(0.1); opacity: 0; }
+}
+@keyframes ez-event-horizon-ripple {
+  0% { transform: scale(1); opacity: 0; }
+  10% { opacity: 0.9; }
+  100% { transform: scale(9); opacity: 0; }
+}
+
 /* Print: the field fills a letter page, play name as the title. */
 @media print {
   @page { size: letter; margin: 0.5in; }

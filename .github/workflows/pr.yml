@@ -86,6 +86,14 @@ jobs:
           path: test-results/man-coverage-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the end zones
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: end-zones
+          path: test-results/end-zones-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
