@@ -123,7 +123,9 @@ function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
  */
 function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "shadowForArt" | "vis"> {
   const artShadow = doc.artShadow === true;
-  return { artShadow, shadowForArt: false, ...(artShadow ? { vis: "both" } : follow(s, doc)) };
+  // a shadow the pictures' choice put on the field was never the coach's own preference
+  const base = follow(s.shadowForArt ? { ...s, vis: s.side } : s, doc).vis;
+  return { artShadow, shadowForArt: artShadow && base !== "both", vis: artShadow ? "both" : base };
 }
 
 /** The field's shadow shown or hidden; hiding it takes that player off the field, so stop editing them. */

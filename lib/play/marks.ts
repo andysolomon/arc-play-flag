@@ -19,8 +19,8 @@ import type { ZoneMap } from "./zones";
  *   each is an obstacle, and the first clear spot wins (below, inward, outward, above). When none
  *   is clear, the spot that does least harm wins: grazing a ring beats covering a player, and
  *   covering a player's centre (and label) is the worst of all.
- * - M6 a tag floats free of its defender: every spot tucks under the defender's own ring, which is
- *   drawn over it, so the ring, and a selection or highlight around it, stays whole.
+ * - M6 a tag floats free of its defender: every spot overlaps the defender's own ring by a couple of
+ *   units, as a name plate hangs off it. Tags are drawn over the players, so no neighbour can hide one.
  * - M7 an unlabelled receiver reads "on Player 2", as the slides name them; a receiver who is gone reads "Man".
  * - M8 a label breaks the markup: callers escape `text`.
  * - M9 the layout depends on storage order: defenders are laid out left to right (byLine).
@@ -51,8 +51,8 @@ export const STAMP_H = 32;
 export const STAMP_FONT = 22;
 export const STAMP_SPACING = 1.5;
 const TOKEN_R = 23;
-/** how far a tag tucks under its own defender's ring */
-const TUCK = 4;
+/** how far a tag overlaps its own defender's ring, just enough to hang off it */
+const TUCK = 2;
 /** tags keep this far inside the art's edges */
 const EDGE = 4;
 /** and this far off anything else */
@@ -148,7 +148,8 @@ export function manTags(
       }
       for (const t of placed) if (hitsBox(near, t)) harm += 200 + overlap(near, t) / 10;
       for (const b of avoid) if (hitsBox(near, b)) harm += 200 + overlap(near, b) / 10;
-      for (const e of bubbles) if (hitsEllipse(near, e)) harm += 30;
+      // a bubble shows through round a tag, so sitting on one costs less than cutting into a player
+      for (const e of bubbles) if (hitsEllipse(near, e)) harm += 10;
       if (harm < least) { best = { id: p.id, text, place: s.place, ...box }; least = harm; }
       if (harm === 0) break;
     }
