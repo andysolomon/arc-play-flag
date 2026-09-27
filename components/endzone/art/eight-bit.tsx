@@ -274,7 +274,8 @@ function Pops({ x, y, rise, i }: { x: number; y: number; rise: number; i: number
  * the 1UP.
  */
 export function EightBitArt({ w, h, label, celebrate }: ArtProps) {
-  const p = Math.max(2, Math.round(h / 28));
+  // a pixel a 28th of the band, but never so coarse the level runs out of width for its blocks and hills
+  const p = Math.max(2, Math.min(Math.round(h / 28), Math.floor(w / 100)));
   const cols = Math.ceil(w / p);
   const rows = Math.ceil(h / p);
   // the grid sits on the goal line; any part of a pixel left over is lost off the top
@@ -295,7 +296,18 @@ export function EightBitArt({ w, h, label, celebrate }: ArtProps) {
 
   // a coin over the left block when there's sky above it, else a row of three out beyond each block
   const coinRow = (x: number, n: number, y: number): Stamp[] => Array.from({ length: n }, (_, k) => ({ sprite: COIN, x: x + k * 9, y }));
-  const coins: Stamp[] = blocks.length === 0 ? [] : headroom ? coinRow(left + 3, 1, rowY - 11) : [...coinRow(left - 32, 3, rowY + 1), ...coinRow(right + ROW + 8, 3, rowY + 1)];
+  // only whole coins, a pixel clear of either edge; a side with room for none of its row keeps one midway between the edge and its block
+  const whole = (c: Stamp): boolean => c.x >= 1 && c.x + 6 <= cols - 1;
+  const beyond = (row: Stamp[], mid: number): Stamp[] => {
+    const kept = row.filter(whole);
+    return kept.length > 0 ? kept : coinRow(Math.round(mid - 3), 1, rowY + 1).filter(whole);
+  };
+  const coins: Stamp[] =
+    blocks.length === 0
+      ? []
+      : headroom
+        ? coinRow(left + 3, 1, rowY - 11).filter(whole)
+        : [...beyond(coinRow(left - 32, 3, rowY + 1), left / 2), ...beyond(coinRow(right + ROW + 8, 3, rowY + 1), (right + ROW + cols) / 2)];
   // the hills stoop to keep under a low sky
   const tall = Math.min(12, Math.max(6, ground - 5));
   const small = Math.round(tall * 0.6);
@@ -315,7 +327,7 @@ export function EightBitArt({ w, h, label, celebrate }: ArtProps) {
   const oneUp = lettering("1UP", MINI);
   // a pixel of green all round the text and its shadow
   const tagW = (oneUp[0]?.length ?? 0) + 2;
-  const tagAt = headroom ? { x: Math.round(right + (ROW - tagW) / 2), y: rowY - 9 } : { x: cols - tagW - 3, y: 1 };
+  const tagAt = headroom ? { x: Math.min(Math.round(right + (ROW - tagW) / 2), cols - tagW - 1), y: rowY - 9 } : { x: cols - tagW - 3, y: 1 };
 
   return (
     <g className={celebrate ? "ez-eight-bit-party" : undefined}>
