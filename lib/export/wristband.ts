@@ -1,3 +1,4 @@
+import { losOf } from "@/lib/play/field";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { TeamSettings, Vis } from "@/lib/play/types";
 import { artView, playerWithLabel, positionsOf, type Numbered } from "./numbered";
@@ -98,6 +99,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
       ...artView(item.play, o.vis),
       showYardNumbers: false,
       noRunZones: hasNoRunZones(o.team),
+      los: losOf(item.play),
       // a landscape cell: show only as much field as the cell's shape needs, so the play fills it
       minDepth: 14,
     }, 0.75),

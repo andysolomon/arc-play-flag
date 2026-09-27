@@ -1,3 +1,4 @@
+import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel } from "./field";
 import { DEF, ROUTES, inkFor, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
@@ -6,10 +7,8 @@ import type { ZoneMap } from "./zones";
 export const S = 22;
 export const VW = 660;
 export const FIELD_YARDS = 30;
-/** The yard line the line of scrimmage sits on: every drive starts on the 5. */
-export const LOS_YARD = 5;
-/** The goal line, in yards from the line of scrimmage (the 40); the end zone lies beyond it, up to -37. */
-export const GOAL_LINE = -35;
+/** The shallowest card the designer and the pictures show, unless the end line comes first. */
+export const MIN_DEPTH = 24;
 
 export function px(x: number): number {
   return x * S;
@@ -41,15 +40,20 @@ export function clamp(x: number, y: number, team: Team | null, top: number, gap 
 
 /**
  * Depth is derived on every read from the play plus the measured pane, never stored,
- * so it can never lag behind a route or position change.
+ * so it can never lag behind a route or position change. With the ball near their goal
+ * line the card ends at the end line (`los` is the play's yard line, see lib/play/field.ts),
+ * so drags, preset routes, zones and playback, which all stop at the card's top, stay in
+ * bounds; a player who already stands past it is never cut off.
  */
-export function depth(players: readonly Player[], pane: Pane | null, minDepth = 24): number {
+export function depth(players: readonly Player[], pane: Pane | null, minDepth = MIN_DEPTH, los = LOS_YARD): number {
   const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
   const hasDeep = players.some((p) => p.route?.type === "zoneDeep");
   const need = hasDeep ? Math.min(deepest, Math.min(-12, deepest - 4) - 2.9) : deepest;
   const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : 45;
   const d = Math.max(aspect, 8 - need + 1.2);
-  return Math.round(Math.max(minDepth, Math.min(45, d)) * 2) / 2;
+  // from the own 5 the end line is 53 yards off, past the deepest card, so this stays 45
+  const max = Math.min(45, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2));
+  return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
 }
 
 export function cardWidth(pane: Pane | null, depthYards: number): number | null {
@@ -220,38 +224,58 @@ export interface FieldLayout {
 }
 
 /**
- * Yard lines, hatched no-run bands, end zone and labels for a given depth. A league that
- * plays without no-run zones gets the same field with no bands (and no NO-RUN labels).
+ * Yard lines, hatched no-run bands, end zone and labels for a given depth, with the ball on
+ * the `los` yard line (field yard n sits at y = los - n). A league that plays without no-run
+ * zones gets the same field with no bands (and no NO-RUN labels). On the 5, the default,
+ * this is the field as it has always been drawn.
  */
-export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZones = true): FieldLayout {
+export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZones = true, los = LOS_YARD): FieldLayout {
   const top = ybv(depthYards), vh = depthYards * S;
+  const at = (n: number): number => los - n;
   const clipRect = (y1: number, y2: number): Band | null => {
     const a = Math.max(y1, top), b2 = Math.min(y2, 8);
     if (b2 - a <= 0.05) return null;
     return { y: py(a, top), h: (b2 - a) * S };
   };
-  // the 5 yards before midfield (the 20) and before the goal line (the 40)
-  const bands = noRunZones ? [clipRect(-15, -10), clipRect(-35, -30)].filter((b): b is Band => b !== null) : [];
-  const endZone = clipRect(GOAL_LINE - 2, GOAL_LINE);
+  const endLine = GOAL_YARD + END_ZONE_YARDS;
+  // the 5 yards before midfield (the 20) and before the goal line (the 40); once the ball is
+  // past midfield its band lies behind the play and is left off. A band the ball is in crosses the LOS.
+  const bands = noRunZones
+    ? [
+      los < MIDFIELD_YARD ? clipRect(at(MIDFIELD_YARD), at(MIDFIELD_YARD - NO_RUN_YARDS)) : null,
+      clipRect(at(GOAL_YARD), at(GOAL_YARD - NO_RUN_YARDS)),
+    ].filter((b): b is Band => b !== null)
+    : [];
+  const endZone = clipRect(at(endLine), at(GOAL_YARD));
+  // every 5 yards from the own goal line to theirs, the LOS wherever it is, and the end line,
+  // from the bottom of the card up; on a 5-yard line the LOS is that line
+  const marks = [...new Set([...Array.from({ length: GOAL_YARD / 5 + 1 }, (_, i) => i * 5), los, endLine])].sort((a, b) => a - b);
   const lines: YardLine[] = [];
-  for (let y = 5; y >= -35; y -= 5) {
+  for (const n of marks) {
+    const y = at(n);
     if (y < top - 0.01 || y > 8) continue;
+    const edge = n === GOAL_YARD || n === endLine;
     lines.push({
       y: py(y, top),
-      w: y === 0 ? 4.5 : y === -35 ? 3 : 1.6,
-      o: y === 0 ? 1 : y === -35 ? 0.55 : 0.22,
+      w: n === los ? 4.5 : edge ? 3 : 1.6,
+      o: n === los ? 1 : edge ? 0.55 : 0.22,
     });
   }
   const texts: FieldText[] = [];
   if (showYardNumbers) {
-    // the drive starts on the 5-yard line, so the LOS is the 5 and the goal line the 40
-    for (let y = 0; y >= -35; y -= 5) {
-      if (y < top - 0.01) continue;
-      const t = y === 0 ? "LOS" : String(LOS_YARD - y);
+    // yards count from the own goal line: the drive starts on the 5 and the goal line is the 40.
+    // Lines behind the LOS and the end line stay unlabelled.
+    for (const n of marks) {
+      const y = at(n);
+      if (y > 0 || n > GOAL_YARD || y < top - 0.01) continue;
+      const t = n === los ? losLabel(los) : String(n);
       texts.push({ key: t + String(y), x: 12, y: py(y, top) - 7, t });
     }
+    // a band's label sits in the part in front of the ball: behind it stands the offense
+    const los0 = py(0, top);
     bands.forEach((b, i) => {
-      if (b.h > 46) texts.push({ key: "norun" + String(i), x: 286, y: b.y + b.h / 2 + 6, t: "NO-RUN", letterSpacing: 1.5 });
+      const h = Math.min(b.y + b.h, los0) - b.y;
+      if (h > 46) texts.push({ key: "norun" + String(i), x: 286, y: b.y + h / 2 + 6, t: "NO-RUN", letterSpacing: 1.5 });
     });
     if (endZone && endZone.h > 30) {
       texts.push({ key: "ez", x: 266, y: endZone.y + endZone.h / 2 + 6, t: "END ZONE", letterSpacing: 2.5 });

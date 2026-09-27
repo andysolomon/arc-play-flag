@@ -11,12 +11,14 @@ export interface Doc {
   side: Team;
   /** the other team is drawn, faded, on this play's pictures; a play from before the choice has none */
   artShadow?: boolean;
+  /** the yard line the ball is on, counted from the offense's own goal line (see lib/play/field.ts) */
+  los: number;
   players: readonly Player[];
 }
 
 /**
  * One undo step: the players before an edit on this play.
- * Name, notes, side, the pictures' choice and id belong to the play and are never undone.
+ * Name, notes, side, the pictures' choice, ball spot and id belong to the play and are never undone.
  * Opening or starting a play clears the stacks, so a step cannot point at another play.
  */
 export interface Entry {
@@ -41,7 +43,10 @@ export interface HistoryStep {
 }
 
 function apply(entry: Entry, current: Doc): Doc {
-  return { id: current.id, name: current.name, notes: current.notes, side: current.side, artShadow: current.artShadow, players: entry.players };
+  return {
+    id: current.id, name: current.name, notes: current.notes, side: current.side, artShadow: current.artShadow, los: current.los,
+    players: entry.players,
+  };
 }
 
 /** What the reverse step must restore: the players on the document as it is now. */

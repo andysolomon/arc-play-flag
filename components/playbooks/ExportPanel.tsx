@@ -111,7 +111,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
               role="img"
               aria-label="Playbook PDF preview"
               className="w-full max-w-[240px] overflow-hidden rounded-field border-2 border-ink bg-turf [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { ...artView(items[0].play), noRunZones: hasNoRunZones(team), box: { pw: 660, ph: 280 } }) }}
+              dangerouslySetInnerHTML={{ __html: playSvg(items[0].play.players, { ...artView(items[0].play), noRunZones: hasNoRunZones(team), los: items[0].play.los, box: { pw: 660, ph: 280 } }) }}
             />
             <span className="text-caption leading-note text-ink-muted">
               Preview: {items[0].play.name}. Each play is drawn from its own side. The other team is printed, faded, only on plays that include it in their play art.

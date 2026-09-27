@@ -31,6 +31,9 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *  - a pass carried over the goal line isn't a touchdown, or the party starts before the ball
  *    crosses                                                    → "a pass carried over", "touchdowns ... in turn"
  *  - a catch inside the end zone isn't a touchdown              → "touchdowns ... in turn"
+ *  - with the ball spotted near their goal, the goal line is still taken to be the 5's, so a
+ *    short pass into the end zone doesn't count; or the deeper end zone isn't the design's band,
+ *    or the goal line's 40 sits on the design                    → "with the ball near their goal"
  *  - a completion short of the goal line, a throw to someone else while the primary runs into the
  *    end zone, or a play stopped early counts                   → "a completion short"
  *  - the count isn't kept, opens the wrong end zone or skips one, or a touchdown claims a new end
@@ -68,6 +71,8 @@ const DRAG = play("fx-td-drag", "Otter Back Line", { o3: { type: "custom", prima
 const SHORT = play("fx-td-short", "Otter Two Short", { o3: { type: "custom", primary: true, pts: [[3, -33]] } });
 // X still runs into the end zone, but a check-down out to Y is there for the other 20%
 const CHECKDOWN = play("fx-td-checkdown", "Otter Check Down", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] }, o4: { type: "out" } });
+// the ball on their 10 (the 30): the goal line is ten yards on, and X runs two yards into the end zone
+const RED_ZONE: SavedPlay = { ...play("fx-td-red-zone", "Otter Red Zone", { o3: { type: "custom", primary: true, pts: [[3, -12]] } }), los: 30 };
 // two routes into the end zone, for the pictures: the lanes show where each one crosses the design
 const GALLERY = play("fx-ez-gallery", "Otter Showcase", {
   o3: { type: "custom", primary: true, pts: [[3, -35.6]] },
@@ -285,7 +290,7 @@ test("a fresh device keeps the classic end zone, and the picker says what is ope
   }
   await expect(hint(tools)).toHaveText(
     "3 of 8 open. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in. " +
-      "It sits past the 40, at the top of a full-length field. Printed pages and exports keep the classic green.",
+      "It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green.",
   );
   // a locked swatch can't be picked, by a tap or by the keyboard: arrowing on from the last open
   // one wraps round to Classic, past every locked one
@@ -407,6 +412,46 @@ test("a pass carried over the goal line is a touchdown: the chosen end zone cele
   await expect(swatch(tools, "Sakura")).toBeEnabled();
   await expect(swatch(tools, "Matrix")).toBeDisabled();
   await expect(hint(tools)).toContainText("4 of 8 open. Throw a touchdown pass on ▶ to open Matrix: a catch in the end zone, or one carried in. 1 touchdown pass on this device.");
+});
+
+test("with the ball near their goal the end zone is on every screen: the design fills its deeper band, and a short pass into it scores", async ({ page }) => {
+  await pinRandom(page);
+  await watchTouchdowns(page);
+  await seed(page, { plays: [RED_ZONE], team: OTTERS });
+  await store(page, { zone: "synthwave" });
+  const d = new Designer(page);
+  // no phone's window: the card stops at the end line, so the end zone is in view on every device
+  await d.goto(`?open=${RED_ZONE.id}`);
+  await expect(art(d.field)).toHaveAttribute("data-ez-art", "synthwave");
+  await expect(art(d.field)).toBeVisible();
+  const box = art(d.field).locator("xpath=..");
+  for (const k of ["y", "height"] as const) expect(await box.getAttribute(k)).toBe(await band(d.field).getAttribute(k));
+  // deeper than the two yards the 5 ever shows, and never more than the ten-yard end zone
+  const tall = Number(await box.getAttribute("height"));
+  expect(tall).toBeGreaterThan(44);
+  expect(tall).toBeLessThanOrEqual(220);
+  await expect(plainLabel(d.field)).toBeHidden();
+  // the goal line's number would sit on the design; it stays in the page for print
+  await expect(d.field.locator("text", { hasText: /^40$/ })).toHaveCount(1);
+  await expect(d.field.locator("text", { hasText: /^40$/ })).toBeHidden();
+  await expect(d.field.locator("text", { hasText: "LOS 30" })).toBeVisible();
+  await expect(lanes(d.field)).toHaveCount(1);
+
+  await runPlay(page, d);
+  await expect(celebration(page)).toHaveAttribute("data-celebration", "synthwave", { timeout: 10_000 });
+  await expect(celebration(page).locator("[data-unlocked]")).toHaveText("New end zone: Sakura");
+  expect(await stored(page)).toEqual({ zone: "synthwave", touchdowns: "1" });
+  await playEnds(page);
+  const r = await lastRun(page);
+  // the goal line is the play's own: ten yards on from the 30, not the 5's thirty-five
+  const goal = (RED_ZONE.los ?? 5) - 40;
+  const td = touchdownAt(buildMotion(RED_ZONE.players, -20, simulationPlayback(() => 0.1)), RED_ZONE.players, RED_ZONE.los);
+  if (td === null) throw new Error("the fixture no longer scores");
+  expect(touchdownAt(buildMotion(RED_ZONE.players, -20, simulationPlayback(() => 0.1)), RED_ZONE.players)).toBeNull();
+  expect(r.celebratedAt).toBeGreaterThanOrEqual(td - 0.02);
+  expect(r.celebratedAt).toBeLessThan(td + 1);
+  expect(r.party?.ballY).toBeLessThanOrEqual(goal);
+  expect(r.deepest).toBeGreaterThan(goal - 2.5);
 });
 
 test("a completion short of the goal line, a throw to someone else while the primary runs in, and a play stopped early are not touchdowns", async ({ page }) => {

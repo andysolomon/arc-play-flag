@@ -113,7 +113,7 @@ function sheet(items: readonly Numbered[], o: PostcardOptions, side: "front" | "
     const s = slots[i];
     if (!s) return;
     const body = side === "front"
-      ? cardBody({ name: item.play.name, players: item.play.players, n: item.n, team: o.team, ...cardView(artView(item.play, vis)) })
+      ? cardBody({ name: item.play.name, players: item.play.players, n: item.n, team: o.team, ...cardView(artView(item.play, vis)), los: item.play.los })
       : postcardBack(item, o);
     out.push(face(body, s));
     // scissors only need a guide where the sheet is bigger than the card

@@ -61,7 +61,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
           ? `${String(open)} of ${String(END_ZONES.length)} open. Throw a touchdown pass on ▶ to open ${next.name}: a catch in the end zone, or one carried in.`
           : `All ${String(END_ZONES.length)} open.`}
         {touchdowns > 0 && ` ${scored} on this device.`}
-        {" "}It sits past the 40, at the top of a full-length field. Printed pages and exports keep the classic green.
+        {" "}It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green.
       </span>
     </div>
   );
