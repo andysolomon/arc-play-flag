@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { Patrick_Hand } from "next/font/google";
 import { OfflineStatus } from "@/components/OfflineStatus";
+import { Repainting } from "@/components/Repainting";
 import { themeScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="h-full">
         {children}
+        <Repainting />
         {process.env.NODE_ENV === "production" ? <OfflineStatus /> : null}
       </body>
     </html>
