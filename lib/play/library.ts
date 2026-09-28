@@ -117,7 +117,7 @@ export function playbookById(id: string | null | undefined): Playbook | null {
 
 /** Saves a play (new id when none is given) and returns the record as stored. */
 export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): Written<SavedPlay> {
-  // the ball spot goes last and only off the 5, as normalizeSavedPlay reads it back
+  // the ball spot goes last and only off the own goal line, as normalizeSavedPlay reads it back
   const rec: SavedPlay = withLos({
     id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side, ...artShadow(play.artShadow),
   }, losOf(play));

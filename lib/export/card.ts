@@ -24,7 +24,7 @@ export interface CardOptions {
   vis?: Vis;
   /** the play's own side: with both shown, the other team is faded, and a defensive call gets no ball or offensive call */
   side?: Team;
-  /** the play's ball spot (SavedPlay.los); the own 5 when left out */
+  /** the play's ball spot (SavedPlay.los); the own goal line when left out */
   los?: number;
 }
 
@@ -68,7 +68,7 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   const los = losOf(o);
   const f = cardField(o.players, vis, los);
   // near their goal the card stops at the end line, so the field is shorter than its box: centre it
-  // rather than leave a blank band over the footer. On the 5 it fills the box and stays where it always was.
+  // rather than leave a blank band over the footer. From the 40 it fills the box and stays where it always was.
   const fy = los === LOS_YARD ? top : top + (FIELD_H - f.h) / 2;
   out.push(field(o.players, (W - f.w) / 2, fy, f.w, f.h, {
     level: o.level ?? "simple",

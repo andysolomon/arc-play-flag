@@ -3,7 +3,7 @@ import { HISTORY_CAP, emptyHistory, push, redo, undo, type Doc } from "./history
 import { defaults } from "./routes";
 
 const snap = (n: number, doc: Partial<Doc> = {}): Doc =>
-  ({ id: "play", name: "Play", notes: "", side: "offense", los: 5, players: defaults().map((p) => ({ ...p, x: n })), ...doc });
+  ({ id: "play", name: "Play", notes: "", side: "offense", los: 0, players: defaults().map((p) => ({ ...p, x: n })), ...doc });
 const x = (d: { players: readonly { x: number }[] } | undefined) => d?.players[0]?.x;
 
 describe("history", () => {
