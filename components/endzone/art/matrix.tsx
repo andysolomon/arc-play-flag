@@ -27,8 +27,13 @@ const PERIOD = 24;
 const TRAILS = [8, 12, 17] as const;
 /** how many different strings of code the columns draw from */
 const STRINGS = 5;
-/** the most columns that fall on their own clock; past that, columns far apart share one */
-const CLOCKS = 34;
+/**
+ * The clocks the columns fall on, in rows a second. Every column shares one of these three, and
+ * they all tick on a 12 Hz lattice (3, 4 and 6 divide 12), so the band is repainted at most a
+ * dozen times a second however many columns fall: a column of its own on a clock of its own
+ * would have some column moving, and the band repainting, on nearly every frame.
+ */
+const SPEEDS = [3, 4, 6] as const;
 /** a touchdown's sheet of drops: this many rows of trail, falling through the band in ez-matrix-wave */
 const WAVE = 6;
 /** the scrambled code a letter decodes from during a touchdown: ez-matrix-reel drops this many through its cell */
@@ -52,8 +57,12 @@ function Glyphs({ cells, chars, ...rest }: { cells: readonly Cell[]; chars: stri
   );
 }
 
-/** A glyph's soft phosphor bloom: a stroke painted under its fill. */
-const bloom = { strokeWidth: 3.4, strokeLinejoin: "round", paintOrder: "stroke" } as const;
+/**
+ * A drop's head glows: a soft phosphor stroke painted under its fill. Only the heads get one,
+ * as a separate <text> of their own; stroking every glyph of the rain with a gradient that
+ * left all but the heads transparent was most of what a frame of this design used to cost.
+ */
+const glow = { fill: "none", stroke: PHOSPHOR, strokeOpacity: 0.5, strokeWidth: 3.4, strokeLinejoin: "round" } as const;
 
 interface Column {
   x: number;
@@ -63,18 +72,38 @@ interface Column {
   trail: number;
   /** some columns run their code mirrored, as the film's do */
   flip: boolean;
-  /** how far down its drops start, so the still frame is a good one */
-  offset: number;
+  /** which of SPEEDS it falls at */
+  clock: number;
+  /** the band row the first drop's head is on before the column has moved, so the still frame is a good one */
+  head: number;
 }
 
-/** A column's drops, painted by its trail's repeating gradient. */
-function Drops({ id, col }: { id: string; col: Column }) {
+/**
+ * A column's drops: the glyphs of its code, from the row its first head starts on, that its
+ * fall can ever bring into the band, and no more. A trail lights only its last rows of each
+ * PERIOD, so the rest are never written; the tail gradient does the fading.
+ */
+function Drops({ id, col, rows, reach }: { id: string; col: Column; rows: number; reach: number }) {
+  const len = TRAILS[col.trail] ?? TRAILS[1];
+  // the column sits with row 0 of its code at band row (head - (PERIOD - 1)), then falls `reach` rows; a row's
+  // glyph is worth drawing if some step of that fall puts it in the band (a row's grace either side for its glyph's own height)
+  const shift = col.head - (PERIOD - 1);
+  const first = -1 - shift - reach;
+  const last = rows - shift;
+  const lit: number[] = [];
+  const heads: number[] = [];
+  for (let r = first; r <= last; r++) {
+    const phase = mod(r, PERIOD);
+    if (phase >= PERIOD - len) lit.push(r);
+    if (phase === PERIOD - 1) heads.push(r);
+  }
+  const chars = (rs: readonly number[]): string => rs.map((r) => pick(col.code * PERIOD + mod(r, PERIOD), 7)).join("");
+  const cells = (rs: readonly number[]): Cell[] => rs.map((r): Cell => [0, r]);
   return (
-    <use
-      href={`#${id}-code-${String(col.code)}`} x={num(col.flip ? -col.x : col.x)} y={num(col.offset)} transform={col.flip ? "scale(-1 1)" : undefined}
-      fill={GREEN} stroke={PHOSPHOR} {...bloom}
-      style={{ fill: `url(#${id}-tail-${String(col.trail)})`, stroke: `url(#${id}-glow-${String(col.trail)})` }}
-    />
+    <g transform={`translate(${num(col.x)} ${num(shift * ROW)})${col.flip ? " scale(-1 1)" : ""}`}>
+      <Glyphs cells={cells(heads)} chars={chars(heads)} {...glow} />
+      <Glyphs cells={cells(lit)} chars={chars(lit)} fill={GREEN} style={{ fill: `url(#${id}-tail-${String(col.trail)})` }} />
+    </g>
   );
 }
 
@@ -94,30 +123,6 @@ function TrailGradients({ id }: { id: string }) {
           <stop offset={1} stopColor={HEAD} />
         </linearGradient>
       ))}
-      {TRAILS.map((len, t) => (
-        <linearGradient key={`glow-${String(len)}`} id={`${id}-glow-${String(t)}`} {...span}>
-          <stop offset={at(PERIOD - 3)} stopColor={PHOSPHOR} stopOpacity={0} />
-          <stop offset={at(PERIOD - 1)} stopColor={PHOSPHOR} stopOpacity={0.12} />
-          <stop offset={at(PERIOD - 1)} stopColor={PHOSPHOR} stopOpacity={0.5} />
-          <stop offset={1} stopColor={PHOSPHOR} stopOpacity={0.5} />
-        </linearGradient>
-      ))}
-    </>
-  );
-}
-
-/** The strings of code the columns run, one glyph a row wherever some trail could light it, from row `top` to row `bottom`. */
-function CodeStrings({ id, top, bottom }: { id: string; top: number; bottom: number }) {
-  const longest = Math.max(...TRAILS);
-  const rows = Array.from({ length: bottom - top + 1 }, (_, k) => top + k).filter((r) => mod(r, PERIOD) >= PERIOD - longest);
-  return (
-    <>
-      {Array.from({ length: STRINGS }, (_, s) => (
-        <Glyphs
-          key={s} id={`${id}-code-${String(s)}`} cells={rows.map((r) => [0, r] as const)}
-          chars={rows.map((r) => pick(s * PERIOD + mod(r, PERIOD), 7)).join("")}
-        />
-      ))}
     </>
   );
 }
@@ -125,17 +130,19 @@ function CodeStrings({ id, top, bottom }: { id: string; top: number; bottom: num
 /** A touchdown's downpour: every column at once, a sheet of drops falling through the band, its heads a little ragged. */
 function Wave({ id, xs, rows }: { id: string; xs: readonly number[]; rows: number }) {
   const lag = (j: number): number => Math.floor(rand(j, 21) * 3);
+  const glyph = ([x, r]: Cell): string => pick(Math.round(x * 3) + r * 257, 23);
   // the sheet falls its own depth, its lag and the band's rows, so every head and trail clears the goal line however deep the band
   return (
     <g className="ez-matrix-wave" style={{ "--ez-matrix-drop": `${String((rows + WAVE + 2) * ROW)}px` } as CSSProperties}>
       {[0, 1, 2].map((k) => {
-        const cells = xs.filter((_, j) => lag(j) === k).flatMap((x) => Array.from({ length: WAVE }, (_, r): Cell => [x, r - WAVE]));
+        const cols = xs.filter((_, j) => lag(j) === k);
+        const cells = cols.flatMap((x) => Array.from({ length: WAVE }, (_, r): Cell => [x, r - WAVE]));
+        // the two brightest rows of the sheet glow; the rest just fall
+        const heads = cols.flatMap((x): Cell[] => [[x, -2], [x, -1]]);
         return (
           <g key={k} transform={`translate(0 ${String(-k * ROW)})`}>
-            <Glyphs
-              cells={cells} chars={cells.map(([x, r]) => pick(Math.round(x * 3) + r * 257, 23)).join("")}
-              fill={HEAD} stroke={PHOSPHOR} {...bloom} style={{ fill: `url(#${id}-wave)`, stroke: `url(#${id}-wave-glow)` }}
-            />
+            <Glyphs cells={heads} chars={heads.map(glyph).join("")} {...glow} />
+            <Glyphs cells={cells} chars={cells.map(glyph).join("")} fill={HEAD} style={{ fill: `url(#${id}-wave)` }} />
           </g>
         );
       })}
@@ -143,23 +150,16 @@ function Wave({ id, xs, rows }: { id: string; xs: readonly number[]; rows: numbe
   );
 }
 
-function WaveGradients({ id }: { id: string }) {
-  const span = { gradientUnits: "userSpaceOnUse", x1: 0, x2: 0, y1: -WAVE * ROW, y2: 0 } as const;
+function WaveGradient({ id }: { id: string }) {
   const at = (rows: number): number => rows / WAVE;
   return (
-    <>
-      <linearGradient id={`${id}-wave`} {...span}>
-        <stop offset={0} stopColor={PHOSPHOR} stopOpacity={0} />
-        <stop offset={at(WAVE - 3)} stopColor={PHOSPHOR} stopOpacity={0.9} />
-        <stop offset={at(WAVE - 1)} stopColor={PHOSPHOR} />
-        <stop offset={at(WAVE - 1)} stopColor="#ffffff" />
-        <stop offset={1} stopColor="#ffffff" />
-      </linearGradient>
-      <linearGradient id={`${id}-wave-glow`} {...span}>
-        <stop offset={at(2)} stopColor={PHOSPHOR} stopOpacity={0} />
-        <stop offset={1} stopColor={PHOSPHOR} stopOpacity={0.6} />
-      </linearGradient>
-    </>
+    <linearGradient id={`${id}-wave`} gradientUnits="userSpaceOnUse" x1={0} x2={0} y1={-WAVE * ROW} y2={0}>
+      <stop offset={0} stopColor={PHOSPHOR} stopOpacity={0} />
+      <stop offset={at(WAVE - 3)} stopColor={PHOSPHOR} stopOpacity={0.9} />
+      <stop offset={at(WAVE - 1)} stopColor={PHOSPHOR} />
+      <stop offset={at(WAVE - 1)} stopColor="#ffffff" />
+      <stop offset={1} stopColor="#ffffff" />
+    </linearGradient>
   );
 }
 
@@ -229,6 +229,10 @@ function Terminal({ id, w, h, celebrate }: { id: string; w: number; h: number; c
  * fallen; END ZONE sits on a black terminal plate with a blinking cursor. A touchdown flashes the
  * screen, floods the band with a sheet of drops, rushes every column and decodes the lettering
  * from scrambled code, one letter at a time.
+ *
+ * Drawn to be cheap to repaint, since every step of the rain repaints the band: each column is
+ * one <text> of just the glyphs its fall can show, only the heads are stroked, and the columns
+ * fall on three shared clocks that tick together.
  */
 export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
   const id = useArtId("matrix");
@@ -243,9 +247,9 @@ export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
   const cols = falling.map((x, k): Column => {
     // a third of the drops are caught mid-band in the still frame, the rest anywhere in their fall
     const head = rand(k, 5) < 0.35 ? Math.floor(rand(k, 6) * rows) : rows - PERIOD + Math.floor(rand(k, 6) * PERIOD);
-    return { x, code: Math.floor(rand(k, 2) * STRINGS), trail: Math.floor(rand(k, 3) * TRAILS.length), flip: rand(k, 4) < 0.4, offset: (head - (PERIOD - 1)) * ROW };
+    return { x, code: Math.floor(rand(k, 2) * STRINGS), trail: Math.floor(rand(k, 3) * TRAILS.length), flip: rand(k, 4) < 0.4, clock: Math.floor(rand(k, 8) * SPEEDS.length), head };
   });
-  const clocks = Array.from({ length: Math.min(CLOCKS, cols.length) }, (_, c) => cols.filter((_, k) => k % CLOCKS === c));
+  const clocks = SPEEDS.map((_, c) => cols.filter((col) => col.clock === c)).filter((group) => group.length > 0);
   // the residue: short runs of faded code down most columns, the newest glyph of each a little brighter
   const seen = new Set<string>();
   const residue = xs.flatMap((x, j) =>
@@ -263,16 +267,15 @@ export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
   const faded = residue.filter((c) => !c.newest).map(({ x, r }): Cell => [x, r]);
   const newest = residue.filter((c) => c.newest).map(({ x, r }): Cell => [x, r]);
   const chars = (cells: readonly Cell[], salt: number): string => cells.map(([x, r]) => pick(Math.round(x * 3) + r * 257, salt)).join("");
-  // the code's reach: the still frame and a column's own fall, and a touchdown's rush on top
-  const top = rows - PERIOD - (PERIOD - 1) * (celebrate ? 2 : 1);
+  // how far a column falls: one loop of its own, and a touchdown's rush on top
+  const reach = PERIOD * (celebrate ? 2 : 1);
   return (
     <g className={celebrate ? "ez-matrix-party" : undefined}>
       <rect width={w} height={h} fill={BLACK} />
       <g transform={`scale(${num(scale)})`}>
         <defs>
-          <CodeStrings id={id} top={top} bottom={2 * PERIOD - 2} />
           <TrailGradients id={id} />
-          {celebrate && <WaveGradients id={id} />}
+          {celebrate && <WaveGradient id={id} />}
         </defs>
         {h >= 20 && (
           <>
@@ -281,11 +284,14 @@ export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
           </>
         )}
         <g className="ez-matrix-rush">
-          {clocks.map((group, c) => (
-            <g key={c} className="ez-matrix-fall" style={{ animationDuration: `${num(PERIOD / (2.6 + rand(c, 8) * 2.6))}s` }}>
-              {group.map((col) => <Drops key={col.x} id={id} col={col} />)}
-            </g>
-          ))}
+          {clocks.map((group) => {
+            const clock = group[0]?.clock ?? 0;
+            return (
+              <g key={clock} className="ez-matrix-fall" style={{ animationDuration: `${num(PERIOD / (SPEEDS[clock] ?? SPEEDS[0]))}s` }}>
+                {group.map((col) => <Drops key={col.x} id={id} col={col} rows={rows} reach={reach} />)}
+              </g>
+            );
+          })}
         </g>
         {celebrate && <Wave id={id} xs={xs} rows={rows} />}
       </g>

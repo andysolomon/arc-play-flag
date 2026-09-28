@@ -213,9 +213,10 @@ function Lettering({ id, x, y, fs }: { id: string; x: number; y: number; fs: num
             <stop offset="1" stopColor={CHROME[4]} />
           </linearGradient>
         </defs>
-        <g className="ez-synthwave-glow">
-          <text {...common} fill={PINK} stroke={PINK} strokeWidth={num(fs * 0.75)} opacity={0.2}>END ZONE</text>
-          <text {...common} fill={PINK} stroke={PINK} strokeWidth={num(fs * 0.45)} opacity={0.45}>END ZONE</text>
+        {/* the halo is stroke alone at a stroke opacity: the outline and chrome over it cover the letters' insides, and a whole-element opacity would cost a layer the size of the word on every frame */}
+        <g className="ez-synthwave-glow" fill="none" stroke={PINK}>
+          <text {...common} strokeWidth={num(fs * 0.75)} strokeOpacity={0.2}>END ZONE</text>
+          <text {...common} strokeWidth={num(fs * 0.45)} strokeOpacity={0.45}>END ZONE</text>
         </g>
         <text {...common} fill={NIGHT} stroke={NIGHT} strokeWidth={num(fs * 0.24)}>END ZONE</text>
         <text {...common} fill={CHROME[1]} style={{ fill: `url(#${id}-chrome)` }}>END ZONE</text>

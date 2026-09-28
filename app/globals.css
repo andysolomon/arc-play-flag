@@ -834,9 +834,9 @@
 /* Matrix: code rains down a row at a time and the cursor blinks; a touchdown floods the band with a sheet of drops, rushes every column, flashes the screen and decodes the lettering from falling code. */
 .ez-matrix-fall, .ez-matrix-rush, .ez-matrix-wave, .ez-matrix-reel { transform-box: view-box; transform-origin: 0 0; }
 .ez-matrix-glitch { transform-box: fill-box; transform-origin: center; }
-/* PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next */
+/* PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next. matrix.tsx sets each clock's duration (8s, 6s or 4s) so every step, and the cursor's blink, lands on a 12 Hz lattice: the band repaints a dozen times a second at most. */
 .ez-matrix-fall { animation: ez-matrix-fall 6s steps(24) infinite; }
-.ez-matrix-cursor { animation: ez-matrix-blink 1.1s step-end infinite; }
+.ez-matrix-cursor { animation: ez-matrix-blink 1s step-end infinite; }
 
 .ez-matrix-party .ez-matrix-rush { animation: ez-matrix-fall 0.8s steps(24) 4; }
 .ez-matrix-party .ez-matrix-cursor { animation-duration: 0.3s; }
