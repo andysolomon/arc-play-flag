@@ -34,16 +34,23 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *  - with the ball spotted near their goal, the goal line is still taken to be the 5's, so a
  *    short pass into the end zone doesn't count; or the deeper end zone isn't the design's band,
  *    or the goal line's 40 sits on the design                    → "with the ball near their goal"
+ *  - a catch out the back of the end zone (a route drawn deep from the 5, the ball then spotted
+ *    nearer their goal) counts, or moving the ball mid-play celebrates at the old goal line
+ *                                                               → "a catch out the back"
+ *  - on a defensive call the shadow offense scoring is celebrated as the coach's own touchdown and
+ *    opens end zones                                            → "on a defensive call"
  *  - a completion short of the goal line, a throw to someone else while the primary runs into the
  *    end zone, or a play stopped early counts                   → "a completion short"
  *  - the count isn't kept, opens the wrong end zone or skips one, or a touchdown claims a new end
  *    zone once all are open                                     → "a pass carried over", "touchdowns ... in turn"
  *  - the celebration wears another end zone's colours or motion, has no banner, isn't announced,
- *    or never goes away                                         → "a pass carried over", "touchdowns ... in turn"
+ *    or never goes away: every piece's colour and keyframes and the banner's fill are read against
+ *    the end zone's own, in Synthwave, Classic, 8-Bit and Event Horizon → "a pass carried over", "touchdowns ... in turn"
  *  - with storage blocked a touchdown throws, isn't celebrated, or what it opened can't be picked
  *    for the rest of the visit                                  → "with storage blocked"
- *  - confetti stands still with motion allowed, or shows under reduced motion; a swatch, or a
- *    design under reduced motion, animates when it must hold still → "confetti moves", "a pass carried over"
+ *  - confetti stands still with motion allowed (a fall, a drift, a rain or a burst), or shows under
+ *    reduced motion; a swatch, or a design under reduced motion, animates when it must hold still
+ *                                                               → "confetti moves", "every other way", "a pass carried over"
  * What must not change
  *  - printing shows the design or the lanes, hides the plain END ZONE, or changes the band's green → "printing"
  *  - thumbnails, the export preview or the share snapshot wear the device's end zone → "playbook settings"
@@ -51,15 +58,16 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *
  * Artifacts, in test-results/: end-zones-<device>.json (every end zone and whether it drew on the
  * field, and the touchdown timeline: when each celebration started against when the app's own
- * simulation says the ball crosses, where the ball was, the count stored before and after, and what
- * it opened; asserted against the literal below before it is written), a picture of the top of the
+ * simulation says the ball crosses, where the ball was, the count stored before and after, what it
+ * opened and the colours it wore, each section with the window it ran in; asserted against the
+ * literal below before it is written), a picture of the top of the
  * field in each end zone (end-zones-<device>-<id>.png, sha256 in the manifest) and one mid-
  * celebration (end-zones-<device>-touchdown.png, every animation held at the same moment).
  */
 
-/** The goal line, in yards from the line of scrimmage; the end zone lies beyond it. */
+/** The goal line with the ball on the 5, in yards from the line of scrimmage (every play here but RED_ZONE and OUT_THE_BACK, which work out their own). */
 const GOAL = -35;
-/** A phone-shaped window: the only shape deep enough to show the end zone (the desktop and iPad fields stop short of it). */
+/** A phone-shaped window: with the ball on the 5, the only shape deep enough to show the end zone (the desktop and iPad cards stop short of it). */
 const PHONE = { width: 412, height: 915 };
 const STANDARD_ENDZONE = "rgb(167, 229, 167)";
 
@@ -73,6 +81,11 @@ const SHORT = play("fx-td-short", "Otter Two Short", { o3: { type: "custom", pri
 const CHECKDOWN = play("fx-td-checkdown", "Otter Check Down", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] }, o4: { type: "out" } });
 // the ball on their 10 (the 30): the goal line is ten yards on, and X runs two yards into the end zone
 const RED_ZONE: SavedPlay = { ...play("fx-td-red-zone", "Otter Red Zone", { o3: { type: "custom", primary: true, pts: [[3, -12]] } }), los: 30 };
+// X's route drawn deep from the 5, with the ball then spotted on the 20: the end line is now 30 yards
+// on and X runs past it, so the catch is out the back of the end zone
+const OUT_THE_BACK: SavedPlay = { ...play("fx-td-out-the-back", "Otter Out The Back", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] } }), los: 20 };
+// a defensive call whose shadow offense throws X a touchdown: the coach being scored on
+const SCORED_ON = play("fx-td-scored-on", "Otter Goal Line D", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] }, d1: { type: "zoneDeep" } }, "", "defense");
 // two routes into the end zone, for the pictures: the lanes show where each one crosses the design
 const GALLERY = play("fx-ez-gallery", "Otter Showcase", {
   o3: { type: "custom", primary: true, pts: [[3, -35.6]] },
@@ -117,7 +130,7 @@ async function store(page: Page, v: Partial<Stored>): Promise<void> {
   }, [[ENDZONE_KEY, TOUCHDOWNS_KEY], v] as const);
 }
 
-/** On the desktop and iPad the field stops short of the end zone; anything that must see it gets a phone's window. */
+/** With the ball on the 5 the desktop and iPad cards stop short of the end zone; anything that must see it gets a phone's window. */
 async function showEndZone(page: Page): Promise<void> {
   if ((page.viewportSize()?.width ?? 0) > 500) await page.setViewportSize(PHONE);
 }
@@ -255,6 +268,40 @@ const repaint = (page: Page) => page.evaluate(async () => {
   await frame();
 });
 
+/** A #rrggbb colour as the browser reports it. */
+const rgb = (hex: string): string => {
+  const n = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgb(${n.join(", ")})`;
+};
+
+/**
+ * What a celebration wears, read off the page: its pieces' colours and keyframes (resolved even
+ * where reduced motion hides the pieces) and the banner's fill.
+ */
+const partyLook = (page: Page) => celebration(page).evaluate((c) => ({
+  colors: [...new Set(Array.from(c.querySelectorAll(".ez-piece"), (p) => getComputedStyle(p).color))].sort(),
+  keyframes: [...new Set(Array.from(c.querySelectorAll(".ez-piece"), (p) => getComputedStyle(p).animationName))],
+  banner: getComputedStyle(c.querySelector("[data-touchdown]") ?? c).backgroundColor,
+}));
+
+/** What a celebration in `zone` must wear: its confetti colours and motion, its banner's fill. */
+function lookOf(zone: string) {
+  const z = END_ZONES.find((e) => e.id === zone);
+  if (!z) throw new Error(`no end zone ${zone}`);
+  const paint = (c: string) => rgb(c === "team" ? OTTERS.color : c);
+  return { colors: z.confetti.colors.map(paint), keyframes: [`ez-${z.confetti.motion}`], banner: paint(z.banner.fill) };
+}
+
+/** Checks a celebration wears its own end zone's colours, motion and banner, and says what it wore. */
+async function expectLook(page: Page, zone: string) {
+  const look = await partyLook(page);
+  const want = lookOf(zone);
+  for (const c of look.colors) expect(want.colors, `${zone} confetti colour ${c}`).toContain(c);
+  expect(look.keyframes, `${zone} confetti motion`).toEqual(want.keyframes);
+  expect(look.banner, `${zone} banner`).toBe(want.banner);
+  return look;
+}
+
 const round = (n: number, places = 2): number => Math.round(n * 10 ** places) / 10 ** places;
 const sha = (path: string): string => createHash("sha256").update(readFileSync(path)).digest("hex");
 
@@ -284,8 +331,12 @@ test("a fresh device keeps the classic end zone, and the picker says what is ope
     } else {
       await expect(r, `${z.name} waits for ${String(z.unlock)} touchdowns`).toBeDisabled();
       await expect(label).toHaveAttribute("title", `${z.blurb}. Opens at ${z.unlock === 1 ? "1 touchdown pass" : `${String(z.unlock)} touchdown passes`}.`);
-      await expect(label).toContainText(String(z.unlock));
-      await expect(r).toHaveAccessibleDescription(/^3 of 8 open\. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in\./);
+      // the lock's count, on the preview (not the design's own lettering, which can hold digits too)
+      await expect(label.locator("[data-lock]"), `${z.name}'s lock shows ${String(z.unlock)}`).toHaveText(String(z.unlock));
+      // a screen reader hears what this one needs, then the picker's hint
+      await expect(r).toHaveAccessibleDescription(
+        new RegExp(`^Opens at ${z.unlock === 1 ? "1 touchdown pass" : `${String(z.unlock)} touchdown passes`}\\. 3 of 8 open\\. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in\\. It comes into view`),
+      );
     }
   }
   await expect(hint(tools)).toHaveText(
@@ -384,6 +435,8 @@ test("a pass carried over the goal line is a touchdown: the chosen end zone cele
   await expect(party.locator("[data-unlocked]")).toHaveText("New end zone: Sakura");
   await expect(party.locator("[data-unlocked]")).toHaveAttribute("data-unlocked", "sakura");
   await expect(announcement(page)).toHaveText("Touchdown! The Sakura end zone is open.");
+  // in Synthwave's own neon and burst, under its own banner
+  await expectLook(page, "synthwave");
   // reduced motion: the banner simply shows; the confetti and every design hold still
   expect(await party.locator("[data-confetti]").count()).toBeGreaterThan(0);
   await expect(party.locator("[data-confetti]:visible")).toHaveCount(0);
@@ -420,7 +473,7 @@ test("with the ball near their goal the end zone is on every screen: the design 
   await seed(page, { plays: [RED_ZONE], team: OTTERS });
   await store(page, { zone: "synthwave" });
   const d = new Designer(page);
-  // no phone's window: the card stops at the end line, so the end zone is in view on every device
+  // no phone's window: the goal line is ten yards off, inside even the shallowest card, so the end zone is in view on every device
   await d.goto(`?open=${RED_ZONE.id}`);
   await expect(art(d.field)).toHaveAttribute("data-ez-art", "synthwave");
   await expect(art(d.field)).toBeVisible();
@@ -492,6 +545,56 @@ test("a completion short of the goal line, a throw to someone else while the pri
 
   await expect(celebration(page)).toHaveCount(0);
   expect(await stored(page)).toEqual({ zone: null, touchdowns: null });
+});
+
+test("a catch out the back of the end zone isn't a touchdown, and moving the ball mid-play ends the play before it can score", async ({ page }) => {
+  test.slow();
+  await pinRandom(page);
+  await watchTouchdowns(page);
+  await seed(page, { plays: [OUT_THE_BACK, CARRY], team: OTTERS });
+  const d = new Designer(page);
+
+  // X caught it near the 31 of this field, beyond the end line at -30 and off the top of the card
+  const endLine = (OUT_THE_BACK.los ?? 5) - 50;
+  expect(touchdownAt(buildMotion(OUT_THE_BACK.players, endLine, simulationPlayback(() => 0.1)), OUT_THE_BACK.players, OUT_THE_BACK.los)).toBeNull();
+  await d.goto(`?open=${OUT_THE_BACK.id}`);
+  await runPlay(page, d);
+  await playEnds(page);
+  const r = await lastRun(page);
+  expect(r.party).toBeNull();
+  expect(r.deepest).toBeLessThan(endLine);
+
+  // the carry-in touchdown, but the ball is moved up to the 10 while X is still running, long before
+  // he would cross: the play it was watching ends, and nothing is scored at a goal line that has moved
+  await d.goto("?open=fx-td-carry");
+  await runPlay(page, d);
+  await d.tools();
+  await expect(page.getByRole("button", { name: "Stop the play" })).toBeVisible();
+  await page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" }).selectOption("10");
+  await expect(page.getByRole("button", { name: "Run the play" })).toBeVisible();
+  await page.waitForTimeout(Math.max(0, (expected(CARRY).td ?? 0) * 1000) + 500);
+  expect((await lastRun(page)).party).toBeNull();
+  await expect(celebration(page)).toHaveCount(0);
+  expect(await stored(page)).toEqual({ zone: null, touchdowns: null });
+});
+
+test("on a defensive call the shadow offense scoring is being scored on: no celebration, no count, nothing opened", async ({ page }) => {
+  await pinRandom(page);
+  await watchTouchdowns(page);
+  await seed(page, { plays: [SCORED_ON], team: OTTERS });
+  await store(page, { zone: "synthwave" });
+  const d = new Designer(page);
+  await d.goto(`?open=${SCORED_ON.id}`);
+  // the same pass would score for the offense
+  expect(expected(SCORED_ON).td).not.toBeNull();
+  await runPlay(page, d);
+  await playEnds(page);
+  const r = await lastRun(page);
+  expect(r.deepest, "the ball crossed the goal line").toBeLessThanOrEqual(GOAL);
+  expect(r.party).toBeNull();
+  await expect(celebration(page)).toHaveCount(0);
+  await expect(announcement(page)).toHaveCount(0);
+  expect(await stored(page)).toEqual({ zone: "synthwave", touchdowns: null });
 });
 
 test("an end zone in use stays drawn and checked after its touchdowns are lost, while the rest stay locked", async ({ page }) => {
@@ -709,11 +812,47 @@ test.describe("with motion allowed", () => {
   });
 });
 
+test.describe("with motion allowed, every other way", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  test("confetti falls, rains and bursts in the end zone's own way: every piece runs its motion and really moves", async ({ page }) => {
+    test.slow();
+    await showEndZone(page);
+    await pinRandom(page);
+    await seed(page, { plays: [CARRY], team: OTTERS });
+    const d = new Designer(page);
+    // Sakura's drift has its own test above
+    for (const zone of ["classic", "matrix", "synthwave"]) {
+      await store(page, { zone: zone === "classic" ? null : zone, touchdowns: "5" });
+      await d.goto("?open=fx-td-carry");
+      await runPlay(page, d);
+      const party = celebration(page);
+      await expect(party).toHaveAttribute("data-celebration", zone, { timeout: 12_000 });
+      const want = lookOf(zone);
+      await expectLook(page, zone);
+      const pieces = party.locator("[data-confetti]");
+      const count = await pieces.count();
+      expect(count, zone).toBeGreaterThan(20);
+      const names = await animationsIn(page, "[data-celebration]");
+      expect(names.filter((n) => n === want.keyframes[0]), zone).toHaveLength(count);
+      const spots = () => pieces.evaluateAll((els) => els.map((el) => getComputedStyle(el).transform));
+      const before = await spots();
+      await page.waitForTimeout(700);
+      const after = await spots();
+      // a rain starts its drops over more than a second, so fewer are under way this early
+      expect(before.filter((t, i) => t !== after[i]).length, zone).toBeGreaterThan(count * (zone === "matrix" ? 0.4 : 0.8));
+      await playEnds(page);
+      await expect(party).toHaveCount(0, { timeout: 6_000 });
+    }
+  });
+});
+
 test.describe("the end zones manifest", () => {
   test.describe.configure({ mode: "serial" });
 
-  const manifest: { project: string; viewport: { width: number; height: number } | null; zones: unknown[]; touchdowns: unknown[] } = {
-    project: "", viewport: null, zones: [], touchdowns: [],
+  type Size = { width: number; height: number } | null;
+  const manifest: { project: string; zonesViewport: Size; touchdownsViewport: Size; zones: unknown[]; touchdowns: unknown[] } = {
+    project: "", zonesViewport: null, touchdownsViewport: null, zones: [], touchdowns: [],
   };
 
   test("every end zone draws its own design in the band on screen, with a picture of each", async ({ page }, testInfo) => {
@@ -726,7 +865,7 @@ test.describe("the end zones manifest", () => {
     await d.goto("?open=fx-ez-gallery");
     const tools = page.locator("#play-sidebar");
     manifest.project = project;
-    manifest.viewport = page.viewportSize();
+    manifest.zonesViewport = page.viewportSize();
     const bandHeight = Number(await band(d.field).getAttribute("height"));
     // the field letters the end zone when there is room, and so does a design
     const lettered = bandHeight > 30;
@@ -794,6 +933,8 @@ test.describe("the end zones manifest", () => {
   test("touchdowns carried in or caught in the end zone open each end zone in turn, and once all are open one just celebrates", async ({ page }, testInfo) => {
     test.slow();
     const project = testInfo.project.name;
+    // the device's own window: on the desktop and iPad the end zone is off the card, and a touchdown still counts
+    manifest.touchdownsViewport = page.viewportSize();
     await pinRandom(page);
     await watchTouchdowns(page);
     await seed(page, { plays: [CARRY, DRAG], team: OTTERS });
@@ -822,6 +963,7 @@ test.describe("the end zones manifest", () => {
       const unlocked = party.locator("[data-unlocked]");
       const bannerLine = (await unlocked.count()) ? await unlocked.textContent() : null;
       const announced = await announcement(page).textContent();
+      const look = await expectLook(page, before.zone ?? "classic");
       const after = await stored(page);
       await playEnds(page);
       const r = await lastRun(page);
@@ -838,7 +980,7 @@ test.describe("the end zones manifest", () => {
         play: s.play.name, how: s.how, receiver: want.receiver, zone: r.party.zone, motion: r.party.motion,
         expectedAt: round(want.td), celebrationAt: round(r.celebratedAt), ballYards: round(r.party.ballY ?? NaN),
         storedBefore: before.touchdowns, storedAfter: after.touchdowns, storedAtCelebration: r.party.stored,
-        opened: r.party.unlocked, bannerLine, announced,
+        opened: r.party.unlocked, bannerLine, announced, colors: look.colors.length, banner: look.banner,
       });
     }
 
@@ -850,22 +992,24 @@ test.describe("the end zones manifest", () => {
     const at = expect.any(Number);
     expect(manifest).toEqual({
       project,
-      viewport: { width: expect.any(Number), height: expect.any(Number) },
+      zonesViewport: { width: expect.any(Number), height: expect.any(Number) },
+      touchdownsViewport: { width: expect.any(Number), height: expect.any(Number) },
       zones: expect.any(Array),
       touchdowns: [
         {
           play: "Otter End Zone", how: "carried in", receiver: "X", zone: "classic", motion: "fall", expectedAt: 5.54, celebrationAt: at, ballYards: at,
           storedBefore: null, storedAfter: "1", storedAtCelebration: "1", opened: "sakura", bannerLine: "New end zone: Sakura",
-          announced: "Touchdown! The Sakura end zone is open.",
+          announced: "Touchdown! The Sakura end zone is open.", colors: at, banner: rgb("#f2b705"),
         },
         {
           play: "Otter Back Line", how: "caught in the end zone", receiver: "X", zone: "eight-bit", motion: "fall", expectedAt: 6.1, celebrationAt: at,
           ballYards: -35.6, storedBefore: "4", storedAfter: "5", storedAtCelebration: "5", opened: "event-horizon",
-          bannerLine: "New end zone: Event Horizon", announced: "Touchdown! The Event Horizon end zone is open.",
+          bannerLine: "New end zone: Event Horizon", announced: "Touchdown! The Event Horizon end zone is open.", colors: at, banner: rgb("#000000"),
         },
         {
           play: "Otter End Zone", how: "carried in", receiver: "X", zone: "event-horizon", motion: "burst", expectedAt: 5.54, celebrationAt: at, ballYards: at,
-          storedBefore: "5", storedAfter: "6", storedAtCelebration: "6", opened: null, bannerLine: null, announced: "Touchdown!",
+          storedBefore: "5", storedAfter: "6", storedAtCelebration: "6", opened: null, bannerLine: null, announced: "Touchdown!", colors: at,
+          banner: rgb("#0b0a1a"),
         },
       ],
     });

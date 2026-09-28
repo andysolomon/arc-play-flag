@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useArtId, type ArtProps } from "./shared";
+import { num, rand, sparkle, useArtId, type ArtProps } from "./shared";
 
 /** The SynthWave '84 palette the celebration's confetti uses (lib/endzone.ts). */
 const PINK = "#ff2a6d";
@@ -23,16 +23,6 @@ const SLANT = 0.21;
  * without a seam.
  */
 const STEP = 1.7;
-
-const num = (n: number): string => String(Math.round(n * 100) / 100);
-
-/** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
-function rand(i: number, salt: number): number {
-  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
 
 /** Distances from an edge, `STEP` apart geometrically, from `near` in towards the edge until they are too fine to see. */
 function recede(near: number, finest: number): number[] {
@@ -79,7 +69,7 @@ function Grid({ w, h, cx, horizon, celebrate }: { w: number; h: number; cx: numb
   );
 }
 
-/** A half sun on the horizon, cut by the slits of a retro sunset that drift down and widen as they go. */
+/** A half sun on the horizon, cut by the slits of a retro sunset, which run down and widen as they go during a touchdown. */
 function Sun({ id, cx, horizon, r }: { id: string; cx: number; horizon: number; r: number }) {
   const zone = r * 0.6;
   const top = horizon - zone;
@@ -112,12 +102,6 @@ function Sun({ id, cx, horizon, r }: { id: string; cx: number; horizon: number; 
       </g>
     </g>
   );
-}
-
-/** A four-point sparkle's outline, `r` to each point and `waist` between them. */
-function sparkle(x: number, y: number, r: number, waist: number): string {
-  const t = r * waist;
-  return `M${num(x)} ${num(y - r)}L${num(x + t)} ${num(y - t)}L${num(x + r)} ${num(y)}L${num(x + t)} ${num(y + t)}L${num(x)} ${num(y + r)}L${num(x - t)} ${num(y + t)}L${num(x - r)} ${num(y)}L${num(x - t)} ${num(y - t)}Z`;
 }
 
 function Star({ x, y, r, i }: { x: number; y: number; r: number; i: number }) {
@@ -180,17 +164,28 @@ function Beams({ cx, horizon, reach }: { cx: number; horizon: number; reach: num
   );
 }
 
-/** Shooting stars across the sky, only while a touchdown is celebrated; `scale` sizes them and their flight to the band. */
-function Meteors({ w, horizon, scale }: { w: number; horizon: number; scale: number }) {
+/**
+ * The shooting stars: where each starts, as fractions of the width and of the sky, how steeply it
+ * dives in degrees and when it sets off in seconds. The first three start a third of the width
+ * apart, so between them their flights cross the whole sky; a tall sky gets the fourth, lower down.
+ */
+const METEORS = [
+  { x: 0.03, y: 0.14, tilt: 7, at: 0 },
+  { x: 0.36, y: 0.08, tilt: 5, at: 0.35 },
+  { x: 0.66, y: 0.2, tilt: 6, at: 0.7 },
+  { x: 0.16, y: 0.4, tilt: 6, at: 0.5 },
+] as const;
+
+/**
+ * Shooting stars across the sky, only while a touchdown is celebrated. `scale` sizes them and their
+ * flight (about 210 units at 1); drawn in the sky, they pass behind the sun, the peaks and the palms.
+ */
+function Meteors({ w, horizon, scale, count }: { w: number; horizon: number; scale: number; count: number }) {
   return (
     <g>
-      {[
-        { x: 0.08, y: 0.14, tilt: 7 },
-        { x: 0.58, y: 0.1, tilt: 5 },
-        { x: 0.3, y: 0.24, tilt: 8 },
-      ].map((m, k) => (
+      {METEORS.slice(0, count).map((m) => (
         <g key={m.x} transform={`translate(${num(w * m.x)} ${num(horizon * m.y)}) rotate(${String(m.tilt)}) scale(${num(scale)})`}>
-          <g className="ez-synthwave-meteor" style={delay(k * 0.35)} opacity={0}>
+          <g className="ez-synthwave-meteor" style={delay(m.at)} opacity={0}>
             <path d="M0 -1.5L-64 0L0 1.5Z" fill="#ffffff" />
             <circle r={2.1} fill="#ffffff" />
           </g>
@@ -233,8 +228,8 @@ function Lettering({ id, x, y, fs }: { id: string; x: number; y: number; fs: num
 /**
  * Synthwave '84: a neon sunset. A dusk sky over a half sun cut by slits, dark peaks and palms
  * either side, and a neon grid floor, cyan rails and pink rungs, rolling in towards the goal line
- * with END ZONE on it in italic chrome. The slits drift down, the sun breathes, the grid rolls on
- * and the stars twinkle; a touchdown races the grid and swaps its neon, pulses the sun, strobes the
+ * with END ZONE on it in italic chrome. The sun breathes, the grid rolls on and the stars twinkle;
+ * a touchdown races the grid and swaps its neon, pulses the sun and runs its slits down, strobes the
  * lettering, swings searchlights up from the horizon and sends shooting stars over the sky.
  */
 export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
@@ -244,7 +239,9 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
   const horizon = h * 0.6;
   const sun = Math.min(horizon * 0.92, w * 0.16);
   const tall = h >= 24;
-  const palm = Math.min(h * 0.98, w * 0.19);
+  // the band's depth, a flatter rise past about 56 and the width's cap, so a crown's fronds keep
+  // clear of the top edge in any band: 43 at 44, 102 at 132, 125 at 220
+  const palm = Math.min(w * 0.19, h * 0.98, 20 + h * 0.62);
   const peaks = { x0: palm * 0.8, x1: cx - sun * 0.55, tall: horizon * 0.34 };
   return (
     <g className={celebrate ? "ez-synthwave-party" : undefined}>
@@ -280,6 +277,8 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
         <>
           <rect className="ez-synthwave-afterglow" width={w} height={num(horizon)} fill="none" opacity={0} style={{ fill: `url(#${id}-flare)` }} />
           <Beams cx={cx} horizon={horizon} reach={Math.max(w * 0.45, h * 2)} />
+          {/* sized to the band only so far: past about 62 deep they would swell into bars, so a tall sky gets one more instead */}
+          {tall && <Meteors w={w} horizon={horizon} scale={Math.min(h / 44, 1.4)} count={h > 90 ? 4 : 3} />}
         </>
       )}
       <Sun id={id} cx={cx} horizon={horizon} r={sun} />
@@ -293,7 +292,6 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
       <Grid w={w} h={h} cx={cx} horizon={horizon} celebrate={celebrate} />
       <rect y={num(horizon)} width={w} height={num(h - horizon)} fill="none" style={{ fill: `url(#${id}-haze)` }} />
       <rect y={num(horizon - 0.6)} width={w} height={1.2} fill="#ffd0a8" />
-      {celebrate && tall && <Meteors w={w} horizon={horizon} scale={h / 44} />}
       {tall && (
         <>
           <Palm x={palm * 0.45} base={h} height={palm} lean={palm * 0.2} i={0} />

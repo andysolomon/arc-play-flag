@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useArtId, type ArtProps } from "./shared";
+import { num, px, rand, secs, useArtId, type ArtProps } from "./shared";
 
 const CREAM = "#fdf5ee";
 const BLUSH = "#f9dce3";
@@ -25,18 +25,7 @@ type Vars = CSSProperties & { [key: `--ez-sakura-${string}`]: string };
 /** A band of mist: its left and right ends, its middle's height and its depth. */
 type Band = readonly [x0: number, x1: number, y: number, d: number];
 
-const num = (n: number): string => String(Math.round(n * 100) / 100);
-const px = (n: number): string => `${num(n)}px`;
-const secs = (n: number): string => `${num(n)}s`;
 const deg = (n: number): string => `${num(n)}deg`;
-
-/** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
-function rand(i: number, salt: number): number {
-  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
 
 /** Maps a shape drawn upright about (0, 0) to (x, y), turned `deg`. */
 function turn(x: number, y: number, deg: number): (u: number, v: number) => string {
@@ -99,7 +88,7 @@ const cloud = ([x0, x1, y, d]: Band, rise = true): Band[] => [
   [x1 - (x1 - x0) * 0.45, x1 + d * 0.95, y + d * 0.38, d * 0.46],
 ];
 
-/** Across the reach and down the bough's depth, as fractions; thickness in units at the field's full depth. */
+/** Across the reach and down the bough's depth, as fractions; thickness in units at a 44-deep band. */
 type Knot = readonly [u: number, v: number, thick: number];
 interface Bloom {
   readonly u: number;
@@ -412,7 +401,7 @@ function Lettering({ cx, cy, fs, sun }: { cx: number; cy: number; fs: number; su
 export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
   const id = useArtId("sakura");
   const reach = Math.min(w * 0.36, h * 4.4);
-  // the swatch is taller than the field is deep: its boughs keep the field's proportions, with bigger blossom
+  // a band deeper than the boughs' reach (the swatch, or the field with the ball near their goal): the boughs keep their proportions, with bigger blossom
   const depth = Math.min(h, reach * 0.55);
   const k = Math.max(Math.sqrt(reach * depth) / 92, h / 70);
   const boughs = h >= 22;

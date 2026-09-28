@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useArtId, type ArtProps } from "./shared";
+import { num, px, rand, secs, useArtId, type ArtProps } from "./shared";
 
 const INDIGO = "#1f3a60";
 const BLUE = "#3f6fb5";
@@ -35,18 +35,6 @@ interface Box {
 }
 /** A talon of foam reaching from (u, v) in its wave's box, `len` long as a fraction of the box's height, at `deg` clockwise from east. */
 type Talon = readonly [u: number, v: number, len: number, deg: number];
-
-const num = (n: number): string => String(Math.round(n * 100) / 100);
-const px = (n: number): string => `${num(n)}px`;
-const secs = (n: number): string => `${num(n)}s`;
-
-/** A fixed pseudo-random number in [0, 1) for motif `i`: the same on the server and in the browser. */
-function rand(i: number, salt: number): number {
-  let x = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
 
 /** The point (u, v) in a box, given as fractions across and up from its foot. */
 const spot = ({ x0, bottom, bw, bh }: Box, u: number, v: number): readonly [x: number, y: number] => [x0 + u * bw, bottom - v * bh];
@@ -404,9 +392,9 @@ export function GreatWaveArt({ w, h, label, celebrate }: ArtProps) {
   const wave: Box = { x0: 0, bottom: h, bw, bh };
   const fw = h * 0.66;
   const fh = h * 0.3;
-  // mid-band, unless that leaves the wave and Fuji too little room (the swatch): then at the right end
+  // mid-band, unless that leaves the wave and Fuji too little room (a deep band: the swatch, or the field's whole end zone): then at the right end
   const sealX = Math.min(Math.max(w / 2, bw + fw + h * 0.4 + sealW / 2), w - sealW / 2 - h * 0.08);
-  // lifted in a band deeper than the field's (the swatch), so the seal sits in the sky above the swell
+  // lifted in a band deeper than 44 (the swatch, or a deep field end zone), so the seal sits in the sky above the swell
   const sealY = h / 2 - Math.max(0, h - 44) * 0.3;
   const sealLeft = sealX - sealW / 2;
   // the flat distant sea, low as in the print, that Fuji stands on and the far swell rolls across

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { contrast, inkOn, luminance, useArtId, type ArtProps } from "./shared";
+import { contrast, inkOn, luminance, num, useArtId, type ArtProps } from "./shared";
 
 const INK = "#1b1a17";
 const CREAM = "#fffdf6";
@@ -27,7 +27,6 @@ const mix = (a: string, b: string, t: number): string => {
   return `#${x.map((c, i) => Math.round(c + ((y[i] ?? c) - c) * t).toString(16).padStart(2, "0")).join("")}`;
 };
 
-const num = (n: number): string => String(Math.round(n * 100) / 100);
 const pts = (...xy: number[]): string => xy.map(num).join(" ");
 
 /** The paint pot for one team colour, pale or dark: every shade the design uses. */
@@ -136,16 +135,25 @@ function Pennant({ x, top, bottom, paint }: { x: number; top: number; bottom: nu
   );
 }
 
-/** Scoreboard bulbs along the border for a touchdown: dark sockets, and three sets of lit bulbs over them that light in turn, so they chase. */
+/**
+ * Scoreboard bulbs round the border for a touchdown: dark sockets, and three sets of lit bulbs over
+ * them that light in turn, so they chase. The bulbs keep a bulb's spacing however deep the band, and
+ * a deep one gets them down its sides too; numbered clockwise, so the chase circles the border.
+ */
 function Marquee({ w, h, inset, line, paint }: { w: number; h: number; inset: number; line: number; paint: Paints }) {
-  const across = Math.max(2, Math.round((w - inset * 2) / Math.max(18, h * 0.6)));
-  const step = (w - inset * 2) / across;
+  const pitch = Math.max(18, Math.min(h, 44) * 0.6);
+  const across = Math.max(2, Math.round((w - inset * 2) / pitch));
+  const down = Math.round((h - inset * 2) / pitch);
+  const dx = (w - inset * 2) / across;
+  const dy = (h - inset * 2) / Math.max(1, down);
   const r = Math.max(1.6, line * 0.85);
-  const bulbs = Array.from({ length: across + 1 }, (_, i) => inset + i * step).flatMap((x, i) => [
-    { x, y: inset, set: i % 3 },
-    // the bottom row runs the other way round, so the lights circle the border
-    { x, y: h - inset, set: (3 - (i % 3)) % 3 },
-  ]);
+  const ring = [
+    ...Array.from({ length: across + 1 }, (_, i) => ({ x: inset + i * dx, y: inset })),
+    ...Array.from({ length: Math.max(0, down - 1) }, (_, j) => ({ x: w - inset, y: inset + (j + 1) * dy })),
+    ...Array.from({ length: across + 1 }, (_, i) => ({ x: w - inset - i * dx, y: h - inset })),
+    ...Array.from({ length: Math.max(0, down - 1) }, (_, j) => ({ x: inset, y: h - inset - (j + 1) * dy })),
+  ];
+  const bulbs = ring.map((b, k) => ({ ...b, set: k % 3 }));
   return (
     <g>
       <g fill={paint.shadow}>
