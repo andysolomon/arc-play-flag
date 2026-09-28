@@ -6,7 +6,7 @@ import { buildMotion, simulationPlayback } from "../../lib/play/motion";
 import { touchdownAt } from "../../lib/play/touchdown";
 import type { SavedPlay } from "../../lib/play/types";
 import { Designer, armSabotage, sabotage } from "../support/designer";
-import { OTTERS, play, playbook, seed } from "../support/fixtures";
+import { KEYS, OTTERS, play, playbook, seed } from "../support/fixtures";
 
 /*
  * End zones: a coach picks the end zone's look (Play tools, or playbook settings), and every
@@ -27,6 +27,13 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *    band                                                       → "picking", "every end zone"
  *  - an end zone in use goes back to classic, or can't be kept, once its count is lost → "an end zone in use"
  *  - junk in storage opens end zones, draws a design, or poisons the next count → "junk in storage"
+ * The team's name
+ *  - a design spells out END ZONE, or letters something other than the team's name; the name is
+ *    missing from a design, or drawn past the band's edges, short or long; with no name a design
+ *    still letters something (Home Team's HOME aside), or the hint doesn't say where to give one
+ *                                                               → "the team's name"
+ *  - the name can't be given from Play tools, a new name doesn't repaint the field or the swatches,
+ *    isn't kept, or doesn't reach playbook settings          → "the team's name"
  * Touchdowns
  *  - a pass carried over the goal line isn't a touchdown, or the party starts before the ball
  *    crosses                                                    → "a pass carried over", "touchdowns ... in turn"
@@ -56,8 +63,8 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *  - thumbnails, the export preview or the share snapshot wear the device's end zone → "playbook settings"
  *  - playbook settings lack the picker, or a pick there doesn't reach the designer → "playbook settings"
  *
- * Artifacts, in test-results/: end-zones-<device>.json (every end zone and whether it drew on the
- * field, and the touchdown timeline: when each celebration started against when the app's own
+ * Artifacts, in test-results/: end-zones-<device>.json (every end zone, whether it drew on the
+ * field and the name it lettered, and the touchdown timeline: when each celebration started against when the app's own
  * simulation says the ball crosses, where the ball was, the count stored before and after, what it
  * opened and the colours it wore, each section with the window it ran in; asserted against the
  * literal below before it is written), a picture of the top of the
@@ -108,6 +115,13 @@ const hint = (scope: Page | Locator) => scope.getByText(/\d of 8 open\.|All 8 op
 const art = (field: Locator) => field.locator("[data-ez-art]");
 /** The field's own END ZONE words, not a design's lettering. */
 const plainLabel = (field: Locator) => field.locator("text:not([data-ez-art] text)", { hasText: "END ZONE" });
+/** A design's lettering of the team's name; it carries the text as drawn. */
+const lettering = (scope: Locator) => scope.locator("[data-ez-name]");
+/** The team's name as the designs letter it. */
+const painted = (name: string) => name.trim().replace(/\s+/g, " ").toUpperCase();
+/** The name the app stored for the team. */
+const storedTeamName = (page: Page): Promise<string | null> =>
+  page.evaluate((k) => (JSON.parse(localStorage.getItem(k) ?? "null") as { name?: string } | null)?.name ?? null, KEYS.team);
 const lanes = (field: Locator) => field.locator("[data-lane]");
 /** The classic band: the field's first rect in the end zone's green. */
 const band = (field: Locator) => field.locator("rect[fill='#a7e5a7']").first();
@@ -335,12 +349,15 @@ test("a fresh device keeps the classic end zone, and the picker says what is ope
       await expect(label.locator("[data-lock]"), `${z.name}'s lock shows ${String(z.unlock)}`).toHaveText(String(z.unlock));
       // a screen reader hears what this one needs, then the picker's hint
       await expect(r).toHaveAccessibleDescription(
-        new RegExp(`^Opens at ${z.unlock === 1 ? "1 touchdown pass" : `${String(z.unlock)} touchdown passes`}\\. 3 of 8 open\\. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in\\. It comes into view`),
+        new RegExp(
+          `^Opens at ${z.unlock === 1 ? "1 touchdown pass" : `${String(z.unlock)} touchdown passes`}\\. 3 of 8 open\\. ` +
+            "Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in\\. Each design paints your team name across it\\. It comes into view",
+        ),
       );
     }
   }
   await expect(hint(tools)).toHaveText(
-    "3 of 8 open. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in. " +
+    "3 of 8 open. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in. Each design paints your team name across it. " +
       "It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green.",
   );
   // a locked swatch can't be picked, by a tap or by the keyboard: arrowing on from the last open
@@ -415,6 +432,90 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
   expect(await stored(page)).toEqual({ zone: null, touchdowns: null });
   await expect(art(d2.field)).toHaveCount(0);
   await expect(plainLabel(d2.field)).toBeVisible();
+});
+
+test("the team's name is painted across every design and none says END ZONE; it is given in Play tools, repaints at once, is kept, and reaches playbook settings", async ({ page }) => {
+  test.slow();
+  await showEndZone(page);
+  await seed(page, { plays: [GALLERY], team: OTTERS });
+  await store(page, { touchdowns: String(Math.max(...END_ZONES.map((z) => z.unlock))) });
+  const d = new Designer(page);
+  await d.goto("?open=fx-ez-gallery");
+  const tools = page.locator("#play-sidebar");
+  const designed = END_ZONES.filter((z) => z.id !== "classic");
+  // a 39-character name, the longest a coach can nearly type, for the second pass
+  const long = "Riverside Otters U12 Flag Football Club";
+
+  /** The lettering sits inside the band: never past its sides, and centred on a line within it. */
+  const insideTheBand = async (zone: string) => {
+    const word = lettering(art(d.field));
+    await expect(word, zone).toHaveCount(1);
+    const [name, box] = [await word.boundingBox(), await art(d.field).locator("xpath=..").boundingBox()];
+    if (!name || !box) throw new Error(`${zone}: the lettering has no box`);
+    expect(name.x, `${zone} left edge`).toBeGreaterThanOrEqual(box.x - 1);
+    expect(name.x + name.width, `${zone} right edge`).toBeLessThanOrEqual(box.x + box.width + 1);
+    expect(name.y + name.height / 2, `${zone} middle`).toBeGreaterThan(box.y);
+    expect(name.y + name.height / 2, `${zone} middle`).toBeLessThan(box.y + box.height);
+  };
+
+  for (const teamName of [OTTERS.name, long]) {
+    if (teamName !== OTTERS.name) {
+      await d.tools();
+      await tools.getByRole("textbox", { name: "Team name" }).fill(teamName);
+    }
+    for (const z of designed) {
+      await d.tools();
+      await swatch(tools, z.name).check();
+      await expect(swatch(tools, z.name)).toBeChecked();
+      await d.closeSidebars();
+      await expect(art(d.field)).toHaveAttribute("data-ez-art", z.id);
+      // the design letters the name, whole (8-Bit and Matrix cut only a name their band has no columns for; this one fits), and never END ZONE
+      await expect(lettering(art(d.field)), z.id).toHaveAttribute("data-ez-name", painted(teamName));
+      await expect(art(d.field).locator("text", { hasText: "END ZONE" }), z.id).toHaveCount(0);
+      expect(await art(d.field).textContent(), z.id).not.toContain("END ZONE");
+      await insideTheBand(z.id);
+      // the plain words stay for print only
+      await expect(plainLabel(d.field)).toBeHidden();
+    }
+  }
+  expect(await storedTeamName(page)).toBe(long);
+
+  // a shorter name, typed in Play tools: the field and every swatch repaint as it is typed
+  await d.tools();
+  const field = tools.getByRole("textbox", { name: "Team name" });
+  await field.fill("Delta Force 7");
+  await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  for (const z of designed) await expect(lettering(picker(tools).locator(`[data-ez-art='${z.id}']`)), z.id).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  await expect(hint(tools)).toContainText("Each design paints your team name across it.");
+  expect(await storedTeamName(page)).toBe("Delta Force 7");
+
+  // no name: nothing is lettered but the design (Home Team keeps its HOME), and the hint says where to give one
+  await field.fill("");
+  await expect(lettering(art(d.field))).toHaveCount(0);
+  await expect(art(d.field).locator("text", { hasText: "END ZONE" })).toHaveCount(0);
+  for (const z of designed) {
+    const word = lettering(picker(tools).locator(`[data-ez-art='${z.id}']`));
+    if (z.id === "home") await expect(word).toHaveAttribute("data-ez-name", "HOME");
+    else await expect(word, z.id).toHaveCount(0);
+  }
+  await expect(hint(tools)).toContainText("Give your team a name (under Team) and each design paints it across.");
+  expect(await storedTeamName(page)).toBe("");
+
+  // the name given here is the team's everywhere: it outlasts a reload and is what playbook settings show
+  await field.fill("Delta Force 7");
+  await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  await page.reload();
+  await expect(art(d.field)).toHaveAttribute("data-ez-art", "event-horizon");
+  await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  await page.goto("/playbooks");
+  const settings = page.getByRole("button", { name: /Delta Force 7 · team, theme & backup settings/ });
+  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  await expect(async () => {
+    await settings.click();
+    await expect(dialog).toBeVisible({ timeout: 1_000 });
+  }).toPass();
+  await expect(dialog.getByRole("textbox", { name: "Team name" })).toHaveValue("Delta Force 7");
+  await expect(lettering(picker(dialog).locator("[data-ez-art='synthwave']"))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
 });
 
 test("a pass carried over the goal line is a touchdown: the chosen end zone celebrates, the count is kept, and Sakura opens", async ({ page }) => {
@@ -913,6 +1014,7 @@ test.describe("the end zones manifest", () => {
         id: z.id, name: z.name, opensAt: z.unlock,
         drawn: (await art(d.field).count()) === 1 && (await art(d.field).isVisible()),
         plainLabelOnScreen: await plainLabel(d.field).isVisible(),
+        lettered: (await lettering(d.field).count()) === 1 ? await lettering(d.field).getAttribute("data-ez-name") : null,
         lanes: await lanes(d.field).count(),
         routes: await d.routes.count(),
         picture, sha256: sha(`test-results/${picture}`),
@@ -923,6 +1025,8 @@ test.describe("the end zones manifest", () => {
       id: z.id, name: z.name, opensAt: z.unlock,
       drawn: z.id !== "classic",
       plainLabelOnScreen: z.id === "classic" && lettered,
+      // a design letters the team's name where the field would letter END ZONE
+      lettered: z.id !== "classic" && lettered ? painted(OTTERS.name) : null,
       lanes: z.id === "classic" ? 0 : 2,
       routes: 2,
       picture: `end-zones-${project}-${z.id}.png`,

@@ -943,7 +943,7 @@
   100% { transform: translate(var(--ez-great-wave-dx), calc(var(--ez-great-wave-dy) * -0.3)) scale(0.9) rotate(20deg); opacity: 0; }
 }
 
-/* 8-Bit: coins spin, ? blocks shimmer, clouds drift a pixel at a time and the 1UP blinks; a touchdown bumps the ? blocks and the title card, popping coins out, ripples the bricks, flickers END ZONE through a star's colours, spins the coins up and flashes the 1UP. */
+/* 8-Bit: coins spin, ? blocks shimmer, clouds drift a pixel at a time and the 1UP blinks; a touchdown bumps the ? blocks and the title card, popping coins out, ripples the bricks, flickers the team's name through a star's colours, spins the coins up and flashes the 1UP. */
 .ez-eight-bit-coin, .ez-eight-bit-flip, .ez-eight-bit-bump, .ez-eight-bit-ripple, .ez-eight-bit-pop, .ez-eight-bit-clouds { transform-box: fill-box; transform-origin: center; }
 .ez-eight-bit-coin { animation: ez-eight-bit-spin 1s steps(1, end) infinite; }
 /* CLOUD_REPEAT pixels in components/endzone/art/eight-bit.tsx, a pixel a step */
