@@ -4,9 +4,9 @@ import type { TeamSettings } from "@/lib/play/types";
 /**
  * What every end zone design is given. It draws into the box (0, 0)–(w, h) in SVG units and
  * nowhere else; its caller clips it there. The live field passes the full 660 wide and the
- * visible depth of the end zone: 11 to 220 in half-yard (11-unit) steps, 44 at most with the ball
- * on the 5 and up to the whole 10-yard end zone (220) with it spotted near their goal, or a sliver
- * when the field is cut short. A picker swatch passes a 300 × 84 preview box, lettering on. With
+ * visible depth of the end zone: 11 to 220 in half-yard (11-unit) steps, up to the whole 10-yard
+ * end zone (220) with the ball spotted near their goal, or a sliver when the field is cut short
+ * (from the 40 the end zone is past the deepest card and is not drawn). A picker swatch passes a 300 × 84 preview box, lettering on. With
  * every animation off (reduced motion, the picker's previews) the design must still look finished.
  */
 export interface ArtProps {

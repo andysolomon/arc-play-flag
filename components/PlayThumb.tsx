@@ -14,7 +14,7 @@ interface Props {
   side: Team;
   /** the play draws the other team, faded, on its pictures */
   artShadow?: boolean;
-  /** where the play's ball is (SavedPlay.los); undefined is the own 5. Never optional, so no picture falls back to the 5 by accident */
+  /** where the play's ball is (SavedPlay.los); undefined is the own goal line. Never optional, so no picture falls back to it by accident */
   los: number | undefined;
   className?: string;
 }

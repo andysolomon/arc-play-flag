@@ -48,7 +48,7 @@ export interface SharedRecord extends DraftRecord {
  * restores the other team as the faded shadow. `side` is written only for a defensive
  * call, so an offensive play's link is unchanged from before plays had a side. No-run
  * zones are written only when they are off, the pictures' choice only when it is on, and
- * the ball spot only when it is off the 5, for the same reason. A `vis` field from an
+ * the ball spot only when it is off the own goal line, for the same reason. A `vis` field from an
  * older link is ignored: those links still carry every player.
  */
 export function encodeShare(rec: DraftRecord, noRunZones = true): string {
@@ -76,7 +76,7 @@ export function decodeShare(id: string): SharedRecord | null {
     // links without a side predate the choice: read the side off the routes, as storage does
     const side = readSide("side" in parsed ? parsed.side : undefined, players);
     const noRunZones = !("noRunZones" in parsed) || parsed.noRunZones !== false;
-    // links without a spot predate the choice, and every one of them was drawn on the 5
+    // links without a spot put the ball where every drive starts, the own goal line
     return withLos(
       { name, players, side, noRunZones, ...artShadow("artShadow" in parsed ? parsed.artShadow : undefined) },
       readLos("los" in parsed ? parsed.los : undefined),

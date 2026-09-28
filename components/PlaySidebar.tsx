@@ -128,7 +128,7 @@ function PlaySidebarImpl({
       <span id={losNote} aria-live="polite" className="flex-none text-caption leading-note text-ink-muted">
         {noRunZones && inNoRunZone(los)
           ? "Saved with this play. The ball is in a no-run zone, so no runs from here."
-          : "Saved with this play. Yards count from your own goal line: midfield is the 20, their goal line the 40."}
+          : "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20."}
       </span>
       <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
         <input
