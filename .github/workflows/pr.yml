@@ -110,6 +110,14 @@ jobs:
           path: test-results/look-folds-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the phone palette
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phone-palette
+          path: test-results/phone-palette-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
