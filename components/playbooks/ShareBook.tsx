@@ -36,6 +36,11 @@ export function useShareCount(id: string): number {
   const raw = useSyncExternalStore(subscribe, snapshot, () => "{}");
   return (parse(raw)[id] ?? []).length;
 }
+/** The share links this device holds for a playbook, in words: what a folded Share section says. */
+export function ShareLinks({ id }: { id: string }) {
+  const n = useShareCount(id);
+  return n === 0 ? "Not shared yet" : n === 1 ? "1 link" : `${String(n)} links`;
+}
 async function failure(response: Response): Promise<never> {
   const data = await response.json() as { error?: string };
   throw new Error(data.error ?? "Sharing failed. Try again.");

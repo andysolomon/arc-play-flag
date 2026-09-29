@@ -5,7 +5,7 @@ import { END_ZONES, ENDZONE_KEY, TOUCHDOWNS_KEY } from "../../lib/endzone";
 import { buildMotion, simulationPlayback } from "../../lib/play/motion";
 import { touchdownAt } from "../../lib/play/touchdown";
 import type { SavedPlay } from "../../lib/play/types";
-import { Designer, armSabotage, sabotage } from "../support/designer";
+import { Designer, armSabotage, sabotage, unfoldBook } from "../support/designer";
 import { KEYS, OTTERS, play, playbook, seed } from "../support/fixtures";
 
 /*
@@ -867,6 +867,7 @@ test("playbook settings have the same picker, and pictures made from plays never
   await expect(dialog).toBeHidden();
 
   await page.goto(`/playbooks?book=${book.id}`);
+  await unfoldBook(page, "Export");
   const preview = page.getByRole("img", { name: "Playbook PDF preview" });
   await expect(preview).toBeVisible();
   await expect(art(preview)).toHaveCount(0);

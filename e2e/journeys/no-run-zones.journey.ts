@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { Designer } from "../support/designer";
+import { Designer, unfoldBook } from "../support/designer";
 import { KEYS, OTTERS, SLANT_LEFT, playbook, seed } from "../support/fixtures";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -68,6 +68,7 @@ test("a league without no-run zones turns them off once, and the field, reload a
 test("playbook settings turn them off for every picture and printout preview on the device", async ({ page }) => {
   await seed(page, { plays: [SLANT_LEFT], playbooks: [playbook("fx-nrz", "Otter No-Run Book", [SLANT_LEFT])], team: OTTERS });
   await page.goto("/playbooks?book=fx-nrz");
+  await unfoldBook(page, "Export");
   const preview = page.getByRole("img", { name: "Playbook PDF preview" });
   await expect(preview).toBeVisible();
   await expect(bands(preview)).not.toHaveCount(0);
@@ -89,6 +90,7 @@ test("playbook settings turn them off for every picture and printout preview on 
   expect(JSON.parse(team ?? "{}")).toEqual({ ...OTTERS, noRunZones: false });
 
   await page.goto("/playbooks?book=fx-nrz");
+  await unfoldBook(page, "Export");
   await expect(preview).toBeVisible();
   await expect(bands(preview)).toHaveCount(0);
 

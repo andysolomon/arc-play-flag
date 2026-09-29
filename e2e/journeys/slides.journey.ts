@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { DIAGNOSTICS_KEY } from "../../lib/diagnostics";
 import { playSvg } from "../../lib/render/play-svg";
-import { armSabotage, canvasBudget, downloadBytes, sabotage } from "../support/designer";
+import { armSabotage, canvasBudget, downloadBytes, sabotage, unfoldBook } from "../support/designer";
 import {
   COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
   corruptStoredText, playbook, seed,
@@ -113,6 +113,7 @@ test("a coach downloads the playbook as slides for a team meeting: every slide, 
   expect(planted).toEqual({ control: true, lone: true, vtab: true });
 
   await page.goto("/playbooks?book=fx-meeting");
+  await unfoldBook(page, "Export");
   await expect(page.getByText("SLIDES", { exact: true })).toBeVisible();
   await expect(page.getByText("One play per slide for your team meeting, with your notes and every player's job in the speaker notes.")).toBeVisible();
   await expect(page.getByText("10 slides · opens in PowerPoint, Keynote and Google Slides")).toBeVisible();
@@ -245,6 +246,7 @@ test("a slide that cannot be drawn, first or halfway through the deck, is a fail
   await armSabotage(page);
   await seed(page, { plays: PLAYS, playbooks: [BOOK], team: OTTERS });
   await page.goto("/playbooks?book=fx-meeting");
+  await unfoldBook(page, "Export");
   const downloads: Download[] = [];
   page.on("download", (d) => { downloads.push(d); });
 

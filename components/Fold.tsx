@@ -4,12 +4,13 @@ import { useId, useState, type ReactNode } from "react";
 import { eyebrow } from "./ui";
 
 /**
- * A sidebar section folded away behind its heading, which still says what is picked inside it.
- * Folded on every visit: the look is set once and rarely touched, so it shouldn't sit between a
- * coach and the play. Its contents mount only while open, so a folded end zone picker fetches
- * none of its designs. Opening Play tools again leaves each section as it was.
+ * A section folded away behind its heading, which still says what is inside it. Folded on every
+ * visit: what it holds is rarely touched, so it shouldn't sit between a coach and the play.
+ * Its contents mount only while open, so a folded end zone picker fetches none of its designs;
+ * `keep` keeps them mounted and only hides them, for a section whose state must outlast a fold
+ * (a share link's revoke control not yet saved, the export options a coach set).
  */
-export function Fold({ label, says, children }: { label: string; says: ReactNode; children: ReactNode }) {
+export function Fold({ label, says, keep = false, children }: { label: string; says?: ReactNode; keep?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
@@ -18,6 +19,7 @@ export function Fold({ label, says, children }: { label: string; says: ReactNode
         type="button"
         aria-expanded={open}
         aria-controls={id}
+        data-fold={label}
         onClick={() => { setOpen((o) => !o); }}
         className="flex min-h-11 flex-none cursor-pointer items-center gap-2 rounded-note text-left hover:bg-yellow-soft"
       >
@@ -31,7 +33,7 @@ export function Fold({ label, says, children }: { label: string; says: ReactNode
         </svg>
       </button>
       <div id={id} hidden={!open} className="flex flex-none flex-col gap-[10px]">
-        {open && children}
+        {(open || keep) && children}
       </div>
     </>
   );

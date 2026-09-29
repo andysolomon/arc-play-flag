@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from "@playwrigh
 import { readBackupFile } from "../../lib/export/backup";
 import { readTransfer } from "../../lib/export/transfer";
 import type { SavedPlay } from "../../lib/play/types";
-import { Designer, downloadText } from "../support/designer";
+import { Designer, downloadText, unfoldBook } from "../support/designer";
 import {
   GOAL_LINE_FADE, KEYS, OTTERS, RED_ZONE_FADE, SLANT_LEFT, formation, jsonUpload, play, playbook, seed, storedDraft, storedPlays,
 } from "../support/fixtures";
@@ -362,6 +362,7 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
 
   // the printout preview draws the book's first play from the 5
   await page.goto(`/playbooks?book=${book.id}`);
+  await unfoldBook(page, "Export");
   const preview = page.getByRole("img", { name: "Playbook PDF preview" });
   await expect(preview).toBeVisible();
   const pdf = await readField(preview);

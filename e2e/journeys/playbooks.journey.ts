@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { encodePlayFile } from "../../lib/export/transfer";
-import { armSabotage, downloadBytes, downloadText, sabotage } from "../support/designer";
+import { armSabotage, downloadBytes, downloadText, sabotage, unfoldBook } from "../support/designer";
 import {
   COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook, playbookFile, seed, storageSnapshot, storedPlaybooks, storedPlays,
 } from "../support/fixtures";
@@ -57,12 +57,14 @@ test("exports are disabled for an empty book, download as real files for a full 
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [empty, road], team: OTTERS });
 
   await page.goto("/playbooks?book=fx-empty");
+  await unfoldBook(page, "Export");
   for (const label of ["Download wristbands PDF", "Download binder PDF", "Download postcards PDF", "Download flyer PDF", "Download slides", "Download playbook file"]) {
     await expect(page.getByRole("button", { name: label })).toBeDisabled();
   }
   await expect(page.getByText("Opens in PowerPoint, Keynote and Google Slides.")).toBeVisible();
 
   await page.goto("/playbooks?book=fx-road");
+  await unfoldBook(page, "Export");
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download playbook file" }).click()]);
   await expect(toast(page)).toHaveText("Saved");
   expect(file.suggestedFilename()).toBe("otter-road-book.playbook.json");
@@ -96,6 +98,7 @@ test("postcards print two-sided and the flyer prints one page the coach chose", 
   const road = playbook("fx-road", "Otter Road Book", [WHEEL_RIGHT, COVER_TWO, SLANT_LEFT]);
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [road], team: OTTERS });
   await page.goto("/playbooks?book=fx-road");
+  await unfoldBook(page, "Export");
 
   // one play's postcard is named after the play, not the book
   await page.getByRole("combobox", { name: "Plays to print as postcards" }).selectOption("fx-cover-two");
@@ -164,6 +167,7 @@ test("a playbook file downloaded on one device imports whole on another", async 
   const season = playbook("fx-season", "Otter Season Book", [COVER_TWO, SLANT_LEFT, WHEEL_RIGHT]);
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [season], team: OTTERS });
   await page.goto("/playbooks?book=fx-season");
+  await unfoldBook(page, "Export");
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download playbook file" }).click()]);
   expect(download.suggestedFilename()).toBe("otter-season-book.playbook.json");
   const text = await downloadText(download);

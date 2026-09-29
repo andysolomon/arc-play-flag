@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { Designer, downloadBytes, downloadText } from "../support/designer";
+import { Designer, downloadBytes, downloadText, unfoldBook } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
 import { END_ZONES, ENDZONE_KEY, TOUCHDOWNS_KEY } from "../../lib/endzone";
 import { MIDFIELD_YARD } from "../../lib/play/field";
@@ -43,6 +43,7 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
 
   await page.goto("/playbooks?book=offline-book");
   await expect(page.getByRole("textbox", { name: "Playbook name" })).toHaveValue("Offline Book");
+  await unfoldBook(page, "Export");
   await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
 
   const failedChunks: string[] = [];

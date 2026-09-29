@@ -7,7 +7,7 @@ import type { Numbered } from "../../lib/export/numbered";
 import { postcardPages } from "../../lib/export/postcard";
 import { slidePlans } from "../../lib/export/slides";
 import { BAND_PRESETS, wristbandPages } from "../../lib/export/wristband";
-import { Designer, downloadBytes } from "../support/designer";
+import { Designer, downloadBytes, unfoldBook } from "../support/designer";
 import { BUNCH_MAN_D, COVER_ONE_D, COVER_TWO, OTTERS, SLANT_LEFT, ZONE_D, playbook, seed, storedDraft, storedPlays } from "../support/fixtures";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -229,6 +229,7 @@ test("a man defender wears a name tag, not an arrow to nobody, wherever the offe
   manifest.zoneThumbnail = await drawn(zone);
 
   await page.goto("/playbooks?book=fx-mca");
+  await unfoldBook(page, "Export");
   const exportPreview = page.getByRole("img", { name: "Playbook PDF preview" });
   await expect(exportPreview).toBeVisible();
   manifest.exportPreview = await drawn(exportPreview);

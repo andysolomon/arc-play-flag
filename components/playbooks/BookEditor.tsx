@@ -10,10 +10,11 @@ import {
 } from "@/lib/play/library";
 import { failureMessage } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
+import { Fold } from "../Fold";
 import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, input, pill, pillDark, pillSm } from "../ui";
 import { AddPlaysModal } from "./AddPlays";
-import { ShareBook } from "./ShareBook";
+import { ShareBook, ShareLinks } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
 import { TwoStep } from "./TwoStep";
@@ -74,7 +75,9 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
       </div>
       <span className="text-caption leading-note text-ink-muted">Plays are numbered by their order here. Deleting a playbook keeps the plays.</span>
 
-      <ShareBook key={book.id} book={book} plays={plays} team={team} />
+      <Fold label="Share" says={<ShareLinks id={book.id} />} keep>
+        <ShareBook key={book.id} book={book} plays={plays} team={team} />
+      </Fold>
       <span className={divider} />
       <div className="flex flex-wrap items-center gap-2">
         <span className={eyebrow}>PLAYS IN THIS PLAYBOOK</span>
@@ -112,8 +115,9 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
       )}
 
       <span className={divider} />
-      <span className={eyebrow}>EXPORT</span>
-      <ExportPanel book={book} items={items} team={team} say={say} />
+      <Fold label="Export" says="Wristbands, binder, slides, postcards, flyer" keep>
+        <ExportPanel book={book} items={items} team={team} say={say} />
+      </Fold>
     </>
   );
 }

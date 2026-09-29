@@ -200,6 +200,18 @@ export type Sabotage = "quota" | "noCanvas";
  * or once a canvas budget is spent, so the tests can exercise the app's failure states
  * without filling a real disk or running a phone out of canvas memory.
  */
+/**
+ * Share and Export fold away in a playbook; opens one unless it already is. The first tap after
+ * a navigation can land before React has hydrated, so it taps again if it did.
+ */
+export async function unfoldBook(page: Page, label: "Share" | "Export"): Promise<void> {
+  const fold = page.locator(`button[data-fold='${label}']`);
+  await expect(async () => {
+    if ((await fold.getAttribute("aria-expanded")) !== "true") await fold.click();
+    await expect(fold).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+  }).toPass();
+}
+
 export async function armSabotage(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>;
