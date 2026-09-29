@@ -25,6 +25,9 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *    round-capped path (a route), or an id the field and a swatch both use → "picking", "every end zone"
  *  - a route's turf lane is missing under a design, drawn under Classic, or not clipped to the
  *    band                                                       → "picking", "every end zone"
+ *  - a design is drawn inside the diagram, so every frame of its animation repaints each line,
+ *    route and player (in Safari on a phone, a few frames a second and a drawer that stays blank for
+ *    seconds), or the diagram's own band hides the design's layer → "picking", "every end zone", "printing"
  *  - an end zone in use goes back to classic, or can't be kept, once its count is lost → "an end zone in use"
  *  - junk in storage opens end zones, draws a design, or poisons the next count → "junk in storage"
  * Touchdowns
@@ -56,8 +59,8 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *  - thumbnails, the export preview or the share snapshot wear the device's end zone → "playbook settings"
  *  - playbook settings lack the picker, or a pick there doesn't reach the designer → "playbook settings"
  *
- * Artifacts, in test-results/: end-zones-<device>.json (every end zone and whether it drew on the
- * field, and the touchdown timeline: when each celebration started against when the app's own
+ * Artifacts, in test-results/: end-zones-<device>.json (every end zone, whether it drew on the
+ * field and that it drew on its own layer rather than inside the diagram, and the touchdown timeline: when each celebration started against when the app's own
  * simulation says the ball crosses, where the ball was, the count stored before and after, what it
  * opened and the colours it wore, each section with the window it ran in; asserted against the
  * literal below before it is written), a picture of the top of the
@@ -105,7 +108,8 @@ const swatch = (scope: Page | Locator, name: string) => picker(scope).getByRole(
 const swatchFrame = (scope: Locator, name: string) =>
   picker(scope).locator("label").filter({ has: scope.page().getByRole("radio", { name, exact: true }) });
 const hint = (scope: Page | Locator) => scope.getByText(/\d of 8 open\.|All 8 open\./);
-const art = (field: Locator) => field.locator("[data-ez-art]");
+/** The field's design: on its own layer beside the diagram, under its lines, routes and players (never inside it). */
+const art = (field: Locator) => field.locator("xpath=..").locator(":scope > [data-ez-backdrop] [data-ez-art]");
 /** The field's own END ZONE words, not a design's lettering. */
 const plainLabel = (field: Locator) => field.locator("text:not([data-ez-art] text)", { hasText: "END ZONE" });
 const lanes = (field: Locator) => field.locator("[data-lane]");
@@ -379,6 +383,9 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
   await expect(swatch(tools, "Synthwave '84")).toBeChecked();
   await expect(art(d.field)).toHaveAttribute("data-ez-art", "synthwave");
   await expect(art(d.field)).toBeVisible();
+  // on its own layer, out of the diagram, whose plain band is see-through on screen so the design shows
+  await expect(d.field.locator("[data-ez-art]")).toHaveCount(0);
+  await expect(band(d.field)).toHaveCSS("opacity", "0");
   // the design letters itself: the plain words stay in the DOM for print, hidden on screen
   await expect(plainLabel(d.field)).toHaveCount(1);
   await expect(plainLabel(d.field)).toBeHidden();
@@ -392,6 +399,7 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
   await expect(clipRect).toHaveAttribute("height", (await band(d.field).getAttribute("height")) ?? "");
   // the football is the field's only picture, and only while a play runs
   await expect(d.field.locator("image")).toHaveCount(0);
+  await expect(art(d.field).locator("image")).toHaveCount(0);
   expect(await stored(page)).toEqual({ zone: "synthwave", touchdowns: null });
 
   // the other tab follows without a reload
@@ -703,6 +711,9 @@ test("printing keeps the classic end zone: no design, no lanes, the plain words 
   for (const lane of await lanes(d.field).all()) await expect(lane).toBeHidden();
   await expect(plainLabel(d.field)).toBeVisible();
   await expect(band(d.field)).toHaveCSS("fill", STANDARD_ENDZONE);
+  await expect(band(d.field)).toHaveCSS("opacity", "1");
+  // and the diagram's own turf, which its design layer carries on screen
+  await expect(d.field).toHaveCSS("background-color", "rgb(193, 240, 193)");
   await expect(d.routes).toHaveCount(2);
 
   await page.emulateMedia({ media: "screen" });
@@ -890,6 +901,8 @@ test.describe("the end zones manifest", () => {
           expect(await box.getAttribute(k), `${z.id} ${k}`).toBe(await band(d.field).getAttribute(k));
         }
         await expect(plainLabel(d.field)).toBeHidden();
+        await expect(d.field.locator("[data-ez-art]")).toHaveCount(0);
+        await expect(art(d.field).locator("image")).toHaveCount(0);
       } else {
         await expect(art(d.field)).toHaveCount(0);
         if (lettered) await expect(plainLabel(d.field)).toBeVisible();
@@ -912,6 +925,7 @@ test.describe("the end zones manifest", () => {
       manifest.zones.push({
         id: z.id, name: z.name, opensAt: z.unlock,
         drawn: (await art(d.field).count()) === 1 && (await art(d.field).isVisible()),
+        insideDiagram: await d.field.locator("[data-ez-art]").count(),
         plainLabelOnScreen: await plainLabel(d.field).isVisible(),
         lanes: await lanes(d.field).count(),
         routes: await d.routes.count(),
@@ -922,6 +936,7 @@ test.describe("the end zones manifest", () => {
     expect(manifest.zones).toEqual(END_ZONES.map((z) => ({
       id: z.id, name: z.name, opensAt: z.unlock,
       drawn: z.id !== "classic",
+      insideDiagram: 0,
       plainLabelOnScreen: z.id === "classic" && lettered,
       lanes: z.id === "classic" ? 0 : 2,
       routes: 2,
