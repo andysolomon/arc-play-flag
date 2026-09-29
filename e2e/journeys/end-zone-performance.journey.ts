@@ -18,9 +18,10 @@ import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
  *  - a design leans on what costs the most to repaint: a <pattern> or <filter>, a stroke painted
  *    with a gradient, or hundreds upon hundreds of elements → "every design's band"
  *  - the picker's swatches, drawn all at once, cost more than their budget → "the picker's swatches"
- *  - the Matrix rain falls off its lattice: a column on a clock of its own, a speed that doesn't
- *    divide 12 or a cursor that blinks off the beat, so the band repaints on nearly every frame
- *    again; or it repaints more than a dozen times a second in the browser → "the Matrix rain"
+ *  - the Matrix rain moves at rest (it is to hold still until a touchdown, only the cursor
+ *    blinking), so the band repaints on nearly every frame again; or its touchdown clocks fall
+ *    off the lattice: a column on a clock of its own, a speed that doesn't divide 12, or a
+ *    cursor off the beat → "the Matrix rain"
  *
  * Paint cost is measured in the page, by drawing the band's own SVG onto a canvas at its size on
  * this screen, and taken against a fixed calibration picture drawn the same way at the same
@@ -53,8 +54,8 @@ const BUDGETS: Readonly<Record<EndZoneId, { shallow: number; deep: number; swatc
   "eight-bit": { shallow: 0.7, deep: 0.6, swatch: 0.5 },
   "event-horizon": { shallow: 4, deep: 6.5, swatch: 2.6 },
 };
-/** How many times a second the Matrix band may repaint, in the browser, and the lattice its clocks tick on. */
-const MATRIX_REPAINTS_PER_SECOND = 14;
+/** How many times a second the Matrix band may lay out at rest, in the browser (a blink is a paint, not a layout), and the lattice its touchdown clocks tick on. */
+const MATRIX_REPAINTS_PER_SECOND = 4;
 const MATRIX_LATTICE_HZ = 12;
 /** No design draws more elements than this on the deep band. */
 const MOST_ELEMENTS = 450;
@@ -260,7 +261,7 @@ test.describe("end zone performance", () => {
     }
   });
 
-  test("the Matrix rain falls on three shared clocks that tick on a 12 Hz lattice, so its band repaints a dozen times a second at most", async ({ page }, testInfo) => {
+  test("the Matrix rain holds still at rest, only the cursor blinking, and its touchdown clocks sit on a 12 Hz lattice", async ({ page }, testInfo) => {
     await store(page, "matrix");
     const d = new Designer(page);
     await d.goto(`?open=${MIDFIELD.id}`);
@@ -270,29 +271,32 @@ test.describe("end zone performance", () => {
     const timing = await page.evaluate(() => {
       const band = document.querySelector("[data-ez-backdrop] [data-ez-art='matrix']");
       if (!band) throw new Error("no Matrix band");
-      const falls: { durationS: number; stepsPerSecond: number; delayS: number }[] = [];
+      // what runs at rest, and what the columns are set to fall at in a touchdown (their own inline durations)
+      const running: string[] = [];
+      const clocks: { durationS: number; stepsPerSecond: number; delayS: number }[] = [];
       let cursorS: number | null = null;
       for (const el of Array.from(band.querySelectorAll("*"))) {
         const s = getComputedStyle(el);
-        if (s.animationName === "ez-matrix-fall") {
-          const durationS = parseFloat(s.animationDuration);
-          const steps = /steps\((\d+)/.exec(s.animationTimingFunction)?.[1];
-          falls.push({ durationS, stepsPerSecond: Math.round((Number(steps) / durationS) * 1000) / 1000, delayS: parseFloat(s.animationDelay) });
-        }
+        if (s.animationName !== "none") running.push(s.animationName);
         if (s.animationName === "ez-matrix-blink") cursorS = parseFloat(s.animationDuration);
+        if (el.classList.contains("ez-matrix-fall")) {
+          const durationS = parseFloat((el as HTMLElement).style.animationDuration);
+          clocks.push({ durationS, stepsPerSecond: Math.round((24 / durationS) * 1000) / 1000, delayS: parseFloat(s.animationDelay) || 0 });
+        }
       }
-      return { falls, cursorS };
+      return { running: [...new Set(running)].sort(), clocks, cursorS };
     });
-    manifest.matrix = { clocks: timing.falls, cursorS: timing.cursorS, latticeHz: MATRIX_LATTICE_HZ };
-    expect(timing.falls.length, "columns fall in three clock groups").toBeLessThanOrEqual(3);
-    expect(timing.falls.length).toBeGreaterThan(0);
-    for (const c of timing.falls) {
+    manifest.matrix = { clocks: timing.clocks, cursorS: timing.cursorS, latticeHz: MATRIX_LATTICE_HZ };
+    expect(timing.running, "at rest only the cursor animates").toEqual(["ez-matrix-blink"]);
+    expect(timing.clocks.length, "columns fall in three clock groups").toBeLessThanOrEqual(3);
+    expect(timing.clocks.length).toBeGreaterThan(0);
+    for (const c of timing.clocks) {
       expect(Number.isInteger(c.stepsPerSecond), `a clock steps ${String(c.stepsPerSecond)} times a second`).toBe(true);
       expect(MATRIX_LATTICE_HZ % c.stepsPerSecond, `a clock of ${String(c.stepsPerSecond)} steps a second is off the lattice`).toBe(0);
       expect(Math.round(c.delayS * MATRIX_LATTICE_HZ * 1000) / 1000 % 1, "a clock's delay is off the lattice").toBe(0);
     }
     expect(timing.cursorS, "the cursor blinks on the beat").toBe(1);
-    // and in the browser: layouts a second while it rains (every step is one; sixty would be every frame)
+    // and in the browser: layouts a second at rest (a moving column is one each; sixty would be every frame)
     const r = await repaints(page, 3);
     (manifest.zones.matrix ??= {}).repaints = r;
     expect(r.layoutsPerSecond, `the Matrix band laid out ${String(r.layoutsPerSecond)} times a second`).toBeLessThanOrEqual(MATRIX_REPAINTS_PER_SECOND);
