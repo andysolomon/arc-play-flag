@@ -74,7 +74,7 @@ interface Column {
   flip: boolean;
   /** which of SPEEDS it falls at */
   clock: number;
-  /** the band row the first drop's head is on before the column has moved, so the still frame is a good one */
+  /** the band row the first drop's head is on at rest, before a touchdown moves the column */
   head: number;
 }
 
@@ -234,9 +234,11 @@ function Terminal({ id, w, h, name, celebrate }: { id: string; w: number; h: num
  * flashes the screen, floods the band with a sheet of drops, rushes every column and decodes the
  * lettering from scrambled code, one letter at a time.
  *
- * Drawn to be cheap to repaint, since every step of the rain repaints the band: each column is
- * one <text> of just the glyphs its fall can show, only the heads are stroked, and the columns
- * fall on three shared clocks that tick together.
+ * At rest the rain holds still: every drop is caught in the band, and only the cursor blinks, so
+ * the band costs nothing to keep on screen (every step of the rain repaints it, and on a phone
+ * that was felt across the whole app). A touchdown sets the columns falling, on three shared
+ * clocks that tick together, for as long as it lasts. Each column is one <text> of just the
+ * glyphs its fall can show, and only the heads are stroked.
  */
 export function MatrixArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("matrix");
@@ -249,9 +251,10 @@ export function MatrixArt({ w, h, label, celebrate, name }: ArtProps) {
   // fewer drops across the middle third, where the lettering and most routes are
   const falling = xs.filter((x, j) => rand(j, 1) < (Math.abs(x / band - 0.5) < 1 / 6 ? 0.45 : 0.8));
   const cols = falling.map((x, k): Column => {
-    // a third of the drops are caught mid-band in the still frame, the rest anywhere in their fall
-    const head = rand(k, 5) < 0.35 ? Math.floor(rand(k, 6) * rows) : rows - PERIOD + Math.floor(rand(k, 6) * PERIOD);
-    return { x, code: Math.floor(rand(k, 2) * STRINGS), trail: Math.floor(rand(k, 3) * TRAILS.length), flip: rand(k, 4) < 0.4, clock: Math.floor(rand(k, 8) * SPEEDS.length), head };
+    const trail = Math.floor(rand(k, 3) * TRAILS.length);
+    // every drop is caught in the band in the still frame, a few by their tails alone, their heads just past the goal line
+    const head = Math.floor(rand(k, 6) * (rows + Math.floor((TRAILS[trail] ?? TRAILS[1]) * 0.5)));
+    return { x, code: Math.floor(rand(k, 2) * STRINGS), trail, flip: rand(k, 4) < 0.4, clock: Math.floor(rand(k, 8) * SPEEDS.length), head };
   });
   const clocks = SPEEDS.map((_, c) => cols.filter((col) => col.clock === c)).filter((group) => group.length > 0);
   // the residue: short runs of faded code down most columns, the newest glyph of each a little brighter
@@ -271,8 +274,8 @@ export function MatrixArt({ w, h, label, celebrate, name }: ArtProps) {
   const faded = residue.filter((c) => !c.newest).map(({ x, r }): Cell => [x, r]);
   const newest = residue.filter((c) => c.newest).map(({ x, r }): Cell => [x, r]);
   const chars = (cells: readonly Cell[], salt: number): string => cells.map(([x, r]) => pick(Math.round(x * 3) + r * 257, salt)).join("");
-  // how far a column falls: one loop of its own, and a touchdown's rush on top
-  const reach = PERIOD * (celebrate ? 2 : 1);
+  // how far a column falls: not at all at rest; in a touchdown, one loop of its own and the rush on top
+  const reach = celebrate ? PERIOD * 2 : 0;
   return (
     <g className={celebrate ? "ez-matrix-party" : undefined}>
       <rect width={w} height={h} fill={BLACK} />
