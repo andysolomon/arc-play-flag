@@ -348,7 +348,7 @@ test("a fresh device keeps the classic end zone, and the picker says what is ope
   await expect(lanes(d.field)).toHaveCount(0);
   await expect(d.routes).toHaveCount(1);
 
-  await d.tools();
+  await d.unfold("End zone");
   const tools = page.locator("#play-sidebar");
   await expect(picker(tools).getByRole("radio")).toHaveCount(END_ZONES.length);
   await expect(swatch(tools, "Classic")).toBeChecked();
@@ -406,7 +406,7 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
   await d2.closeSidebars();
   await expect(art(d2.field)).toHaveCount(0);
 
-  await d.tools();
+  await d.unfold("End zone");
   const tools = page.locator("#play-sidebar");
   await swatch(tools, "Synthwave '84").check();
   await expect(swatch(tools, "Synthwave '84")).toBeChecked();
@@ -437,7 +437,7 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
 
   await page.reload();
   await expect(art(d.field)).toHaveAttribute("data-ez-art", "synthwave");
-  await d.tools();
+  await d.unfold("End zone");
   await expect(swatch(tools, "Synthwave '84")).toBeChecked();
 
   await swatch(tools, "Home Team").check();
@@ -484,7 +484,7 @@ test("the team's name is painted across every design and none says END ZONE; it 
       await tools.getByRole("textbox", { name: "Team name" }).fill(teamName);
     }
     for (const z of designed) {
-      await d.tools();
+      await d.unfold("End zone");
       await swatch(tools, z.name).check();
       await expect(swatch(tools, z.name)).toBeChecked();
       await d.closeSidebars();
@@ -501,7 +501,7 @@ test("the team's name is painted across every design and none says END ZONE; it 
   expect(await storedTeamName(page)).toBe(long);
 
   // a shorter name, typed in Play tools: the field and every swatch repaint as it is typed
-  await d.tools();
+  await d.unfold("End zone");
   const field = tools.getByRole("textbox", { name: "Team name" });
   await field.fill("Delta Force 7");
   await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
@@ -581,7 +581,7 @@ test("a pass carried over the goal line is a touchdown: the chosen end zone cele
   expect(r.lasted).toBeLessThan(5);
 
   // the next time Play tools opens, Sakura can be picked and Matrix is next
-  await d.tools();
+  await d.unfold("End zone");
   const tools = page.locator("#play-sidebar");
   await expect(swatch(tools, "Sakura")).toBeEnabled();
   await expect(swatch(tools, "Matrix")).toBeDisabled();
@@ -728,7 +728,7 @@ test("an end zone in use stays drawn and checked after its touchdowns are lost, 
   await expect(art(d.field)).toHaveAttribute("data-ez-art", "matrix");
   await expect(plainLabel(d.field)).toBeHidden();
 
-  await d.tools();
+  await d.unfold("End zone");
   const tools = page.locator("#play-sidebar");
   await expect(swatch(tools, "Matrix")).toBeChecked();
   await expect(swatch(tools, "Matrix")).toBeEnabled();
@@ -760,7 +760,7 @@ test("junk in storage falls back to the classic end zone and no touchdowns, and 
   for (const j of junk) {
     await store(page, j);
     await d.goto("?open=fx-td-carry");
-    await d.tools();
+    await d.unfold("End zone");
     await expect(swatch(tools, "Classic"), JSON.stringify(j)).toBeChecked();
     await expect(swatch(tools, "Sakura"), JSON.stringify(j)).toBeDisabled();
     await expect(hint(tools)).toContainText("3 of 8 open.");
@@ -791,7 +791,7 @@ test("with storage blocked a touchdown still celebrates, and what it opened can 
   expect(await stored(page)).toEqual({ zone: null, touchdowns: null });
   await playEnds(page);
 
-  await d.tools();
+  await d.unfold("End zone");
   const tools = page.locator("#play-sidebar");
   await expect(hint(tools)).toContainText("4 of 8 open. Throw a touchdown pass on ▶ to open Matrix");
   await expect(hint(tools)).toContainText("1 touchdown pass on this device.");
@@ -803,7 +803,7 @@ test("with storage blocked a touchdown still celebrates, and what it opened can 
   // nothing was kept, so a new visit starts over
   await page.reload();
   await expect(d.field).toBeVisible();
-  await d.tools();
+  await d.unfold("End zone");
   await expect(swatch(tools, "Classic")).toBeChecked();
   await expect(swatch(tools, "Sakura")).toBeDisabled();
   await expect(art(d.field)).toHaveCount(0);
@@ -895,7 +895,7 @@ test.describe("with motion allowed", () => {
     await d.goto("?open=fx-td-carry");
     await expect(art(d.field)).toHaveAttribute("data-ez-art", "sakura");
     // a swatch previews its design standing still, even with motion allowed
-    await d.tools();
+    await d.unfold("End zone");
     await expect(picker(page.locator("#play-sidebar"))).toBeVisible();
     expect(await animationsIn(page, "[role='radiogroup'][aria-label='End zone']")).toEqual([]);
 
@@ -995,7 +995,7 @@ test.describe("the end zones manifest", () => {
     const lettered = bandHeight > 30;
 
     for (const z of END_ZONES) {
-      await d.tools();
+      await d.unfold("End zone");
       await expect(swatch(tools, z.name)).toBeEnabled();
       await swatch(tools, z.name).check();
       await expect(swatch(tools, z.name)).toBeChecked();
@@ -1083,7 +1083,7 @@ test.describe("the end zones manifest", () => {
       if (s.before !== null) await store(page, { touchdowns: s.before });
       await d.goto(`?open=${s.play.id}`);
       if (s.pick) {
-        await d.tools();
+        await d.unfold("End zone");
         await swatch(tools, s.pick).check();
         await expect(swatch(tools, s.pick)).toBeChecked();
       }
@@ -1115,7 +1115,7 @@ test.describe("the end zones manifest", () => {
       });
     }
 
-    await d.tools();
+    await d.unfold("End zone");
     for (const z of END_ZONES) await expect(swatch(tools, z.name), z.name).toBeEnabled();
     await expect(hint(tools)).toContainText("All 8 open. 6 touchdown passes on this device.");
 

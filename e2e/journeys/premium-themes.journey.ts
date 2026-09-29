@@ -102,7 +102,7 @@ test("every premium theme keeps its words readable, with a contrast report and a
   await seed(page, { plays: [SLANT_LEFT], playbooks: [BOOK], team: OTTERS });
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Theme");
   const tools = page.locator("#play-sidebar");
   const save = tools.getByRole("button", { name: "Save", exact: true });
   const report: Record<string, Record<string, number>> = {};
@@ -180,7 +180,7 @@ test("a premium theme prints ink on paper, and stays in use after its playbooks 
   const d = new Designer(page);
   await d.goto();
   await expect(html(page)).toHaveAttribute("data-theme", "gruvbox");
-  await d.tools();
+  await d.unfold("Theme");
   await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeChecked();
   await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeEnabled();
   await expect(picker(page).getByRole("radio", { name: "Nord" })).toBeDisabled();
@@ -203,7 +203,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   });
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Theme");
   const themed = page.getByRole("switch", { name: /Themed field/ });
   const svg = d.field;
   const primary = d.primaryRoutes.first();
@@ -223,7 +223,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   await page.reload();
   await expect(html(page)).toHaveAttribute("data-field", "themed");
   await expect(svg).toHaveCSS("background-color", "rgb(28, 43, 45)");
-  await d.tools();
+  await d.unfold("Theme");
   await expect(themed).toBeChecked();
 
   const report: Record<string, Record<string, number>> = {};

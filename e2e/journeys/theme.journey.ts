@@ -18,7 +18,7 @@ test("a dark device gets the dark board; a coach's pick outlasts a reload, and A
   await expect(html(page)).toHaveAttribute("data-theme", "dark");
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#24221d");
 
-  await d.tools();
+  await d.unfold("Theme");
   await expect(picker(page).getByRole("radio", { name: "Auto" })).toBeChecked();
   await picker(page).getByRole("radio", { name: "Light" }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "light");
@@ -27,7 +27,7 @@ test("a dark device gets the dark board; a coach's pick outlasts a reload, and A
 
   await page.reload();
   await expect(html(page)).toHaveAttribute("data-theme", "light");
-  await d.tools();
+  await d.unfold("Theme");
   await expect(picker(page).getByRole("radio", { name: "Light" })).toBeChecked();
 
   await picker(page).getByRole("radio", { name: "Auto" }).check();
@@ -41,7 +41,7 @@ test("a dark device gets the dark board; a coach's pick outlasts a reload, and A
 test("yellow highlights keep dark ink on the dark board, and printing still puts ink on paper", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Theme");
   // the open Play tools toggle and the chosen theme are yellow; the Routes toggle is not
   await expect(page.getByRole("button", { name: "Play tools" })).toHaveCSS("color", INK);
   await expect(picker(page).locator("label").filter({ hasText: "Auto" })).toHaveCSS("color", INK);
@@ -65,6 +65,7 @@ test("stickers are chalk on the dark board and ink on paper, and each look is ke
   await expect(d.undo.locator("img:visible")).toHaveAttribute("src", /undo-dark\.png/);
   await tools.screenshot({ path: `test-results/theme-stickers-${testInfo.project.name}-dark.png` });
 
+  await d.unfold("Theme");
   await picker(page).getByRole("radio", { name: "Light" }).check();
   await expect(save.locator("img:visible")).toHaveCount(1);
   await expect(save.locator("img:visible")).toHaveAttribute("src", /save\.png/);

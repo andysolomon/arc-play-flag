@@ -246,7 +246,7 @@ test.describe("end zone performance", () => {
   test("the picker's swatches, drawn all at once, each paint within their budget", async ({ page }) => {
     const d = new Designer(page);
     await d.goto(`?open=${SLANT_LEFT.id}`);
-    await d.tools();
+    await d.unfold("End zone");
     const swatches = page.locator("[role=radiogroup][aria-label='End zone'] [data-ez-art]");
     await expect(swatches).toHaveCount(END_ZONES.length);
     for (const [i, z] of END_ZONES.entries()) {

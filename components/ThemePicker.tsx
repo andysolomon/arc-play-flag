@@ -28,6 +28,12 @@ const toggle =
   "before:transition-transform before:duration-[120ms] checked:bg-yellow checked:before:translate-x-5 " +
   "disabled:cursor-not-allowed disabled:bg-paper-2 disabled:before:bg-paper-2 motion-reduce:transition-none motion-reduce:before:transition-none";
 
+/** The theme in use, by name: what a folded Theme section says. */
+export function ThemeName() {
+  const choice = usePicked("theme", useSyncExternalStore(subscribeThemeChoice, getThemeChoice, serverChoice));
+  return PREMIUM_THEMES.find((t) => t.id === choice)?.name ?? COPY[choice as (typeof THEME_CHOICES)[number]].label;
+}
+
 export function Lock() {
   return (
     <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth={2} strokeLinecap="round">
