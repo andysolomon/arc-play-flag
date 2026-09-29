@@ -47,8 +47,10 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
               />
               {/* one string, so a screen reader hears "Opens at 5 touchdown passes." whole */}
               {locked && <span id={`${hint}-${z.id}`} hidden>{`Opens at ${needs}.`}</span>}
-              {/* the tick or the lock sits on the preview, leaving the name its whole row; taps pass through to the radio */}
-              <span className="pointer-events-none relative block">
+              {/* the tick or the lock sits on the preview, leaving the name its whole row; taps pass through to the radio.
+                  Off screen the browser skips drawing it (content-visibility), so a theme pick doesn't restyle
+                  every preview's few hundred nodes; the aspect ratio holds its place meanwhile. */}
+              <span className="pointer-events-none relative block aspect-[300/84] [content-visibility:auto]">
                 <svg aria-hidden viewBox={`0 0 ${String(PREVIEW_W)} ${String(PREVIEW_H)}`} className="block h-auto w-full">
                   <EndZoneArt id={z.id} w={PREVIEW_W} h={PREVIEW_H} label celebrate={false} still />
                 </svg>

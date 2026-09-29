@@ -23,13 +23,18 @@ import { GOAL_LINE_FADE, OTTERS, playbook, seed } from "../support/fixtures";
  *    wins; or the interstitial takes focus off the picker → "arrow keys"
  *  - the spinner spins under reduced motion, or stands still with motion allowed → "a theme pick", "arrow keys"
  *  - in playbook settings (a modal dialog) it is drawn under the dialog → "playbook settings"
+ * Keeping it quick: the end zone picker's previews (about half the page's nodes) are left for the
+ * browser to skip while off screen, so a theme pick restyles only what is in view first.
+ *  - a preview changes size as it is drawn in, so the picker jumps under the coach's thumb, or a
+ *    preview scrolled into view after a theme pick is left blank → "end zone previews"
  *
  * The field is spotted near their goal (GOAL_LINE_FADE), so its end zone is on every screen.
  * The clock is paused around each pick, so the interstitial holds still to be looked at: nothing
  * but the interstitial may have changed until the clock runs. Artifacts, in test-results/:
  * switching-<device>-<test>.json (each switch: what the interstitial said, and the theme, field and
- * end zone before the pick, while it was up and after it came down) and a picture of it up
- * over the designer and over playbook settings.
+ * end zone before the pick, while it was up and after it came down), a picture of it up over the
+ * designer and over playbook settings, and switching-<device>-previews.json with a picture of the
+ * end zone picker after a theme pick (each preview's box before and after, and whether it drew).
  */
 
 const BOOK = playbook("fx-book", "Otter Book", [GOAL_LINE_FADE]);
@@ -200,4 +205,53 @@ test("playbook settings: the interstitial is drawn over the dialog, not under it
   expect(s.after.theme).toBe("nord");
   await expect(settings).toBeVisible();
   keep(testInfo, "settings", [s]);
+});
+
+test("end zone previews keep their size while the browser draws them in, and each draws its design once in view", async ({ page }, testInfo) => {
+  await page.evaluate(() => { localStorage.setItem("ffpd.touchdowns.v1", "9"); });
+  const d = new Designer(page);
+  await d.openSaved(GOAL_LINE_FADE.name);
+  await d.tools();
+  const zones = page.getByRole("radiogroup", { name: "End zone" });
+  const previews = zones.locator("label > span.relative");
+  await expect(previews).toHaveCount(8);
+  const boxes = (): Promise<{ id: string; w: number; h: number; drawn: boolean }[]> =>
+    previews.evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        id: el.querySelector("[data-ez-art]")?.getAttribute("data-ez-art") ?? "",
+        w: Math.round(r.width * 10) / 10,
+        h: Math.round(r.height * 10) / 10,
+        drawn: el.checkVisibility({ contentVisibilityAuto: true }),
+      };
+    }));
+
+  // picking a theme with the previews below it, as a coach does
+  await page.getByRole("radiogroup", { name: "Theme" }).scrollIntoViewIfNeeded();
+  const before = await boxes();
+  for (const b of before) expect(Math.abs(b.h - (b.w * 84) / 300), `${b.id} keeps the preview's shape`).toBeLessThan(1);
+  await page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Tokyo Night" }).click();
+  await expect(overlay(page)).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "tokyo-night");
+
+  // each one, scrolled to, is drawn at the size it held, with its design in it
+  const after: Awaited<ReturnType<typeof boxes>> = [];
+  for (let i = 0; i < 8; i++) {
+    const preview = previews.nth(i);
+    await preview.scrollIntoViewIfNeeded();
+    await expect.poll(() => preview.evaluate((el) => el.checkVisibility({ contentVisibilityAuto: true }))).toBe(true);
+    const art = await preview.locator("[data-ez-art]").evaluate((g) => {
+      const b = (g as SVGGraphicsElement).getBBox();
+      return { w: b.width, h: b.height };
+    });
+    expect(art.w, `preview ${String(i)} has its design drawn`).toBeGreaterThan(0);
+    expect(art.h).toBeGreaterThan(0);
+    const now = (await boxes())[i];
+    if (now) after.push(now);
+  }
+  expect(after.map(({ id, w, h }) => ({ id, w, h }))).toEqual(before.map(({ id, w, h }) => ({ id, w, h })));
+  expect(after.every((a) => a.drawn)).toBe(true);
+
+  await zones.screenshot({ path: `test-results/switching-${testInfo.project.name}-previews.png`, animations: "disabled" });
+  writeFileSync(`test-results/switching-${testInfo.project.name}-previews.json`, `${JSON.stringify({ theme: "tokyo-night", before, after }, null, 2)}\n`);
 });
