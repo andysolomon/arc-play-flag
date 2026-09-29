@@ -12,7 +12,7 @@ import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscrib
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute } from "@/lib/play/routes";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
-import { Field } from "./Field";
+import { FIELD_TITLE_ID, Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
 import { Header } from "./Header";
 import { Hint } from "./Hint";
@@ -183,7 +183,7 @@ export function App() {
     const shared = params.get("p");
     const rec = shared ? decodeShare(shared) : null;
     if (rec) {
-      dispatch({ type: "load", name: rec.name, side: rec.side, artShadow: rec.artShadow, los: rec.los, players: rec.players, shadow: true });
+      dispatch({ type: "load", name: rec.name, notes: rec.notes, side: rec.side, artShadow: rec.artShadow, los: rec.los, players: rec.players, shadow: true });
       // A formation/share payload is an intentional handoff into the designer;
       // keep the tools visible so the coach can immediately inspect or name it.
       openToolsTimer = window.setTimeout(() => { setLeftOpen(true); }, 0);
@@ -258,8 +258,8 @@ export function App() {
     say("New play");
   }, [say]);
   const shareUrl = useCallback(() =>
-    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] }, noRunZones)}`,
-  [s.name, s.side, s.artShadow, s.los, s.players, noRunZones]);
+    `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] }, noRunZones)}`,
+  [s.name, s.notes, s.side, s.artShadow, s.los, s.players, noRunZones]);
   // where this play's ball is spotted: saved with the play, never undone (like its name)
   const onLos = useCallback((los: number) => { dispatch({ type: "setLos", los }); }, []);
   // the team's settings: its name and colour, and the field's no-run zones
@@ -357,7 +357,7 @@ export function App() {
           />
         </Sidebar>
       </div>
-      <Hint text={toast ?? hint} />
+      <Hint text={toast ?? hint} below={FIELD_TITLE_ID} />
       {shareOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-3" role="presentation">
           <section
@@ -373,6 +373,9 @@ export function App() {
             </div>
             <p className="flex-none text-small leading-note text-ink-muted">
               It is a snapshot of this play now, not a live view; later edits are not added to it. The other team is always saved with the link and appears, faded, when the play is opened in the designer.
+            </p>
+            <p className="flex-none text-small leading-note text-ink-muted">
+              {s.notes.trim() ? "Your coaching notes go with it, under the play." : "This play has no coaching notes yet; any you add in Play tools go with the link."}
             </p>
             <div
               role="img"

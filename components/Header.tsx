@@ -26,8 +26,19 @@ const SIDE: Record<Team, { label: string; title: string }> = {
   defense: { label: "Defense", title: "This is a defensive call" },
 };
 
-/** Icon-only on phones: a 44px circle with the glyph centred, instead of a tall oval round a bare character. */
-const round = "inline-flex shrink-0 items-center justify-center gap-1 max-[479px]:w-11 max-[479px]:px-0";
+/**
+ * On phones each control is a 44px-tall key with its glyph over a small name, so a coach can tell
+ * Clear from Undo without trying them; from 480px up the name sits beside the glyph.
+ */
+const round =
+  "inline-flex shrink-0 items-center justify-center gap-1 max-[479px]:min-w-11 max-[479px]:flex-col max-[479px]:gap-0.5 " +
+  "max-[479px]:rounded-[14px] max-[479px]:px-1 max-[479px]:py-0.5";
+/** The same key for a control whose name comes before its glyph on wider screens (Redo, Routes). */
+const roundAfter = round.replace("max-[479px]:flex-col ", "max-[479px]:flex-col-reverse ");
+/** Stickers shrink a little on phones to leave room for the name under them. */
+const glyph = "shrink-0 max-[479px]:h-5 max-[479px]:w-5";
+/** The name under the glyph on phones. */
+const name = "max-[479px]:text-[11px] max-[479px]:leading-none";
 
 /** Three-line menu mark for Play tools, so it reads as a menu instead of a panel chevron. */
 function MenuIcon() {
@@ -61,7 +72,7 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
         data-active={leftOpen}
         className={`${pillSm} ${round} data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
       >
-        <MenuIcon /><span className="max-[479px]:hidden">Play</span>
+        <MenuIcon /><span className={name}>Play</span>
       </button>
       <div className="min-w-0 flex-1" />
       <div className="flex gap-1.5">
@@ -71,16 +82,16 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           title={kind.title}
           className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
         >
-          <Sticker icon={side} size={22} className="shrink-0" />
-          <span className="max-[479px]:hidden">{kind.label}</span>
+          <Sticker icon={side} size={22} className={glyph} />
+          <span className={name}>{kind.label}</span>
         </span>
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
-          <Sticker icon="undo" size={24} className={`shrink-0 ${canUndo ? "" : "opacity-40"}`} />
-          <span className="max-[479px]:hidden">Undo</span>
+          <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
+          <span className={name}>Undo</span>
         </button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${round}`}>
-          <span className="max-[479px]:hidden">Redo</span>
-          <Sticker icon="redo" size={24} className={`shrink-0 ${canRedo ? "" : "opacity-40"}`} />
+        <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${roundAfter}`}>
+          <span className={name}>Redo</span>
+          <Sticker icon="redo" size={24} className={`${glyph} ${canRedo ? "" : "opacity-40"}`} />
         </button>
         <button
           type="button"
@@ -90,8 +101,8 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
           aria-label="Clear routes"
           className={`${pillMd} ${round}`}
         >
-          <Sticker icon="clear" size={22} className={`shrink-0 ${canClear ? "" : "opacity-40"}`} />
-          <span className="max-[479px]:hidden">Clear</span>
+          <Sticker icon="clear" size={22} className={`${glyph} ${canClear ? "" : "opacity-40"}`} />
+          <span className={name}>Clear</span>
         </button>
       </div>
       <button
@@ -102,9 +113,9 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
         aria-expanded={rightOpen}
         aria-controls="route-sidebar"
         data-active={rightOpen}
-        className={`${pillSm} ${round} data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+        className={`${pillSm} ${roundAfter} data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
       >
-        <span className="max-[479px]:hidden">Routes</span><Chevron dir={rightOpen ? "right" : "left"} />
+        <span className={name}>Routes</span><Chevron dir={rightOpen ? "right" : "left"} />
       </button>
     </header>
   );
