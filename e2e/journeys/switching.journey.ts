@@ -83,7 +83,7 @@ test.beforeEach(async ({ page }) => {
 test("a theme pick puts up the interstitial before the page redraws, and takes it down once the new theme is drawn", async ({ page }, testInfo) => {
   const d = new Designer(page);
   await d.openSaved(GOAL_LINE_FADE.name);
-  await d.tools();
+  await d.unfold("Theme");
   const theme = page.getByRole("radiogroup", { name: "Theme" });
   const shot = `test-results/switching-${testInfo.project.name}-designer.png`;
 
@@ -124,7 +124,8 @@ test("an end zone pick and the Themed field switch go through the interstitial t
   await page.evaluate((k) => { localStorage.setItem(k, "gruvbox"); }, THEME_KEY);
   const d = new Designer(page);
   await d.openSaved(GOAL_LINE_FADE.name);
-  await d.tools();
+  await d.unfold("End zone");
+  await d.unfold("Theme");
   const zones = page.getByRole("radiogroup", { name: "End zone" });
 
   const synthwave = zones.locator("input[value='synthwave']");
@@ -155,7 +156,7 @@ test("arrow keys along the picker while it is up: the last pick lands, and focus
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Theme");
   const theme = page.getByRole("radiogroup", { name: "Theme" });
   await theme.getByRole("radio", { name: "Dark" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

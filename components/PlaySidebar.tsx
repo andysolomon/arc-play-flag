@@ -3,12 +3,13 @@
 import { memo, useId, useState, type ReactNode, type ChangeEvent } from "react";
 import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
 import { MAX_NOTES } from "@/lib/play/storage";
-import { EndZonePicker } from "./endzone/EndZonePicker";
+import { EndZoneName, EndZonePicker } from "./endzone/EndZonePicker";
+import { Fold } from "./Fold";
 import type { Team, TeamSettings, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { Support } from "./Support";
 import { TEAM_NOTE, TeamFields } from "./TeamFields";
-import { ThemePicker } from "./ThemePicker";
+import { ThemeName, ThemePicker } from "./ThemePicker";
 import { divider, eyebrow, input, pill, select, tileGrid } from "./ui";
 
 interface Props {
@@ -188,11 +189,13 @@ function PlaySidebarImpl({
       <TeamFields team={team} onTeam={onTeam} />
       <span className="flex-none text-caption leading-note text-ink-muted">{TEAM_NOTE}</span>
       <span className={divider} />
-      <span className={eyebrow}>THEME</span>
-      <ThemePicker className="flex-none" unlockHref="/playbooks" />
+      <Fold label="Theme" says={<ThemeName />}>
+        <ThemePicker className="flex-none" unlockHref="/playbooks" />
+      </Fold>
       <span className={divider} />
-      <span className={eyebrow}>END ZONE</span>
-      <EndZonePicker className="flex-none" />
+      <Fold label="End zone" says={<EndZoneName />}>
+        <EndZonePicker className="flex-none" />
+      </Fold>
       <span className={divider} />
       <Support />
     </>

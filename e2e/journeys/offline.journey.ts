@@ -133,7 +133,7 @@ test("every end zone design is in the shell: with the network off, one picked fo
     await expect(art).toBeVisible();
   }
   const designer = new Designer(page);
-  await designer.tools();
+  await designer.unfold("End zone");
   const swatches = page.locator("[role='radiogroup'][aria-label='End zone'] [data-ez-art]");
   await expect(swatches).toHaveCount(END_ZONES.length);
   for (const [i, zone] of END_ZONES.entries()) {

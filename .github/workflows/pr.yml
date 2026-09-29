@@ -102,6 +102,14 @@ jobs:
           path: test-results/switching-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the look folds
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: look-folds
+          path: test-results/look-folds-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4

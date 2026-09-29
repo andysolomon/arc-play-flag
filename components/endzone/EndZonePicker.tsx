@@ -50,6 +50,12 @@ function useSeen(ref: React.RefObject<HTMLElement | null>): boolean {
   return seen;
 }
 
+/** The end zone in use, by name: what a folded End zone section says. */
+export function EndZoneName() {
+  const choice = usePicked("end-zone", useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone));
+  return END_ZONES.find((z) => z.id === choice)?.name ?? END_ZONES[0].name;
+}
+
 /**
  * The end zone's look, kept on this device. Some are open from the start; every touchdown pass
  * thrown on ▶ opens the next, and the swatch says how many touchdowns each one needs. An end

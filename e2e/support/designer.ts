@@ -75,6 +75,13 @@ export class Designer {
   async tools(): Promise<void> {
     await this.open("Play tools", "play-sidebar");
   }
+  /** Theme and End zone are folded away in Play tools; opens Play tools and that section unless they already are. */
+  async unfold(label: "Theme" | "End zone"): Promise<void> {
+    await this.tools();
+    const fold = this.page.locator("#play-sidebar").getByRole("button", { name: new RegExp(`^${label}\\b`, "i") });
+    if ((await fold.getAttribute("aria-expanded")) !== "true") await fold.click();
+    await expect(fold).toHaveAttribute("aria-expanded", "true");
+  }
   async palette(): Promise<void> {
     await this.open("Route palette", "route-sidebar");
   }
