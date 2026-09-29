@@ -7,6 +7,8 @@ import {
   PREMIUM_THEMES, THEME_CHOICES, getFieldChoice, getThemeChoice, setFieldChoice, setThemeChoice, subscribeFieldChoice, subscribeThemeChoice,
   type FieldChoice, type ThemeChoice,
 } from "@/lib/theme";
+import { repaint } from "@/lib/repaint";
+import { usePicked } from "./Repainting";
 import { eyebrow, segment, segmentInput, segmented, swatch } from "./ui";
 
 const COPY: Record<(typeof THEME_CHOICES)[number], { label: string; title: string }> = {
@@ -45,9 +47,9 @@ export function Lock() {
 export function ThemePicker({ className = "", unlockHref }: { className?: string; unlockHref?: string }) {
   const name = useId();
   const hint = useId();
-  const choice = useSyncExternalStore(subscribeThemeChoice, getThemeChoice, serverChoice);
+  const choice = usePicked("theme", useSyncExternalStore(subscribeThemeChoice, getThemeChoice, serverChoice));
   const unlocked = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks).length > 0;
-  const field = useSyncExternalStore(subscribeFieldChoice, getFieldChoice, serverField);
+  const field = usePicked("field", useSyncExternalStore(subscribeFieldChoice, getFieldChoice, serverField));
   const premium = PREMIUM_THEMES.some((t) => t.id === choice);
   const fieldHint = useId();
   return (
@@ -56,7 +58,7 @@ export function ThemePicker({ className = "", unlockHref }: { className?: string
         <div className={segmented}>
           {THEME_CHOICES.map((c) => (
             <label key={c} title={COPY[c].title} className={segment}>
-              <input type="radio" name={name} value={c} checked={choice === c} onChange={() => { setThemeChoice(c); }} className={segmentInput} />
+              <input type="radio" name={name} value={c} checked={choice === c} onChange={() => { repaint({ picker: "theme", value: c, what: COPY[c].label }, () => { setThemeChoice(c); }); }} className={segmentInput} />
               {COPY[c].label}
             </label>
           ))}
@@ -76,7 +78,7 @@ export function ThemePicker({ className = "", unlockHref }: { className?: string
                 <input
                   type="radio" name={name} value={t.id} checked={choice === t.id} disabled={locked}
                   aria-describedby={locked ? hint : undefined}
-                  onChange={() => { setThemeChoice(t.id); }}
+                  onChange={() => { repaint({ picker: "theme", value: t.id, what: t.name }, () => { setThemeChoice(t.id); }); }}
                   className={`${segmentInput} disabled:cursor-not-allowed`}
                 />
                 <span data-theme={t.id} className="flex flex-col text-ink">
@@ -108,7 +110,10 @@ export function ThemePicker({ className = "", unlockHref }: { className?: string
       <label className={`flex min-h-11 items-center gap-3 ${premium ? "cursor-pointer" : "cursor-not-allowed"}`}>
         <input
           type="checkbox" role="switch" checked={field === "themed"} disabled={!premium} aria-describedby={fieldHint}
-          onChange={(e) => { setFieldChoice(e.target.checked ? "themed" : "standard"); }}
+          onChange={(e) => {
+            const next = e.target.checked ? "themed" : "standard";
+            repaint({ picker: "field", value: next, what: next === "themed" ? "the themed field" : "the green field" }, () => { setFieldChoice(next); });
+          }}
           className={toggle}
         />
         <span className="flex flex-col">

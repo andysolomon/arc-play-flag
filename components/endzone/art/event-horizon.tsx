@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { num, px, rand, secs, sparkle, useArtId, type ArtProps } from "./shared";
+import { CAP, fitAttrs, fitText, num, px, rand, secs, sparkle, useArtId, type ArtProps, type Fit } from "./shared";
 
 /** the void between the stars */
 const VOID = "#0b0a1a";
@@ -13,8 +13,6 @@ const VIOLET = "#9d7bff";
 const ICE = "#5ad1ff";
 /** the pale violet of a cooler star */
 const LILAC = "#cbbcff";
-/** Patrick Hand's capitals stand this much of an em above the baseline */
-const CAP = 0.68;
 /** how far the disk is tipped towards us: its depth on screen for its width */
 const TILT = 0.12;
 /** the disk's inner edge, in shadow radii: gas any nearer falls straight in */
@@ -251,24 +249,40 @@ function Ripples({ cx, cy, r }: { cx: number; cy: number; r: number }) {
   );
 }
 
-/** END and ZONE either side of the hole in warm starlight, outlined in the void, each tugged towards the hole in a touchdown. */
-function Lettering({ cx, cy, gap, fs }: { cx: number; cy: number; gap: number; fs: number }) {
-  const spacing = fs * 0.16;
-  const y = cy + (fs * CAP) / 2;
-  const common = { y: num(y), fontFamily: "var(--font-hand)", fontSize: num(fs), letterSpacing: num(spacing), strokeLinejoin: "round" } as const;
-  const words = [
-    // an end-anchored word carries its trailing letter spacing past its last letter: give it back
-    { text: "END", x: cx - gap + spacing, anchor: "end", pull: 1 },
-    { text: "ZONE", x: cx + gap, anchor: "start", pull: -1 },
-  ] as const;
+/** A word of the name set beside the hole: its text, the side it sits on and how it fits the room there. */
+interface Word {
+  text: string;
+  side: -1 | 1;
+  fit: Fit;
+}
+
+/**
+ * The name split either side of the hole: its words shared out as evenly as they go (a single
+ * word sits on the right), each side sized into `room`.
+ */
+function words(name: string, size: number, room: number): Word[] {
+  const parts = name.split(" ");
+  // the cut between words that leaves the two sides nearest the same length; a single word is all right side
+  const lopsided = (k: number): number => Math.abs(parts.slice(0, k).join(" ").length - parts.slice(k).join(" ").length);
+  let cut = parts.length < 2 ? 0 : 1;
+  for (let k = 2; k < parts.length; k++) if (lopsided(k) < lopsided(cut)) cut = k;
+  const sides: [string, -1 | 1][] = [[parts.slice(0, cut).join(" "), -1], [parts.slice(cut).join(" "), 1]];
+  return sides.filter(([text]) => text).map(([text, side]) => ({ text, side, fit: fitText(text, size, room, size * 3) }));
+}
+
+/** The name either side of the hole in warm starlight, outlined in the void, each side tugged towards the hole in a touchdown. */
+function Lettering({ cx, cy, gap, name, list }: { cx: number; cy: number; gap: number; name: string; list: readonly Word[] }) {
   return (
-    <g>
-      {words.map(({ text, x, anchor, pull }) => {
-        const style: Vars = { "--ez-event-horizon-pull": px(pull * fs * 0.2), transformOrigin: pull > 0 ? "0% 50%" : "100% 50%" };
-        const at = { ...common, x: num(x), textAnchor: anchor };
+    <g data-ez-name={name}>
+      {list.map(({ text, side, fit }) => {
+        const y = cy + (fit.fs * CAP) / 2;
+        // an end-anchored word carries its trailing letter spacing past its last letter: give it back
+        const x = side < 0 ? cx - gap + fit.spacing : cx + gap;
+        const style: Vars = { "--ez-event-horizon-pull": px(-side * fit.fs * 0.2), transformOrigin: side < 0 ? "0% 50%" : "100% 50%" };
+        const at = { ...fitAttrs(fit), x: num(x), y: num(y), textAnchor: side < 0 ? "end" : "start", strokeLinejoin: "round" } as const;
         return (
-          <g key={text} className="ez-event-horizon-word" style={style}>
-            <text {...at} fill={VOID} stroke={VOID} strokeWidth={num(fs * 0.3)}>{text}</text>
+          <g key={side} className="ez-event-horizon-word" style={style}>
+            <text {...at} fill={VOID} stroke={VOID} strokeWidth={num(fit.fs * 0.3)}>{text}</text>
             <text {...at} fill={GOLD}>{text}</text>
           </g>
         );
@@ -281,12 +295,12 @@ function Lettering({ cx, cy, gap, fs }: { cx: number; cy: number; gap: number; f
  * Event Horizon: deep space with a black hole at its heart, after Interstellar's Gargantua. A
  * violet void washed with nebulae and scattered with stars; an accretion disk tipped nearly edge on,
  * blazing brighter on the side that swings towards us; its far side bent up over the shadow by the
- * hole's gravity, a thin photon ring round the pure black shadow, and END and ZONE either side in
- * starlight. The disk swirls, inner streams faster, and the stars twinkle; a touchdown flares the
- * disk and spins it up, streaks the stars inwards at warp, ripples rings out from the hole and tugs
- * the lettering towards it.
+ * hole's gravity, a thin photon ring round the pure black shadow, and the team's name either side
+ * in starlight. The disk swirls, inner streams faster, and the stars twinkle; a touchdown flares
+ * the disk and spins it up, streaks the stars inwards at warp, ripples rings out from the hole and
+ * tugs the lettering towards it.
  */
-export function EventHorizonArt({ w, h, label, celebrate }: ArtProps) {
+export function EventHorizonArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("event-horizon");
   const cx = w / 2;
   const cy = h * 0.52;
@@ -295,11 +309,13 @@ export function EventHorizonArt({ w, h, label, celebrate }: ArtProps) {
   const fs = Math.min(h * 0.46, 17 + (h - 44) * 0.18);
   const gap = r * 2.9;
   const clear: Box[] = [{ x0: cx - r * 2.4, x1: cx + r * 2.4, y0: cy - r * 2.3, y1: cy + r * 1.6 }];
-  if (label) {
-    // END runs about 2 em wide and ZONE under 3, letter spacing and all
-    const top = cy - fs * 0.55;
-    const bottom = cy + fs * 0.55;
-    clear.push({ x0: cx - gap - fs * 2.1, x1: cx - gap + fs * 0.1, y0: top, y1: bottom }, { x0: cx + gap - fs * 0.1, x1: cx + gap + fs * 2.8, y0: top, y1: bottom });
+  // each side of the name has the room from the hole's gap to a little short of the edge
+  const lettered = label && name ? words(name, fs, w / 2 - gap - fs * 0.4) : [];
+  for (const { side, fit } of lettered) {
+    const [top, bottom] = [cy - fit.fs * 0.55, cy + fit.fs * 0.55];
+    const near = cx + side * (gap - fit.fs * 0.1);
+    const far = cx + side * (gap + fit.width + fit.fs * 0.1);
+    clear.push({ x0: Math.min(near, far), x1: Math.max(near, far), y0: top, y1: bottom });
   }
   return (
     <g className={celebrate ? "ez-event-horizon-party" : undefined}>
@@ -357,7 +373,7 @@ export function EventHorizonArt({ w, h, label, celebrate }: ArtProps) {
           <Ripples cx={cx} cy={cy} r={r} />
         </>
       )}
-      {label && <Lettering cx={cx} cy={cy} gap={gap} fs={fs} />}
+      {lettered.length > 0 && <Lettering cx={cx} cy={cy} gap={gap} name={name} list={lettered} />}
     </g>
   );
 }

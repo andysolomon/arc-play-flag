@@ -70,20 +70,20 @@ describe("cardWidth", () => {
 
 describe("fieldLayout", () => {
   test("clips bands and lines to the card", () => {
-    const f = fieldLayout(24);
+    const f = fieldLayout(24, true, true, 5);
     expect(f.top).toBe(-16);
     expect(f.viewBox).toBe("0 0 660 528");
     expect(f.bands).toHaveLength(1);
     expect(f.endZone).toBeNull();
     expect(f.lines.map((l) => l.y)).toEqual([462, 352, 242, 132, 22]);
-    expect(f.texts.map((t) => t.t)).toEqual(["LOS", "10", "15", "20", "NO-RUN"]);
+    expect(f.texts.map((t) => t.t)).toEqual(["LOS 35", "30", "25", "20", "NO-RUN"]);
     // at 19 yards the band is clipped to 1 yard, too short for its label
-    const g = fieldLayout(19);
+    const g = fieldLayout(19, true, true, 5);
     expect(g.bands).toHaveLength(1);
     expect(g.texts.map((t) => t.t)).not.toContain("NO-RUN");
   });
   test("shows the end zone at full depth", () => {
-    const f = fieldLayout(45);
+    const f = fieldLayout(45, true, true, 5);
     expect(f.endZone).toEqual({ y: 0, h: 44 });
     expect(f.texts.at(-1)?.t).toBe("END ZONE");
   });

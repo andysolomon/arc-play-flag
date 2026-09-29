@@ -13,8 +13,8 @@ const BISECT = 20;
  * after the catch before the play ends. `los` is the yard line the play's ball is on (see
  * lib/play/field.ts), so the goal line lies `GOAL_YARD - los` yards ahead of it and the end line
  * ten yards beyond that. Null for a run, a play with no throw, a completion that stays short of
- * the goal line, or a catch out the back of the end zone (a route drawn deep from the 5 runs past
- * the end line once the ball is spotted nearer their goal). A carried-in ball's crossing is found
+ * the goal line, or a catch out the back of the end zone (a route drawn deep from further back
+ * runs past the end line once the ball is spotted nearer their goal). A carried-in ball's crossing is found
  * to well within a frame, so the celebration starts on the first frame that shows the ball over.
  */
 export function touchdownAt(m: Motion, players: readonly Player[], los = LOS_YARD): number | null {

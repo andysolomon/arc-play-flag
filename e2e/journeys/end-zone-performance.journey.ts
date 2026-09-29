@@ -1,6 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { END_ZONES, ENDZONE_KEY, TOUCHDOWNS_KEY, type EndZoneId } from "../../lib/endzone";
+import { MIDFIELD_YARD } from "../../lib/play/field";
+import type { SavedPlay } from "../../lib/play/types";
 import { Designer } from "../support/designer";
 import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
 
@@ -11,8 +13,8 @@ import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
  * nearly every frame, and a coach who picked it saw the app crawl. What could go wrong, and the
  * test (by the start of its title) that catches each:
  *
- *  - a design's band costs more than its budget to paint, on a phone-sized screen, with the ball
- *    on the 5 (a shallow band) or near their goal (the whole ten yards) → "every design's band"
+ *  - a design's band costs more than its budget to paint, on a phone-sized screen: a sliver of the
+ *    end zone (a short window cutting the card) or the whole ten yards → "every design's band"
  *  - a design leans on what costs the most to repaint: a <pattern> or <filter>, a stroke painted
  *    with a gradient, or hundreds upon hundreds of elements → "every design's band"
  *  - the picker's swatches, drawn all at once, cost more than their budget → "the picker's swatches"
@@ -33,19 +35,23 @@ import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
  * browser, and the Matrix clocks; asserted against the budgets below before it is written.
  */
 
-/** A phone-shaped window: with the ball on the 5, the only shape deep enough to show the end zone. */
+/** A phone's window, and a short one: from midfield the tall one shows the whole end zone, the short one cuts the card to a sliver of it. */
 const PHONE = { width: 412, height: 915 };
+const SHORT_PHONE = { width: 412, height: 520 };
+const WINDOWS = { shallow: SHORT_PHONE, deep: PHONE } as const;
+/** A play spotted at midfield: the end zone is in the card on a phone. */
+const MIDFIELD: SavedPlay = { ...SLANT_LEFT, los: MIDFIELD_YARD };
 
 /** Paint budgets, in calibration frames, for the band with the ball on the 5 and near their goal, and for the swatch. */
 const BUDGETS: Readonly<Record<EndZoneId, { shallow: number; deep: number; swatch: number }>> = {
   classic: { shallow: 0.3, deep: 0.3, swatch: 0.3 },
-  home: { shallow: 1, deep: 4.5, swatch: 0.6 },
-  synthwave: { shallow: 2.6, deep: 7.5, swatch: 2.2 },
-  sakura: { shallow: 6.5, deep: 10, swatch: 6 },
-  matrix: { shallow: 2.2, deep: 3.5, swatch: 1.1 },
-  "great-wave": { shallow: 3, deep: 5, swatch: 2.4 },
-  "eight-bit": { shallow: 0.8, deep: 0.6, swatch: 0.7 },
-  "event-horizon": { shallow: 2.2, deep: 6, swatch: 2.2 },
+  home: { shallow: 1.3, deep: 4, swatch: 0.5 },
+  synthwave: { shallow: 4.8, deep: 9, swatch: 3 },
+  sakura: { shallow: 8, deep: 15, swatch: 6.5 },
+  matrix: { shallow: 2.4, deep: 3.6, swatch: 1.3 },
+  "great-wave": { shallow: 4.8, deep: 5.4, swatch: 2.6 },
+  "eight-bit": { shallow: 0.7, deep: 0.6, swatch: 0.5 },
+  "event-horizon": { shallow: 4, deep: 6.5, swatch: 2.6 },
 };
 /** How many times a second the Matrix band may repaint, in the browser, and the lattice its clocks tick on. */
 const MATRIX_REPAINTS_PER_SECOND = 14;
@@ -192,19 +198,19 @@ test.describe("end zone performance", () => {
 
   const manifest: {
     project: string;
-    viewport: { width: number; height: number } | null;
+    windows: typeof WINDOWS | null;
     budgets: typeof BUDGETS;
     matrixRepaintsPerSecondBudget: number;
     zones: Record<string, { shallow?: Frame; deep?: Frame; swatch?: Frame; repaints?: { layoutsPerSecond: number; mainThreadMsPerSecond: number } }>;
     matrix: { clocks: { durationS: number; stepsPerSecond: number; delayS: number }[]; cursorS: number | null; latticeHz: number } | null;
-  } = { project: "", viewport: null, budgets: BUDGETS, matrixRepaintsPerSecondBudget: MATRIX_REPAINTS_PER_SECOND, zones: {}, matrix: null };
+  } = { project: "", windows: null, budgets: BUDGETS, matrixRepaintsPerSecondBudget: MATRIX_REPAINTS_PER_SECOND, zones: {}, matrix: null };
 
   test.beforeEach(async ({ page }, testInfo) => {
     manifest.project = testInfo.project.name;
     await page.setViewportSize(PHONE);
-    manifest.viewport = page.viewportSize();
-    // a play on the 5 for the shallow band, and one with the ball on their 5 for the whole end zone
-    await seed(page, { plays: [SLANT_LEFT, GOAL_LINE_FADE], team: OTTERS });
+    manifest.windows = WINDOWS;
+    // a play from midfield for the sliver, and one with the ball on their 5 for the whole end zone
+    await seed(page, { plays: [MIDFIELD, GOAL_LINE_FADE], team: OTTERS });
   });
 
   test("every design's band paints within its budget, shallow and deep, without a pattern, filter or gradient stroke, and how often each repaints", async ({ page }) => {
@@ -214,7 +220,8 @@ test.describe("end zone performance", () => {
       await store(page, z.id);
       const entry = (manifest.zones[z.id] ??= {});
       for (const depth of ["shallow", "deep"] as const) {
-        await d.goto(`?open=${depth === "deep" ? GOAL_LINE_FADE.id : SLANT_LEFT.id}`);
+        await page.setViewportSize(WINDOWS[depth]);
+        await d.goto(`?open=${depth === "deep" ? GOAL_LINE_FADE.id : MIDFIELD.id}`);
         if (z.id === "classic") {
           await expect(art(page)).toHaveCount(0);
           continue;
@@ -256,7 +263,7 @@ test.describe("end zone performance", () => {
   test("the Matrix rain falls on three shared clocks that tick on a 12 Hz lattice, so its band repaints a dozen times a second at most", async ({ page }, testInfo) => {
     await store(page, "matrix");
     const d = new Designer(page);
-    await d.goto(`?open=${SLANT_LEFT.id}`);
+    await d.goto(`?open=${MIDFIELD.id}`);
     await expect(art(page)).toHaveAttribute("data-ez-art", "matrix");
     await expect(art(page)).toBeVisible();
     await d.settle();

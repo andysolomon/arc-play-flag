@@ -5,6 +5,9 @@ import {
   END_ZONES, getEndZone, getTouchdowns, isUnlocked, nextLocked, serverEndZone, serverTouchdowns, setEndZone, subscribeEndZone,
   subscribeTouchdowns,
 } from "@/lib/endzone";
+import { getServerTeam, getTeam, subscribe } from "@/lib/play/library";
+import { repaint } from "@/lib/repaint";
+import { usePicked } from "../Repainting";
 import { Lock } from "../ThemePicker";
 import { segmentInput, swatch } from "../ui";
 import { EndZoneArt } from "./EndZoneArt";
@@ -50,15 +53,17 @@ function useSeen(ref: React.RefObject<HTMLElement | null>): boolean {
 /**
  * The end zone's look, kept on this device. Some are open from the start; every touchdown pass
  * thrown on ▶ opens the next, and the swatch says how many touchdowns each one needs. An end
- * zone already in use stays checked and drawn even if the count is later lost.
+ * zone already in use stays checked and drawn even if the count is later lost. Every design
+ * paints the team's name across it (the swatches show it too), so the hint says where to give one.
  */
 export function EndZonePicker({ className = "" }: { className?: string }) {
   const name = useId();
   const hint = useId();
   const box = useRef<HTMLDivElement>(null);
   const seen = useSeen(box);
-  const choice = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
+  const choice = usePicked("end-zone", useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone));
   const touchdowns = useSyncExternalStore(subscribeTouchdowns, getTouchdowns, serverTouchdowns);
+  const named = useSyncExternalStore(subscribe, getTeam, getServerTeam).name.trim().length > 0;
   const open = END_ZONES.filter((z) => isUnlocked(z, touchdowns)).length;
   const next = nextLocked(touchdowns);
   const scored = touchdowns === 1 ? "1 touchdown pass" : `${String(touchdowns)} touchdown passes`;
@@ -73,7 +78,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
               <input
                 type="radio" name={name} value={z.id} checked={choice === z.id} disabled={locked}
                 aria-describedby={locked ? `${hint}-${z.id} ${hint}` : undefined}
-                onChange={() => { setEndZone(z.id); }}
+                onChange={() => { repaint({ picker: "end-zone", value: z.id, what: `the ${z.name} end zone` }, () => { setEndZone(z.id); }); }}
                 className={`${segmentInput} disabled:cursor-not-allowed`}
               />
               {/* one string, so a screen reader hears "Opens at 5 touchdown passes." whole */}
@@ -99,7 +104,8 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
           ? `${String(open)} of ${String(END_ZONES.length)} open. Throw a touchdown pass on ▶ to open ${next.name}: a catch in the end zone, or one carried in.`
           : `All ${String(END_ZONES.length)} open.`}
         {touchdowns > 0 && ` ${scored} on this device.`}
-        {" It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green."}
+        {named ? " Each design paints your team name across it." : " Give your team a name (under Team) and each design paints it across."}
+        {" It comes into view with the ball near their goal (Line of scrimmage). Printed pages and exports keep the classic green."}
       </span>
     </div>
   );

@@ -4,7 +4,7 @@ import { lazy, memo, Suspense, useSyncExternalStore, type ComponentType } from "
 import type { EndZoneId } from "@/lib/endzone";
 import { getServerTeam, getTeam, subscribe } from "@/lib/play/library";
 import { ClassicArt } from "./art/classic";
-import type { ArtProps } from "./art/shared";
+import { letteringName, type ArtProps } from "./art/shared";
 
 /**
  * One design per end zone in lib/endzone.ts. Classic is the band the field has always drawn and
@@ -35,8 +35,9 @@ interface Props {
 }
 
 /**
- * An end zone's design, in the box (0, 0)–(w, h). The caller clips it and keeps it off print and
- * exports. Until a design's chunk has arrived the box is empty, and the classic band shows through.
+ * An end zone's design, in the box (0, 0)–(w, h), lettered with the team's name. The caller clips it
+ * and keeps it off print and exports. Until a design's chunk has arrived the box is empty, and the
+ * classic band shows through.
  */
 function EndZoneArtImpl({ id, w, h, label, celebrate, still = false }: Props) {
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
@@ -44,7 +45,7 @@ function EndZoneArtImpl({ id, w, h, label, celebrate, still = false }: Props) {
   return (
     <g data-ez-art={id} className={still ? "ez-still" : undefined}>
       <Suspense fallback={null}>
-        <Art w={w} h={h} label={label} celebrate={celebrate} team={team} />
+        <Art w={w} h={h} label={label} celebrate={celebrate} team={team} name={letteringName(team)} />
       </Suspense>
     </g>
   );

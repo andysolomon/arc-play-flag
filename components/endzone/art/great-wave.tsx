@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { num, px, rand, secs, useArtId, type ArtProps } from "./shared";
+import { CAP, fitAttrs, fitText, num, px, rand, secs, useArtId, type ArtProps, type Fit } from "./shared";
 
 const INDIGO = "#1f3a60";
 const BLUE = "#3f6fb5";
@@ -11,8 +11,6 @@ const SKY_TOP = "#cbb88c";
 const SKY = "#e0d0a8";
 const FUJI = "#3a5680";
 const SEAL = "#b3321f";
-/** Patrick Hand's capitals stand this much of an em above the baseline */
-const CAP = 0.68;
 /** below this depth there is no room for sky, the big wave or Fuji: the band is all sea */
 const SLIVER = 22;
 
@@ -255,11 +253,13 @@ function Fuji({ x, base, fw, fh }: { x: number; base: number; fw: number; fh: nu
   );
 }
 
-/** END ZONE carved in a vermilion seal `sw` wide, pressed a touch askew, as a print is signed. */
-function Seal({ cx, cy, fs, sw }: { cx: number; cy: number; fs: number; sw: number }) {
-  const sh = fs * 1.5;
+/** The seal's width round lettering that fits as `fit`: a padding of the size it was cut for either side. */
+const sealWidth = (fit: Fit, size: number): number => fit.width + size * 1.2;
+
+/** The team's name carved in a vermilion seal `sw` wide, pressed a touch askew, as a print is signed. */
+function Seal({ cx, cy, text, fit, size, sw }: { cx: number; cy: number; text: string; fit: Fit; size: number; sw: number }) {
+  const sh = size * 1.5;
   const inset = sh * 0.13;
-  const spacing = fs * 0.12;
   const wob = (i: number): number => (rand(i, 70) - 0.5) * sh * 0.06;
   const [l, r, t, b] = [cx - sw / 2, cx + sw / 2, cy - sh / 2, cy + sh / 2];
   const edge = `M${num(l + wob(0))} ${num(t + wob(1))}L${num(r + wob(2))} ${num(t + wob(3))}L${num(r + wob(4))} ${num(b + wob(5))}L${num(l + wob(6))} ${num(b + wob(7))}Z`;
@@ -269,13 +269,13 @@ function Seal({ cx, cy, fs, sw }: { cx: number; cy: number; fs: number; sw: numb
   const [topNick, bottomNick] = [rw * 0.8, rw + rh + rw * 0.76];
   const chipped = [topNick, nick, bottomNick - topNick - nick, nick * 0.8, (rw + rh) * 2].map(num).join(" ");
   return (
-    <g className="ez-great-wave-seal">
+    <g className="ez-great-wave-seal" data-ez-name={text}>
       <g transform={`rotate(-2 ${num(cx)} ${num(cy)})`}>
         <path d={edge} fill={SEAL} stroke={SEAL} strokeWidth={num(sh * 0.06)} strokeLinejoin="round" />
         <rect x={num(l + inset)} y={num(t + inset)} width={num(rw)} height={num(rh)} fill="none" stroke={FOAM} strokeWidth={num(Math.max(0.8, sh * 0.045))} strokeDasharray={chipped} />
         {/* letter-spacing trails the last glyph too, which pushes middle-anchored text left by half of it */}
-        <text x={num(cx + spacing / 2)} y={num(cy + (fs * CAP) / 2)} textAnchor="middle" fontFamily="var(--font-hand)" fontSize={num(fs)} letterSpacing={num(spacing)} fill={FOAM}>
-          END ZONE
+        <text x={num(cx + fit.spacing / 2)} y={num(cy + (fit.fs * CAP) / 2)} textAnchor="middle" {...fitAttrs(fit)} fill={FOAM}>
+          {text}
         </text>
       </g>
     </g>
@@ -367,12 +367,12 @@ function Spray({ w, h, from, lip, run }: { w: number; h: number; from: number; l
 /**
  * Great Wave: the end zone as Hokusai's print. A parchment sky over a flat distant sea and
  * layered bands of Prussian blue swell rolling in, a great wave rearing on the left with its
- * crest breaking into claws of foam, tiny snow-capped Fuji on the horizon beyond it, and END ZONE
- * carved in a vermilion seal. The swell rolls on and the big wave breathes; a touchdown sends a
- * broader wave surging through, flinging spray off every crest, as the sea heaves, the big wave
- * lunges and the seal rocks.
+ * crest breaking into claws of foam, tiny snow-capped Fuji on the horizon beyond it, and the
+ * team's name carved in a vermilion seal. The swell rolls on and the big wave breathes; a
+ * touchdown sends a broader wave surging through, flinging spray off every crest, as the sea
+ * heaves, the big wave lunges and the seal rocks.
  */
-export function GreatWaveArt({ w, h, label, celebrate }: ArtProps) {
+export function GreatWaveArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("great-wave");
   const party = celebrate ? "ez-great-wave-party" : undefined;
   if (h < SLIVER) {
@@ -386,7 +386,9 @@ export function GreatWaveArt({ w, h, label, celebrate }: ArtProps) {
     );
   }
   const fs = Math.min(h * 0.46, 17 + (h - 44) * 0.18);
-  const sealW = fs * 5.6;
+  // the seal takes up to half the band's width; without a name there is none, and the layout is as it would be for a short one
+  const fit = fitText(name || "END ZONE", fs, w * 0.5 - fs * 1.2, fs * 4.5);
+  const sealW = sealWidth(fit, fs);
   const bh = h * 0.92;
   const bw = Math.min(bh * 2.3, w * 0.32);
   const wave: Box = { x0: 0, bottom: h, bw, bh };
@@ -437,7 +439,7 @@ export function GreatWaveArt({ w, h, label, celebrate }: ArtProps) {
           <Spray w={w} h={h} from={bw} lip={surgeX + surgeW * 0.95} run={run} />
         </>
       )}
-      {label && <Seal cx={sealX} cy={sealY} fs={fs} sw={sealW} />}
+      {label && name && <Seal cx={sealX} cy={sealY} text={name} fit={fit} size={fs} sw={sealW} />}
     </g>
   );
 }

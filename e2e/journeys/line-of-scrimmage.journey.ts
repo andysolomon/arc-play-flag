@@ -12,18 +12,28 @@ import {
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 /**
- * Yards count from the offense's own goal line: the field is 40 yards goal line to goal
- * line, midfield is the 20, and a 10-yard end zone runs to the end line at the 50. Field
- * yard n sits at y = los - n, in yards from the line of scrimmage.
+ * A spot is stored in yards from the offense's own goal line: the field is 40 yards goal line
+ * to goal line, midfield is the 20, and a 10-yard end zone runs to the end line at the 50.
+ * Field yard n sits at y = los - n, in yards from the line of scrimmage. The coach reads the
+ * other way, in yards to go: the own goal line is "the 40", their 10 (the 30) "the 10".
  */
 const GOAL = 40, END_LINE = 50;
+/** What the field and picker call yard n: the yards left to their goal line. */
+const toGo = (n: number): number => GOAL - n;
 /** The deepest player in the default formation (the safety), whom the card must never cut off. */
 const DEEPEST = Math.min(...formation().map((p) => p.y));
-const DEFAULT_NOTE = "Saved with this play. Yards count from your own goal line: midfield is the 20, their goal line the 40.";
+const DEFAULT_NOTE = "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20.";
 const NO_RUN_NOTE = "Saved with this play. The ball is in a no-run zone, so no runs from here.";
-/** The spots the sweep visits; 18, 35 and 39 are inside a no-run zone. */
-const SPOTS = [7, 12, 18, 20, 30, 35, 39] as const;
-const IN_NO_RUN_ZONE = new Set([18, 35, 39]);
+/** The only spots a coach can pick, as stored: from the 40 (the own goal line), the 20, the 10 and the 5. */
+const CHOICES = [
+  { los: 0, option: "From the 40 · drive start" },
+  { los: 20, option: "From the 20 · midfield" },
+  { los: 30, option: "From the 10" },
+  { los: 35, option: "From the 5" },
+] as const;
+/** The spots the sweep visits after the drive start; only their 5 is inside a no-run zone. */
+const SPOTS = [20, 30, 35] as const;
+const IN_NO_RUN_ZONE = new Set([35]);
 
 const losSelect = (page: Page): Locator => page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" });
 const losNote = (page: Page): Locator => page.locator("#play-sidebar").getByText(/^Saved with this play\./);
@@ -120,11 +130,11 @@ function expectField(m: Reading, los: number, { labels = true }: { labels?: bool
     expect(m.labels).toEqual([]);
     return;
   }
-  const numbers = [los, 10, 15, 20, 25, 30, 35, GOAL]
+  const numbers = [los, 5, 10, 15, 20, 25, 30, 35, GOAL]
     .filter((n, i) => i === 0 || n > los)
-    .map((n) => ({ t: n !== los ? String(n) : los === 5 ? "LOS" : `LOS ${String(los)}`, y: at(n) }))
+    .map((n) => ({ t: n === los ? (los === 0 ? "LOS" : `LOS ${String(toGo(los))}`) : n === GOAL ? "G" : String(toGo(n)), y: at(n) }))
     .filter((l) => onCard(l.y));
-  expect(m.labels.filter((l) => /^(LOS|\d)/.test(l.t)).map(({ t, y }) => ({ t, y })), "yard numbers").toEqual(numbers);
+  expect(m.labels.filter((l) => /^(LOS|G$|\d)/.test(l.t)).map(({ t, y }) => ({ t, y })), "yard numbers").toEqual(numbers);
   expect(m.labels.filter((l) => l.t.startsWith("LOS"))).toHaveLength(1);
   // a band is named in the part of it in front of the ball, never among the offense behind it
   const named = m.labels.filter((l) => l.t === "NO-RUN");
@@ -146,32 +156,29 @@ async function keep(testInfo: TestInfo, name: string, data: unknown): Promise<vo
   await testInfo.attach(name, { path: file, contentType: "application/json" });
 }
 
-test("a coach puts the ball on their 10 for a red-zone play, and only that play moves", async ({ page }, testInfo) => {
+test("a coach puts the ball on the 10 for a red-zone play, and only that play moves", async ({ page }, testInfo) => {
   const project = testInfo.project.name;
   await seed(page, { plays: [RED_ZONE_FADE, SLANT_LEFT], team: OTTERS });
   const d = new Designer(page);
   await d.goto(`?open=${RED_ZONE_FADE.id}`);
   await expect(page.getByRole("heading", { name: RED_ZONE_FADE.name })).toBeVisible();
   await d.closeSidebars();
-  // every play starts where every drive does: the 5, drawn exactly as the field always was
-  const markup5 = await fieldMarkup(d.field);
-  const at5 = await readField(d.field);
-  expectField(at5, 5);
-  await d.field.screenshot({ path: `test-results/line-of-scrimmage-${project}-5.png` });
+  // every play starts where every drive does: the own goal line, which a coach calls the 40
+  const markup0 = await fieldMarkup(d.field);
+  const at0 = await readField(d.field);
+  expectField(at0, 0);
+  await d.field.screenshot({ path: `test-results/line-of-scrimmage-${project}-40.png` });
 
   await d.tools();
   const spot = losSelect(page);
-  await expect(spot).toHaveValue("5");
-  await expect(spot.locator("option")).toHaveCount(35);
-  await expect(spot.locator('option[value="5"]')).toHaveText("The 5 · drive start");
-  await expect(spot.locator('option[value="12"]')).toHaveText("The 12");
-  await expect(spot.locator('option[value="20"]')).toHaveText("The 20 · midfield");
-  await expect(spot.locator('option[value="30"]')).toHaveText("The 30 · their 10");
-  await expect(spot.locator('option[value="39"]')).toHaveText("The 39 · their 1");
+  await expect(spot).toHaveValue("0");
+  // four spots and no more, counted down into their end zone
+  await expect(spot.locator("option")).toHaveText(CHOICES.map((c) => c.option));
+  expect(await spot.locator("option").evaluateAll((os) => os.map((o) => Number((o as HTMLOptionElement).value)))).toEqual(CHOICES.map((c) => c.los));
   await expect(losNote(page)).toHaveText(DEFAULT_NOTE);
   await expect(await d.tool("Save")).toHaveAttribute("title", "Save this play");
 
-  const sweep: Record<string, unknown>[] = [{ los: 5, option: "The 5 · drive start", note: DEFAULT_NOTE, ...at5 }];
+  const sweep: Record<string, unknown>[] = [{ los: 0, option: CHOICES[0].option, note: DEFAULT_NOTE, ...at0 }];
   for (const los of SPOTS) {
     await d.tools();
     await spot.selectOption(String(los));
@@ -182,34 +189,35 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
     await d.closeSidebars();
     await expect(async () => { expectField(await readField(d.field), los); }).toPass();
     const m = await readField(d.field);
-    // the card shows as much field as it did on the 5, up to the end line (at the 39 see below)
-    if (los !== 39) expect(m.top, "the card ends at the end line, or where it did on the 5").toBe(Math.max(los - END_LINE, at5.top));
-    if (los === 12) expect(m.labels.slice(0, 4).map((l) => l.t)).toEqual(["LOS 12", "15", "20", "25"]);
-    // past midfield the band before it lies behind the play, so it is left off
-    if (los === 20) for (const [, bottom] of m.bands) expect(bottom).toBeLessThanOrEqual(0);
+    // the card shows as much field as it did from the 40, up to the end line
+    expect(m.top, "the card ends at the end line, or where it did from the 40").toBe(Math.max(los - END_LINE, at0.top));
+    if (los === 20) {
+      expect(m.labels.slice(0, 4).map((l) => l.t)).toEqual(["LOS 20", "15", "10", "5"]);
+      // past midfield the band before it lies behind the play, so it is left off
+      for (const [, bottom] of m.bands) expect(bottom).toBeLessThanOrEqual(0);
+    }
     if (los === 35) {
-      // their 5: the goal line 5 yards off, the whole end zone and nothing past the end line, on every screen
+      // the 5: the goal line 5 yards off, the whole end zone and nothing past the end line, on every screen
       expect(m.viewBox).toBe("0 0 660 506");
       expect(m.bands).toEqual([[-5, 0]]);
       expect(m.endZone).toEqual([-15, -5]);
+      expect(m.labels.slice(0, 2).map((l) => l.t)).toEqual(["LOS 5", "G"]);
     }
-    // their 1: the safety stands on the end line, so the card keeps a yard past it rather than cut him off
-    if (los === 39) expect(m.viewBox).toBe("0 0 660 440");
-    await d.field.screenshot({ path: `test-results/line-of-scrimmage-${project}-${String(los)}.png` });
+    await d.field.screenshot({ path: `test-results/line-of-scrimmage-${project}-${String(toGo(los))}.png` });
     sweep.push({ los, option, note, ...m });
   }
 
-  // back on the 5, the field is the same markup it started as, and the draft carries no spot
+  // back on the 40, the field is the same markup it started as, and the draft carries no spot
   await d.tools();
-  await spot.selectOption("5");
+  await spot.selectOption("0");
   await d.closeSidebars();
-  await expect.poll(() => fieldMarkup(d.field)).toBe(markup5);
+  await expect.poll(() => fieldMarkup(d.field)).toBe(markup0);
   await expect.poll(async () => { const dr = await storedDraft(page); return dr !== null && !("los" in dr); }).toBe(true);
   await expect(status(page)).toHaveText("Saved");
-  // eight spot changes, and nothing to undo: the spot is the play's, like its name
+  // four spot changes, and nothing to undo: the spot is the play's, like its name
   await expect(d.undo).toBeDisabled();
 
-  // their 10: it marks the play changed and autosaves; undo leaves the spot where it is
+  // the 10: it marks the play changed and autosaves; undo leaves the spot where it is
   await d.tools();
   await spot.selectOption("30");
   await expect(status(page)).toHaveText("Draft autosaved");
@@ -222,7 +230,7 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
   await d.tools();
   await expect(spot).toHaveValue("30");
 
-  // saved with the play, last, and only because it is off the 5
+  // saved with the play, last, and only because it is off the own goal line
   await d.save();
   await expect(d.toast).toHaveText("Saved");
   const saved = (await storedPlays(page))[RED_ZONE_FADE.id];
@@ -246,32 +254,33 @@ test("a coach puts the ball on their 10 for a red-zone play, and only that play 
   const copy = Object.values(await storedPlays(page)).find((p) => p.name === `${RED_ZONE_FADE.name} copy`);
   expect(copy?.los).toBe(30);
 
-  // a new play, started from the copy on their 10, goes back to the 5
+  // a new play, started from the copy on the 10, goes back to the 40
   await expect(losSelect(page)).toHaveValue("30");
   await d.newPlay("Offense");
-  await expect(losSelect(page)).toHaveValue("5");
+  await expect(losSelect(page)).toHaveValue("0");
   await expect(d.field.locator("text", { hasText: /^LOS$/ })).toHaveCount(1);
   await expect.poll(async () => (await storedDraft(page))?.name).toBe("New play");
   expect(await storedDraft(page)).not.toHaveProperty("los");
 
-  // every other play stays on the 5, drawn exactly as before
+  // every other play stays on the 40, drawn exactly as before
   await d.openSaved(SLANT_LEFT.name);
   await d.tools();
-  await expect(losSelect(page)).toHaveValue("5");
+  await expect(losSelect(page)).toHaveValue("0");
   await d.closeSidebars();
-  await expect(async () => { expectField(await readField(d.field), 5); }).toPass();
-  await expect.poll(() => fieldMarkup(d.field)).toBe(markup5);
+  await expect(async () => { expectField(await readField(d.field), 0); }).toPass();
+  await expect.poll(() => fieldMarkup(d.field)).toBe(markup0);
 
   await keep(testInfo, "line-of-scrimmage", {
     project,
-    markupAtThe5: createHash("sha256").update(markup5).digest("hex"),
+    choices: CHOICES,
+    markupAtThe40: createHash("sha256").update(markup0).digest("hex"),
     sweep,
     saved: { keys: Object.keys(saved ?? {}), los: saved?.los ?? null },
     duplicate: { los: copy?.los ?? null },
   });
 });
 
-test("the spot travels in the share link, and links from before it still open on the 5", async ({ page }, testInfo) => {
+test("the spot travels in the share link, and links without one open on the 40", async ({ page }, testInfo) => {
   await seed(page, { plays: [GOAL_LINE_FADE, SLANT_LEFT], team: OTTERS });
   const d = new Designer(page);
   await d.goto(`?open=${GOAL_LINE_FADE.id}`);
@@ -280,7 +289,7 @@ test("the spot travels in the share link, and links from before it still open on
   await expect(losNote(page)).toHaveText(NO_RUN_NOTE);
   // the picker as a coach finds it in Play tools, with the no-run warning under it
   await losSelect(page).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `test-results/line-of-scrimmage-${testInfo.project.name}-tools-35.png` });
+  await page.screenshot({ path: `test-results/line-of-scrimmage-${testInfo.project.name}-tools-5.png` });
 
   await d.clickTool("Copy share link");
   const dialog = page.getByRole("dialog", { name: "Share snapshot" });
@@ -301,15 +310,15 @@ test("the spot travels in the share link, and links from before it still open on
   const shared = page.getByRole("img", { name: "Play diagram" });
   await expect(shared).toBeVisible();
   await expect(async () => { expectField(await readField(shared), 35); }).toPass();
-  await expect(shared.locator("text", { hasText: "LOS 35" })).toHaveCount(1);
+  await expect(shared.locator("text", { hasText: "LOS 5" })).toHaveCount(1);
   const sharedReading = await readField(shared);
-  await shared.screenshot({ path: `test-results/line-of-scrimmage-${testInfo.project.name}-shared-35.png` });
+  await shared.screenshot({ path: `test-results/line-of-scrimmage-${testInfo.project.name}-shared-5.png` });
   await page.getByRole("link", { name: "Open in designer ›" }).click();
   await expect(d.field).toBeVisible();
   await d.tools();
   await expect(losSelect(page)).toHaveValue("35");
 
-  // a play on the 5 writes the link exactly as before
+  // a play on the 40 writes the link without a spot
   await d.openSaved(SLANT_LEFT.name);
   await d.clickTool("Copy share link");
   await dialog.getByRole("button", { name: "Copy snapshot link" }).click();
@@ -317,13 +326,17 @@ test("the spot travels in the share link, and links from before it still open on
   const plainKeys = Object.keys(linkPayload(await page.evaluate(() => navigator.clipboard.readText())));
   expect(plainKeys).toEqual(["name", "players"]);
 
-  // links made before plays had a spot, or hand-edited ones, open on a real yard line
+  // links without a spot, spotted before the choices were cut to four, or hand-edited, open on one of the four
   const players = formation({ o3: { type: "go" } });
   const legacy: { extra: Record<string, unknown>; los: number }[] = [
-    { extra: {}, los: 5 },
-    { extra: { los: "30" }, los: 5 },
-    { extra: { los: 99 }, los: 39 },
-    { extra: { los: 12.4 }, los: 12 },
+    { extra: {}, los: 0 },
+    { extra: { los: "30" }, los: 0 },
+    { extra: { los: 7 }, los: 0 },
+    { extra: { los: 12.4 }, los: 20 },
+    { extra: { los: 25 }, los: 30 },
+    { extra: { los: 33 }, los: 35 },
+    { extra: { los: 99 }, los: 35 },
+    { extra: { los: -4 }, los: 0 },
   ];
   for (const l of legacy) {
     const id = Buffer.from(JSON.stringify({ name: "Otter Old Link", players, ...l.extra })).toString("base64url");
@@ -338,7 +351,7 @@ test("the spot travels in the share link, and links from before it still open on
     snapshotPreview: snapshot,
     link: { keys: Object.keys(payload), los: payload.los },
     sharedPage: sharedReading,
-    linkOnThe5: { keys: plainKeys },
+    linkOnThe40: { keys: plainKeys },
     legacy: legacy.map((l) => ({ payload: l.extra, opensOn: l.los })),
   });
 });
@@ -347,7 +360,7 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
   const book = playbook("fx-los", "Otter Goal Line Book", [GOAL_LINE_FADE, SLANT_LEFT]);
   await seed(page, { plays: [GOAL_LINE_FADE, SLANT_LEFT], playbooks: [book], team: OTTERS });
 
-  // the printout preview draws the book's first play from their 5
+  // the printout preview draws the book's first play from the 5
   await page.goto(`/playbooks?book=${book.id}`);
   const preview = page.getByRole("img", { name: "Playbook PDF preview" });
   await expect(preview).toBeVisible();
@@ -373,7 +386,7 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
   expectField(goalArt, 35, { labels: false });
   expect(goalArt.viewBox).toBe("0 0 660 506");
   const slantArt = await readField(page.getByRole("img", { name: SLANT_LEFT.name }).first());
-  expectField(slantArt, 5, { labels: false });
+  expectField(slantArt, 0, { labels: false });
   expect(slantArt.viewBox).toBe("0 0 660 528");
 
   // a short link uploads the play with its spot, in the canonical form the server accepts
@@ -398,12 +411,12 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
   expect(backupRead.ok).toBe(true);
   expect(backupRead.ok ? backupRead.file.plays.find((p) => p.id === GOAL_LINE_FADE.id)?.los : null).toBe(35);
 
-  // another coach holds the same play on the 5: the file brings the goal-line version in as a copy
-  const onThe5: SavedPlay = { id: GOAL_LINE_FADE.id, name: GOAL_LINE_FADE.name, notes: GOAL_LINE_FADE.notes, side: GOAL_LINE_FADE.side, players: GOAL_LINE_FADE.players };
+  // another coach holds the same play on the 40: the file brings the goal-line version in as a copy
+  const onThe40: SavedPlay = { id: GOAL_LINE_FADE.id, name: GOAL_LINE_FADE.name, notes: GOAL_LINE_FADE.notes, side: GOAL_LINE_FADE.side, players: GOAL_LINE_FADE.players };
   const other = await browser.newContext();
   try {
     const page2 = await other.newPage();
-    await seed(page2, { plays: [onThe5] });
+    await seed(page2, { plays: [onThe40] });
     await page2.goto("/playbooks");
     await page2.getByLabel("Import a playbook file").setInputFiles(jsonUpload("otter-goal-line-book.playbook.json", text));
     await expect(page2.getByRole("button", { name: "Import playbook", exact: true })).toBeVisible();
@@ -411,10 +424,10 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
     await page2.getByRole("button", { name: "Import playbook", exact: true }).click();
     await expect.poll(async () => Object.keys(await storedPlays(page2)).length).toBe(3);
     const lib = await storedPlays(page2);
-    expect(lib[GOAL_LINE_FADE.id]).toEqual(onThe5);
-    expect(Object.values(lib).filter((p) => p.name === GOAL_LINE_FADE.name).map((p) => p.los ?? 5).sort((a, b) => a - b)).toEqual([5, 35]);
+    expect(lib[GOAL_LINE_FADE.id]).toEqual(onThe40);
+    expect(Object.values(lib).filter((p) => p.name === GOAL_LINE_FADE.name).map((p) => p.los ?? 0).sort((a, b) => a - b)).toEqual([0, 35]);
 
-    // restoring the backup over it puts the book's play back on their 5
+    // restoring the backup over it puts the book's play back on the 5
     await page2.goto("/playbooks");
     await openSettings(page2);
     await page2.getByLabel("Restore a device backup").setInputFiles(jsonUpload("device-backup.json", backup));
@@ -424,7 +437,7 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
     await keep(testInfo, "line-of-scrimmage-files", {
       project: testInfo.project.name,
       pdfPreview: pdf,
-      thumbnails: { goalLine: goalArt, onThe5: slantArt },
+      thumbnails: { goalLine: goalArt, onThe40: slantArt },
       playbookFile: filePlays.map((p) => ({ id: p.id, keys: Object.keys(p), los: p.los ?? null })),
       shortLink: { normalized: shortLink.ok ? shortLink.normalized : null, los: 35 },
       importedBeside: Object.values(lib).map((p) => ({ id: p.id === GOAL_LINE_FADE.id || p.id === SLANT_LEFT.id ? p.id : "(copy)", name: p.name, los: p.los ?? null })),
@@ -435,7 +448,7 @@ test("playbooks, files, short links and backups keep each play's spot", async ({
 });
 
 test("near their goal, ▶ keeps every player on the field, a man defender included", async ({ page }, testInfo) => {
-  // a defensive call on their 5, so both teams are drawn: a Go with man coverage on it, and a corner
+  // a defensive call from the 5, so both teams are drawn: a Go with man coverage on it, and a corner
   const call: SavedPlay = {
     ...play("fx-goal-line-man", "Otter Goal Line Man", {
       o3: { type: "go" }, o4: { type: "corner" }, d1: { type: "man", target: "o3" }, d4: { type: "man", target: "o4" },

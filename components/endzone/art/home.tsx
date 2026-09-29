@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { contrast, inkOn, luminance, num, useArtId, type ArtProps } from "./shared";
+import { contrast, fitText, inkOn, luminance, num, useArtId, type ArtProps, type Fit } from "./shared";
 
 const INK = "#1b1a17";
 const CREAM = "#fffdf6";
@@ -7,13 +7,6 @@ const BULB = "#fff3b0";
 const FALLBACK = "#f2b705";
 /** the diagonal the stripes are painted at, degrees off vertical */
 const SLANT = 35;
-
-/** Patrick Hand's capitals, digits and space, and each one's advance in hundredths of an em, to measure a name before it is drawn */
-const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
-const ADVANCE = [49, 51, 55, 48, 44, 38, 48, 47, 24, 37, 52, 37, 60, 53, 56, 48, 66, 45, 46, 47, 55, 56, 62, 60, 44, 51, 45, 36, 47, 45, 38, 42, 40, 50, 43, 37, 23];
-// anything else is taken as wide (a whole em past Latin, where a fallback font draws it), so a name is never underestimated
-const advance = (c: string): number => ADVANCE[GLYPHS.indexOf(c)] ?? (c > "\u024f" ? 100 : 60);
-const ems = (text: string): number => Array.from(text).reduce((sum, c) => sum + advance(c) / 100, 0);
 
 const channels = (hex: string): [number, number, number] => {
   const n = /^#?([0-9a-f]{6})$/i.exec(hex.trim())?.[1] ?? FALLBACK.slice(1);
@@ -49,24 +42,6 @@ function paints(color: string) {
 }
 type Paints = ReturnType<typeof paints>;
 
-interface Fit {
-  fs: number;
-  spacing: number;
-  /** the lettering's width as laid out, first letter to last */
-  width: number;
-  /** condensed to `width` with textLength: the name is too long even at its smallest size */
-  squeeze: boolean;
-}
-
-/** Sizes a name into `room`: a long one gets smaller, then condensed; a short one is spaced out towards `span`, as end zone lettering is. */
-function fitName(text: string, size: number, room: number, span: number): Fit {
-  const [n, em] = [Array.from(text).length, ems(text)];
-  const fs = Math.max(size * 0.62, Math.min(size, room / (em + (n - 1) * 0.05)));
-  const spacing = Math.max(fs * 0.05, Math.min(fs * 0.45, (Math.min(span, room) - em * fs) / n));
-  const width = em * fs + (n - 1) * spacing;
-  return width > room ? { fs, spacing: 0, width: room, squeeze: true } : { fs, spacing, width, squeeze: false };
-}
-
 /**
  * The stripes, one path of parallelograms leaning SLANT off vertical, from a stripe pair left of
  * the band (ez-home-march runs them one pair to the right) to its far edge. Drawn outright: a
@@ -94,7 +69,7 @@ function Name({ text, x, y, fit, paint, celebrate }: { text: string; x: number; 
   const bold = fs * 0.05;
   const drop = Math.max(1, fs * 0.09);
   return (
-    <g className="ez-home-name">
+    <g className="ez-home-name" data-ez-name={text}>
       <g transform={`translate(${num(drop)} ${num(drop)})`}>
         <text {...common} fill={paint.shadow} stroke={paint.shadow} strokeWidth={outline}>{text}</text>
       </g>
@@ -185,12 +160,13 @@ function Marquee({ w, h, inset, line, paint }: { w: number; h: number; inset: nu
 
 /**
  * Home Team: the coach's own colour painted in bold diagonal stripes inside a white border, the
- * team's name in outlined block letters across the middle between two stars, and a pennant flying
- * on each side. Every shade comes from the team colour, so it works for any of them, pale or dark.
- * A glossy sheen passes now and then; a touchdown chases bulbs round the border like a
- * scoreboard, runs the stripes, flashes the name, spins the stars and whips the pennants.
+ * team's name (HOME until they give it one) in outlined block letters across the middle between
+ * two stars, and a pennant flying on each side. Every shade comes from the team colour, so it
+ * works for any of them, pale or dark. A glossy sheen passes now and then; a touchdown chases
+ * bulbs round the border like a scoreboard, runs the stripes, flashes the name, spins the stars
+ * and whips the pennants.
  */
-export function HomeArt({ w, h, label, celebrate, team }: ArtProps) {
+export function HomeArt({ w, h, label, celebrate, team, name }: ArtProps) {
   const id = useArtId("home");
   const paint = paints(team.color);
   const period = Math.min(40, Math.max(12, h * 0.62));
@@ -204,13 +180,13 @@ export function HomeArt({ w, h, label, celebrate, team }: ArtProps) {
   const flagTop = (h - flagTall) / 2;
   const poleX = inset + line * 2.6 + flagTall * 0.25;
   const room = w - (poleX + flagTall * 2.25) * 2;
-  const text = team.name.trim().toUpperCase() || "HOME";
+  const text = name || "HOME";
   const size = Math.min(h * 0.54, 22 + (h - 44) * 0.3);
   const star = size * 0.36;
   const starGap = size * 0.5;
-  const starred = fitName(text, size, room - (starGap + star * 2) * 2, w * 0.3);
+  const starred = fitText(text, size, room - (starGap + star * 2) * 2, w * 0.3);
   const stars = starred.fs >= size * 0.9 && !starred.squeeze;
-  const fit = stars ? starred : fitName(text, size, room, w * 0.3);
+  const fit = stars ? starred : fitText(text, size, room, w * 0.3);
 
   return (
     <g className={celebrate ? "ez-home-party" : undefined} style={vars}>

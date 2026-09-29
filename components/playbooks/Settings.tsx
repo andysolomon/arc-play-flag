@@ -9,8 +9,9 @@ import { download } from "@/lib/export/raster";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, refresh, setTeam, subscribe } from "@/lib/play/library";
 import { StorageError, failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { EndZonePicker } from "../endzone/EndZonePicker";
+import { TEAM_NOTE, TeamFields } from "../TeamFields";
 import { ThemePicker } from "../ThemePicker";
-import { card, divider, eyebrow, input, pill, pillDark } from "../ui";
+import { card, divider, eyebrow, pill, pillDark } from "../ui";
 import { PreviewModal } from "./PreviewModal";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
@@ -80,16 +81,8 @@ function SettingsPanel() {
   return (
     <div className="flex flex-col gap-3">
       <span className={eyebrow}>TEAM</span>
-      <div className="flex flex-wrap items-center gap-2">
-        <input value={team.name} maxLength={40} placeholder="Team name" aria-label="Team name"
-          onChange={(e) => { onTeam({ ...team, name: e.target.value }); }} className={`${input} min-w-0 flex-1 basis-[220px]`} />
-        <label className={`${pill} relative flex min-h-11 cursor-pointer items-center gap-2 px-3 text-small`}>
-          <span className="h-5 w-5 rounded-full border-2 border-ink" style={{ background: team.color }} aria-hidden />
-          Team colour
-          <input type="color" value={team.color} aria-label="Team colour" onChange={(e) => { onTeam({ ...team, color: e.target.value }); }} className="absolute h-0 w-0 opacity-0" />
-        </label>
-      </div>
-      <span className="text-caption leading-note text-ink-muted">Shown on cards and printed pages. Nothing else changes.</span>
+      <TeamFields team={team} onTeam={onTeam} />
+      <span className="text-caption leading-note text-ink-muted">{TEAM_NOTE}</span>
       <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small">
         <input type="checkbox" checked={hasNoRunZones(team)} onChange={(e) => { onTeam({ ...team, noRunZones: e.target.checked }); }}
           className="h-5 w-5 flex-none cursor-pointer accent-ink" />

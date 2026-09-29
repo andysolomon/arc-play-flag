@@ -13,6 +13,10 @@ test("a league without no-run zones turns them off once, and the field, reload a
   await d.goto();
   // every team starts with them, as the field always had
   await expect(bands(d.field)).not.toHaveCount(0);
+  // from the 40 the nearest band can sit at the top of a short card, too thin to name; from the 10
+  // the one before their goal line is in full view on every screen
+  await d.tools();
+  await page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" }).selectOption("30");
   await expect(noRunLabel(d.field)).not.toHaveCount(0);
   await d.closeSidebars();
   await d.field.screenshot({ path: `test-results/no-run-zones-${testInfo.project.name}-on.png` });

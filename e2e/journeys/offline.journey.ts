@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { Designer, downloadBytes, downloadText } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
 import { END_ZONES, ENDZONE_KEY, TOUCHDOWNS_KEY } from "../../lib/endzone";
+import { MIDFIELD_YARD } from "../../lib/play/field";
 import { KEYS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook } from "../support/fixtures";
 import { readZip } from "../support/pptx";
 
@@ -88,15 +89,15 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
 });
 
 test("every end zone design is in the shell: with the network off, one picked for the first time still draws, and the picker shows them all", async ({ context, page }) => {
-  // a phone's window: with the ball on the 5, the only shape deep enough to show the end zone
+  // a phone's window, and a play from midfield: the shape and spot that bring the end zone into view
   await page.setViewportSize({ width: 412, height: 915 });
   await page.goto("/");
   await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await page.evaluate(([keys, savedPlay, touchdownsKey]) => {
-    localStorage.setItem(keys.plays, JSON.stringify({ [savedPlay.id]: savedPlay }));
+  await page.evaluate(([keys, savedPlay, touchdownsKey, midfield]) => {
+    localStorage.setItem(keys.plays, JSON.stringify({ [savedPlay.id]: { ...savedPlay, los: midfield } }));
     // enough touchdowns to open every one
     localStorage.setItem(touchdownsKey, "9");
-  }, [KEYS, SLANT_LEFT, TOUCHDOWNS_KEY] as const);
+  }, [KEYS, SLANT_LEFT, TOUCHDOWNS_KEY, MIDFIELD_YARD] as const);
   // the shell itself holds every chunk its scripts import on demand, the designs among them
   const shell = await page.evaluate(async () => {
     const [name] = (await caches.keys()).filter((n) => n.startsWith("ffpd-shell-"));

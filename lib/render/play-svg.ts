@@ -26,7 +26,7 @@ export interface ArtOptions {
   showYardNumbers?: boolean;
   /** the hatched no-run bands; off for a team whose league plays without them */
   noRunZones?: boolean;
-  /** the yard line this play's ball is on (SavedPlay.los); the own 5 when left out */
+  /** the yard line this play's ball is on (SavedPlay.los); the own goal line when left out */
   los?: number;
   /**
    * The box the field will be fitted into: its aspect decides how much depth shows.
