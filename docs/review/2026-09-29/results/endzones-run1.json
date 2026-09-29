@@ -1,0 +1,8 @@
+[
+ {"name":"Classic","scored":true,"celebration":"classic","motion":"fall","unlocked":"New end zone: Sakura","announced":["Touchdown! The Sakura end zone is open."],"touchdowns":"1"},
+ {"name":"Home Team","scored":true,"celebration":"home","motion":"fall","unlocked":"New end zone: Matrix","announced":["Touchdown! The Matrix end zone is open."],"touchdowns":"2"},
+ {"name":"Synthwave '84","scored":true,"celebration":"synthwave","motion":"burst","unlocked":"New end zone: Great Wave","announced":["Touchdown! The Great Wave end zone is open."],"touchdowns":"3"},
+ {"name":"Sakura","scored":true,"celebration":"sakura","motion":"drift","unlocked":"New end zone: 8-Bit","announced":["Touchdown! The 8-Bit end zone is open."],"touchdowns":"4"},
+ {"name":"Matrix","scored":true,"celebration":"matrix","motion":"rain","unlocked":"New end zone: Event Horizon","announced":["Touchdown! The Event Horizon end zone is open."],"touchdowns":"5"},
+ {"name":"Great Wave","scored":true,"celebration":"great-wave","motion":"burst","unlocked":null,"touchdowns":"6"}
+]

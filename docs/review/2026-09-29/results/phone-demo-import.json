@@ -1,0 +1,112 @@
+{
+ "demoHeadings": [
+  "Learn the whole play designer in 7 short clips.",
+  "Draw the offense",
+  "Draw a route of your own",
+  "Watch plays run",
+  "Build the defense",
+  "Save, note and share",
+  "Build a playbook",
+  "Print it for the sideline"
+ ],
+ "demoCount": 7,
+ "demoFrames": [
+  {
+   "src": "build-play.webm",
+   "dur": 9,
+   "w": 960,
+   "h": 540
+  },
+  {
+   "src": "custom-routes.webm",
+   "dur": 9,
+   "w": 960,
+   "h": 540
+  },
+  {
+   "src": "run-play.webm",
+   "dur": 11,
+   "w": 960,
+   "h": 540
+  },
+  {
+   "src": "build-defense.webm",
+   "dur": 11,
+   "w": 960,
+   "h": 540
+  },
+  {
+   "src": "save-share.webm",
+   "dur": 8,
+   "w": 960,
+   "h": 540
+  },
+  {
+   "src": "playbooks.webm",
+   "dur": 7.9,
+   "w": 960,
+   "h": 540
+  },
+  {
+   "src": "print-playbook.webm",
+   "dur": 9,
+   "w": 960,
+   "h": 540
+  }
+ ],
+ "demoLog": [],
+ "phoneToolsOverlay": "absolute",
+ "phoneSaved": [
+  "Phone Slant"
+ ],
+ "phoneHeader": [
+  {
+   "name": "Play tools",
+   "text": "",
+   "w": 44,
+   "h": 44
+  },
+  {
+   "name": "Undo",
+   "text": "",
+   "w": 44,
+   "h": 44
+  },
+  {
+   "name": "Redo",
+   "text": "",
+   "w": 44,
+   "h": 44
+  },
+  {
+   "name": "Clear routes",
+   "text": "",
+   "w": 44,
+   "h": 44
+  },
+  {
+   "name": "Route palette",
+   "text": "",
+   "w": 44,
+   "h": 44
+  }
+ ],
+ "importLink": "http://localhost:3123/s/C-DNXuYOYXox5NHb",
+ "importButtons": [
+  "Import playbook",
+  "Import playbook…",
+  "Import play…"
+ ],
+ "importToast": [],
+ "afterImportPlays": 6,
+ "offlineDesigner": true,
+ "phoneLog": [
+  "error: Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+  "error: Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+ ],
+ "tdBefore": 2,
+ "deleteToast": [
+  "Deleted “TD Test - X Fade”"
+ ],
+ "tdAfter": 1
+}

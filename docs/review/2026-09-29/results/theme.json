@@ -1,0 +1,26 @@
+{
+ "themeRadios": [
+  "Auto",
+  "Light",
+  "Dark",
+  "Aa\nTokyo Night",
+  "Aa\nCatppuccin",
+  "Aa\nGruvbox",
+  "Aa\nNord",
+  "Aa\nKanagawa",
+  "Aa\nMatte Black",
+  "Aa\nRosé Pine",
+  "Aa\nFlexoki"
+ ],
+ "Dark-enabled": true,
+ "Tokyo Night-enabled": true,
+ "Rosé Pine-enabled": true,
+ "Light-enabled": true,
+ "storedTheme": "light",
+ "shareDialog": "Share snapshot\n✕\n\nIt is a snapshot of this play now, not a live view; later edits are not added to it. The other team is always saved with the link and appears, faded, when the play is opened in the designer.\n\nLOS\n35\n30\n25\nC\nQB\nX\nY\nZ\nDefense in play art\nDraws the defense faded in the snapshot, and on this play's thumbnail and printouts once it is saved.\nCopy snapshot link",
+ "snapshotLink": "http://localhost:3123/p/eyJuYW1lIjoiVHJpcHMgUmlnaHQgRmxvb2QiLCJwbGF5ZXJzIjpbeyJpZCI6Im8xIiwidGVhbSI6Im9mZmVuc2UiLCJsYWJlbCI6IkMiLCJ4IjoxNSwieSI6MSwicm91dGUiOnsidHlwZSI6ImN1cmwifX0seyJpZCI6Im8yIiwidGVhbSI6Im9mZmVuc2UiLCJsYWJlbCI6IlFCIiwieCI6MTUsInkiOjUsInJvdXRlIjpudWxsfSx7ImlkIjoibzMiLCJ0ZWFtIjoib2ZmZW5zZSIsImxhYmVsIjoiWCIsIngiOjIxLCJ5IjoxLCJyb3V0ZSI6eyJ0eXBlIjoib3V0IiwicHJpbWFyeSI6dHJ1ZX19LHsiaWQiOiJvNCIsInRlYW0iOiJvZmZlbnNlIiwibGFiZWwiOiJZIiwieCI6MjcsInkiOjEsInJvdXRlIjp7InR5cGUiOiJnbyJ9fSx7ImlkIjoibzUiLCJ0ZWFtIjoib2ZmZW5zZSIsImxhYmVsIjoiWiIsIngiOjI0LCJ5IjozLCJyb3V0ZSI6eyJ0eXBlIjoiZmxhdCJ9fSx7ImlkIjoiZDEiLCJ0ZWFtIjoiZGVmZW5zZSIsImxhYmVsIjoiIiwieCI6MywieSI6LTUsInJvdXRlIjpudWxsfSx7ImlkIjoiZDIiLCJ0ZWFtIjoiZGVmZW5zZSIsImxhYmVsIjoiIiwieCI6MTEsInkiOi00LCJyb3V0ZSI6bnVsbH0seyJpZCI6ImQzIiwidGVhbSI6ImRlZmVuc2UiLCJsYWJlbCI6IiIsIngiOjE4LCJ5IjotNCwicm91dGUiOm51bGx9LHsiaWQiOiJkNCIsInRlYW0iOiJkZWZlbnNlIiwibGFiZWwiOiIiLCJ4IjoyNywieSI6LTUsInJvdXRlIjpudWxsfSx7ImlkIjoiZDUiLCJ0ZWFtIjoiZGVmZW5zZSIsImxhYmVsIjoiIiwieCI6MTUsInkiOi0xMSwicm91dGUiOm51bGx9XX0",
+ "toast": [
+  "Link copied"
+ ],
+ "snapshotTitle": "Trips Right Flood · Flag Football Play Designer"
+}

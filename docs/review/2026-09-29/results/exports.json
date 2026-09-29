@@ -1,0 +1,254 @@
+[
+ {
+  "book": "Hawks Base Offense"
+ },
+ {
+  "label": "Download wristbands PDF",
+  "file": "hawks-base-offense-wristbands.pdf",
+  "bytes": 430975,
+  "ms": 1596,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-base-offense-binder.pdf",
+  "bytes": 703779,
+  "ms": 1233,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-base-offense-binder.pdf",
+  "bytes": 235710,
+  "ms": 765,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download postcards PDF",
+  "file": "hawks-base-offense-postcards.pdf",
+  "bytes": 934677,
+  "ms": 2542,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download flyer PDF",
+  "file": "hawks-base-offense-flyer.pdf",
+  "bytes": 191284,
+  "ms": 637,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download slides",
+  "file": "hawks-base-offense-slides.pptx",
+  "bytes": 1554235,
+  "ms": 918,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download playbook file",
+  "file": "hawks-base-offense.playbook.json",
+  "bytes": 10580,
+  "ms": 341,
+  "toast": "Saved"
+ },
+ {
+  "share": "http://localhost:3123/s/C-DNXuYOYXox5NHb",
+  "body": "hawks-base-offense.json",
+  "bodyBytes": 10580
+ },
+ {
+  "sharePageTitle": "Shared snapshot · Arc Play Flag",
+  "h1": [
+   "Shared snapshot"
+  ]
+ },
+ {
+  "book": "Hawks Red Zone & Specials"
+ },
+ {
+  "label": "Download wristbands PDF",
+  "file": "hawks-red-zone-specials-wristbands.pdf",
+  "bytes": 483120,
+  "ms": 998,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-red-zone-specials-binder.pdf",
+  "bytes": 734732,
+  "ms": 1282,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-red-zone-specials-binder.pdf",
+  "bytes": 265479,
+  "ms": 704,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download postcards PDF",
+  "file": "hawks-red-zone-specials-postcards.pdf",
+  "bytes": 983057,
+  "ms": 2073,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download flyer PDF",
+  "file": "hawks-red-zone-specials-flyer.pdf",
+  "bytes": 216544,
+  "ms": 542,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download slides",
+  "file": "hawks-red-zone-specials-slides.pptx",
+  "bytes": 1702379,
+  "ms": 818,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download playbook file",
+  "file": "hawks-red-zone-specials.playbook.json",
+  "bytes": 10565,
+  "ms": 331,
+  "toast": "Saved"
+ },
+ {
+  "share": "http://localhost:3123/s/RlhHXqB7sPPpMwBe",
+  "body": "hawks-red-zone-specials.json",
+  "bodyBytes": 10565
+ },
+ {
+  "sharePageTitle": "Shared snapshot · Arc Play Flag",
+  "h1": [
+   "Shared snapshot"
+  ]
+ },
+ {
+  "book": "Hawks Base Defense"
+ },
+ {
+  "label": "Download wristbands PDF",
+  "file": "hawks-base-defense-wristbands.pdf",
+  "bytes": 394482,
+  "ms": 949,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-base-defense-binder.pdf",
+  "bytes": 661518,
+  "ms": 976,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-base-defense-binder.pdf",
+  "bytes": 220409,
+  "ms": 519,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download postcards PDF",
+  "file": "hawks-base-defense-postcards.pdf",
+  "bytes": 768308,
+  "ms": 1867,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download flyer PDF",
+  "file": "hawks-base-defense-flyer.pdf",
+  "bytes": 202574,
+  "ms": 527,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download slides",
+  "file": "hawks-base-defense-slides.pptx",
+  "bytes": 1501585,
+  "ms": 788,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download playbook file",
+  "file": "hawks-base-defense.playbook.json",
+  "bytes": 8515,
+  "ms": 336,
+  "toast": "Saved"
+ },
+ {
+  "share": "http://localhost:3123/s/Mjik5lncjHjNeoyW",
+  "body": "hawks-base-defense.json",
+  "bodyBytes": 8515
+ },
+ {
+  "sharePageTitle": "Shared snapshot · Arc Play Flag",
+  "h1": [
+   "Shared snapshot"
+  ]
+ },
+ {
+  "book": "Hawks Pressure Package"
+ },
+ {
+  "label": "Download wristbands PDF",
+  "file": "hawks-pressure-package-wristbands.pdf",
+  "bytes": 414487,
+  "ms": 962,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-pressure-package-binder.pdf",
+  "bytes": 594550,
+  "ms": 1009,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download binder PDF",
+  "file": "hawks-pressure-package-binder.pdf",
+  "bytes": 208939,
+  "ms": 558,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download postcards PDF",
+  "file": "hawks-pressure-package-postcards.pdf",
+  "bytes": 742465,
+  "ms": 1530,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download flyer PDF",
+  "file": "hawks-pressure-package-flyer.pdf",
+  "bytes": 190085,
+  "ms": 569,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download slides",
+  "file": "hawks-pressure-package-slides.pptx",
+  "bytes": 1442025,
+  "ms": 735,
+  "toast": "Saved"
+ },
+ {
+  "label": "Download playbook file",
+  "file": "hawks-pressure-package.playbook.json",
+  "bytes": 8809,
+  "ms": 346,
+  "toast": "Saved"
+ },
+ {
+  "share": "http://localhost:3123/s/akQO1SOo8_Ehii6N",
+  "body": "hawks-pressure-package.json",
+  "bodyBytes": 8809
+ },
+ {
+  "sharePageTitle": "Shared snapshot · Arc Play Flag",
+  "h1": [
+   "Shared snapshot"
+  ]
+ }
+]

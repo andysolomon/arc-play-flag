@@ -1,0 +1,38 @@
+[
+ {
+  "hintStart": "All 8 open. 11 touchdown passes on this device. Each design paints your team name across it. It comes into view with the ball near their goal (Line of scrimmage). Printed pages and exports keep the classic green."
+ },
+ {
+  "name": "Great Wave",
+  "scored": true,
+  "celebration": "great-wave",
+  "motion": "burst",
+  "banner": "TOUCHDOWN!",
+  "unlocked": null,
+  "announced": [],
+  "touchdowns": "12"
+ },
+ {
+  "name": "8-Bit",
+  "scored": true,
+  "celebration": "eight-bit",
+  "motion": "fall",
+  "banner": "TOUCHDOWN!",
+  "unlocked": null,
+  "announced": [],
+  "touchdowns": "13"
+ },
+ {
+  "name": "Event Horizon",
+  "scored": true,
+  "celebration": "event-horizon",
+  "motion": "burst",
+  "banner": "TOUCHDOWN!",
+  "unlocked": null,
+  "announced": [],
+  "touchdowns": "14"
+ },
+ {
+  "hintEnd": "All 8 open. 14 touchdown passes on this device. Each design paints your team name across it. It comes into view with the ball near their goal (Line of scrimmage). Printed pages and exports keep the classic green."
+ }
+]

@@ -1,0 +1,63 @@
+{
+ "depth-laptop-1280x720": {
+  "viewBox": "0 0 660 528",
+  "yardsDownfield": 16,
+  "totalYards": 24
+ },
+ "depth-laptop-1440x900": {
+  "viewBox": "0 0 660 528",
+  "yardsDownfield": 16,
+  "totalYards": 24
+ },
+ "depth-desktop-1920x1080": {
+  "viewBox": "0 0 660 528",
+  "yardsDownfield": 16,
+  "totalYards": 24
+ },
+ "depth-ipad-810x1080": {
+  "viewBox": "0 0 660 814",
+  "yardsDownfield": 29,
+  "totalYards": 37
+ },
+ "depth-iphone-390x844": {
+  "viewBox": "0 0 660 990",
+  "yardsDownfield": 37,
+  "totalYards": 45
+ },
+ "losCaption": "Saved with this play. The ball is in a no-run zone, so no runs from here.",
+ "runsOfferedInNoRunZone": [
+  "Handoff",
+  "Dive",
+  "Stretch",
+  "Counter",
+  "Reverse",
+  "Delay",
+  "Pitch",
+  "Done"
+ ],
+ "stretchStored": {
+  "type": "stretch"
+ },
+ "toastAfterRun": [
+  "New play"
+ ],
+ "blitz": {
+  "before": "translate(396.0,308.0)",
+  "after": "translate(396.0,198.0)"
+ },
+ "clamp": {
+  "X": "translate(66.0,374.0)",
+  "Y": "translate(633.6,374.0)"
+ },
+ "nameStored": "Trips Right Bunch Flood Wheel Sluggo Double Move Special 🦅🏈",
+ "afterReload": {
+  "heading": "Trips Right Bunch Flood Wheel Sluggo Double Move Special 🦅🏈",
+  "zRoute": {
+   "type": "post"
+  }
+ },
+ "afterCtrlZ": {
+  "type": "post"
+ },
+ "tdCardsBefore": 2
+}
