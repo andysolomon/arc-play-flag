@@ -10,7 +10,7 @@ import { GreatWaveArt } from "./art/great-wave";
 import { HomeArt } from "./art/home";
 import { MatrixArt } from "./art/matrix";
 import { SakuraArt } from "./art/sakura";
-import type { ArtProps } from "./art/shared";
+import { letteringName, type ArtProps } from "./art/shared";
 import { SynthwaveArt } from "./art/synthwave";
 
 /** One design per end zone in lib/endzone.ts. */
@@ -35,13 +35,13 @@ interface Props {
   still?: boolean;
 }
 
-/** An end zone's design, in the box (0, 0)–(w, h). The caller clips it and keeps it off print and exports. */
+/** An end zone's design, in the box (0, 0)–(w, h), lettered with the team's name. The caller clips it and keeps it off print and exports. */
 function EndZoneArtImpl({ id, w, h, label, celebrate, still = false }: Props) {
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const Art = ART[id];
   return (
     <g data-ez-art={id} className={still ? "ez-still" : undefined}>
-      <Art w={w} h={h} label={label} celebrate={celebrate} team={team} />
+      <Art w={w} h={h} label={label} celebrate={celebrate} team={team} name={letteringName(team)} />
     </g>
   );
 }

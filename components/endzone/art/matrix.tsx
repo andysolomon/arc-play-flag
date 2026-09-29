@@ -164,16 +164,20 @@ function WaveGradients({ id }: { id: string }) {
 }
 
 /**
- * END ZONE in phosphor on a black terminal plate, behind a prompt and ahead of a blinking cursor.
- * During a touchdown each letter rolls in through falling code, left to right, and the plate glitches.
+ * The team's name in phosphor on a black terminal plate, behind a prompt and ahead of a blinking
+ * cursor. A long name types smaller, down to half size, and past that the line runs out of columns
+ * and the rest of the name is cut. During a touchdown each letter rolls in through falling code,
+ * left to right, and the plate glitches.
  */
-function Terminal({ id, w, h, celebrate }: { id: string; w: number; h: number; celebrate: boolean }) {
-  const fs = Math.min(h * 0.5, 20, 16 + (h - 33) * 0.2);
+function Terminal({ id, w, h, name, celebrate }: { id: string; w: number; h: number; name: string; celebrate: boolean }) {
+  const size = Math.min(h * 0.5, 20, 16 + (h - 33) * 0.2);
+  // the prompt, a space, the word and the cursor, each a cell 0.64 em wide, and the plate's padding of 1.1 em, in 92% of the band
+  const fs = Math.max(size * 0.5, Math.min(size, (w * 0.92) / ((Array.from(name).length + 3) * 0.64 + 1.1)));
+  const columns = Math.floor(((w * 0.92) / fs - 1.1) / 0.64) - 3;
+  const word = Array.from(name).slice(0, Math.max(1, columns)).join("").trimEnd();
   const cell = fs * 0.64;
   const cap = fs * 0.73;
-  const word = "END ZONE";
-  // the prompt, a space, the word, the cursor
-  const cells = word.length + 3;
+  const cells = Array.from(word).length + 3;
   const plate = { w: cells * cell + fs * 1.1, h: fs * 1.45 };
   const x0 = (w - plate.w) / 2;
   const y0 = (h - plate.h) / 2;
@@ -184,7 +188,7 @@ function Terminal({ id, w, h, celebrate }: { id: string; w: number; h: number; c
   // a reel is drawn at font size 10 and scaled to fit, its glyphs a plate's height apart: 14.5, as ez-matrix-reel expects
   const pitch = (plate.h / fs) * 10;
   return (
-    <g className="ez-matrix-glitch">
+    <g className="ez-matrix-glitch" data-ez-name={word}>
       <rect x={num(x0)} y={num(y0)} width={num(plate.w)} height={num(plate.h)} rx={num(fs * 0.12)} fill={BLACK} fillOpacity={0.94} />
       <rect
         className="ez-matrix-frame" x={num(x0 + 0.75)} y={num(y0 + 0.75)} width={num(plate.w - 1.5)} height={num(plate.h - 1.5)} rx={num(fs * 0.1)}
@@ -226,11 +230,11 @@ function Terminal({ id, w, h, celebrate }: { id: string; w: number; h: number; c
 /**
  * Matrix: digital rain. Columns of phosphor code fall down a black end zone a row at a time, each
  * drop led by a near-white glyph and trailing a fading tail, over faint runs of code already
- * fallen; END ZONE sits on a black terminal plate with a blinking cursor. A touchdown flashes the
- * screen, floods the band with a sheet of drops, rushes every column and decodes the lettering
- * from scrambled code, one letter at a time.
+ * fallen; the team's name sits on a black terminal plate with a blinking cursor. A touchdown
+ * flashes the screen, floods the band with a sheet of drops, rushes every column and decodes the
+ * lettering from scrambled code, one letter at a time.
  */
-export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
+export function MatrixArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("matrix");
   // whole rows to the band, so a drop ticks cell to cell inside it; bigger rows in a taller band
   const rows = Math.max(1, Math.floor(h / Math.max(8.5, Math.min(14, 4 + h * 0.16)) + 0.35));
@@ -290,7 +294,7 @@ export function MatrixArt({ w, h, label, celebrate }: ArtProps) {
         {celebrate && <Wave id={id} xs={xs} rows={rows} />}
       </g>
       {celebrate && <rect className="ez-matrix-flash" width={w} height={h} fill={PHOSPHOR} opacity={0} />}
-      {label && <Terminal id={id} w={w} h={h} celebrate={celebrate} />}
+      {label && name && <Terminal id={id} w={w} h={h} name={name} celebrate={celebrate} />}
     </g>
   );
 }

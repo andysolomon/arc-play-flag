@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { num, px, rand, secs, useArtId, type ArtProps } from "./shared";
+import { CAP, fitAttrs, fitText, num, px, rand, secs, useArtId, type ArtProps } from "./shared";
 
 const CREAM = "#fdf5ee";
 const BLUSH = "#f9dce3";
@@ -16,8 +16,6 @@ const MIST = "#fffaf5";
 const SEAL = "#c63a31";
 /** the loose petals: the celebration's confetti pinks (lib/endzone.ts), less the palest, which vanish on the blush */
 const DRIFT = ["#ffb7c5", "#ff8fab", "#f06292"] as const;
-/** Patrick Hand's capitals stand this much of an em above the baseline */
-const CAP = 0.68;
 /** a blossom's radius in its <defs>, scaled to each one's size where it's used */
 const UNIT = 10;
 
@@ -371,20 +369,19 @@ function Seal({ x, y, s }: { x: number; y: number; s: number }) {
   );
 }
 
-/** END ZONE in plum on a bank of mist, sealed. */
-function Lettering({ cx, cy, fs, sun }: { cx: number; cy: number; fs: number; sun: boolean }) {
-  // Patrick Hand sets END ZONE about 4.4 em wide at this spacing
-  const width = fs * 4.42;
-  const spacing = fs * 0.1;
-  const seal = fs * 0.92;
-  const gap = fs * 0.4;
+/** The team's name in plum on a bank of mist, sealed; the name and its seal together take no more than `room`. */
+function Lettering({ cx, cy, size, room, text, sun }: { cx: number; cy: number; size: number; room: number; text: string; sun: boolean }) {
+  const seal = size * 0.92;
+  const gap = size * 0.4;
+  const fit = fitText(text, size, room - gap - seal, size * 4.4);
+  const [fs, width] = [fit.fs, fit.width];
   const tx = cx - (gap + seal) / 2;
   return (
     <g>
-      {sun && <circle cx={num(cx)} cy={num(cy - fs * 0.55)} r={num(fs * 1.25)} fill="#f7c0cd" opacity={0.55} />}
-      <Mist fill={MIST} opacity={0.95} bands={cloud([tx - width / 2 - fs * 0.7, cx + (width + gap + seal) / 2 + fs * 0.6, cy, fs * 1.3], false)} />
-      <text x={num(tx + spacing / 2)} y={num(cy + (fs * CAP) / 2)} textAnchor="middle" fontFamily="var(--font-hand)" fontSize={num(fs)} letterSpacing={num(spacing)} fill={PLUM}>
-        END ZONE
+      {sun && <circle cx={num(cx)} cy={num(cy - size * 0.55)} r={num(size * 1.25)} fill="#f7c0cd" opacity={0.55} />}
+      <Mist fill={MIST} opacity={0.95} bands={cloud([tx - width / 2 - size * 0.7, cx + (width + gap + seal) / 2 + size * 0.6, cy, size * 1.3], false)} />
+      <text data-ez-name={text} x={num(tx + fit.spacing / 2)} y={num(cy + (fs * CAP) / 2)} textAnchor="middle" {...fitAttrs(fit)} fill={PLUM}>
+        {text}
       </text>
       <Seal x={tx + width / 2 + gap + seal / 2} y={cy} s={seal} />
     </g>
@@ -393,12 +390,12 @@ function Lettering({ cx, cy, fs, sun }: { cx: number; cy: number; fs: number; su
 
 /**
  * Sakura: a spring end zone. A cream sky blushing down to a petal-strewn ground, gnarled boughs
- * reaching in from both top corners heavy with five-petal blossom, END ZONE in plum on a bank of
- * mist with a red seal, and loose petals drifting across on the breeze, tumbling as they go. A
- * touchdown blows a gust through it: the boughs shake, the blossom bounces, buds burst open, the
- * seal stamps down and clumps of petals loop off the branches and whirl away.
+ * reaching in from both top corners heavy with five-petal blossom, the team's name in plum on a
+ * bank of mist with a red seal, and loose petals drifting across on the breeze, tumbling as they
+ * go. A touchdown blows a gust through it: the boughs shake, the blossom bounces, buds burst open,
+ * the seal stamps down and clumps of petals loop off the branches and whirl away.
  */
-export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
+export function SakuraArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("sakura");
   const reach = Math.min(w * 0.36, h * 4.4);
   // a band deeper than the boughs' reach (the swatch, or the field with the ball near their goal): the boughs keep their proportions, with bigger blossom
@@ -425,7 +422,8 @@ export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
         <Twigs id={id} w={w} h={h} />
       )}
       <Petals list={near} opacity={1} />
-      {label && <Lettering cx={w / 2} cy={h / 2 + Math.max(0, h - 44) * 0.25} fs={fs} sun={boughs} />}
+      {/* the mist bank keeps to the middle two thirds, clear of the boughs' roots in the corners */}
+      {label && name && <Lettering cx={w / 2} cy={h / 2 + Math.max(0, h - 44) * 0.25} size={fs} room={w * 0.66} text={name} sun={boughs} />}
       {celebrate && <Gust w={w} h={h} reach={reach} depth={depth} scale={scale} />}
     </g>
   );
