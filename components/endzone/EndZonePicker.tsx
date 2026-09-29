@@ -5,6 +5,8 @@ import {
   END_ZONES, getEndZone, getTouchdowns, isUnlocked, nextLocked, serverEndZone, serverTouchdowns, setEndZone, subscribeEndZone,
   subscribeTouchdowns,
 } from "@/lib/endzone";
+import { repaint } from "@/lib/repaint";
+import { usePicked } from "../Repainting";
 import { Lock } from "../ThemePicker";
 import { segmentInput, swatch } from "../ui";
 import { EndZoneArt } from "./EndZoneArt";
@@ -24,7 +26,7 @@ const PREVIEW_H = 84;
 export function EndZonePicker({ className = "" }: { className?: string }) {
   const name = useId();
   const hint = useId();
-  const choice = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
+  const choice = usePicked("end-zone", useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone));
   const touchdowns = useSyncExternalStore(subscribeTouchdowns, getTouchdowns, serverTouchdowns);
   const open = END_ZONES.filter((z) => isUnlocked(z, touchdowns)).length;
   const next = nextLocked(touchdowns);
@@ -40,7 +42,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
               <input
                 type="radio" name={name} value={z.id} checked={choice === z.id} disabled={locked}
                 aria-describedby={locked ? `${hint}-${z.id} ${hint}` : undefined}
-                onChange={() => { setEndZone(z.id); }}
+                onChange={() => { repaint({ picker: "end-zone", value: z.id, what: `the ${z.name} end zone` }, () => { setEndZone(z.id); }); }}
                 className={`${segmentInput} disabled:cursor-not-allowed`}
               />
               {/* one string, so a screen reader hears "Opens at 5 touchdown passes." whole */}
