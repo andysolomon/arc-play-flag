@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { encodePlayFile } from "@/lib/export/transfer";
 import { download } from "@/lib/export/raster";
-import { booksHolding, deletePlay } from "@/lib/play/library";
-import { failureMessage, kebab } from "@/lib/play/storage";
+import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
+import { booksHolding, deletePlay, getServerTeam, getTeam, subscribe } from "@/lib/play/library";
+import { failureMessage, hasNoRunZones, kebab } from "@/lib/play/storage";
 import type { SavedPlay } from "@/lib/play/types";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
-import { card, chip, pillDark } from "../ui";
+import { card, chip, flagChip, pillDark } from "../ui";
 import { AddToPlaybookModal } from "./AddPlays";
 import { MoreMenu, menuItem, menuItemDanger } from "./MoreMenu";
 import type { Say } from "./PlaybooksScreen";
@@ -23,6 +24,8 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
   const links = useShareCount(`play:${p.id}`);
   const holding = booksHolding(p.id).length;
   const [adding, setAdding] = useState(false);
+  // the same flag its picture and printouts carry, in words beside the side it is for
+  const flagged = runInNoRunZone(p, hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam)));
   return (
     <div className={`${card} flex flex-col gap-2.5`}>
       <Link href={`/?open=${p.id}`} aria-label={`Open ${p.name} in the designer`} className="group flex flex-col gap-2 !text-ink no-underline">
@@ -32,6 +35,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
       </Link>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <SideBadge side={p.side} />
+        {flagged && <span className={flagChip}>{NO_RUN_FLAG}</span>}
         {links > 0 && <span className={chip}>Shared</span>}
       </div>
       {/* pinned to the bottom so every card in a row lines up */}

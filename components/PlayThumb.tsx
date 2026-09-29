@@ -2,6 +2,7 @@
 
 import { memo, useMemo, useSyncExternalStore } from "react";
 import { getServerTeam, getTeam, subscribe } from "@/lib/play/library";
+import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { COVERAGE_WORDS, coverageOf } from "@/lib/play/coverage";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { Player, Team } from "@/lib/play/types";
@@ -26,11 +27,13 @@ function PlayThumbImpl({ players, name, side, artShadow = false, los, className 
     () => playArt(players, { showYardNumbers: false, noRunZones, los, show: artShadow ? "both" : side, side }),
     [players, side, artShadow, noRunZones, los],
   );
-  // what the stamp and the fade show, in words, for a named picture
+  // what the stamps and the fade show, in words, for a named picture
   const cover = side === "defense" ? coverageOf(players) : null;
+  const flagged = runInNoRunZone({ side, players, los }, noRunZones);
   const label = !name ? name : [
     name,
     cover ? `${COVERAGE_WORDS[cover]} coverage` : null,
+    flagged ? NO_RUN_FLAG.toLowerCase() : null,
     artShadow ? `the ${side === "defense" ? "offense" : "defense"} faded` : null,
   ].filter(Boolean).join(", ");
   return (

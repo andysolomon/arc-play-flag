@@ -5,13 +5,14 @@ import {
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
+import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { LOS_YARD } from "@/lib/play/field";
-import { MIN_DEPTH, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
+import { MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
-import { manTags, tagged } from "@/lib/play/marks";
+import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
@@ -88,6 +89,10 @@ const STEP: Record<string, readonly [number, number]> = {
 const TITLE_CHROME = 24;
 /** The clip that keeps a route's turf-coloured lane inside a designed end zone. */
 const LANE_CLIP = "ffez-lane";
+/** Where the ▶ button floats over the field's bottom-right corner, in CSS pixels: 12 in from each edge, 48 across. */
+const PLAY_BUTTON = { inset: 12, size: 48 };
+/** The field's border, in CSS pixels: the diagram's units start inside it. */
+const FIELD_BORDER = 3;
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
@@ -166,6 +171,16 @@ function FieldImpl({
   // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
   const onField = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
   const tags = useMemo(() => manTags(visible, effective, top, layout.vh, zones), [visible, effective, top, layout.vh, zones]);
+  // a run called from a no-run zone is flagged in the backfield corner every picture of it uses,
+  // kept clear of the ▶ button on screen; a screen reader hears it with the diagram
+  const flagged = runInNoRunZone({ side, players, los }, noRunZones);
+  const flag = useMemo(() => {
+    if (!flagged) return null;
+    const k = VW / Math.max(1, (width ?? 430) - 2 * FIELD_BORDER);
+    const reach = PLAY_BUTTON.inset + PLAY_BUTTON.size - FIELD_BORDER;
+    const button = { x: VW - reach * k, y: layout.vh - reach * k, w: PLAY_BUTTON.size * k, h: PLAY_BUTTON.size * k };
+    return stampBox(NO_RUN_STAMP, visible, top, layout.vh, [button]);
+  }, [flagged, width, layout.vh, visible, top]);
   // and a screen reader hears the same, naming each defender as their token announces itself
   const tagWords = useMemo(() => {
     const who = (id: string): string => {
@@ -555,6 +570,7 @@ function FieldImpl({
           <desc>
             {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
+            {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
           <defs>
             <pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -600,6 +616,21 @@ function FieldImpl({
               </g>
             )}
           </g>
+          {/* under the routes, as on every picture, so it never hides the end of one */}
+          {flag && (
+            <g data-no-run-flag="" aria-hidden="true" pointerEvents="none">
+              <rect
+                x={flag.x.toFixed(1)} y={flag.y.toFixed(1)} width={flag.w.toFixed(1)} height={flag.h.toFixed(1)} rx={6}
+                fill="#f2b705" stroke="#1b1a17" strokeWidth={2.5}
+              />
+              <text
+                x={(flag.x + flag.w / 2).toFixed(1)} y={(flag.y + flag.h / 2 + 1).toFixed(1)} textAnchor="middle" dominantBaseline="central"
+                fontFamily="var(--font-hand)" fontSize={STAMP_FONT} letterSpacing={STAMP_SPACING} fill="#1b1a17" className="select-none"
+              >
+                {NO_RUN_STAMP}
+              </text>
+            </g>
+          )}
           <RouteLayer routes={routes} draftD={draftD} lane={designed && layout.endZone ? LANE_CLIP : null} />
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;

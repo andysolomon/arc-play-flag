@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useRef, type ChangeEvent } from "react";
+import { memo, useId, useRef, type ChangeEvent } from "react";
 import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, mirrorable, tableFor } from "@/lib/play/routes";
 import { teamFill } from "@/lib/play/geometry";
 import type { Player, RouteType } from "@/lib/play/types";
@@ -17,11 +17,17 @@ interface Props {
   onPrimary: () => void;
   onMirror: () => void;
   onRename: (id: string, label: string, commit: boolean) => void;
+  /**
+   * an offensive play's ball is in a no-run zone and the league plays with them: a run from here is
+   * flagged. Never on a defensive call, whose shadow offense is the other team's and never flagged.
+   */
+  noRunZone: boolean;
 }
 
-function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMirror, onRename }: Props) {
+function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMirror, onRename, noRunZone }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
+  const noRunNote = useId();
   // offense splits into the passing tree and the run game; defense is one list
   const keys: readonly RouteType[] = sel?.team === "offense" ? PASS_KEYS : DEFENSE_KEYS;
   const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS : [];
@@ -111,6 +117,12 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
           {runKeys.length > 0 && (
             <>
               <span className={eyebrow}>RUN</span>
+              {/* still offered: a handoff or pitch that ends in a throw is a pass, legal from anywhere */}
+              {noRunZone && (
+                <span id={noRunNote} className="flex-none text-caption leading-note text-ink-muted">
+                  The ball is in a no-run zone: a run from here is flagged. A handoff or pitch that ends in a throw is a pass.
+                </span>
+              )}
               <div className={tileGrid} role="group" aria-label="Runs">
                 {runKeys.map((k) => (
                   <IconTile
@@ -118,6 +130,8 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
                     icon={k}
                     label={tableFor(sel.team)[k]?.label ?? k}
                     active={sel.route?.type === k}
+                    hatched={noRunZone}
+                    describedBy={noRunZone ? noRunNote : undefined}
                     onClick={() => { onPick(k); }}
                   />
                 ))}

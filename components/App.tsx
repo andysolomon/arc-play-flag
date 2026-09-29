@@ -5,7 +5,8 @@ import { install, record } from "@/lib/diagnostics";
 import { initialState, reducer, selected, unsaved } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
-import { withLos } from "@/lib/play/field";
+import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
+import { inNoRunZone, withLos } from "@/lib/play/field";
 import type { RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -276,6 +277,15 @@ export function App() {
   const openShare = useCallback(() => { setShareOpen(true); }, []);
   const onArtShadow = useCallback((on: boolean) => { dispatch({ type: "setArtShadow", on }); }, []);
   const other = s.side === "defense" ? "offense" : "defense";
+  // a run called where the league allows none: flagged on the field, in Play tools and on every picture.
+  // It is said once as it happens, however it happens: a run picked, the ball moved onto the 5, the read
+  // moved onto the runner, the receivers cleared, the zones turned back on, or a flagged play opened.
+  const flagged = runInNoRunZone(s, noRunZones);
+  const wasFlagged = useRef(false);
+  useEffect(() => {
+    if (flagged && !wasFlagged.current) say(`Flagged · ${NO_RUN_FLAG.toLowerCase()}`, 3200);
+    wasFlagged.current = flagged;
+  }, [flagged, say]);
   // errors nobody caught are remembered (scrubbed, on this device only) for "Report a problem"
   useEffect(() => install(), []);
   const sel = selected(s);
@@ -327,6 +337,7 @@ export function App() {
             onTeam={onTeam}
             los={s.los}
             onLos={onLos}
+            flagged={flagged}
           />
         </Sidebar>
         <Field
@@ -354,6 +365,7 @@ export function App() {
             onPrimary={onPrimary}
             onMirror={onMirror}
             onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
+            noRunZone={s.side === "offense" && noRunZones && inNoRunZone(s.los)}
           />
         </Sidebar>
       </div>
