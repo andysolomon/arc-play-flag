@@ -6,7 +6,7 @@ import { buildMotion, simulationPlayback } from "../../lib/play/motion";
 import { touchdownAt } from "../../lib/play/touchdown";
 import type { SavedPlay } from "../../lib/play/types";
 import { Designer, armSabotage, sabotage } from "../support/designer";
-import { OTTERS, play, playbook, seed } from "../support/fixtures";
+import { KEYS, OTTERS, play, playbook, seed } from "../support/fixtures";
 
 /*
  * End zones: a coach picks the end zone's look (Play tools, or playbook settings), and every
@@ -30,14 +30,21 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *    seconds), or the diagram's own band hides the design's layer → "picking", "every end zone", "printing"
  *  - an end zone in use goes back to classic, or can't be kept, once its count is lost → "an end zone in use"
  *  - junk in storage opens end zones, draws a design, or poisons the next count → "junk in storage"
+ * The team's name
+ *  - a design spells out END ZONE, or letters something other than the team's name; the name is
+ *    missing from a design, or drawn past the band's edges, short or long; with no name a design
+ *    still letters something (Home Team's HOME aside), or the hint doesn't say where to give one
+ *                                                               → "the team's name"
+ *  - the name can't be given from Play tools, a new name doesn't repaint the field or the swatches,
+ *    isn't kept, or doesn't reach playbook settings          → "the team's name"
  * Touchdowns
  *  - a pass carried over the goal line isn't a touchdown, or the party starts before the ball
  *    crosses                                                    → "a pass carried over", "touchdowns ... in turn"
  *  - a catch inside the end zone isn't a touchdown              → "touchdowns ... in turn"
- *  - with the ball spotted near their goal, the goal line is still taken to be the 5's, so a
+ *  - with the ball spotted near their goal, the goal line is still taken to be midfield's, so a
  *    short pass into the end zone doesn't count; or the deeper end zone isn't the design's band,
- *    or the goal line's 40 sits on the design                    → "with the ball near their goal"
- *  - a catch out the back of the end zone (a route drawn deep from the 5, the ball then spotted
+ *    or the goal line's G sits on the design                     → "with the ball near their goal"
+ *  - a catch out the back of the end zone (a route drawn deep from midfield, the ball then spotted
  *    nearer their goal) counts, or moving the ball mid-play celebrates at the old goal line
  *                                                               → "a catch out the back"
  *  - on a defensive call the shadow offense scoring is celebrated as the coach's own touchdown and
@@ -60,7 +67,8 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  *  - playbook settings lack the picker, or a pick there doesn't reach the designer → "playbook settings"
  *
  * Artifacts, in test-results/: end-zones-<device>.json (every end zone, whether it drew on the
- * field and that it drew on its own layer rather than inside the diagram, and the touchdown timeline: when each celebration started against when the app's own
+ * field, that it drew on its own layer rather than inside the diagram and the name it lettered, and the touchdown
+ * timeline: when each celebration started against when the app's own
  * simulation says the ball crosses, where the ball was, the count stored before and after, what it
  * opened and the colours it wore, each section with the window it ran in; asserted against the
  * literal below before it is written), a picture of the top of the
@@ -68,37 +76,48 @@ import { OTTERS, play, playbook, seed } from "../support/fixtures";
  * celebration (end-zones-<device>-touchdown.png, every animation held at the same moment).
  */
 
-/** The goal line with the ball on the 5, in yards from the line of scrimmage (every play here but RED_ZONE and OUT_THE_BACK, which work out their own). */
-const GOAL = -35;
-/** A phone-shaped window: with the ball on the 5, the only shape deep enough to show the end zone (the desktop and iPad cards stop short of it). */
+/**
+ * Where the plays here put the ball: midfield, the 20 (from the 40, where a play starts, the end
+ * zone is past the deepest card). RED_ZONE and OUT_THE_BACK are spotted nearer their goal.
+ */
+const MIDFIELD = 20;
+/** The goal line with the ball at midfield, in yards from the line of scrimmage (every play here but RED_ZONE and OUT_THE_BACK, which work out their own). */
+const GOAL = -20;
+/** The top of a phone's card with the ball at midfield: the end line. */
+const MIDFIELD_TOP = -30;
+/** A phone-shaped window: with the ball at midfield, the only shape deep enough to show the end zone (the desktop and iPad cards stop short of it). */
 const PHONE = { width: 412, height: 915 };
+/** A play spotted at midfield. */
+const fromMidfield = (p: SavedPlay): SavedPlay => ({ ...p, los: MIDFIELD });
 const STANDARD_ENDZONE = "rgb(167, 229, 167)";
 
-// X (o3) runs a custom route straight up the left side: caught around the 36, carried over the goal line
-const CARRY = play("fx-td-carry", "Otter End Zone", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] } });
+// X (o3) runs a custom route from midfield: 9 yards up the left side, in to the middle and up the seam, caught
+// short of the goal line and carried over it
+const CARRY_ROUTE: [number, number][] = [[3, -8], [15, -8], [15, -20.6]];
+const CARRY = fromMidfield(play("fx-td-carry", "Otter End Zone", { o3: { type: "custom", primary: true, pts: CARRY_ROUTE } }));
 // X gets to the end zone first and drags across it: the ball is caught inside the end zone
-const DRAG = play("fx-td-drag", "Otter Back Line", { o3: { type: "custom", primary: true, pts: [[3, -35.6], [25, -35.6]] } });
+const DRAG = fromMidfield(play("fx-td-drag", "Otter Back Line", { o3: { type: "custom", primary: true, pts: [[3, -20.6], [25, -20.6]] } }));
 // the same run, pulled up two yards short of the goal line
-const SHORT = play("fx-td-short", "Otter Two Short", { o3: { type: "custom", primary: true, pts: [[3, -33]] } });
+const SHORT = fromMidfield(play("fx-td-short", "Otter Two Short", { o3: { type: "custom", primary: true, pts: [[3, -8], [15, -8], [15, -18]] } }));
 // X still runs into the end zone, but a check-down out to Y is there for the other 20%
-const CHECKDOWN = play("fx-td-checkdown", "Otter Check Down", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] }, o4: { type: "out" } });
+const CHECKDOWN = fromMidfield(play("fx-td-checkdown", "Otter Check Down", { o3: { type: "custom", primary: true, pts: CARRY_ROUTE }, o4: { type: "out" } }));
 // the ball on their 10 (the 30): the goal line is ten yards on, and X runs two yards into the end zone
 const RED_ZONE: SavedPlay = { ...play("fx-td-red-zone", "Otter Red Zone", { o3: { type: "custom", primary: true, pts: [[3, -12]] } }), los: 30 };
-// X's route drawn deep from the 5, with the ball then spotted on the 20: the end line is now 30 yards
+// X's route drawn deep from midfield, with the ball then spotted on the 5: the end line is now 15 yards
 // on and X runs past it, so the catch is out the back of the end zone
-const OUT_THE_BACK: SavedPlay = { ...play("fx-td-out-the-back", "Otter Out The Back", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] } }), los: 20 };
+const OUT_THE_BACK: SavedPlay = { ...play("fx-td-out-the-back", "Otter Out The Back", { o3: { type: "custom", primary: true, pts: [[3, -20.6]] } }), los: 35 };
 // a defensive call whose shadow offense throws X a touchdown: the coach being scored on
-const SCORED_ON = play("fx-td-scored-on", "Otter Goal Line D", { o3: { type: "custom", primary: true, pts: [[3, -35.6]] }, d1: { type: "zoneDeep" } }, "", "defense");
+const SCORED_ON = fromMidfield(play("fx-td-scored-on", "Otter Goal Line D", { o3: { type: "custom", primary: true, pts: CARRY_ROUTE }, d1: { type: "zoneDeep" } }, "", "defense"));
 // two routes into the end zone, for the pictures: the lanes show where each one crosses the design
-const GALLERY = play("fx-ez-gallery", "Otter Showcase", {
-  o3: { type: "custom", primary: true, pts: [[3, -35.6]] },
-  o4: { type: "custom", pts: [[27, -24], [21, -35.8]] },
-});
+const GALLERY = fromMidfield(play("fx-ez-gallery", "Otter Showcase", {
+  o3: { type: "custom", primary: true, pts: [[3, -20.6]] },
+  o4: { type: "custom", pts: [[27, -9], [21, -20.8]] },
+}));
 
 /** What the app's own simulation says a playback does, the receiver pinned as the page pins it. */
 function expected(p: SavedPlay, random = 0.1) {
-  const m = buildMotion(p.players, -37, simulationPlayback(() => random));
-  const td = touchdownAt(m, p.players);
+  const m = buildMotion(p.players, MIDFIELD_TOP, simulationPlayback(() => random));
+  const td = touchdownAt(m, p.players, p.los);
   return { receiver: p.players.find((q) => q.id === m.receiver)?.label ?? null, td, catchAt: m.catchAt, dur: m.dur };
 }
 
@@ -112,6 +131,13 @@ const hint = (scope: Page | Locator) => scope.getByText(/\d of 8 open\.|All 8 op
 const art = (field: Locator) => field.locator("xpath=..").locator(":scope > [data-ez-backdrop] [data-ez-art]");
 /** The field's own END ZONE words, not a design's lettering. */
 const plainLabel = (field: Locator) => field.locator("text:not([data-ez-art] text)", { hasText: "END ZONE" });
+/** A design's lettering of the team's name; it carries the text as drawn. */
+const lettering = (scope: Locator) => scope.locator("[data-ez-name]");
+/** The team's name as the designs letter it. */
+const painted = (name: string) => name.trim().replace(/\s+/g, " ").toUpperCase();
+/** The name the app stored for the team. */
+const storedTeamName = (page: Page): Promise<string | null> =>
+  page.evaluate((k) => (JSON.parse(localStorage.getItem(k) ?? "null") as { name?: string } | null)?.name ?? null, KEYS.team);
 const lanes = (field: Locator) => field.locator("[data-lane]");
 /** The classic band: the field's first rect in the end zone's green. */
 const band = (field: Locator) => field.locator("rect[fill='#a7e5a7']").first();
@@ -134,7 +160,7 @@ async function store(page: Page, v: Partial<Stored>): Promise<void> {
   }, [[ENDZONE_KEY, TOUCHDOWNS_KEY], v] as const);
 }
 
-/** With the ball on the 5 the desktop and iPad cards stop short of the end zone; anything that must see it gets a phone's window. */
+/** With the ball at midfield the desktop and iPad cards stop short of the end zone; anything that must see it gets a phone's window. */
 async function showEndZone(page: Page): Promise<void> {
   if ((page.viewportSize()?.width ?? 0) > 500) await page.setViewportSize(PHONE);
 }
@@ -339,13 +365,16 @@ test("a fresh device keeps the classic end zone, and the picker says what is ope
       await expect(label.locator("[data-lock]"), `${z.name}'s lock shows ${String(z.unlock)}`).toHaveText(String(z.unlock));
       // a screen reader hears what this one needs, then the picker's hint
       await expect(r).toHaveAccessibleDescription(
-        new RegExp(`^Opens at ${z.unlock === 1 ? "1 touchdown pass" : `${String(z.unlock)} touchdown passes`}\\. 3 of 8 open\\. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in\\. It comes into view`),
+        new RegExp(
+          `^Opens at ${z.unlock === 1 ? "1 touchdown pass" : `${String(z.unlock)} touchdown passes`}\\. 3 of 8 open\\. ` +
+            "Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in\\. Each design paints your team name across it\\. It comes into view",
+        ),
       );
     }
   }
   await expect(hint(tools)).toHaveText(
-    "3 of 8 open. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in. " +
-      "It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green.",
+    "3 of 8 open. Throw a touchdown pass on ▶ to open Sakura: a catch in the end zone, or one carried in. Each design paints your team name across it. " +
+      "It comes into view with the ball near their goal (Line of scrimmage). Printed pages and exports keep the classic green.",
   );
   // a locked swatch can't be picked, by a tap or by the keyboard: arrowing on from the last open
   // one wraps round to Classic, past every locked one
@@ -425,6 +454,90 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
   await expect(plainLabel(d2.field)).toBeVisible();
 });
 
+test("the team's name is painted across every design and none says END ZONE; it is given in Play tools, repaints at once, is kept, and reaches playbook settings", async ({ page }) => {
+  test.slow();
+  await showEndZone(page);
+  await seed(page, { plays: [GALLERY], team: OTTERS });
+  await store(page, { touchdowns: String(Math.max(...END_ZONES.map((z) => z.unlock))) });
+  const d = new Designer(page);
+  await d.goto("?open=fx-ez-gallery");
+  const tools = page.locator("#play-sidebar");
+  const designed = END_ZONES.filter((z) => z.id !== "classic");
+  // a 39-character name, the longest a coach can nearly type, for the second pass
+  const long = "Riverside Otters U12 Flag Football Club";
+
+  /** The lettering sits inside the band: never past its sides, and centred on a line within it. */
+  const insideTheBand = async (zone: string) => {
+    const word = lettering(art(d.field));
+    await expect(word, zone).toHaveCount(1);
+    const [name, box] = [await word.boundingBox(), await art(d.field).locator("xpath=..").boundingBox()];
+    if (!name || !box) throw new Error(`${zone}: the lettering has no box`);
+    expect(name.x, `${zone} left edge`).toBeGreaterThanOrEqual(box.x - 1);
+    expect(name.x + name.width, `${zone} right edge`).toBeLessThanOrEqual(box.x + box.width + 1);
+    expect(name.y + name.height / 2, `${zone} middle`).toBeGreaterThan(box.y);
+    expect(name.y + name.height / 2, `${zone} middle`).toBeLessThan(box.y + box.height);
+  };
+
+  for (const teamName of [OTTERS.name, long]) {
+    if (teamName !== OTTERS.name) {
+      await d.tools();
+      await tools.getByRole("textbox", { name: "Team name" }).fill(teamName);
+    }
+    for (const z of designed) {
+      await d.tools();
+      await swatch(tools, z.name).check();
+      await expect(swatch(tools, z.name)).toBeChecked();
+      await d.closeSidebars();
+      await expect(art(d.field)).toHaveAttribute("data-ez-art", z.id);
+      // the design letters the name, whole (8-Bit and Matrix cut only a name their band has no columns for; this one fits), and never END ZONE
+      await expect(lettering(art(d.field)), z.id).toHaveAttribute("data-ez-name", painted(teamName));
+      await expect(art(d.field).locator("text", { hasText: "END ZONE" }), z.id).toHaveCount(0);
+      expect(await art(d.field).textContent(), z.id).not.toContain("END ZONE");
+      await insideTheBand(z.id);
+      // the plain words stay for print only
+      await expect(plainLabel(d.field)).toBeHidden();
+    }
+  }
+  expect(await storedTeamName(page)).toBe(long);
+
+  // a shorter name, typed in Play tools: the field and every swatch repaint as it is typed
+  await d.tools();
+  const field = tools.getByRole("textbox", { name: "Team name" });
+  await field.fill("Delta Force 7");
+  await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  for (const z of designed) await expect(lettering(picker(tools).locator(`[data-ez-art='${z.id}']`)), z.id).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  await expect(hint(tools)).toContainText("Each design paints your team name across it.");
+  expect(await storedTeamName(page)).toBe("Delta Force 7");
+
+  // no name: nothing is lettered but the design (Home Team keeps its HOME), and the hint says where to give one
+  await field.fill("");
+  await expect(lettering(art(d.field))).toHaveCount(0);
+  await expect(art(d.field).locator("text", { hasText: "END ZONE" })).toHaveCount(0);
+  for (const z of designed) {
+    const word = lettering(picker(tools).locator(`[data-ez-art='${z.id}']`));
+    if (z.id === "home") await expect(word).toHaveAttribute("data-ez-name", "HOME");
+    else await expect(word, z.id).toHaveCount(0);
+  }
+  await expect(hint(tools)).toContainText("Give your team a name (under Team) and each design paints it across.");
+  expect(await storedTeamName(page)).toBe("");
+
+  // the name given here is the team's everywhere: it outlasts a reload and is what playbook settings show
+  await field.fill("Delta Force 7");
+  await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  await page.reload();
+  await expect(art(d.field)).toHaveAttribute("data-ez-art", "event-horizon");
+  await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+  await page.goto("/playbooks");
+  const settings = page.getByRole("button", { name: /Delta Force 7 · team, theme & backup settings/ });
+  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  await expect(async () => {
+    await settings.click();
+    await expect(dialog).toBeVisible({ timeout: 1_000 });
+  }).toPass();
+  await expect(dialog.getByRole("textbox", { name: "Team name" })).toHaveValue("Delta Force 7");
+  await expect(lettering(picker(dialog).locator("[data-ez-art='synthwave']"))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
+});
+
 test("a pass carried over the goal line is a touchdown: the chosen end zone celebrates, the count is kept, and Sakura opens", async ({ page }) => {
   await pinRandom(page);
   await watchTouchdowns(page);
@@ -457,7 +570,7 @@ test("a pass carried over the goal line is a touchdown: the chosen end zone cele
   await expect(announcement(page)).toHaveCount(0);
   const r = await lastRun(page);
   const want = expected(CARRY);
-  expect(want).toMatchObject({ receiver: "X", td: expect.closeTo(5.54, 1) });
+  expect(want).toMatchObject({ receiver: "X", td: expect.closeTo(5.08, 1) });
   if (want.td === null) throw new Error("the fixture no longer scores");
   // it starts on the frame the ball crosses, not before; X caught it short and carried it in
   expect(r.celebratedAt).toBeGreaterThanOrEqual(want.td - 0.02);
@@ -487,15 +600,15 @@ test("with the ball near their goal the end zone is on every screen: the design 
   await expect(art(d.field)).toBeVisible();
   const box = art(d.field).locator("xpath=..");
   for (const k of ["y", "height"] as const) expect(await box.getAttribute(k)).toBe(await band(d.field).getAttribute(k));
-  // deeper than the two yards the 5 ever shows, and never more than the ten-yard end zone
+  // deeper than a sliver, and never more than the ten-yard end zone
   const tall = Number(await box.getAttribute("height"));
   expect(tall).toBeGreaterThan(44);
   expect(tall).toBeLessThanOrEqual(220);
   await expect(plainLabel(d.field)).toBeHidden();
   // the goal line's number would sit on the design; it stays in the page for print
-  await expect(d.field.locator("text", { hasText: /^40$/ })).toHaveCount(1);
-  await expect(d.field.locator("text", { hasText: /^40$/ })).toBeHidden();
-  await expect(d.field.locator("text", { hasText: "LOS 30" })).toBeVisible();
+  await expect(d.field.locator("text", { hasText: /^G$/ })).toHaveCount(1);
+  await expect(d.field.locator("text", { hasText: /^G$/ })).toBeHidden();
+  await expect(d.field.locator("text", { hasText: "LOS 10" })).toBeVisible();
   await expect(lanes(d.field)).toHaveCount(1);
 
   await runPlay(page, d);
@@ -504,8 +617,8 @@ test("with the ball near their goal the end zone is on every screen: the design 
   expect(await stored(page)).toEqual({ zone: "synthwave", touchdowns: "1" });
   await playEnds(page);
   const r = await lastRun(page);
-  // the goal line is the play's own: ten yards on from the 30, not the 5's thirty-five
-  const goal = (RED_ZONE.los ?? 5) - 40;
+  // the goal line is the play's own: ten yards on from the 10, not forty from the drive start
+  const goal = (RED_ZONE.los ?? 0) - 40;
   const td = touchdownAt(buildMotion(RED_ZONE.players, -20, simulationPlayback(() => 0.1)), RED_ZONE.players, RED_ZONE.los);
   if (td === null) throw new Error("the fixture no longer scores");
   expect(touchdownAt(buildMotion(RED_ZONE.players, -20, simulationPlayback(() => 0.1)), RED_ZONE.players)).toBeNull();
@@ -529,7 +642,7 @@ test("a completion short of the goal line, a throw to someone else while the pri
   await playEnds(page);
   let r = await lastRun(page);
   expect(r.party).toBeNull();
-  expect(r.deepest).toBeCloseTo(-33, 1);
+  expect(r.deepest).toBeCloseTo(-18, 1);
 
   // the other 20%: Y gets the ball on the out while X runs into the end zone without it
   expect(expected(CHECKDOWN, 0.95)).toMatchObject({ receiver: "Y", td: null });
@@ -562,8 +675,8 @@ test("a catch out the back of the end zone isn't a touchdown, and moving the bal
   await seed(page, { plays: [OUT_THE_BACK, CARRY], team: OTTERS });
   const d = new Designer(page);
 
-  // X caught it near the 31 of this field, beyond the end line at -30 and off the top of the card
-  const endLine = (OUT_THE_BACK.los ?? 5) - 50;
+  // X caught it near 21 yards on, beyond the end line at -15 and off the top of the card
+  const endLine = (OUT_THE_BACK.los ?? 0) - 50;
   expect(touchdownAt(buildMotion(OUT_THE_BACK.players, endLine, simulationPlayback(() => 0.1)), OUT_THE_BACK.players, OUT_THE_BACK.los)).toBeNull();
   await d.goto(`?open=${OUT_THE_BACK.id}`);
   await runPlay(page, d);
@@ -572,13 +685,13 @@ test("a catch out the back of the end zone isn't a touchdown, and moving the bal
   expect(r.party).toBeNull();
   expect(r.deepest).toBeLessThan(endLine);
 
-  // the carry-in touchdown, but the ball is moved up to the 10 while X is still running, long before
+  // the carry-in touchdown, but the ball is moved up to their 10 while X is still running, long before
   // he would cross: the play it was watching ends, and nothing is scored at a goal line that has moved
   await d.goto("?open=fx-td-carry");
   await runPlay(page, d);
   await d.tools();
   await expect(page.getByRole("button", { name: "Stop the play" })).toBeVisible();
-  await page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" }).selectOption("10");
+  await page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" }).selectOption("30");
   await expect(page.getByRole("button", { name: "Run the play" })).toBeVisible();
   await page.waitForTimeout(Math.max(0, (expected(CARRY).td ?? 0) * 1000) + 500);
   expect((await lastRun(page)).party).toBeNull();
@@ -927,6 +1040,7 @@ test.describe("the end zones manifest", () => {
         drawn: (await art(d.field).count()) === 1 && (await art(d.field).isVisible()),
         insideDiagram: await d.field.locator("[data-ez-art]").count(),
         plainLabelOnScreen: await plainLabel(d.field).isVisible(),
+        lettered: (await lettering(art(d.field)).count()) === 1 ? await lettering(art(d.field)).getAttribute("data-ez-name") : null,
         lanes: await lanes(d.field).count(),
         routes: await d.routes.count(),
         picture, sha256: sha(`test-results/${picture}`),
@@ -938,6 +1052,8 @@ test.describe("the end zones manifest", () => {
       drawn: z.id !== "classic",
       insideDiagram: 0,
       plainLabelOnScreen: z.id === "classic" && lettered,
+      // a design letters the team's name where the field would letter END ZONE
+      lettered: z.id !== "classic" && lettered ? painted(OTTERS.name) : null,
       lanes: z.id === "classic" ? 0 : 2,
       routes: 2,
       picture: `end-zones-${project}-${z.id}.png`,
@@ -1012,17 +1128,17 @@ test.describe("the end zones manifest", () => {
       zones: expect.any(Array),
       touchdowns: [
         {
-          play: "Otter End Zone", how: "carried in", receiver: "X", zone: "classic", motion: "fall", expectedAt: 5.54, celebrationAt: at, ballYards: at,
+          play: "Otter End Zone", how: "carried in", receiver: "X", zone: "classic", motion: "fall", expectedAt: 5.08, celebrationAt: at, ballYards: at,
           storedBefore: null, storedAfter: "1", storedAtCelebration: "1", opened: "sakura", bannerLine: "New end zone: Sakura",
           announced: "Touchdown! The Sakura end zone is open.", colors: at, banner: rgb("#f2b705"),
         },
         {
-          play: "Otter Back Line", how: "caught in the end zone", receiver: "X", zone: "eight-bit", motion: "fall", expectedAt: 6.1, celebrationAt: at,
-          ballYards: -35.6, storedBefore: "4", storedAfter: "5", storedAtCelebration: "5", opened: "event-horizon",
+          play: "Otter Back Line", how: "caught in the end zone", receiver: "X", zone: "eight-bit", motion: "fall", expectedAt: 5.8, celebrationAt: at,
+          ballYards: -20.6, storedBefore: "4", storedAfter: "5", storedAtCelebration: "5", opened: "event-horizon",
           bannerLine: "New end zone: Event Horizon", announced: "Touchdown! The Event Horizon end zone is open.", colors: at, banner: rgb("#000000"),
         },
         {
-          play: "Otter End Zone", how: "carried in", receiver: "X", zone: "event-horizon", motion: "burst", expectedAt: 5.54, celebrationAt: at, ballYards: at,
+          play: "Otter End Zone", how: "carried in", receiver: "X", zone: "event-horizon", motion: "burst", expectedAt: 5.08, celebrationAt: at, ballYards: at,
           storedBefore: "5", storedAfter: "6", storedAtCelebration: "6", opened: null, bannerLine: null, announced: "Touchdown!", colors: at,
           banner: rgb("#0b0a1a"),
         },

@@ -4,9 +4,10 @@ import { memo, useId, useState, type ReactNode, type ChangeEvent } from "react";
 import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
 import { MAX_NOTES } from "@/lib/play/storage";
 import { EndZonePicker } from "./endzone/EndZonePicker";
-import type { Team, Vis } from "@/lib/play/types";
+import type { Team, TeamSettings, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { Support } from "./Support";
+import { TEAM_NOTE, TeamFields } from "./TeamFields";
 import { ThemePicker } from "./ThemePicker";
 import { divider, eyebrow, input, pill, select, tileGrid } from "./ui";
 
@@ -39,6 +40,9 @@ interface Props {
   /** the team's field has the hatched no-run bands */
   noRunZones: boolean;
   onNoRunZones: (on: boolean) => void;
+  /** the coach's team: its name and colour, the identity the whole app wears */
+  team: TeamSettings;
+  onTeam: (next: TeamSettings) => void;
   /** the yard line this play's ball is on, counted from the offense's own goal line */
   los: number;
   onLos: (los: number) => void;
@@ -46,7 +50,7 @@ interface Props {
 
 function PlaySidebarImpl({
   name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
-  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, los, onLos,
+  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, team, onTeam, los, onLos,
 }: Props) {
   const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
@@ -128,7 +132,7 @@ function PlaySidebarImpl({
       <span id={losNote} aria-live="polite" className="flex-none text-caption leading-note text-ink-muted">
         {noRunZones && inNoRunZone(los)
           ? "Saved with this play. The ball is in a no-run zone, so no runs from here."
-          : "Saved with this play. Yards count from your own goal line: midfield is the 20, their goal line the 40."}
+          : "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20."}
       </span>
       <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
         <input
@@ -179,6 +183,10 @@ function PlaySidebarImpl({
         {other === "offense" ? "Offense" : "Defense"} in play art
       </label>
       <span className="flex-none text-caption leading-note text-ink-muted">Draws the {other} faded on this play&apos;s thumbnail, snapshot and printouts. Save keeps it with the play.</span>
+      <span className={divider} />
+      <span className={eyebrow}>TEAM</span>
+      <TeamFields team={team} onTeam={onTeam} />
+      <span className="flex-none text-caption leading-note text-ink-muted">{TEAM_NOTE}</span>
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
       <ThemePicker className="flex-none" unlockHref="/playbooks" />

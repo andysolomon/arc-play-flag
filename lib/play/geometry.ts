@@ -1,4 +1,4 @@
-import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel } from "./field";
+import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
 import { DEF, ROUTES, inkFor, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
@@ -51,7 +51,7 @@ export function depth(players: readonly Player[], pane: Pane | null, minDepth = 
   const need = hasDeep ? Math.min(deepest, Math.min(-12, deepest - 4) - 2.9) : deepest;
   const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : 45;
   const d = Math.max(aspect, 8 - need + 1.2);
-  // from the own 5 the end line is 53 yards off, past the deepest card, so this stays 45
+  // from the own goal line the end line is 58 yards off, past the deepest card, so this stays 45
   const max = Math.min(45, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2));
   return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
 }
@@ -226,8 +226,8 @@ export interface FieldLayout {
 /**
  * Yard lines, hatched no-run bands, end zone and labels for a given depth, with the ball on
  * the `los` yard line (field yard n sits at y = los - n). A league that plays without no-run
- * zones gets the same field with no bands (and no NO-RUN labels). On the 5, the default,
- * this is the field as it has always been drawn.
+ * zones gets the same field with no bands (and no NO-RUN labels). The ball is on the own
+ * goal line unless the play is spotted nearer their goal.
  */
 export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZones = true, los = LOS_YARD): FieldLayout {
   const top = ybv(depthYards), vh = depthYards * S;
@@ -238,7 +238,7 @@ export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZon
     return { y: py(a, top), h: (b2 - a) * S };
   };
   const endLine = GOAL_YARD + END_ZONE_YARDS;
-  // the 5 yards before midfield (the 20) and before the goal line (the 40); once the ball is
+  // the 5 yards before midfield (the 20) and before their goal line (the 40); once the ball is
   // past midfield its band lies behind the play and is left off. A band the ball is in crosses the LOS.
   const bands = noRunZones
     ? [
@@ -263,12 +263,13 @@ export function fieldLayout(depthYards: number, showYardNumbers = true, noRunZon
   }
   const texts: FieldText[] = [];
   if (showYardNumbers) {
-    // yards count from the own goal line: the drive starts on the 5 and the goal line is the 40.
-    // Lines behind the LOS and the end line stay unlabelled.
+    // numbers read the yards left to their goal line, as a coach calls a spot: the drive starts
+    // on the 40, midfield is the 20 and their goal line is G. Lines behind the LOS and the end
+    // line stay unlabelled.
     for (const n of marks) {
       const y = at(n);
       if (y > 0 || n > GOAL_YARD || y < top - 0.01) continue;
-      const t = n === los ? losLabel(los) : String(n);
+      const t = n === los ? losLabel(los) : n === GOAL_YARD ? "G" : String(toGo(n));
       texts.push({ key: t + String(y), x: 12, y: py(y, top) - 7, t });
     }
     // a band's label sits in the part in front of the ball: behind it stands the offense

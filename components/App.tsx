@@ -6,7 +6,7 @@ import { initialState, reducer, selected, unsaved } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { withLos } from "@/lib/play/field";
-import type { RouteType, Team } from "@/lib/play/types";
+import type { RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
@@ -262,10 +262,12 @@ export function App() {
   [s.name, s.side, s.artShadow, s.los, s.players, noRunZones]);
   // where this play's ball is spotted: saved with the play, never undone (like its name)
   const onLos = useCallback((los: number) => { dispatch({ type: "setLos", los }); }, []);
-  const onNoRunZones = useCallback((on: boolean) => {
-    const r = setTeam({ ...getTeam(), noRunZones: on });
+  // the team's settings: its name and colour, and the field's no-run zones
+  const onTeam = useCallback((next: TeamSettings) => {
+    const r = setTeam(next);
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
   }, [say]);
+  const onNoRunZones = useCallback((on: boolean) => { onTeam({ ...getTeam(), noRunZones: on }); }, [onTeam]);
   const copyShare = useCallback(() => {
     const url = shareUrl();
     setShareOpen(false);
@@ -321,6 +323,8 @@ export function App() {
             onArtShadow={onArtShadow}
             noRunZones={noRunZones}
             onNoRunZones={onNoRunZones}
+            team={team}
+            onTeam={onTeam}
             los={s.los}
             onLos={onLos}
           />

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { num, rand, sparkle, useArtId, type ArtProps } from "./shared";
+import { CAP, fitAttrs, fitText, num, rand, sparkle, useArtId, type ArtProps } from "./shared";
 
 /** The SynthWave '84 palette the celebration's confetti uses (lib/endzone.ts). */
 const PINK = "#ff2a6d";
@@ -11,8 +11,6 @@ const NIGHT = "#1a0b2e";
 const SILHOUETTE = "#12061f";
 /** the chrome lettering, top to bottom; every band reads on NIGHT at 9:1 or better */
 const CHROME = ["#ffffff", "#8ff4ff", "#f2fdff", "#ff9bd8", "#ffd27a"] as const;
-/** Patrick Hand's capitals stand this much of an em above the baseline */
-const CAP = 0.68;
 /** the lettering's italic lean, as run over rise */
 const SLANT = 0.21;
 
@@ -195,15 +193,17 @@ function Meteors({ w, horizon, scale, count }: { w: number; horizon: number; sca
   );
 }
 
-/** END ZONE in italic chrome, outlined in the night and haloed in pink neon. */
-function Lettering({ id, x, y, fs }: { id: string; x: number; y: number; fs: number }) {
-  const spacing = fs * 0.12;
-  const common = { x: 0, y: 0, textAnchor: "middle", fontFamily: "var(--font-hand)", fontSize: fs, letterSpacing: spacing, strokeLinejoin: "round" } as const;
-  // where the chrome catches the light: the last E's top corner, about 2.25 em right of the middle and pushed over by the slant
-  const glint = { x: x + fs * (2.24 + CAP * SLANT), y: y - fs * (CAP + 0.06) };
+/** The team's name in italic chrome, outlined in the night and haloed in pink neon, sized into `room` and centred on `cy` on the floor. */
+function Lettering({ id, x, cy, text, size, room }: { id: string; x: number; cy: number; text: string; size: number; room: number }) {
+  const fit = fitText(text, size, room, size * 4.5);
+  const fs = fit.fs;
+  const y = cy + (fs * CAP) / 2;
+  const common = { x: 0, y: 0, textAnchor: "middle", ...fitAttrs(fit), strokeLinejoin: "round" } as const;
+  // where the chrome catches the light: the last letter's top corner, half the lettering right of the middle and pushed over by the slant
+  const glint = { x: x + fit.width / 2 + fs * CAP * SLANT, y: y - fs * (CAP + 0.06) };
   return (
-    <g className="ez-synthwave-word">
-      <g transform={`translate(${num(x + spacing / 2)} ${num(y)}) skewX(${num((-Math.atan(SLANT) * 180) / Math.PI)})`}>
+    <g className="ez-synthwave-word" data-ez-name={text}>
+      <g transform={`translate(${num(x + fit.spacing / 2)} ${num(y)}) skewX(${num((-Math.atan(SLANT) * 180) / Math.PI)})`}>
         <defs>
           <linearGradient id={`${id}-chrome`} gradientUnits="userSpaceOnUse" x1="0" y1={num(-fs * CAP)} x2="0" y2="0">
             <stop offset="0" stopColor={CHROME[0]} />
@@ -213,12 +213,13 @@ function Lettering({ id, x, y, fs }: { id: string; x: number; y: number; fs: num
             <stop offset="1" stopColor={CHROME[4]} />
           </linearGradient>
         </defs>
-        <g className="ez-synthwave-glow">
-          <text {...common} fill={PINK} stroke={PINK} strokeWidth={num(fs * 0.75)} opacity={0.2}>END ZONE</text>
-          <text {...common} fill={PINK} stroke={PINK} strokeWidth={num(fs * 0.45)} opacity={0.45}>END ZONE</text>
+        {/* the halo is stroke alone at a stroke opacity: the outline and chrome over it cover the letters' insides, and a whole-element opacity would cost a layer the size of the word on every frame */}
+        <g className="ez-synthwave-glow" fill="none" stroke={PINK}>
+          <text {...common} strokeWidth={num(fs * 0.75)} strokeOpacity={0.2}>{text}</text>
+          <text {...common} strokeWidth={num(fs * 0.45)} strokeOpacity={0.45}>{text}</text>
         </g>
-        <text {...common} fill={NIGHT} stroke={NIGHT} strokeWidth={num(fs * 0.24)}>END ZONE</text>
-        <text {...common} fill={CHROME[1]} style={{ fill: `url(#${id}-chrome)` }}>END ZONE</text>
+        <text {...common} fill={NIGHT} stroke={NIGHT} strokeWidth={num(fs * 0.24)}>{text}</text>
+        <text {...common} fill={CHROME[1]} style={{ fill: `url(#${id}-chrome)` }}>{text}</text>
       </g>
       <path className="ez-synthwave-glint" d={sparkle(glint.x, glint.y, fs * 0.3, 0.17)} fill="#ffffff" />
     </g>
@@ -228,11 +229,11 @@ function Lettering({ id, x, y, fs }: { id: string; x: number; y: number; fs: num
 /**
  * Synthwave '84: a neon sunset. A dusk sky over a half sun cut by slits, dark peaks and palms
  * either side, and a neon grid floor, cyan rails and pink rungs, rolling in towards the goal line
- * with END ZONE on it in italic chrome. The sun breathes, the grid rolls on and the stars twinkle;
- * a touchdown races the grid and swaps its neon, pulses the sun and runs its slits down, strobes the
- * lettering, swings searchlights up from the horizon and sends shooting stars over the sky.
+ * with the team's name on it in italic chrome. The sun breathes, the grid rolls on and the stars
+ * twinkle; a touchdown races the grid and swaps its neon, pulses the sun and runs its slits down,
+ * strobes the lettering, swings searchlights up from the horizon and sends shooting stars over the sky.
  */
-export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
+export function SynthwaveArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("synthwave");
   const cx = w / 2;
   const fs = Math.min(h * 0.46, 18.5 + (h - 44) * 0.19);
@@ -300,7 +301,8 @@ export function SynthwaveArt({ w, h, label, celebrate }: ArtProps) {
           <Palm x={w - palm * 1.3} base={h} height={palm * 0.78} lean={palm * 0.12} i={3} />
         </>
       )}
-      {label && <Lettering id={id} x={cx} y={horizon + (h - horizon + fs * CAP) / 2} fs={fs} />}
+      {/* between the inner palms' trunks, or nearly edge to edge on a band too shallow for them */}
+      {label && name && <Lettering id={id} x={cx} cy={(horizon + h) / 2} text={name} size={fs} room={tall ? w - palm * 2.6 : w * 0.9} />}
     </g>
   );
 }

@@ -37,7 +37,7 @@ const PALETTE = {
 type Ink = keyof typeof PALETTE;
 const INKS = Object.keys(PALETTE) as Ink[];
 
-/** The colours END ZONE flickers through on a touchdown, as with a star's invincibility; each reads on the card at 4.5:1 or better. */
+/** The colours the name flickers through on a touchdown, as with a star's invincibility; each reads on the card at 4.5:1 or better. */
 const STAR: readonly Ink[] = ["H", "V", "S"];
 
 /** Rows of brick the band stands on; one more lies hidden under the goal line for the bricks to bump up from. */
@@ -93,22 +93,102 @@ const PUFF: Sprite = [
   "..KKKKKK..",
 ];
 
-/** Capitals five pixels wide and seven tall, "#" inked. */
+/** Capitals and digits five pixels wide (I and the marks narrower) and seven tall, "#" inked. */
 const FONT: Readonly<Record<string, Sprite>> = {
-  E: ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
-  N: ["#...#", "#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#"],
+  A: [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
+  B: ["####.", "#...#", "#...#", "####.", "#...#", "#...#", "####."],
+  C: [".####", "#....", "#....", "#....", "#....", "#....", ".####"],
   D: ["####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####."],
-  Z: ["#####", "....#", "...#.", "..#..", ".#...", "#....", "#####"],
+  E: ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
+  F: ["#####", "#....", "#....", "####.", "#....", "#....", "#...."],
+  G: [".####", "#....", "#....", "#.###", "#...#", "#...#", ".####"],
+  H: ["#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
+  I: ["###", ".#.", ".#.", ".#.", ".#.", ".#.", "###"],
+  J: ["..###", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##.."],
+  K: ["#...#", "#..#.", "#.#..", "##...", "#.#..", "#..#.", "#...#"],
+  L: ["#....", "#....", "#....", "#....", "#....", "#....", "#####"],
+  M: ["#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#"],
+  N: ["#...#", "#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#"],
   O: [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+  P: ["####.", "#...#", "#...#", "####.", "#....", "#....", "#...."],
+  Q: [".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"],
+  R: ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"],
+  S: [".####", "#....", "#....", ".###.", "....#", "....#", "####."],
+  T: ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."],
+  U: ["#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+  V: ["#...#", "#...#", "#...#", "#...#", "#...#", ".#.#.", "..#.."],
+  W: ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
+  X: ["#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#"],
+  Y: ["#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."],
+  Z: ["#####", "....#", "...#.", "..#..", ".#...", "#....", "#####"],
+  "0": [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."],
+  "1": ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
+  "2": [".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"],
+  "3": ["#####", "...#.", "..#..", "...#.", "....#", "#...#", ".###."],
+  "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."],
+  "5": ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
+  "6": ["..##.", ".#...", "#....", "####.", "#...#", "#...#", ".###."],
+  "7": ["#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."],
+  "8": [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."],
+  "9": [".###.", "#...#", "#...#", ".####", "....#", "...#.", ".##.."],
+  "-": ["...", "...", "...", "###", "...", "...", "..."],
+  ".": [".", ".", ".", ".", ".", ".", "#"],
+  "'": ["#", "#", ".", ".", ".", ".", "."],
+  "!": ["#", "#", "#", "#", "#", ".", "#"],
+  "&": [".##..", "#..#.", ".##..", "#.#.#", "#..#.", "#...#", ".##.#"],
   " ": ["...", "...", "...", "...", "...", "...", "..."],
 };
 
-/** Three by five, for the 1UP. */
+/** Three by five, for the 1UP and for a name too long for the big font. */
 const MINI: Readonly<Record<string, Sprite>> = {
-  "1": [".#.", "##.", ".#.", ".#.", "###"],
-  U: ["#.#", "#.#", "#.#", "#.#", "###"],
+  A: [".#.", "#.#", "###", "#.#", "#.#"],
+  B: ["##.", "#.#", "##.", "#.#", "##."],
+  C: [".##", "#..", "#..", "#..", ".##"],
+  D: ["##.", "#.#", "#.#", "#.#", "##."],
+  E: ["###", "#..", "##.", "#..", "###"],
+  F: ["###", "#..", "##.", "#..", "#.."],
+  G: [".##", "#..", "#.#", "#.#", ".##"],
+  H: ["#.#", "#.#", "###", "#.#", "#.#"],
+  I: ["###", ".#.", ".#.", ".#.", "###"],
+  J: ["..#", "..#", "..#", "#.#", ".#."],
+  K: ["#.#", "#.#", "##.", "#.#", "#.#"],
+  L: ["#..", "#..", "#..", "#..", "###"],
+  M: ["#.#", "###", "###", "#.#", "#.#"],
+  N: ["##.", "#.#", "#.#", "#.#", "#.#"],
+  O: [".#.", "#.#", "#.#", "#.#", ".#."],
   P: ["##.", "#.#", "##.", "#..", "#.."],
+  Q: [".#.", "#.#", "#.#", ".#.", "..#"],
+  R: ["##.", "#.#", "##.", "#.#", "#.#"],
+  S: [".##", "#..", ".#.", "..#", "##."],
+  T: ["###", ".#.", ".#.", ".#.", ".#."],
+  U: ["#.#", "#.#", "#.#", "#.#", "###"],
+  V: ["#.#", "#.#", "#.#", "#.#", ".#."],
+  W: ["#.#", "#.#", "###", "###", "#.#"],
+  X: ["#.#", "#.#", ".#.", "#.#", "#.#"],
+  Y: ["#.#", "#.#", ".#.", ".#.", ".#."],
+  Z: ["###", "..#", ".#.", "#..", "###"],
+  "0": ["###", "#.#", "#.#", "#.#", "###"],
+  "1": [".#.", "##.", ".#.", ".#.", "###"],
+  "2": ["##.", "..#", ".#.", "#..", "###"],
+  "3": ["###", "..#", ".#.", "..#", "##."],
+  "4": ["#.#", "#.#", "###", "..#", "..#"],
+  "5": ["###", "#..", "##.", "..#", "##."],
+  "6": [".##", "#..", "###", "#.#", "###"],
+  "7": ["###", "..#", ".#.", ".#.", ".#."],
+  "8": ["###", "#.#", "###", "#.#", "###"],
+  "9": ["###", "#.#", "###", "..#", "##."],
+  "-": ["...", "...", "###", "...", "..."],
+  ".": [".", ".", ".", ".", "#"],
+  "'": ["#", "#", ".", ".", "."],
+  "!": ["#", "#", "#", ".", "#"],
+  "&": [".#.", "#.#", ".#.", "#.#", ".##"],
+  " ": ["..", "..", "..", "..", ".."],
 };
+
+/** The name as the pixel fonts can set it: accents dropped, in capitals, only the characters they have, one space between words. */
+function pixelName(name: string): string {
+  return Array.from(name.normalize("NFKD").replace(/\p{M}/gu, "").toUpperCase()).filter((c) => c in FONT).join("").replace(/\s+/g, " ").trim();
+}
 
 /**
  * Every pixel of each colour across the stamps, as path data keyed by colour: a run along a row
@@ -262,18 +342,44 @@ function Pops({ x, y, rise, i }: { x: number; y: number; rise: number; i: number
   );
 }
 
+interface TitleCard {
+  /** the size of a pixel */
+  p: number;
+  /** the name as set on the card, or null with no name to set */
+  text: Sprite | null;
+  /** what the card says */
+  word: string;
+}
+
+/**
+ * The pixel size and the name on the title card. A pixel is a 28th of the band, but never so
+ * coarse the level runs out of width for its blocks and hills, or for the name: a long one makes
+ * the pixels finer, down to two units, then drops to the 3×5 font, and past that is cut to the
+ * columns there are. The card, a ? block and its gap either side and a pixel clear of each edge
+ * must all fit across the band.
+ */
+function titleCard(name: string, w: number, h: number): TitleCard {
+  const base = Math.max(2, Math.min(Math.round(h / 28), Math.floor(w / 100)));
+  if (!name) return { p: base, text: null, word: "" };
+  const fits = (sprite: Sprite, p: number): boolean => (sprite[0]?.length ?? 0) + 5 + (ROW + 3) * 2 + 2 <= Math.ceil(w / p);
+  const big = lettering(name, FONT);
+  for (let p = base; p >= 2; p--) if (fits(big, p)) return { p, text: big, word: name };
+  let word = name;
+  while (word.length > 1 && !fits(lettering(word, MINI), 2)) word = word.slice(0, -1).trimEnd();
+  return { p: 2, text: lettering(word, MINI), word };
+}
+
 /**
  * 8-Bit: the end zone as a side-scroller's level. A sky-blue screen over a course of brick, pixel
- * clouds drifting a pixel at a time, rounded green hills, spinning gold coins, and END ZONE on a
- * riveted title card in a hand-built 5×7 pixel font between two shimmering ? blocks, a 1UP
- * blinking over it all. Everything sits on one integer pixel grid, a colour to a path. A touchdown
- * knocks the ? blocks and the card up from below, each knock popping coins out, ripples the bricks
- * out from the middle, flickers END ZONE through a star's colours, spins the coins up and flashes
- * the 1UP.
+ * clouds drifting a pixel at a time, rounded green hills, spinning gold coins, and the team's
+ * name on a riveted title card in a hand-built 5×7 pixel font between two shimmering ? blocks, a
+ * 1UP blinking over it all. Everything sits on one integer pixel grid, a colour to a path. A
+ * touchdown knocks the ? blocks and the card up from below, each knock popping coins out, ripples
+ * the bricks out from the middle, flickers the name through a star's colours, spins the coins up
+ * and flashes the 1UP.
  */
-export function EightBitArt({ w, h, label, celebrate }: ArtProps) {
-  // a pixel a 28th of the band, but never so coarse the level runs out of width for its blocks and hills
-  const p = Math.max(2, Math.min(Math.round(h / 28), Math.floor(w / 100)));
+export function EightBitArt({ w, h, label, celebrate, name }: ArtProps) {
+  const { p, text, word } = titleCard(label ? pixelName(name) : "", w, h);
   const cols = Math.ceil(w / p);
   const rows = Math.ceil(h / p);
   // the grid sits on the goal line; any part of a pixel left over is lost off the top
@@ -281,10 +387,10 @@ export function EightBitArt({ w, h, label, celebrate }: ArtProps) {
   const ground = rows - GROUND;
   const sky = h / p - GROUND;
 
-  const text = lettering("END ZONE", FONT);
-  // a bevel and two pixels of margin before the text, the shadow, a pixel and a bevel after it
-  const cardW = (text[0]?.length ?? 0) + 5;
+  // a bevel and two pixels of margin before the text, the shadow, a pixel and a bevel after it; with no name, the blocks flank a block's width of sky
+  const cardW = text ? (text[0]?.length ?? 0) + 5 : ROW;
   const cardX = Math.round((cols - cardW) / 2);
+  const textY = text ? Math.round((ROW - text.length) / 2) : 0;
   // the row of blocks floats a pixel over the bricks, or as near as the sky allows
   const rowY = Math.max(Math.round((rows - h / p + ground - ROW) / 2), ground - ROW - 1);
   const gap = Math.min(24, Math.max(3, Math.round(cardX * 0.18)));
@@ -348,14 +454,14 @@ export function EightBitArt({ w, h, label, celebrate }: ArtProps) {
         {blocks.map((x, i) => (
           <Block key={x} x={x} y={rowY} i={i * 2} />
         ))}
-        {label && (
-          <g className="ez-eight-bit-bump" style={delay(0.12)}>
+        {text && (
+          <g className="ez-eight-bit-bump" style={delay(0.12)} data-ez-name={word}>
             <Pixels stamps={[{ sprite: card(cardW, ROW), x: cardX, y: rowY }]} />
-            <Pixels stamps={[{ sprite: text, x: cardX + 3, y: rowY + 2 }]} />
+            <Pixels stamps={[{ sprite: text, x: cardX + 3, y: rowY + textY }]} />
             {celebrate &&
               STAR.map((ink, k) => (
                 <g key={ink} className="ez-eight-bit-star" style={delay((k + 1) * 0.08)} opacity={0}>
-                  <Pixels stamps={[{ sprite: recolour(text, "W", ink), x: cardX + 3, y: rowY + 2 }]} />
+                  <Pixels stamps={[{ sprite: recolour(text, "W", ink), x: cardX + 3, y: rowY + textY }]} />
                 </g>
               ))}
           </g>

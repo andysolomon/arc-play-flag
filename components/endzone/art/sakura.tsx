@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { num, px, rand, secs, useArtId, type ArtProps } from "./shared";
+import { CAP, fitAttrs, fitText, num, px, rand, secs, useArtId, type ArtProps } from "./shared";
 
 const CREAM = "#fdf5ee";
 const BLUSH = "#f9dce3";
@@ -16,8 +16,6 @@ const MIST = "#fffaf5";
 const SEAL = "#c63a31";
 /** the loose petals: the celebration's confetti pinks (lib/endzone.ts), less the palest, which vanish on the blush */
 const DRIFT = ["#ffb7c5", "#ff8fab", "#f06292"] as const;
-/** Patrick Hand's capitals stand this much of an em above the baseline */
-const CAP = 0.68;
 /** a blossom's radius in its <defs>, scaled to each one's size where it's used */
 const UNIT = 10;
 
@@ -138,14 +136,28 @@ const RIGHT: Sprig = {
   buds: [[0.92, 0.66], [0.54, 0.28], [0.24, 0.86], [0.8, 0.08], [0.1, 0.32]],
 };
 
-/** The sky, and the two kinds of blossom drawn once: pink, and the paler kind blushing at the heart. */
+/**
+ * The sky, and the two kinds of blossom drawn once: pink, and the paler kind blushing at the
+ * heart. Nothing in a blossom is stroked: every one on the band is repainted on every frame the
+ * boughs sway, and stroking its petals' curves cost more than all its fills. Each petal's edge is
+ * a slightly bigger petal in the edge colour under it, laid petal by petal so each one's edge
+ * shows against the last; the stamens are filled spokes.
+ */
 function Defs({ id }: { id: string }) {
-  const stamens = [18, 90, 162, 234, 306].map((d) => petal(0, 0, UNIT * 0.42, d)).join("");
+  const stamens = [18, 90, 162, 234, 306].map((d) => {
+    const at = turn(0, 0, d);
+    return `M${at(-UNIT * 0.035, -UNIT * 0.12)}L${at(0, -UNIT * 0.42)}L${at(UNIT * 0.035, -UNIT * 0.12)}Z`;
+  }).join("");
   const kind = (name: string, outer: string, inner: string, innerOpacity: number) => (
     <g id={`${id}-${name}`}>
-      <path d={flower(0, 0, UNIT, 0)} fill={outer} stroke={PETAL_EDGE} strokeWidth={num(UNIT * 0.085)} strokeLinejoin="round" />
-      <path d={flower(0, 0, UNIT * 0.52, 0)} fill={inner} opacity={innerOpacity} />
-      <path d={stamens} fill="none" stroke={STAMEN} strokeWidth={num(UNIT * 0.05)} opacity={0.7} />
+      {[0, 72, 144, 216, 288].map((d) => (
+        <g key={d}>
+          <path d={petal(0, 0, UNIT * 1.06, d)} fill={PETAL_EDGE} />
+          <path d={petal(0, 0, UNIT, d)} fill={outer} />
+        </g>
+      ))}
+      <path d={flower(0, 0, UNIT * 0.52, 0)} fill={inner} fillOpacity={innerOpacity} />
+      <path d={stamens} fill={STAMEN} fillOpacity={0.7} />
       <circle r={num(UNIT * 0.17)} fill={HEART} />
     </g>
   );
@@ -269,7 +281,7 @@ function drifters(w: number, h: number, scale: number): { far: Drifter[]; near: 
 
 function Petals({ list, opacity }: { list: readonly Drifter[]; opacity: number }) {
   return (
-    <g opacity={opacity} stroke={PETAL_EDGE} strokeWidth={0.4} strokeLinejoin="round">
+    <g fillOpacity={opacity} strokeOpacity={opacity} stroke={PETAL_EDGE} strokeWidth={0.4} strokeLinejoin="round">
       {list.map((p) => (
         <g key={p.x} transform={`translate(${num(p.x)} ${num(p.y)})`}>
           <path className="ez-sakura-drift" style={p.style} d={p.d} fill={p.color} />
@@ -286,7 +298,7 @@ function Fallen({ w, h, scale }: { w: number; h: number; scale: number }) {
     const x = (w * (i + 0.5 + (rand(i, 50) - 0.5) * 0.9)) / n;
     return loose(x, h - 3 - rand(i, 51) * Math.min(h * 0.14, 7), scale * 4.6 * (0.8 + rand(i, 52) * 0.4), 60 + rand(i, 53) * 60);
   }).join("");
-  return <path d={d} fill="#f29ab2" opacity={0.55} />;
+  return <path d={d} fill="#f29ab2" fillOpacity={0.55} />;
 }
 
 /** Far-off trees in blossom, a soft pink haze of crowns along the ground. */
@@ -299,7 +311,7 @@ function Grove({ w, h }: { w: number; h: number }) {
     const y = h - r * 0.4;
     return `M${num(x - r)} ${num(y)}a${num(r)} ${num(r)} 0 1 1 ${num(r * 2)} 0a${num(r)} ${num(r)} 0 1 1 ${num(-r * 2)} 0Z`;
   }).join("");
-  return <path d={d} fill="#f5bccb" opacity={0.45} />;
+  return <path d={d} fill="#f5bccb" fillOpacity={0.45} />;
 }
 
 /** Long, round-ended bands of mist, the kasumi of old Japanese screens. */
@@ -371,20 +383,19 @@ function Seal({ x, y, s }: { x: number; y: number; s: number }) {
   );
 }
 
-/** END ZONE in plum on a bank of mist, sealed. */
-function Lettering({ cx, cy, fs, sun }: { cx: number; cy: number; fs: number; sun: boolean }) {
-  // Patrick Hand sets END ZONE about 4.4 em wide at this spacing
-  const width = fs * 4.42;
-  const spacing = fs * 0.1;
-  const seal = fs * 0.92;
-  const gap = fs * 0.4;
+/** The team's name in plum on a bank of mist, sealed; the name and its seal together take no more than `room`. */
+function Lettering({ cx, cy, size, room, text, sun }: { cx: number; cy: number; size: number; room: number; text: string; sun: boolean }) {
+  const seal = size * 0.92;
+  const gap = size * 0.4;
+  const fit = fitText(text, size, room - gap - seal, size * 4.4);
+  const [fs, width] = [fit.fs, fit.width];
   const tx = cx - (gap + seal) / 2;
   return (
     <g>
-      {sun && <circle cx={num(cx)} cy={num(cy - fs * 0.55)} r={num(fs * 1.25)} fill="#f7c0cd" opacity={0.55} />}
-      <Mist fill={MIST} opacity={0.95} bands={cloud([tx - width / 2 - fs * 0.7, cx + (width + gap + seal) / 2 + fs * 0.6, cy, fs * 1.3], false)} />
-      <text x={num(tx + spacing / 2)} y={num(cy + (fs * CAP) / 2)} textAnchor="middle" fontFamily="var(--font-hand)" fontSize={num(fs)} letterSpacing={num(spacing)} fill={PLUM}>
-        END ZONE
+      {sun && <circle cx={num(cx)} cy={num(cy - size * 0.55)} r={num(size * 1.25)} fill="#f7c0cd" fillOpacity={0.55} />}
+      <Mist fill={MIST} opacity={0.95} bands={cloud([tx - width / 2 - size * 0.7, cx + (width + gap + seal) / 2 + size * 0.6, cy, size * 1.3], false)} />
+      <text data-ez-name={text} x={num(tx + fit.spacing / 2)} y={num(cy + (fs * CAP) / 2)} textAnchor="middle" {...fitAttrs(fit)} fill={PLUM}>
+        {text}
       </text>
       <Seal x={tx + width / 2 + gap + seal / 2} y={cy} s={seal} />
     </g>
@@ -393,12 +404,12 @@ function Lettering({ cx, cy, fs, sun }: { cx: number; cy: number; fs: number; su
 
 /**
  * Sakura: a spring end zone. A cream sky blushing down to a petal-strewn ground, gnarled boughs
- * reaching in from both top corners heavy with five-petal blossom, END ZONE in plum on a bank of
- * mist with a red seal, and loose petals drifting across on the breeze, tumbling as they go. A
- * touchdown blows a gust through it: the boughs shake, the blossom bounces, buds burst open, the
- * seal stamps down and clumps of petals loop off the branches and whirl away.
+ * reaching in from both top corners heavy with five-petal blossom, the team's name in plum on a
+ * bank of mist with a red seal, and loose petals drifting across on the breeze, tumbling as they
+ * go. A touchdown blows a gust through it: the boughs shake, the blossom bounces, buds burst open,
+ * the seal stamps down and clumps of petals loop off the branches and whirl away.
  */
-export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
+export function SakuraArt({ w, h, label, celebrate, name }: ArtProps) {
   const id = useArtId("sakura");
   const reach = Math.min(w * 0.36, h * 4.4);
   // a band deeper than the boughs' reach (the swatch, or the field with the ball near their goal): the boughs keep their proportions, with bigger blossom
@@ -425,7 +436,8 @@ export function SakuraArt({ w, h, label, celebrate }: ArtProps) {
         <Twigs id={id} w={w} h={h} />
       )}
       <Petals list={near} opacity={1} />
-      {label && <Lettering cx={w / 2} cy={h / 2 + Math.max(0, h - 44) * 0.25} fs={fs} sun={boughs} />}
+      {/* the mist bank keeps to the middle two thirds, clear of the boughs' roots in the corners */}
+      {label && name && <Lettering cx={w / 2} cy={h / 2 + Math.max(0, h - 44) * 0.25} size={fs} room={w * 0.66} text={name} sun={boughs} />}
       {celebrate && <Gust w={w} h={h} reach={reach} depth={depth} scale={scale} />}
     </g>
   );
