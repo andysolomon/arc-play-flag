@@ -528,6 +528,9 @@
  * End zones (lib/endzone.ts, components/endzone). Each design animates with its own keyframes on
  * transform and opacity, and is drawn complete without them: the picker's swatches (.ez-still) and
  * reduced motion hold every design still. None of it prints (the field marks it print:hidden).
+ * A twinkle or a breath that fades one shape, or a set of shapes that never overlap, animates
+ * fill-opacity rather than opacity: opacity on an element composites it through a layer of its
+ * own on every frame, and a starfield's layer is the whole band.
  */
 @layer components {
   .ez-still, .ez-still * { animation: none !important; }
@@ -709,12 +712,12 @@
   to { transform: rotate(2.5deg); }
 }
 @keyframes ez-synthwave-breathe {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.08); opacity: 0.7; }
+  0%, 100% { transform: scale(1); fill-opacity: 1; }
+  50% { transform: scale(1.08); fill-opacity: 0.7; }
 }
 @keyframes ez-synthwave-twinkle {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(0.55); opacity: 0.35; }
+  0%, 100% { transform: scale(1); fill-opacity: 1; }
+  50% { transform: scale(0.55); fill-opacity: 0.35; }
 }
 @keyframes ez-synthwave-hum {
   0%, 90%, 92%, 94%, 100% { opacity: 1; }
@@ -839,9 +842,9 @@
 /* Matrix: code rains down a row at a time and the cursor blinks; a touchdown floods the band with a sheet of drops, rushes every column, flashes the screen and decodes the lettering from falling code. */
 .ez-matrix-fall, .ez-matrix-rush, .ez-matrix-wave, .ez-matrix-reel { transform-box: view-box; transform-origin: 0 0; }
 .ez-matrix-glitch { transform-box: fill-box; transform-origin: center; }
-/* PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next */
+/* PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next. matrix.tsx sets each clock's duration (8s, 6s or 4s) so every step, and the cursor's blink, lands on a 12 Hz lattice: the band repaints a dozen times a second at most. */
 .ez-matrix-fall { animation: ez-matrix-fall 6s steps(24) infinite; }
-.ez-matrix-cursor { animation: ez-matrix-blink 1.1s step-end infinite; }
+.ez-matrix-cursor { animation: ez-matrix-blink 1s step-end infinite; }
 
 .ez-matrix-party .ez-matrix-rush { animation: ez-matrix-fall 0.8s steps(24) 4; }
 .ez-matrix-party .ez-matrix-cursor { animation-duration: 0.3s; }
@@ -918,8 +921,8 @@
   50% { transform: scale(1.015, 1.04) rotate(-0.6deg); }
 }
 @keyframes ez-great-wave-twinkle {
-  0%, 100% { opacity: 1; transform: translate(0, 0); }
-  50% { opacity: 0.3; transform: translate(1px, 1.5px); }
+  0%, 100% { fill-opacity: 1; transform: translate(0, 0); }
+  50% { fill-opacity: 0.3; transform: translate(1px, 1.5px); }
 }
 /* the crest already brushes the band's top, so the wave gathers back and down, then throws itself forward, never up */
 @keyframes ez-great-wave-rear {
@@ -1034,16 +1037,16 @@
   to { transform: rotate(-1080deg); }
 }
 @keyframes ez-event-horizon-twinkle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { fill-opacity: 1; }
+  50% { fill-opacity: 0.3; }
 }
 @keyframes ez-event-horizon-glint {
-  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-  50% { transform: scale(0.45) rotate(45deg); opacity: 0.5; }
+  0%, 100% { transform: scale(1) rotate(0deg); fill-opacity: 1; }
+  50% { transform: scale(0.45) rotate(45deg); fill-opacity: 0.5; }
 }
 @keyframes ez-event-horizon-breathe {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.75; }
+  0%, 100% { transform: scale(1); fill-opacity: 1; }
+  50% { transform: scale(1.1); fill-opacity: 0.75; }
 }
 @keyframes ez-event-horizon-shimmer {
   0%, 100% { opacity: 1; }

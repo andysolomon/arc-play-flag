@@ -42,6 +42,21 @@ function paints(color: string) {
 }
 type Paints = ReturnType<typeof paints>;
 
+/**
+ * The stripes, one path of parallelograms leaning SLANT off vertical, from a stripe pair left of
+ * the band (ez-home-march runs them one pair to the right) to its far edge. Drawn outright: a
+ * rotated <pattern> fill here cost more to repaint than the rest of the band put together.
+ */
+function stripes(w: number, h: number, run: number): string {
+  // how far a stripe's foot, on the band's bottom edge, sits left of its head on the top edge
+  const lean = h * Math.tan((SLANT * Math.PI) / 180);
+  const pairs = Math.ceil((w + lean) / run) + 1;
+  return Array.from({ length: pairs + 1 }, (_, i) => {
+    const x = (i - 1) * run;
+    return `M${pts(x, 0, x + run / 2, 0, x + run / 2 - lean, h, x - lean, h)}Z`;
+  }).join("");
+}
+
 /** The name in painted block letters: a drop shadow, an outline, and letters thickened with their own paint. */
 function Name({ text, x, y, fit, paint, celebrate }: { text: string; x: number; y: number; fit: Fit; paint: Paints; celebrate: boolean }) {
   const { fs, spacing, squeeze } = fit;
@@ -176,10 +191,6 @@ export function HomeArt({ w, h, label, celebrate, team, name }: ArtProps) {
   return (
     <g className={celebrate ? "ez-home-party" : undefined} style={vars}>
       <defs>
-        <pattern id={`${id}-stripes`} patternUnits="userSpaceOnUse" width={period} height={period} patternTransform={`rotate(${String(SLANT)})`}>
-          <rect width={period} height={period} fill={paint.base} />
-          <rect width={period / 2} height={period} fill={paint.stripe} />
-        </pattern>
         <linearGradient id={`${id}-sheen`} x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor={CREAM} stopOpacity={0} />
           <stop offset="0.5" stopColor={CREAM} stopOpacity={0.32} />
@@ -187,7 +198,7 @@ export function HomeArt({ w, h, label, celebrate, team, name }: ArtProps) {
         </linearGradient>
       </defs>
       <rect width={w} height={h} fill={paint.base} />
-      <rect className="ez-home-stripes" x={-run} width={w + run} height={h} style={{ fill: `url(#${id}-stripes)` }} />
+      <path className="ez-home-stripes" d={stripes(w, h, run)} fill={paint.stripe} />
       <polygon className="ez-home-sheen" points={pts(-h * 2, 0, -h * 1.2, 0, -h * 1.7, h, -h * 2.5, h)} style={{ fill: `url(#${id}-sheen)` }} />
       <rect x={inset} y={inset} width={w - inset * 2} height={h - inset * 2} fill="none" stroke={paint.trim} strokeWidth={line} />
       {label && (

@@ -136,14 +136,28 @@ const RIGHT: Sprig = {
   buds: [[0.92, 0.66], [0.54, 0.28], [0.24, 0.86], [0.8, 0.08], [0.1, 0.32]],
 };
 
-/** The sky, and the two kinds of blossom drawn once: pink, and the paler kind blushing at the heart. */
+/**
+ * The sky, and the two kinds of blossom drawn once: pink, and the paler kind blushing at the
+ * heart. Nothing in a blossom is stroked: every one on the band is repainted on every frame the
+ * boughs sway, and stroking its petals' curves cost more than all its fills. Each petal's edge is
+ * a slightly bigger petal in the edge colour under it, laid petal by petal so each one's edge
+ * shows against the last; the stamens are filled spokes.
+ */
 function Defs({ id }: { id: string }) {
-  const stamens = [18, 90, 162, 234, 306].map((d) => petal(0, 0, UNIT * 0.42, d)).join("");
+  const stamens = [18, 90, 162, 234, 306].map((d) => {
+    const at = turn(0, 0, d);
+    return `M${at(-UNIT * 0.035, -UNIT * 0.12)}L${at(0, -UNIT * 0.42)}L${at(UNIT * 0.035, -UNIT * 0.12)}Z`;
+  }).join("");
   const kind = (name: string, outer: string, inner: string, innerOpacity: number) => (
     <g id={`${id}-${name}`}>
-      <path d={flower(0, 0, UNIT, 0)} fill={outer} stroke={PETAL_EDGE} strokeWidth={num(UNIT * 0.085)} strokeLinejoin="round" />
-      <path d={flower(0, 0, UNIT * 0.52, 0)} fill={inner} opacity={innerOpacity} />
-      <path d={stamens} fill="none" stroke={STAMEN} strokeWidth={num(UNIT * 0.05)} opacity={0.7} />
+      {[0, 72, 144, 216, 288].map((d) => (
+        <g key={d}>
+          <path d={petal(0, 0, UNIT * 1.06, d)} fill={PETAL_EDGE} />
+          <path d={petal(0, 0, UNIT, d)} fill={outer} />
+        </g>
+      ))}
+      <path d={flower(0, 0, UNIT * 0.52, 0)} fill={inner} fillOpacity={innerOpacity} />
+      <path d={stamens} fill={STAMEN} fillOpacity={0.7} />
       <circle r={num(UNIT * 0.17)} fill={HEART} />
     </g>
   );
@@ -267,7 +281,7 @@ function drifters(w: number, h: number, scale: number): { far: Drifter[]; near: 
 
 function Petals({ list, opacity }: { list: readonly Drifter[]; opacity: number }) {
   return (
-    <g opacity={opacity} stroke={PETAL_EDGE} strokeWidth={0.4} strokeLinejoin="round">
+    <g fillOpacity={opacity} strokeOpacity={opacity} stroke={PETAL_EDGE} strokeWidth={0.4} strokeLinejoin="round">
       {list.map((p) => (
         <g key={p.x} transform={`translate(${num(p.x)} ${num(p.y)})`}>
           <path className="ez-sakura-drift" style={p.style} d={p.d} fill={p.color} />
@@ -284,7 +298,7 @@ function Fallen({ w, h, scale }: { w: number; h: number; scale: number }) {
     const x = (w * (i + 0.5 + (rand(i, 50) - 0.5) * 0.9)) / n;
     return loose(x, h - 3 - rand(i, 51) * Math.min(h * 0.14, 7), scale * 4.6 * (0.8 + rand(i, 52) * 0.4), 60 + rand(i, 53) * 60);
   }).join("");
-  return <path d={d} fill="#f29ab2" opacity={0.55} />;
+  return <path d={d} fill="#f29ab2" fillOpacity={0.55} />;
 }
 
 /** Far-off trees in blossom, a soft pink haze of crowns along the ground. */
@@ -297,7 +311,7 @@ function Grove({ w, h }: { w: number; h: number }) {
     const y = h - r * 0.4;
     return `M${num(x - r)} ${num(y)}a${num(r)} ${num(r)} 0 1 1 ${num(r * 2)} 0a${num(r)} ${num(r)} 0 1 1 ${num(-r * 2)} 0Z`;
   }).join("");
-  return <path d={d} fill="#f5bccb" opacity={0.45} />;
+  return <path d={d} fill="#f5bccb" fillOpacity={0.45} />;
 }
 
 /** Long, round-ended bands of mist, the kasumi of old Japanese screens. */
@@ -378,7 +392,7 @@ function Lettering({ cx, cy, size, room, text, sun }: { cx: number; cy: number; 
   const tx = cx - (gap + seal) / 2;
   return (
     <g>
-      {sun && <circle cx={num(cx)} cy={num(cy - size * 0.55)} r={num(size * 1.25)} fill="#f7c0cd" opacity={0.55} />}
+      {sun && <circle cx={num(cx)} cy={num(cy - size * 0.55)} r={num(size * 1.25)} fill="#f7c0cd" fillOpacity={0.55} />}
       <Mist fill={MIST} opacity={0.95} bands={cloud([tx - width / 2 - size * 0.7, cx + (width + gap + seal) / 2 + size * 0.6, cy, size * 1.3], false)} />
       <text data-ez-name={text} x={num(tx + fit.spacing / 2)} y={num(cy + (fs * CAP) / 2)} textAnchor="middle" {...fitAttrs(fit)} fill={PLUM}>
         {text}
