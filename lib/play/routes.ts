@@ -103,6 +103,11 @@ export function routeDef(team: Team, type: RouteType): RouteDef | null {
   return tableFor(team)[type] ?? null;
 }
 
+/**
+ * A fresh play's players. Both sides come tagged, each tag once per side, so every player can
+ * be named on slides and given a wristband insert of their own: the offense's centre, quarterback
+ * and receivers, and on defense the left and right corners, a linebacker, the rusher and the safety.
+ */
 export function defaults(): Player[] {
   return [
     { id: "o1", team: "offense", label: "C",  x: 15, y: 1,   route: null },
@@ -110,11 +115,11 @@ export function defaults(): Player[] {
     { id: "o3", team: "offense", label: "X",  x: 3,  y: 1,   route: null },
     { id: "o4", team: "offense", label: "Y",  x: 27, y: 1,   route: null },
     { id: "o5", team: "offense", label: "Z",  x: 19, y: 5,   route: null },
-    { id: "d1", team: "defense", label: "",   x: 3,  y: -5,  route: null },
-    { id: "d2", team: "defense", label: "",   x: 11, y: -4,  route: null },
-    { id: "d3", team: "defense", label: "",   x: 18, y: -4,  route: null },
-    { id: "d4", team: "defense", label: "",   x: 27, y: -5,  route: null },
-    { id: "d5", team: "defense", label: "",   x: 15, y: -11, route: null },
+    { id: "d1", team: "defense", label: "LC", x: 3,  y: -5,  route: null },
+    { id: "d2", team: "defense", label: "LB", x: 11, y: -4,  route: null },
+    { id: "d3", team: "defense", label: "R",  x: 18, y: -4,  route: null },
+    { id: "d4", team: "defense", label: "RC", x: 27, y: -5,  route: null },
+    { id: "d5", team: "defense", label: "S",  x: 15, y: -11, route: null },
   ];
 }
 

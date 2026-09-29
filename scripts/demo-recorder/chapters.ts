@@ -499,7 +499,7 @@ async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.click(shadow, "Hide the shadow offense", 420);
   await d.expectState("The offense is hidden", async () => {
     await expect(d.player("X", "Offense")).toBeHidden({ timeout: ASSERT_TIMEOUT });
-    await expect(d.player("d1", "Defense")).toBeVisible({ timeout: ASSERT_TIMEOUT });
+    await expect(d.player("LC", "Defense")).toBeVisible({ timeout: ASSERT_TIMEOUT });
   }, 240, ["Defense only"]);
   await d.click(shadow, "Show the shadow offense", 420);
   await d.expectState("The faded offense is back as a reference", async () => {
@@ -507,22 +507,22 @@ async function buildDefense(d: ChapterDriver): Promise<void> {
   }, 200, ["Shadow offense"]);
 
   await d.say("Deep zone");
-  await d.selectPlayer("d1", "Defense");
+  await d.selectPlayer("LC", "Defense");
   await d.pick("Zone deep");
-  await d.expectState("d1 drops into a deep zone", async () => {
+  await d.expectState("LC drops into a deep zone", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d1")?.route?.type)).toBe("zoneDeep");
   }, 400, ["Zones", "Defensive plays"]);
 
   await d.say("Man coverage on X");
-  await d.selectPlayer("d2", "Defense");
+  await d.selectPlayer("LB", "Defense");
   await d.pick("Man");
   await d.click(d.page.getByRole("button", { name: "Offense X, man coverage target", exact: true }), "Choose X as the man target", 380);
-  await d.expectState("d2 covers X", async () => {
+  await d.expectState("LB covers X", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d2")?.route)).toEqual({ type: "man", target: "o3" });
   }, 240, ["Man coverage"]);
 
   await d.say("Blitz from a legal depth");
-  await d.selectPlayer("d3", "Defense");
+  await d.selectPlayer("R", "Defense");
   await d.pick("Blitz");
   await d.closePanels();
   await d.expectState(`The blitzer lines up at least ${String(BLITZ_DEPTH)} yards off the ball`, async () => {

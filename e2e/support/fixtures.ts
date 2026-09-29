@@ -33,7 +33,11 @@ export const COVER_TWO = play("fx-cover-two", "Otter Cover Two", {
 // the slides journey's book: every call type, both sides, idle and unlabelled players, a deleted man target (loading
 // drops that route, so the defender has no assignment), an empty side
 export const HOOK_LADDER = play("fx-hook-ladder", 'Otter "Hook" & <Ladder>', { o3: { type: "go" }, o4: { type: "post" }, o5: { type: "handoff", primary: true } }, 'Z takes it & runs <behind> the C.\n\nShout "hut" on two.');
-export const COVER_TWO_D = play("fx-cover-two-d", "Otter Cover Two D", { d1: { type: "zoneDeep" }, d4: { type: "zoneDeep" }, d2: { type: "man", target: "o3" }, d3: { type: "man", target: "fx-gone" } }, "Deep halves.\nNobody gets behind you.", "defense");
+/** A call saved before defenders came with tags, so the slides name them "Defender 1" to "Defender 5". */
+export const COVER_TWO_D: SavedPlay = (() => {
+  const p = play("fx-cover-two-d", "Otter Cover Two D", { d1: { type: "zoneDeep" }, d4: { type: "zoneDeep" }, d2: { type: "man", target: "o3" }, d3: { type: "man", target: "fx-gone" } }, "Deep halves.\nNobody gets behind you.", "defense");
+  return { ...p, players: p.players.map((q) => (q.team === "defense" ? { ...q, label: "" } : q)) };
+})();
 export const FAKE_DIVE = play("fx-fake-dive", "Otter Fake Dive", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "curl" } });
 export const PITCH_OPTION: SavedPlay = (() => {
   const p = play("fx-pitch-option", "Otter Pitch Option", { o5: { type: "pitch" }, o4: { type: "corner" }, o3: { type: "custom", pts: [[3, -6], [8, -10]] } });
