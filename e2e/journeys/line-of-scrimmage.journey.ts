@@ -324,7 +324,8 @@ test("the spot travels in the share link, and links without one open on the 40",
   await dialog.getByRole("button", { name: "Copy snapshot link" }).click();
   await expect(d.toast).toHaveText("Link copied");
   const plainKeys = Object.keys(linkPayload(await page.evaluate(() => navigator.clipboard.readText())));
-  expect(plainKeys).toEqual(["name", "players"]);
+  // (its coaching notes travel with it, #108)
+  expect(plainKeys).toEqual(["name", "players", "notes"]);
 
   // links without a spot, spotted before the choices were cut to four, or hand-edited, open on one of the four
   const players = formation({ o3: { type: "go" } });
