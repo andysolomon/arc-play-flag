@@ -48,8 +48,8 @@ test("a share snapshot shows the play, keeps the other team, and opens it as a s
   await expect(d.nameInput).toHaveValue("Otter Cover Two");
   await expect(d.field.getByRole("button")).toHaveCount(10);
   await expect(d.player("X")).toHaveCSS("opacity", "1");
-  await expect(d.player("d1", "Defense")).toBeVisible();
-  await expect(d.player("d1", "Defense")).toHaveCSS("opacity", "0.4");
+  await expect(d.player("LC", "Defense")).toBeVisible();
+  await expect(d.player("LC", "Defense")).toHaveCSS("opacity", "0.4");
   await expect(d.routes).toHaveCount(6);
 });
 
@@ -81,7 +81,7 @@ test("a defensive snapshot shows the call, then opens with the shadow offense", 
   await expect(d.field).toBeVisible();
   await expect(d.field.getByRole("button")).toHaveCount(10);
   await expect(d.player("X")).toHaveCSS("opacity", "0.4");
-  await expect(d.player("d1", "Defense")).toHaveCSS("opacity", "1");
+  await expect(d.player("LC", "Defense")).toHaveCSS("opacity", "1");
 });
 
 test("a link that is not a play is a 404, not a blank field", async ({ page }) => {

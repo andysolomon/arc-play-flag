@@ -7,6 +7,7 @@ import type { Numbered } from "../../lib/export/numbered";
 import { postcardPages } from "../../lib/export/postcard";
 import { slidePlans } from "../../lib/export/slides";
 import { BAND_PRESETS, wristbandPages } from "../../lib/export/wristband";
+import { defaults } from "../../lib/play/routes";
 import { Designer, downloadBytes } from "../support/designer";
 import { BUNCH_MAN_D, COVER_ONE_D, COVER_TWO, OTTERS, SLANT_LEFT, ZONE_D, playbook, seed, storedDraft, storedPlays } from "../support/fixtures";
 
@@ -77,7 +78,9 @@ interface Geometry {
 
 /** Where each tag landed, measured in the page against the picture's own players and bubbles. */
 async function geometry(svg: Locator): Promise<Geometry[]> {
-  return svg.evaluate(async (el) => {
+  // each defender's tag, as the live field names their token ("Defense LC"), keyed by player id
+  const tagOf = Object.fromEntries(defaults().map((p) => [p.id, p.label]));
+  return svg.evaluate(async (el, tagOf) => {
     await document.fonts.ready;
     const root = el instanceof SVGSVGElement ? el : el.querySelector("svg");
     if (!root) return [];
@@ -104,8 +107,8 @@ async function geometry(svg: Locator): Promise<Geometry[]> {
     };
     const gap = (b: { x: number; y: number; w: number; h: number }, t: { cx: number; cy: number }) =>
       Math.hypot(Math.max(b.x, Math.min(t.cx, b.x + b.w)) - t.cx, Math.max(b.y, Math.min(t.cy, b.y + b.h)) - t.cy);
-    // the live field names each token "Defense d1"; static art has no names, so its own token is the closest one
-    const own = (b: (typeof boxes)[number]) => tokens.find((t) => t.id === b.id)
+    // the live field names each token by its tag ("Defense LC"); static art has no names, so its own token is the closest one
+    const own = (b: (typeof boxes)[number]) => tokens.find((t) => t.id === tagOf[b.id])
       ?? tokens.reduce((m, t) => (gap(b, t) < gap(b, m) ? t : m));
     return boxes.map((b) => {
       const mine = own(b);
@@ -121,7 +124,7 @@ async function geometry(svg: Locator): Promise<Geometry[]> {
         fits: !!b.text && b.text.x >= b.x && b.text.x + b.text.width <= b.x + b.w,
       };
     });
-  });
+  }, tagOf);
 }
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
@@ -168,7 +171,7 @@ test("a man defender wears a name tag, not an arrow to nobody, wherever the offe
   // the blitzer's arrow and the deep zone are drawn as ever; the designer shows no stamp
   await expect(d.routes).toHaveCount(2);
   await expect(stamp(d.field)).toHaveCount(0);
-  await expect(d.field.locator("desc")).toContainText("Man coverage: Defense d1 on X; Defense d2 on C; Defense d4 on Y.");
+  await expect(d.field.locator("desc")).toContainText("Man coverage: Defense LC on X; Defense LB on C; Defense RC on Y.");
   manifest.designer = await drawn(d.field);
   manifest.designerGeometry = await geometry(d.field);
   await d.field.screenshot({ path: `${out}-designer.png` });
@@ -177,7 +180,7 @@ test("a man defender wears a name tag, not an arrow to nobody, wherever the offe
   const tag = await d.field.locator('[data-man-tag="d1"] rect').boundingBox();
   if (!tag) throw new Error("no tag on d1");
   await page.mouse.click(tag.x + tag.width / 2, tag.y + tag.height * 0.3);
-  await expect(d.player("d1", "Defense")).toHaveAttribute("aria-pressed", "true");
+  await expect(d.player("LC", "Defense")).toHaveAttribute("aria-pressed", "true");
   await d.palette();
   await expect(page.getByRole("heading", { name: "Pick a coverage" })).toBeVisible();
   await expect(page.locator("#route-sidebar").getByRole("button", { name: "Man", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -277,7 +280,7 @@ test("a coach includes the offense in a defensive call's play art, and the saved
   await shadowTile(page).click();
   await expect(inArt(page, "Offense")).toBeChecked();
   // it is not an edit to the diagram: undo takes back a move, never the choice
-  await d.player("d5", "Defense").press("ArrowRight");
+  await d.player("S", "Defense").press("ArrowRight");
   await d.undo.click();
   await expect(d.undo).toBeDisabled();
   // a phone or tablet folds Play tools once a player is picked, so open it again to read the box
@@ -394,7 +397,7 @@ test("every printout of a man call draws its tags, or with the offense included 
     flyer: sum([flyerPage([...book, null, null, null], base).svg]),
     slides: sum(deck.slides.map((s) => s.page.svg)),
     slideAlt: deck.slides.slice(-3).map((s) => s.alt.split("\n").slice(0, 3)),
-    // one card per position and one for everyone, each with the call on it
+    // one card per defender and one for everyone, each with the call on it
     wristbandCards: { cards: band.reduce((n, p) => n + p.stamps.length, 0), tags: band.reduce((n, p) => n + p.tags, 0), arrows: band.reduce((n, p) => n + p.arrows, 0) },
     binderSha256: binder.map((svg) => sha(stable(svg))),
   };
@@ -417,11 +420,11 @@ test("every printout of a man call draws its tags, or with the offense included 
     // the glance slide and the three play slides
     slides: { tags: 8, arrows: 6, fadedOffense: 10, offenseCall: false, stamps: ["man", "man", "man", "man", "man", "man"] },
     slideAlt: [
-      ["Play 1: Otter Cover One.", "Defense, man coverage.", "Left to right: Defender 1: Man on X; Defender 2: Man on C; Defender 3: Zone deep; Defender 4: Blitz; Defender 5: Man on Y."],
+      ["Play 1: Otter Cover One.", "Defense, man coverage.", "Left to right: LC: Man on X; LB: Man on C; S: Zone deep; R: Blitz; RC: Man on Y."],
       ["Play 2: Otter Cover One In.", "Defense, man coverage.", "The offense is drawn faded."],
-      ["Play 3: Otter Cover Two Call.", "Defense, man coverage.", "Left to right: Defender 1: Zone deep; Defender 2: Man on X; Defender 3: No assignment; Defender 4: Blitz; Defender 5: Zone deep."],
+      ["Play 3: Otter Cover Two Call.", "Defense, man coverage.", "Left to right: LC: Zone deep; LB: Man on X; S: No assignment; R: Blitz; RC: Zone deep."],
     ],
-    wristbandCards: { cards: 5, tags: 15, arrows: 0 },
+    wristbandCards: { cards: 6, tags: 18, arrows: 0 },
     binderSha256: [expect.stringMatching(/^[0-9a-f]{64}$/), expect.stringMatching(/^[0-9a-f]{64}$/), expect.stringMatching(/^[0-9a-f]{64}$/)] as unknown,
   });
   // the same book drawn again is the same pages

@@ -29,8 +29,8 @@ describe("numbering", () => {
     expect(list.map((n) => n.n)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(list[2]?.play.id).toBe("p2");
   });
-  test("positions are offensive labels minus the quarterback", () => {
-    expect(positionsOf(numbered(book, library))).toEqual(["C", "X", "Y", "Z"]);
+  test("positions are an offensive book's labels minus the quarterback", () => {
+    expect(positionsOf(numbered(book, library)).map((p) => `${p.team} ${p.label}`)).toEqual(["offense C", "offense X", "offense Y", "offense Z"]);
   });
   test("a drawing follows the play's side unless a composition is chosen", () => {
     const off = library[0];
@@ -45,7 +45,7 @@ describe("wristbands", () => {
   test("plans one card set per position plus everyone, overflowing past the grid", () => {
     const cards = planCards(numbered(book, library), 6);
     expect(cards).toHaveLength(5 * 2);
-    expect(cards[0]).toMatchObject({ position: "C", index: 0, count: 2 });
+    expect(cards[0]).toMatchObject({ position: { team: "offense", label: "C" }, name: "C", index: 0, count: 2 });
     expect(cards[1]?.cells.filter(Boolean)).toHaveLength(1);
     expect(cards[1]?.cells[0]?.n).toBe(7);
     expect(cards[9]?.position).toBeNull();

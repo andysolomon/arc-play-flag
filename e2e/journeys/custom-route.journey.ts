@@ -79,16 +79,16 @@ test("man targets are announced and work by keyboard while pointer targeting rem
   // temporarily visible and focusable until the coverage is committed.
   await d.newPlay("Defense");
   await d.page.getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true }).click();
-  await d.select("d1", "Defense");
+  await d.select("LC", "Defense");
   await d.pick("Man");
 
   const firstTarget = d.field.getByRole("button", { name: "Offense C, man coverage target" });
   await expect(firstTarget).toBeFocused();
-  await expect(page.getByText(/Targeting for Defense d1\. Focus an offense player/)).toBeAttached();
+  await expect(page.getByText(/Targeting for Defense LC\. Focus an offense player/)).toBeAttached();
   await firstTarget.press("Enter");
   await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "d1")?.route).toEqual({ type: "man", target: "o1" });
 
-  await d.select("d2", "Defense");
+  await d.select("LB", "Defense");
   await d.pick("Man");
   await d.field.getByRole("button", { name: "Offense X, man coverage target" }).click();
   await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "d2")?.route).toEqual({ type: "man", target: "o3" });
