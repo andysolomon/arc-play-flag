@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { Designer, downloadBytes, downloadText } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
+import { END_ZONES, ENDZONE_KEY, TOUCHDOWNS_KEY } from "../../lib/endzone";
 import { KEYS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook } from "../support/fixtures";
 import { readZip } from "../support/pptx";
 
@@ -83,6 +84,61 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
   await page.goto("/?open=fx-wheel-right");
   const designer = new Designer(page);
   await expect(designer.field).toBeVisible();
+  expect(failedChunks).toEqual([]);
+});
+
+test("every end zone design is in the shell: with the network off, one picked for the first time still draws, and the picker shows them all", async ({ context, page }) => {
+  // a phone's window: with the ball on the 5, the only shape deep enough to show the end zone
+  await page.setViewportSize({ width: 412, height: 915 });
+  await page.goto("/");
+  await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await page.evaluate(([keys, savedPlay, touchdownsKey]) => {
+    localStorage.setItem(keys.plays, JSON.stringify({ [savedPlay.id]: savedPlay }));
+    // enough touchdowns to open every one
+    localStorage.setItem(touchdownsKey, "9");
+  }, [KEYS, SLANT_LEFT, TOUCHDOWNS_KEY] as const);
+  // the shell itself holds every chunk its scripts import on demand, the designs among them
+  const shell = await page.evaluate(async () => {
+    const [name] = (await caches.keys()).filter((n) => n.startsWith("ffpd-shell-"));
+    if (!name) throw new Error("no shell cache");
+    const cache = await caches.open(name);
+    const keys = (await cache.keys()).map((r) => new URL(r.url).pathname);
+    const onDemand = new Set<string>();
+    for (const path of keys.filter((k) => k.endsWith(".js"))) {
+      const text = (await (await cache.match(path))?.text()) ?? "";
+      for (const list of text.matchAll(/\[\s*"static\/chunks\/[^"\]]+\.js"(?:\s*,\s*"static\/chunks\/[^"\]]+\.js")*\s*\]/g)) {
+        for (const chunk of list[0].matchAll(/"(static\/chunks\/[^"]+\.js)"/g)) onDemand.add(`/_next/${chunk[1] ?? ""}`);
+      }
+    }
+    return { onDemand: [...onDemand].sort(), missing: [...onDemand].filter((k) => !keys.includes(k)).sort() };
+  });
+  expect(shell.onDemand.length, "chunks imported on demand").toBeGreaterThanOrEqual(END_ZONES.length - 1);
+  expect(shell.missing).toEqual([]);
+
+  const failedChunks: string[] = [];
+  page.on("requestfailed", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/_next/static/")) failedChunks.push(request.url());
+  });
+  await context.setOffline(true);
+
+  // each design is a chunk of its own, fetched the first time it is drawn: here, from the shell
+  const art = page.locator("[aria-label='Play diagram'] [data-ez-art]");
+  for (const zone of END_ZONES) {
+    if (zone.id === "classic") continue;
+    await page.evaluate(([key, id]) => { localStorage.setItem(key, id); }, [ENDZONE_KEY, zone.id] as const);
+    await page.goto(`/?open=${SLANT_LEFT.id}`);
+    await expect(art).toHaveAttribute("data-ez-art", zone.id);
+    // an empty box is not visible: the design itself has to have drawn
+    await expect(art).toBeVisible();
+  }
+  const designer = new Designer(page);
+  await designer.tools();
+  const swatches = page.locator("[role='radiogroup'][aria-label='End zone'] [data-ez-art]");
+  await expect(swatches).toHaveCount(END_ZONES.length);
+  for (const [i, zone] of END_ZONES.entries()) {
+    await expect(swatches.nth(i)).toHaveAttribute("data-ez-art", zone.id);
+    await expect(swatches.nth(i)).toBeVisible();
+  }
   expect(failedChunks).toEqual([]);
 });
 

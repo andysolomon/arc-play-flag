@@ -155,7 +155,12 @@ function Hole({ id, cx, cy, r }: { id: string; cx: number; cy: number; r: number
   );
 }
 
-/** The starfield: pinpricks in three twinkling sets and one still one, clear of the hole and the lettering. */
+/**
+ * The starfield: pinpricks in three twinkling sets and one still one, clear of the hole and the
+ * lettering. A set is one path a tint, not a circle a star: its twinkle fades the fill-opacity
+ * of those few paths, so a frame restyles a handful of elements rather than a hundred, and
+ * composites no layer for it (an opacity on the set would, the size of the band).
+ */
 function Stars({ w, h, clear }: { w: number; h: number; clear: readonly Box[] }) {
   const count = Math.round((w * h) / 560);
   const size = Math.max(0.55, Math.min(h, 60) / 44);
@@ -167,21 +172,25 @@ function Stars({ w, h, clear }: { w: number; h: number; clear: readonly Box[] })
     const tint = rand(i, 4);
     stars.push({ x, y, r: size * (0.45 + rand(i, 3) ** 3 * 0.85), fill: tint < 0.15 ? ICE : tint < 0.28 ? LILAC : tint < 0.45 ? "#ffe9c4" : "#ffffff" });
   }
+  const dot = ({ x, y, r }: { x: number; y: number; r: number }): string =>
+    `M${num(x - r)} ${num(y)}a${num(r)} ${num(r)} 0 1 0 ${num(r * 2)} 0a${num(r)} ${num(r)} 0 1 0 ${num(-r * 2)} 0Z`;
   return (
     <g>
-      {[0, 1, 2, 3].map((set) => (
-        <g
-          key={set}
-          className={set ? "ez-event-horizon-twinkle" : undefined}
-          style={set ? beat(2.6 + set * 1.3, -set * 0.9) : undefined}
-        >
-          {stars
-            .filter((_, k) => k % 4 === set)
-            .map((s) => (
-              <circle key={`${num(s.x)},${num(s.y)}`} cx={num(s.x)} cy={num(s.y)} r={num(s.r)} fill={s.fill} />
+      {[0, 1, 2, 3].map((set) => {
+        const own = stars.filter((_, k) => k % 4 === set);
+        const tints = [...new Set(own.map((s) => s.fill))];
+        return (
+          <g
+            key={set}
+            className={set ? "ez-event-horizon-twinkle" : undefined}
+            style={set ? beat(2.6 + set * 1.3, -set * 0.9) : undefined}
+          >
+            {tints.map((fill) => (
+              <path key={fill} d={own.filter((s) => s.fill === fill).map(dot).join("")} fill={fill} />
             ))}
-        </g>
-      ))}
+          </g>
+        );
+      })}
     </g>
   );
 }

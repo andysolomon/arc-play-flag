@@ -220,6 +220,8 @@ test.describe("end zone performance", () => {
           continue;
         }
         await expect(art(page)).toHaveAttribute("data-ez-art", z.id);
+        // an empty box is not visible: the design's own chunk has to have arrived
+        await expect(art(page)).toBeVisible();
         await d.settle();
         const f = await frame(page, "field");
         entry[depth] = f;
@@ -242,6 +244,7 @@ test.describe("end zone performance", () => {
     await expect(swatches).toHaveCount(END_ZONES.length);
     for (const [i, z] of END_ZONES.entries()) {
       await expect(swatches.nth(i)).toHaveAttribute("data-ez-art", z.id);
+      await expect(swatches.nth(i)).toBeVisible();
       const f = await frame(page, i);
       (manifest.zones[z.id] ??= {}).swatch = f;
       expect(f.patterns, `${z.id} swatch patterns`).toBe(0);
@@ -255,6 +258,7 @@ test.describe("end zone performance", () => {
     const d = new Designer(page);
     await d.goto(`?open=${SLANT_LEFT.id}`);
     await expect(art(page)).toHaveAttribute("data-ez-art", "matrix");
+    await expect(art(page)).toBeVisible();
     await d.settle();
     const timing = await page.evaluate(() => {
       const band = document.querySelector("[aria-label='Play diagram'] [data-ez-art='matrix']");

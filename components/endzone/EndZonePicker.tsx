@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import {
   END_ZONES, getEndZone, getTouchdowns, isUnlocked, nextLocked, serverEndZone, serverTouchdowns, setEndZone, subscribeEndZone,
   subscribeTouchdowns,
@@ -17,6 +17,37 @@ const PREVIEW_W = 300;
 const PREVIEW_H = 84;
 
 /**
+ * Whether `ref` can be seen: not inside anything inert, as both sidebars make their contents
+ * while closed. The swatches draw their designs only once the picker can be: every design but
+ * Classic is a chunk of its own (components/endzone/EndZoneArt.tsx), and a picker folded away
+ * in a closed sidebar must not fetch all seven while the app loads. The playbook settings mount
+ * their picker only while open, so there it can be seen from the start.
+ */
+function useSeen(ref: React.RefObject<HTMLElement | null>): boolean {
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (seen || !el) return;
+    const visible = (): boolean => !el.closest("[inert]");
+    if (visible()) {
+      // after this commit, not in it
+      const soon = window.setTimeout(() => { setSeen(true); }, 0);
+      return () => { window.clearTimeout(soon); };
+    }
+    // a sidebar opening takes the inert off its contents; nothing else on the page toggles it
+    const watcher = new MutationObserver(() => {
+      if (visible()) {
+        setSeen(true);
+        watcher.disconnect();
+      }
+    });
+    watcher.observe(document.documentElement, { attributes: true, attributeFilter: ["inert"], subtree: true });
+    return () => { watcher.disconnect(); };
+  }, [ref, seen]);
+  return seen;
+}
+
+/**
  * The end zone's look, kept on this device. Some are open from the start; every touchdown pass
  * thrown on ▶ opens the next, and the swatch says how many touchdowns each one needs. An end
  * zone already in use stays checked and drawn even if the count is later lost.
@@ -24,13 +55,15 @@ const PREVIEW_H = 84;
 export function EndZonePicker({ className = "" }: { className?: string }) {
   const name = useId();
   const hint = useId();
+  const box = useRef<HTMLDivElement>(null);
+  const seen = useSeen(box);
   const choice = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
   const touchdowns = useSyncExternalStore(subscribeTouchdowns, getTouchdowns, serverTouchdowns);
   const open = END_ZONES.filter((z) => isUnlocked(z, touchdowns)).length;
   const next = nextLocked(touchdowns);
   const scored = touchdowns === 1 ? "1 touchdown pass" : `${String(touchdowns)} touchdown passes`;
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div ref={box} className={`flex flex-col gap-2 ${className}`}>
       <div role="radiogroup" aria-label="End zone" className="grid grid-cols-2 gap-2">
         {END_ZONES.map((z) => {
           const locked = !isUnlocked(z, touchdowns) && choice !== z.id;
@@ -48,7 +81,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
               {/* the tick or the lock sits on the preview, leaving the name its whole row; taps pass through to the radio */}
               <span className="pointer-events-none relative block">
                 <svg aria-hidden viewBox={`0 0 ${String(PREVIEW_W)} ${String(PREVIEW_H)}`} className="block h-auto w-full">
-                  <EndZoneArt id={z.id} w={PREVIEW_W} h={PREVIEW_H} label celebrate={false} still />
+                  {seen && <EndZoneArt id={z.id} w={PREVIEW_W} h={PREVIEW_H} label celebrate={false} still />}
                 </svg>
                 {(locked || choice === z.id) && (
                   <span aria-hidden className={chip}>
