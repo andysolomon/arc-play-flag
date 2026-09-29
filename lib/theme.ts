@@ -16,16 +16,16 @@ export interface PremiumTheme {
   readonly blurb: string;
 }
 
-/** Keep in step with the [data-theme] blocks in app/globals.css. */
+/** Keep in step with the [data-theme] blocks in app/globals.css. Listed as the picker shows them: dark then light, by name. */
 export const PREMIUM_THEMES = [
-  { id: "tokyo-night", name: "Tokyo Night", tone: "dark", color: "#1f2335", blurb: "City lights after dark: indigo board, electric blue highlighter" },
   { id: "catppuccin", name: "Catppuccin", tone: "dark", color: "#181825", blurb: "Mocha: soft pastels on a deep base, mauve highlighter" },
   { id: "gruvbox", name: "Gruvbox", tone: "dark", color: "#32302f", blurb: "Retro groove: warm earth tones, a gold highlighter" },
-  { id: "nord", name: "Nord", tone: "dark", color: "#3b4252", blurb: "Arctic slate with a frost-blue highlighter" },
   { id: "kanagawa", name: "Kanagawa", tone: "dark", color: "#2a2a37", blurb: "The Great Wave: sumi ink, fuji white, carp yellow" },
   { id: "matte-black", name: "Matte Black", tone: "dark", color: "#1a1a1a", blurb: "Near-black and quiet, one amber highlighter" },
-  { id: "rose-pine", name: "Rosé Pine", tone: "light", color: "#fffaf3", blurb: "Dawn: parchment, pine ink and a rose highlighter" },
+  { id: "nord", name: "Nord", tone: "dark", color: "#3b4252", blurb: "Arctic slate with a frost-blue highlighter" },
+  { id: "tokyo-night", name: "Tokyo Night", tone: "dark", color: "#1f2335", blurb: "City lights after dark: indigo board, electric blue highlighter" },
   { id: "flexoki", name: "Flexoki", tone: "light", color: "#fffcf0", blurb: "Inky paper for daylight, a mustard highlighter" },
+  { id: "rose-pine", name: "Rosé Pine", tone: "light", color: "#fffaf3", blurb: "Dawn: parchment, pine ink and a rose highlighter" },
 ] as const satisfies readonly PremiumTheme[];
 
 export type PremiumThemeId = (typeof PREMIUM_THEMES)[number]["id"];

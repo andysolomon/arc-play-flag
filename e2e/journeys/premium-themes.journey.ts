@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { PREMIUM_THEMES } from "../../lib/theme";
 import { Designer } from "../support/designer";
-import { OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed } from "../support/fixtures";
+import { COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed } from "../support/fixtures";
 
 /*
  * Premium themes: locked until this device holds a playbook, then each one redraws the whole app.
@@ -14,6 +14,10 @@ import { OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed } from "../support/fixt
  *  - words drop below WCAG AA: ink, muted ink, links, the dark pill, the highlighter's ink → test 2 (a JSON report + a screenshot per theme)
  *  - printing from a premium theme prints its colours                                      → test 3
  *  - deleting every playbook takes away the theme in use                                   → test 3
+ * The fold (test 5): the gallery opens when it shouldn't, or stays shut; a shut gallery still
+ * takes focus or spills sideways; the row doesn't name the theme in use; a reload or a drawer
+ * fold forgets an open gallery, or a new tab inherits it; the field switch hides behind the fold.
+ * Cost (test 6): opening, closing or switching themes runs a long task, or a theme's restyle is slow.
  * The "Themed field" option (test 4):
  *  - it can be switched on without a premium theme, or doesn't survive a reload
  *  - the turf changes but a route, a player or the primary read keeps the standard colour
@@ -26,6 +30,13 @@ const THEME_KEY = "ffpd.theme.v1";
 const INK = "rgb(27, 26, 23)";
 const html = (page: Page) => page.locator("html");
 const picker = (page: Page) => page.getByRole("radiogroup", { name: "Theme" });
+/** The row that folds the premium gallery open and shut. */
+const gallery = (scope: Page | Locator) => scope.getByRole("button", { name: /^Premium themes/ });
+async function unfold(scope: Page | Locator): Promise<void> {
+  const row = gallery(scope);
+  if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+}
 const BOOK = playbook("fx-otter-book", "Otter Game Plan", [SLANT_LEFT]);
 
 /** WCAG relative-luminance contrast of two opaque colours as the browser reports them, rgb(). */
@@ -72,8 +83,12 @@ test("premium themes stay locked until a coach makes a playbook, then one redraw
     await settings.click();
     await expect(dialog).toBeVisible({ timeout: 1_000 });
   }).toPass();
+  await expect(gallery(dialog)).toHaveAccessibleName("Premium themes, locked");
+  await expect(gallery(dialog)).toContainText(`${String(PREMIUM_THEMES.length)} premium themes`);
+  await expect(dialog.getByText("Make a playbook to unlock them.")).toBeVisible();
+  await dialog.getByRole("radiogroup", { name: "Theme" }).screenshot({ path: `test-results/premium-theme-${testInfo.project.name}-locked-shut.png` });
+  await unfold(dialog);
   for (const t of PREMIUM_THEMES) await expect(dialog.getByRole("radio", { name: t.name })).toBeDisabled();
-  await expect(dialog.getByText("Make a playbook to unlock eight hand-tuned palettes")).toBeVisible();
   // a locked swatch still shows its own colours, not the page's
   await expect(dialog.locator('[data-theme="nord"] > span').first()).toHaveCSS("background-color", "rgb(46, 52, 64)");
   await dialog.getByRole("radiogroup", { name: "Theme" }).screenshot({ path: `test-results/premium-theme-${testInfo.project.name}-locked.png` });
@@ -84,11 +99,14 @@ test("premium themes stay locked until a coach makes a playbook, then one redraw
   await expect(page).toHaveURL(/\/playbooks\?book=/);
   await page.getByRole("link", { name: "‹ All playbooks" }).click();
   await settings.click();
+  await expect(gallery(dialog)).toHaveAccessibleName("Premium themes");
+  await unfold(dialog);
   const tokyo = dialog.getByRole("radio", { name: "Tokyo Night" });
   await expect(tokyo).toBeEnabled();
   await expect(dialog.getByText("Unlocked by your playbook.")).toBeVisible();
   await tokyo.check();
   await expect(html(page)).toHaveAttribute("data-theme", "tokyo-night");
+  await expect(gallery(dialog)).toHaveAccessibleName("Premium themes: Tokyo Night");
   expect(await page.evaluate((k) => localStorage.getItem(k), THEME_KEY)).toBe("tokyo-night");
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#1f2335");
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(26, 27, 38)");
@@ -103,6 +121,7 @@ test("every premium theme keeps its words readable, with a contrast report and a
   const d = new Designer(page);
   await d.goto();
   await d.tools();
+  await unfold(picker(page));
   const tools = page.locator("#play-sidebar");
   const save = tools.getByRole("button", { name: "Save", exact: true });
   const report: Record<string, Record<string, number>> = {};
@@ -181,10 +200,13 @@ test("a premium theme prints ink on paper, and stays in use after its playbooks 
   await d.goto();
   await expect(html(page)).toHaveAttribute("data-theme", "gruvbox");
   await d.tools();
+  await expect(gallery(picker(page))).toHaveAccessibleName("Premium themes: Gruvbox");
+  await expect(picker(page).getByText("Make a playbook to unlock the others.")).toBeVisible();
+  await expect(picker(page).getByRole("link", { name: "Make a playbook ›" })).toHaveAttribute("href", "/playbooks");
+  await unfold(picker(page));
   await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeChecked();
   await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeEnabled();
   await expect(picker(page).getByRole("radio", { name: "Nord" })).toBeDisabled();
-  await expect(picker(page).getByRole("link", { name: "Make a playbook ›" })).toHaveAttribute("href", "/playbooks");
 
   await page.emulateMedia({ media: "print" });
   await expect(page.locator("body")).toHaveCSS("color", INK);
@@ -204,6 +226,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   const d = new Designer(page);
   await d.goto();
   await d.tools();
+  await unfold(picker(page));
   const themed = page.getByRole("switch", { name: /Themed field/ });
   const svg = d.field;
   const primary = d.primaryRoutes.first();
@@ -224,6 +247,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   await expect(html(page)).toHaveAttribute("data-field", "themed");
   await expect(svg).toHaveCSS("background-color", "rgb(28, 43, 45)");
   await d.tools();
+  await unfold(picker(page));
   await expect(themed).toBeChecked();
 
   const report: Record<string, Record<string, number>> = {};
@@ -285,4 +309,146 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   const thumb = page.getByRole("img", { name: WHEEL_RIGHT.name }).first();
   await expect(thumb.locator("rect").first()).toHaveCSS("fill", STANDARD_TURF);
   await expect(thumb.locator("circle[r='23']").first()).toHaveCSS("fill", "rgb(229, 103, 94)");
+});
+
+test("the premium gallery folds: shut by default with the theme in use on the row, open in place in Dark and Light groups, remembered for the tab, never in the way of the field switch", async ({ page, context }, testInfo) => {
+  await seed(page, { plays: [SLANT_LEFT], playbooks: [BOOK], team: OTTERS });
+  await page.evaluate((k) => { localStorage.setItem(k, "tokyo-night"); }, THEME_KEY);
+  const d = new Designer(page);
+  await d.goto();
+  await d.tools();
+  const row = gallery(picker(page));
+  const nord = picker(page).getByRole("radio", { name: "Nord" });
+  const themed = page.getByRole("switch", { name: /Themed field/ });
+
+  // shut: the row names the theme in use, the tiles are out of reach, the switch is not
+  await expect(row).toHaveAccessibleName("Premium themes: Tokyo Night");
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await expect(row).toContainText("Change");
+  await expect(nord).toBeHidden();
+  await expect(themed).toBeVisible();
+  await row.focus();
+  await page.keyboard.press("Tab");
+  await expect(themed).toBeFocused();
+  await picker(page).screenshot({ path: `test-results/premium-fold-${testInfo.project.name}-shut.png` });
+
+  // open: two groups holding every tile; picking one renames the row and leaves the gallery open
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  await expect(row).toContainText("Done");
+  await expect(nord).toBeVisible();
+  const dark = picker(page).getByRole("group", { name: "Dark themes" });
+  const light = picker(page).getByRole("group", { name: "Light themes" });
+  await expect(dark.getByRole("radio")).toHaveCount(PREMIUM_THEMES.filter((t) => t.tone === "dark").length);
+  await expect(light.getByRole("radio")).toHaveCount(PREMIUM_THEMES.filter((t) => t.tone === "light").length);
+  await nord.check();
+  await expect(html(page)).toHaveAttribute("data-theme", "nord");
+  await expect(row).toHaveAccessibleName("Premium themes: Nord");
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  // nothing spills sideways, on a phone drawer least of all
+  const pane = page.locator("#play-sidebar > div");
+  expect(await pane.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  await picker(page).screenshot({ path: `test-results/premium-fold-${testInfo.project.name}-open.png` });
+
+  // an open gallery survives a reload and the drawer folding; a fresh tab starts shut
+  await page.reload();
+  await d.tools();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  await expect(nord).toBeVisible();
+  await d.closeSidebars();
+  await d.tools();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  const fresh = await context.newPage();
+  const f = new Designer(fresh);
+  await f.goto();
+  await f.tools();
+  await expect(gallery(picker(fresh))).toHaveAttribute("aria-expanded", "false");
+  await fresh.close();
+
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await expect(nord).toBeHidden();
+  await page.reload();
+  await d.tools();
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+});
+
+/** Frame-to-frame gaps for the next `ms` of animation frames, so a stutter shows as a long gap. */
+const frameGaps = (page: Page, ms: number) => page.evaluate((ms) => new Promise<number[]>((resolve) => {
+  const gaps: number[] = [];
+  const start = performance.now();
+  let last = start;
+  const tick = (t: number): void => {
+    gaps.push(Math.round((t - last) * 10) / 10);
+    last = t;
+    if (t - start < ms) requestAnimationFrame(tick); else resolve(gaps);
+  };
+  requestAnimationFrame(tick);
+}), ms);
+
+test("the gallery is cheap: opening, closing and switching through every theme run without a long task, and each theme's restyle is measured", async ({ page }, testInfo) => {
+  await seed(page, {
+    plays: [COVER_TWO], playbooks: [BOOK], team: OTTERS,
+    draft: { name: COVER_TWO.name, players: COVER_TWO.players, side: "defense" },
+  });
+  await page.evaluate((k) => { localStorage.setItem(k, "themed"); }, "ffpd.field.v1");
+  await page.evaluate((k) => { localStorage.setItem(k, "tokyo-night"); }, THEME_KEY);
+  // the suite runs with reduced motion; this test wants the real animation
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const d = new Designer(page);
+  await d.goto();
+  await d.tools();
+  const row = gallery(picker(page));
+  await page.evaluate(() => {
+    const w = window as unknown as { __longTasks: number[] };
+    w.__longTasks = [];
+    new PerformanceObserver((list) => { for (const e of list.getEntries()) w.__longTasks.push(Math.round(e.duration)); }).observe({ type: "longtask" });
+  });
+
+  const opening = frameGaps(page, 350);
+  await row.click();
+  const openGaps = await opening;
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+
+  // switching through the real picker, every tile a live restyle of the whole app and the field
+  for (const t of PREMIUM_THEMES) {
+    await picker(page).getByRole("radio", { name: t.name }).check();
+    await expect(html(page)).toHaveAttribute("data-theme", t.id);
+  }
+  // the restyle alone, forced synchronously: what a theme change costs the main thread
+  const restyle: Record<string, number> = {};
+  for (const t of PREMIUM_THEMES) {
+    restyle[t.id] = await page.evaluate((id) => {
+      const t0 = performance.now();
+      document.documentElement.dataset.theme = id;
+      // reading a computed colour and a layout size forces the restyle and relayout to happen now
+      const forced = getComputedStyle(document.body).backgroundColor.length + document.body.offsetHeight;
+      return Math.round((performance.now() - t0) * 100) / 100 + forced * 0;
+    }, t.id);
+  }
+
+  const closing = frameGaps(page, 350);
+  await row.click();
+  const closeGaps = await closing;
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+
+  const longTasks = await page.evaluate(() => (window as unknown as { __longTasks: number[] }).__longTasks);
+  const nodes = await picker(page).evaluate((el) => el.querySelectorAll("*").length);
+  const report = {
+    device: testInfo.project.name,
+    longTasksMs: longTasks,
+    restyleMs: restyle,
+    foldOpen: { frames: openGaps.length, maxGapMs: Math.max(...openGaps) },
+    foldShut: { frames: closeGaps.length, maxGapMs: Math.max(...closeGaps) },
+    pickerNodes: nodes,
+  };
+  const file = `test-results/premium-themes-perf-${testInfo.project.name}.json`;
+  writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`);
+  await testInfo.attach("perf report", { path: file, contentType: "application/json" });
+
+  // budgets are loose on purpose (a shared CI runner), several times what a laptop measures
+  expect(longTasks.filter((ms) => ms >= 100), "long tasks").toEqual([]);
+  for (const [id, ms] of Object.entries(restyle)) expect(ms, `${id} restyle`).toBeLessThan(60);
+  expect(Math.max(...openGaps), "a frame while opening").toBeLessThan(120);
+  expect(Math.max(...closeGaps), "a frame while closing").toBeLessThan(120);
 });

@@ -495,6 +495,31 @@
   }
 }
 
+@layer components {
+  /*
+   * A section that folds shut (the premium theme gallery). The height rides the grid track,
+   * which browsers can animate, and the contents go invisible once it has closed so nothing
+   * inside can be tabbed to or found. The inner box clips; the padding it is given keeps the
+   * tiles' shadows and rings inside the clip.
+   */
+  .fold {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    margin: 0 -4px;
+    transition: grid-template-rows 200ms ease-out, visibility 0s linear 200ms;
+  }
+  .fold[data-open="true"] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  .fold > * { min-height: 0; overflow: hidden; }
+  @media (prefers-reduced-motion: reduce) {
+    .fold { transition: none; }
+  }
+}
+
 /*
  * Yellow is a highlighter in every theme, so whatever sits on it keeps the light theme's ink
  * and paper. Pair it with every yellow fill, including state ones (data-[active=true]:on-yellow).
