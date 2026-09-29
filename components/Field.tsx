@@ -151,6 +151,10 @@ function FieldImpl({
   const width = cardWidth(pane, d);
   const topRef = useRef(top);
   useLayoutEffect(() => { topRef.current = top; }, [top]);
+  // the band a design paints on screen, and where it sits as a share of the diagram's height
+  const band = designed ? layout.endZone : null;
+  const vbh = Number(layout.viewBox.split(" ")[3]);
+  const share = (n: number): string => (n / vbh).toFixed(5);
 
   const zones = useMemo(() => zoneLayout(effective, top), [effective, top]);
   // Man coverage always exposes its valid offense targets, even when the shadow is hidden.
@@ -510,12 +514,39 @@ function FieldImpl({
               ? `Waypoint ${String((activeWaypoint ?? 0) + 1)} selected at ${selectedPoint[0].toFixed(1)}, ${selectedPoint[1].toFixed(1)} yards. Arrow keys move it; Delete removes it.`
               : ""}
         </span>
+        {/*
+          the chosen end zone's design, on screen only, on a layer of its own just the band's size under
+          the diagram: animated inside the diagram (or on a layer the size of the field) it made Safari
+          repaint every line, route and player on every frame, a few frames a second on a phone. Over
+          the band the diagram is see-through; print and every export keep its own classic band.
+        */}
+        {band && (
+          <svg
+            data-ez-backdrop
+            viewBox={`0 ${band.y.toFixed(1)} 660 ${band.h.toFixed(1)}`}
+            preserveAspectRatio="none"
+            aria-hidden
+            className={
+              "pointer-events-none absolute left-[3px] w-[calc(100%-6px)] print:hidden " +
+              (band.y < 1 ? "rounded-t-[calc(var(--radius-field)-3px)]" : "")
+            }
+            style={{ top: `calc(3px + (100% - 6px) * ${share(band.y)})`, height: `calc((100% - 6px) * ${share(band.h)})` }}
+          >
+            <rect x="0" y={band.y.toFixed(1)} width="660" height={band.h.toFixed(1)} fill="#a7e5a7" style={{ fill: FIELD.endzone }} />
+            <svg x="0" y={band.y.toFixed(1)} width="660" height={band.h.toFixed(1)} overflow="hidden">
+              <EndZoneArt id={endZone} w={660} h={band.h} label={band.h > 30} celebrate={party !== null} />
+            </svg>
+          </svg>
+        )}
         <svg
           ref={svgRef}
           viewBox={layout.viewBox}
           onClick={readOnly ? undefined : onFieldClick}
           onDoubleClick={readOnly ? undefined : () => { if (draft) dispatch({ type: "draftFinishDoubleTap" }); }}
-          className="block h-auto w-full touch-pan-y rounded-field border-[3px] border-ink bg-(--field-turf) shadow-field"
+          className={
+            "relative block h-auto w-full touch-pan-y rounded-field border-[3px] border-ink shadow-field " +
+            (band ? "print:bg-(--field-turf)" : "bg-(--field-turf)")
+          }
           role={readOnly ? "img" : "group"}
           tabIndex={!readOnly && draft ? 0 : undefined}
           aria-keyshortcuts={!readOnly && draft ? "Enter Escape Delete Backspace" : undefined}
@@ -536,15 +567,18 @@ function FieldImpl({
             )}
           </defs>
           <g>
-            {layout.endZone && <rect x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)} fill="#a7e5a7" style={{ fill: FIELD.endzone }} />}
-            {/* the chosen end zone's design, on screen only: print and every export keep the classic band under it */}
-            {designed && layout.endZone && (
-              <svg
-                x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)}
-                overflow="hidden" aria-hidden className="pointer-events-none print:hidden"
-              >
-                <EndZoneArt id={endZone} w={660} h={layout.endZone.h} label={layout.endZone.h > 30} celebrate={party !== null} />
-              </svg>
+            {/* under a design the diagram paints the turf round the band and leaves the band see-through, so the design's layer shows; print keeps the band */}
+            {band && (
+              <g className="print:hidden">
+                <rect x="0" y="0" width="660" height={band.y.toFixed(1)} style={{ fill: FIELD.turf }} />
+                <rect x="0" y={(band.y + band.h).toFixed(1)} width="660" height={Math.max(0, vbh - band.y - band.h).toFixed(1)} style={{ fill: FIELD.turf }} />
+              </g>
+            )}
+            {layout.endZone && (
+              <rect
+                x="0" y={layout.endZone.y.toFixed(1)} width="660" height={layout.endZone.h.toFixed(1)} fill="#a7e5a7" style={{ fill: FIELD.endzone }}
+                className={designed ? "opacity-0 print:opacity-100" : undefined}
+              />
             )}
             {layout.bands.map((b) => (
               <rect key={b.y} x="0" y={b.y.toFixed(1)} width="660" height={b.h.toFixed(1)} fill="url(#ffhatch)" />

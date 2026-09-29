@@ -49,7 +49,7 @@ const look = (page: Page): Promise<Look> =>
   page.evaluate(() => ({
     theme: document.documentElement.dataset.theme ?? null,
     field: document.documentElement.dataset.field ?? null,
-    endZone: document.querySelector("[aria-label='Play diagram'] [data-ez-art]")?.getAttribute("data-ez-art") ?? null,
+    endZone: document.querySelector("[data-ez-backdrop] [data-ez-art]")?.getAttribute("data-ez-art") ?? null,
   }));
 
 /** Stops the page's clock (timers and animation frames), so a switch stays at its first step until run(). */

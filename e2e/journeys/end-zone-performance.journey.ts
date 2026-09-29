@@ -59,7 +59,7 @@ const MATRIX_LATTICE_HZ = 12;
 /** No design draws more elements than this on the deep band. */
 const MOST_ELEMENTS = 450;
 
-const art = (page: Page) => page.locator("[aria-label='Play diagram'] [data-ez-art]");
+const art = (page: Page) => page.locator("[data-ez-backdrop] [data-ez-art]");
 
 async function store(page: Page, zone: EndZoneId): Promise<void> {
   await page.evaluate(([keys, z]) => {
@@ -99,7 +99,7 @@ async function frame(page: Page, box: "field" | number): Promise<Frame> {
   return page.evaluate(async ([box]) => {
     const inField = box === "field";
     const holder = (box === "field"
-      ? document.querySelector("[aria-label='Play diagram'] [data-ez-art]")?.parentElement
+      ? document.querySelector("[data-ez-backdrop] [data-ez-art]")?.parentElement
       : document.querySelectorAll("[role=radiogroup][aria-label='End zone'] [data-ez-art]")[box]?.parentElement) as SVGSVGElement | null | undefined;
     if (!holder) throw new Error("no end zone art to measure");
     const design = holder.querySelector("[data-ez-art]") as SVGGElement;
@@ -268,7 +268,7 @@ test.describe("end zone performance", () => {
     await expect(art(page)).toBeVisible();
     await d.settle();
     const timing = await page.evaluate(() => {
-      const band = document.querySelector("[aria-label='Play diagram'] [data-ez-art='matrix']");
+      const band = document.querySelector("[data-ez-backdrop] [data-ez-art='matrix']");
       if (!band) throw new Error("no Matrix band");
       const falls: { durationS: number; stepsPerSecond: number; delayS: number }[] = [];
       let cursorS: number | null = null;

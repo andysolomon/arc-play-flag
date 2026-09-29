@@ -123,7 +123,7 @@ test("every end zone design is in the shell: with the network off, one picked fo
   await context.setOffline(true);
 
   // each design is a chunk of its own, fetched the first time it is drawn: here, from the shell
-  const art = page.locator("[aria-label='Play diagram'] [data-ez-art]");
+  const art = page.locator("[data-ez-backdrop] [data-ez-art]");
   for (const zone of END_ZONES) {
     if (zone.id === "classic") continue;
     await page.evaluate(([key, id]) => { localStorage.setItem(key, id); }, [ENDZONE_KEY, zone.id] as const);
