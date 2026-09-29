@@ -19,13 +19,19 @@ export interface PremiumTheme {
 /** Keep in step with the [data-theme] blocks in app/globals.css. Listed as the picker shows them: dark then light, by name. */
 export const PREMIUM_THEMES = [
   { id: "catppuccin", name: "Catppuccin", tone: "dark", color: "#181825", blurb: "Mocha: soft pastels on a deep base, mauve highlighter" },
+  { id: "dracula", name: "Dracula", tone: "dark", color: "#303241", blurb: "Purple night with pink and cyan neon: the classic" },
+  { id: "everforest", name: "Everforest", tone: "dark", color: "#343f44", blurb: "Forest floor: moss greens, warm wood, a leaf-green highlighter" },
   { id: "gruvbox", name: "Gruvbox", tone: "dark", color: "#32302f", blurb: "Retro groove: warm earth tones, a gold highlighter" },
   { id: "kanagawa", name: "Kanagawa", tone: "dark", color: "#2a2a37", blurb: "The Great Wave: sumi ink, fuji white, carp yellow" },
   { id: "matte-black", name: "Matte Black", tone: "dark", color: "#1a1a1a", blurb: "Near-black and quiet, one amber highlighter" },
   { id: "nord", name: "Nord", tone: "dark", color: "#3b4252", blurb: "Arctic slate with a frost-blue highlighter" },
+  { id: "synthwave", name: "Synthwave '84", tone: "dark", color: "#2a2139", blurb: "Neon pink on deep purple: an ’80s night game" },
   { id: "tokyo-night", name: "Tokyo Night", tone: "dark", color: "#1f2335", blurb: "City lights after dark: indigo board, electric blue highlighter" },
+  { id: "catppuccin-latte", name: "Catppuccin Latte", tone: "light", color: "#f8f9fc", blurb: "Latte: the light roast, mauve highlighter" },
+  { id: "everforest-light", name: "Everforest Light", tone: "light", color: "#fdf6e3", blurb: "Sunlit forest: green-tinted paper, leaf highlighter" },
   { id: "flexoki", name: "Flexoki", tone: "light", color: "#fffcf0", blurb: "Inky paper for daylight, a mustard highlighter" },
   { id: "rose-pine", name: "Rosé Pine", tone: "light", color: "#fffaf3", blurb: "Dawn: parchment, pine ink and a rose highlighter" },
+  { id: "solarized-light", name: "Solarized Light", tone: "light", color: "#fffcf2", blurb: "The classic warm paper with its mustard highlighter" },
 ] as const satisfies readonly PremiumTheme[];
 
 export type PremiumThemeId = (typeof PREMIUM_THEMES)[number]["id"];

@@ -88,7 +88,7 @@ test("premium themes stay locked until a coach makes a playbook, then one redraw
   await expect(dialog.getByText("Make a playbook to unlock them.")).toBeVisible();
   await dialog.getByRole("radiogroup", { name: "Theme" }).screenshot({ path: `test-results/premium-theme-${testInfo.project.name}-locked-shut.png` });
   await unfold(dialog);
-  for (const t of PREMIUM_THEMES) await expect(dialog.getByRole("radio", { name: t.name })).toBeDisabled();
+  for (const t of PREMIUM_THEMES) await expect(dialog.getByRole("radio", { name: t.name, exact: true })).toBeDisabled();
   // a locked swatch still shows its own colours, not the page's
   await expect(dialog.locator('[data-theme="nord"] > span').first()).toHaveCSS("background-color", "rgb(46, 52, 64)");
   await dialog.getByRole("radiogroup", { name: "Theme" }).screenshot({ path: `test-results/premium-theme-${testInfo.project.name}-locked.png` });
@@ -101,7 +101,7 @@ test("premium themes stay locked until a coach makes a playbook, then one redraw
   await settings.click();
   await expect(gallery(dialog)).toHaveAccessibleName("Premium themes");
   await unfold(dialog);
-  const tokyo = dialog.getByRole("radio", { name: "Tokyo Night" });
+  const tokyo = dialog.getByRole("radio", { name: "Tokyo Night", exact: true });
   await expect(tokyo).toBeEnabled();
   await expect(dialog.getByText("Unlocked by your playbook.")).toBeVisible();
   await tokyo.check();
@@ -127,7 +127,7 @@ test("every premium theme keeps its words readable, with a contrast report and a
   const report: Record<string, Record<string, number>> = {};
 
   for (const t of PREMIUM_THEMES) {
-    await picker(page).getByRole("radio", { name: t.name }).check();
+    await picker(page).getByRole("radio", { name: t.name, exact: true }).check();
     await expect(html(page)).toHaveAttribute("data-theme", t.id);
 
     // the browser chrome is tinted with the header the coach actually sees
@@ -204,18 +204,18 @@ test("a premium theme prints ink on paper, and stays in use after its playbooks 
   await expect(picker(page).getByText("Make a playbook to unlock the others.")).toBeVisible();
   await expect(picker(page).getByRole("link", { name: "Make a playbook ›" })).toHaveAttribute("href", "/playbooks");
   await unfold(picker(page));
-  await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeChecked();
-  await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeEnabled();
-  await expect(picker(page).getByRole("radio", { name: "Nord" })).toBeDisabled();
+  await expect(picker(page).getByRole("radio", { name: "Gruvbox", exact: true })).toBeChecked();
+  await expect(picker(page).getByRole("radio", { name: "Gruvbox", exact: true })).toBeEnabled();
+  await expect(picker(page).getByRole("radio", { name: "Nord", exact: true })).toBeDisabled();
 
   await page.emulateMedia({ media: "print" });
   await expect(page.locator("body")).toHaveCSS("color", INK);
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
 
   await page.emulateMedia({ media: "screen" });
-  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await picker(page).getByRole("radio", { name: "Light", exact: true }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "light");
-  await expect(picker(page).getByRole("radio", { name: "Gruvbox" })).toBeDisabled();
+  await expect(picker(page).getByRole("radio", { name: "Gruvbox", exact: true })).toBeDisabled();
 });
 
 test("a themed field is an option under a premium theme: it repaints the live field, keeps every ink readable, and never reaches exports or print", async ({ page }, testInfo) => {
@@ -236,7 +236,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   await expect(themed).toBeDisabled();
   await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
 
-  await picker(page).getByRole("radio", { name: "Tokyo Night" }).check();
+  await picker(page).getByRole("radio", { name: "Tokyo Night", exact: true }).check();
   await expect(themed).toBeEnabled();
   await expect(themed).not.toBeChecked();
   await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
@@ -252,7 +252,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
 
   const report: Record<string, Record<string, number>> = {};
   for (const t of PREMIUM_THEMES) {
-    await picker(page).getByRole("radio", { name: t.name }).check();
+    await picker(page).getByRole("radio", { name: t.name, exact: true }).check();
     await expect(html(page)).toHaveAttribute("data-theme", t.id);
     const f = await fieldTokens(page);
     expect(f.turf, `${t.name} paints its own turf`).not.toBe(STANDARD_TURF);
@@ -289,7 +289,7 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   await testInfo.attach("field contrast report", { path: file, contentType: "application/json" });
 
   // printing the designer puts the standard field on paper
-  await picker(page).getByRole("radio", { name: "Gruvbox" }).check();
+  await picker(page).getByRole("radio", { name: "Gruvbox", exact: true }).check();
   await expect(svg).not.toHaveCSS("background-color", STANDARD_TURF);
   await page.emulateMedia({ media: "print" });
   await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
@@ -297,13 +297,13 @@ test("a themed field is an option under a premium theme: it repaints the live fi
   await page.emulateMedia({ media: "screen" });
 
   // Light has no field of its own: the option waits, still remembered, and the field is green again
-  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await picker(page).getByRole("radio", { name: "Light", exact: true }).check();
   await expect(themed).toBeDisabled();
   await expect(themed).toBeChecked();
   await expect(svg).toHaveCSS("background-color", STANDARD_TURF);
 
   // exports are drawn by the same renderer as these cards: still the standard field under a themed one
-  await picker(page).getByRole("radio", { name: "Kanagawa" }).check();
+  await picker(page).getByRole("radio", { name: "Kanagawa", exact: true }).check();
   await page.goto("/playbooks");
   await expect(html(page)).toHaveAttribute("data-field", "themed");
   const thumb = page.getByRole("img", { name: WHEEL_RIGHT.name }).first();
@@ -318,7 +318,7 @@ test("the premium gallery folds: shut by default with the theme in use on the ro
   await d.goto();
   await d.tools();
   const row = gallery(picker(page));
-  const nord = picker(page).getByRole("radio", { name: "Nord" });
+  const nord = picker(page).getByRole("radio", { name: "Nord", exact: true });
   const themed = page.getByRole("switch", { name: /Themed field/ });
 
   // shut: the row names the theme in use, the tiles are out of reach, the switch is not
@@ -412,7 +412,7 @@ test("the gallery is cheap: opening, closing and switching through every theme r
 
   // switching through the real picker, every tile a live restyle of the whole app and the field
   for (const t of PREMIUM_THEMES) {
-    await picker(page).getByRole("radio", { name: t.name }).check();
+    await picker(page).getByRole("radio", { name: t.name, exact: true }).check();
     await expect(html(page)).toHaveAttribute("data-theme", t.id);
   }
   // the restyle alone, forced synchronously: what a theme change costs the main thread

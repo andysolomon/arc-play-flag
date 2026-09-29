@@ -19,8 +19,8 @@ test("a dark device gets the dark board; a coach's pick outlasts a reload, and A
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#24221d");
 
   await d.tools();
-  await expect(picker(page).getByRole("radio", { name: "Auto" })).toBeChecked();
-  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await expect(picker(page).getByRole("radio", { name: "Auto", exact: true })).toBeChecked();
+  await picker(page).getByRole("radio", { name: "Light", exact: true }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "light");
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#fffdf6");
   expect(await stored(page)).toBe("light");
@@ -28,9 +28,9 @@ test("a dark device gets the dark board; a coach's pick outlasts a reload, and A
   await page.reload();
   await expect(html(page)).toHaveAttribute("data-theme", "light");
   await d.tools();
-  await expect(picker(page).getByRole("radio", { name: "Light" })).toBeChecked();
+  await expect(picker(page).getByRole("radio", { name: "Light", exact: true })).toBeChecked();
 
-  await picker(page).getByRole("radio", { name: "Auto" }).check();
+  await picker(page).getByRole("radio", { name: "Auto", exact: true }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "dark");
   expect(await stored(page)).toBeNull();
   // Auto keeps following the device while the page is open
@@ -65,7 +65,7 @@ test("stickers are chalk on the dark board and ink on paper, and each look is ke
   await expect(d.undo.locator("img:visible")).toHaveAttribute("src", /undo-dark\.png/);
   await tools.screenshot({ path: `test-results/theme-stickers-${testInfo.project.name}-dark.png` });
 
-  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await picker(page).getByRole("radio", { name: "Light", exact: true }).check();
   await expect(save.locator("img:visible")).toHaveCount(1);
   await expect(save.locator("img:visible")).toHaveAttribute("src", /save\.png/);
   await expect(d.undo.locator("img:visible")).toHaveAttribute("src", /undo\.png/);
@@ -84,7 +84,7 @@ test("a theme picked in playbook settings redraws the designer open in another t
     await books.getByRole("button", { name: /team, theme & backup settings/ }).click();
     await expect(books.getByRole("dialog", { name: "Team, theme & backup" })).toBeVisible({ timeout: 1_000 });
   }).toPass();
-  await books.getByRole("dialog").getByRole("radio", { name: "Light" }).check();
+  await books.getByRole("dialog").getByRole("radio", { name: "Light", exact: true }).check();
   await expect(html(books)).toHaveAttribute("data-theme", "light");
   await expect(html(page)).toHaveAttribute("data-theme", "light");
 });

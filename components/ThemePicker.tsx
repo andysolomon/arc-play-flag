@@ -174,7 +174,8 @@ export function ThemePicker({ className = "", unlockHref }: { className?: string
               {GROUPS.map((g) => (
                 <div key={g.tone} role="group" aria-label={`${g.label} themes`} className="flex flex-col gap-2">
                   <span className={`${eyebrow} flex items-center gap-2 after:h-0.5 after:flex-1 after:bg-divider`}>{g.label.toUpperCase()}</span>
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* as many 114px+ tiles as fit: two in the sidebar or a phone dialog, five in a wide settings dialog */}
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(114px,1fr))] gap-2">
                     {PREMIUM_THEMES.filter((t) => t.tone === g.tone).map((t) => {
                       // a theme in use stays available with no playbook; the rest wait for one
                       const off = !unlocked && choice !== t.id;

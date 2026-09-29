@@ -98,7 +98,7 @@ function SettingsPanel() {
 
       <span className={divider} />
       <span className={eyebrow}>THEME</span>
-      <ThemePicker className="max-w-[320px]" />
+      <ThemePicker className="max-w-[620px]" />
       <span className="text-caption leading-note text-ink-muted">Auto follows this device. Printed pages and exports stay ink on paper.</span>
 
       <span className={divider} />

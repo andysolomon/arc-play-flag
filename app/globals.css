@@ -326,6 +326,129 @@
       --shadow-ink: rgb(16 15 15 / 0.15);
     }
 
+    [data-theme="dracula"] {
+      color-scheme: dark;
+      --color-paper: #282a36;
+      --color-paper-2: #21222c;
+      --color-cream: #303241;
+      --color-white: #383a4a;
+      --color-ink: #f8f8f2;
+      --color-ink-2: #e2e2dc;
+      --color-ink-muted: #b4b8cf;
+      --color-ink-faint: #6272a4;
+      --color-yellow: #bd93f9;
+      --color-accent-ink: #1b1c26;
+      --color-yellow-soft: #4a3f6e;
+      --color-rose-soft: #5a2d45;
+      --color-divider: rgb(248 248 242 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.6);
+      --color-link: #ff79c6;
+      --color-link-hover: #ffb3e0;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="everforest"] {
+      color-scheme: dark;
+      --color-paper: #2d353b;
+      --color-paper-2: #272e33;
+      --color-cream: #343f44;
+      --color-white: #3d484d;
+      --color-ink: #d3c6aa;
+      --color-ink-2: #c5b78f;
+      --color-ink-muted: #b0b7a8;
+      --color-ink-faint: #7a8478;
+      --color-yellow: #a7c080;
+      --color-accent-ink: #232a2e;
+      --color-yellow-soft: #3f4f3a;
+      --color-rose-soft: #543a3c;
+      --color-divider: rgb(211 198 170 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.6);
+      --color-link: #7fbbb3;
+      --color-link-hover: #a0d1c9;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="synthwave"] {
+      color-scheme: dark;
+      --color-paper: #262335;
+      --color-paper-2: #1e1a2b;
+      --color-cream: #2a2139;
+      --color-white: #34294f;
+      --color-ink: #f2eefc;
+      --color-ink-2: #d9d1f0;
+      --color-ink-muted: #b9b0e0;
+      --color-ink-faint: #6d6a8f;
+      --color-yellow: #ff7edb;
+      --color-accent-ink: #1e1a2b;
+      --color-yellow-soft: #5a2d5a;
+      --color-rose-soft: #5e2a4a;
+      --color-divider: rgb(242 238 252 / 0.14);
+      --color-scrim: rgb(0 0 0 / 0.6);
+      --color-link: #36f9f6;
+      --color-link-hover: #9cfffd;
+      --shadow-ink: rgb(0 0 0 / 0.5);
+    }
+    [data-theme="catppuccin-latte"] {
+      color-scheme: light;
+      --color-paper: #eff1f5;
+      --color-paper-2: #e6e9ef;
+      --color-cream: #f8f9fc;
+      --color-white: #ffffff;
+      --color-ink: #4c4f69;
+      --color-ink-2: #5c5f77;
+      --color-ink-muted: #61647c;
+      --color-ink-faint: #9ca0b0;
+      --color-yellow: #8839ef;
+      --color-accent-ink: #ffffff;
+      --color-yellow-soft: #e4d8fb;
+      --color-rose-soft: #f7d5ea;
+      --color-divider: rgb(76 79 105 / 0.16);
+      --color-scrim: rgb(255 255 255 / 0.35);
+      --color-link: #1c5ce0;
+      --color-link-hover: #164cbd;
+      --shadow-ink: rgb(255 255 255 / 0.18);
+    }
+    [data-theme="everforest-light"] {
+      color-scheme: light;
+      --color-paper: #f4f0d9;
+      --color-paper-2: #efebd4;
+      --color-cream: #fdf6e3;
+      --color-white: #fffcf0;
+      --color-ink: #4a5860;
+      --color-ink-2: #5c6a72;
+      --color-ink-muted: #5b6b64;
+      --color-ink-faint: #939f91;
+      --color-yellow: #8da101;
+      --color-accent-ink: #232a2e;
+      --color-focus: #22648a;
+      --color-yellow-soft: #e8eec8;
+      --color-rose-soft: #f8dcd6;
+      --color-divider: rgb(74 88 96 / 0.16);
+      --color-scrim: rgb(35 42 46 / 0.35);
+      --color-link: #22648a;
+      --color-link-hover: #1b5170;
+      --shadow-ink: rgb(35 42 46 / 0.18);
+    }
+    [data-theme="solarized-light"] {
+      color-scheme: light;
+      --color-paper: #fdf6e3;
+      --color-paper-2: #eee8d5;
+      --color-cream: #fffcf2;
+      --color-white: #ffffff;
+      --color-ink: #073642;
+      --color-ink-2: #586e75;
+      --color-ink-muted: #5a6f77;
+      --color-ink-faint: #93a1a1;
+      --color-yellow: #b58900;
+      --color-accent-ink: #002b36;
+      --color-focus: #b23c0e;
+      --color-yellow-soft: #f5e6b3;
+      --color-rose-soft: #f6d3cf;
+      --color-divider: rgb(7 54 66 / 0.16);
+      --color-scrim: rgb(0 43 54 / 0.35);
+      --color-link: #1f6fa8;
+      --color-link-hover: #155a89;
+      --shadow-ink: rgb(0 43 54 / 0.18);
+    }
+
     /*
      * "Themed field" (a per-device option, lib/theme.ts): a premium theme repaints the live field
      * too. Tuned per theme so every route ink clears 4.5:1 on its turf and 3:1 on its end zone,
@@ -486,9 +609,124 @@
       --field-ring: #bc5215;
     }
 
+    :root[data-field="themed"][data-theme="dracula"] {
+      --field-turf: #2a3441;
+      --field-endzone: #334052;
+      --field-line: #f8f8f2;
+      --field-outline: #1b1c26;
+      --field-label: #1b1c26;
+      --field-offense: #ff6e6e;
+      --field-defense: #8be9fd;
+      --field-route: #f8f8f2;
+      --field-primary: #ffb86c;
+      --field-deep: #bd93f9;
+      --field-flat: #50fa7b;
+      --field-curl: #ff79c6;
+      --field-mid: #f1fa8c;
+      --field-blitz: #ff6e6e;
+      --field-cover: #8be9fd;
+      --field-waypoint: #f8f8f2;
+      --field-ring: #f1fa8c;
+    }
+    :root[data-field="themed"][data-theme="everforest"] {
+      --field-turf: #2f3d36;
+      --field-endzone: #38483f;
+      --field-line: #d3c6aa;
+      --field-outline: #232a2e;
+      --field-label: #232a2e;
+      --field-offense: #e67e80;
+      --field-defense: #7fbbb3;
+      --field-route: #d3c6aa;
+      --field-primary: #e69875;
+      --field-deep: #7fbbb3;
+      --field-flat: #83c092;
+      --field-curl: #d699b6;
+      --field-mid: #dbbc7f;
+      --field-blitz: #ee8f91;
+      --field-cover: #a7c080;
+      --field-waypoint: #d3c6aa;
+      --field-ring: #dbbc7f;
+    }
+    :root[data-field="themed"][data-theme="synthwave"] {
+      --field-turf: #2a2140;
+      --field-endzone: #34294f;
+      --field-line: #f2eefc;
+      --field-outline: #1e1a2b;
+      --field-label: #1e1a2b;
+      --field-offense: #ff7edb;
+      --field-defense: #36f9f6;
+      --field-route: #f2eefc;
+      --field-primary: #fede5d;
+      --field-deep: #72f1b8;
+      --field-flat: #36f9f6;
+      --field-curl: #b893ce;
+      --field-mid: #ff8b39;
+      --field-blitz: #ff5a63;
+      --field-cover: #36f9f6;
+      --field-waypoint: #f2eefc;
+      --field-ring: #fede5d;
+    }
+    :root[data-field="themed"][data-theme="catppuccin-latte"] {
+      --field-turf: #e3ecd8;
+      --field-endzone: #d4e2c4;
+      --field-line: #4c4f69;
+      --field-outline: #4c4f69;
+      --field-label: #1e1e2e;
+      --field-offense: #dd7878;
+      --field-defense: #04a5e5;
+      --field-route: #4c4f69;
+      --field-primary: #c40d35;
+      --field-deep: #1a56d6;
+      --field-flat: #0f6367;
+      --field-curl: #7a2fe0;
+      --field-mid: #8a5710;
+      --field-blitz: #b0102f;
+      --field-cover: #2456c4;
+      --field-waypoint: #ffffff;
+      --field-ring: #8839ef;
+    }
+    :root[data-field="themed"][data-theme="everforest-light"] {
+      --field-turf: #e2ead0;
+      --field-endzone: #d3dfbf;
+      --field-line: #3e4c53;
+      --field-outline: #4a5860;
+      --field-label: #1e2326;
+      --field-offense: #f85552;
+      --field-defense: #3a94c5;
+      --field-route: #4a5860;
+      --field-primary: #a4480a;
+      --field-deep: #22648a;
+      --field-flat: #1f6a4e;
+      --field-curl: #a3357f;
+      --field-mid: #7f5b00;
+      --field-blitz: #bb2a27;
+      --field-cover: #22648a;
+      --field-waypoint: #fdf6e3;
+      --field-ring: #b04f0d;
+    }
+    :root[data-field="themed"][data-theme="solarized-light"] {
+      --field-turf: #e8ead0;
+      --field-endzone: #dcdfbd;
+      --field-line: #2f4a52;
+      --field-outline: #073642;
+      --field-label: #fdf6e3;
+      --field-offense: #b8420f;
+      --field-defense: #1f70aa;
+      --field-route: #073642;
+      --field-primary: #b23c0e;
+      --field-deep: #175f92;
+      --field-flat: #166861;
+      --field-curl: #52579e;
+      --field-mid: #7d5d00;
+      --field-blitz: #b31f1c;
+      --field-cover: #175f92;
+      --field-waypoint: #fdf6e3;
+      --field-ring: #cb4b16;
+    }
+
     /* the dark boards get the chalk stickers (components/Sticker.tsx carries both) */
-    :root:is([data-theme="dark"], [data-theme="tokyo-night"], [data-theme="catppuccin"], [data-theme="gruvbox"],
-      [data-theme="nord"], [data-theme="kanagawa"], [data-theme="matte-black"]) {
+    :root:is([data-theme="dark"], [data-theme="catppuccin"], [data-theme="dracula"], [data-theme="everforest"], [data-theme="gruvbox"],
+      [data-theme="kanagawa"], [data-theme="matte-black"], [data-theme="nord"], [data-theme="synthwave"], [data-theme="tokyo-night"]) {
       .sticker-light { display: none; }
       .sticker-dark { display: block; }
     }
