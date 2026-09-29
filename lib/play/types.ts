@@ -80,9 +80,10 @@ export interface SavedPlay {
    */
   artShadow?: true;
   /**
-   * The yard line the ball is on for this play, counted from the offense's own goal line
-   * (5 is the own 5, 20 midfield, 35 their 5; see lib/play/field.ts). Stored only when it is
-   * not the 5, where every drive starts, so a play from before the choice reads and draws the same.
+   * The yard line the ball is on for this play, counted from the offense's own goal line:
+   * 20 is midfield, 30 their 10 and 35 their 5 (see lib/play/field.ts). Stored only when it
+   * is not the own goal line, where every drive starts; any other yard line reads as the
+   * nearest of those spots.
    */
   los?: number;
 }

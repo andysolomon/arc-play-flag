@@ -62,6 +62,7 @@
   --animate-pulse-ring: pulse-ring 1.25s ease-in-out infinite;
   --animate-boing: boing 360ms var(--ease-boing);
   --animate-draw: draw 320ms ease-out;
+  --animate-repaint-in: repaint-in 160ms ease-out 120ms both;
 
   @keyframes pulse-ring {
     0%, 100% { opacity: 0.9; transform: scale(1); }
@@ -75,6 +76,10 @@
   @keyframes draw {
     from { stroke-dashoffset: 900; }
     to { stroke-dashoffset: 0; }
+  }
+  @keyframes repaint-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 

@@ -21,7 +21,7 @@ export interface DraftRecord {
   side?: Team;
   /** the other team is drawn, faded, on the play's pictures; stored only when true */
   artShadow?: true;
-  /** the play's ball spot (see SavedPlay.los); written only when it is not the 5 */
+  /** the play's ball spot (see SavedPlay.los); written only when it is not the own goal line */
   los?: number;
 }
 

@@ -6,6 +6,8 @@ import {
   subscribeTouchdowns,
 } from "@/lib/endzone";
 import { getServerTeam, getTeam, subscribe } from "@/lib/play/library";
+import { repaint } from "@/lib/repaint";
+import { usePicked } from "../Repainting";
 import { Lock } from "../ThemePicker";
 import { segmentInput, swatch } from "../ui";
 import { EndZoneArt } from "./EndZoneArt";
@@ -26,7 +28,7 @@ const PREVIEW_H = 84;
 export function EndZonePicker({ className = "" }: { className?: string }) {
   const name = useId();
   const hint = useId();
-  const choice = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
+  const choice = usePicked("end-zone", useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone));
   const touchdowns = useSyncExternalStore(subscribeTouchdowns, getTouchdowns, serverTouchdowns);
   const named = useSyncExternalStore(subscribe, getTeam, getServerTeam).name.trim().length > 0;
   const open = END_ZONES.filter((z) => isUnlocked(z, touchdowns)).length;
@@ -43,7 +45,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
               <input
                 type="radio" name={name} value={z.id} checked={choice === z.id} disabled={locked}
                 aria-describedby={locked ? `${hint}-${z.id} ${hint}` : undefined}
-                onChange={() => { setEndZone(z.id); }}
+                onChange={() => { repaint({ picker: "end-zone", value: z.id, what: `the ${z.name} end zone` }, () => { setEndZone(z.id); }); }}
                 className={`${segmentInput} disabled:cursor-not-allowed`}
               />
               {/* one string, so a screen reader hears "Opens at 5 touchdown passes." whole */}
@@ -70,7 +72,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
           : `All ${String(END_ZONES.length)} open.`}
         {touchdowns > 0 && ` ${scored} on this device.`}
         {named ? " Each design paints your team name across it." : " Give your team a name (under Team) and each design paints it across."}
-        {" It comes into view with the ball near their goal (Line of scrimmage), or from the 5 on a tall screen. Printed pages and exports keep the classic green."}
+        {" It comes into view with the ball near their goal (Line of scrimmage). Printed pages and exports keep the classic green."}
       </span>
     </div>
   );
