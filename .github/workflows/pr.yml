@@ -118,6 +118,14 @@ jobs:
           path: test-results/phone-palette-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the deep field
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-field
+          path: test-results/deep-field-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the team color palettes
         if: always()
         uses: actions/upload-artifact@v4
