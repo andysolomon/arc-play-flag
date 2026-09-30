@@ -4,10 +4,11 @@ import {
   memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
+import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from "@/lib/deepfield";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
-import { LOS_YARD } from "@/lib/play/field";
-import { MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
+import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
+import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
@@ -26,7 +27,7 @@ import { PlayerToken } from "./PlayerToken";
 import { FIELD } from "./fieldPaint";
 import { ManTagLayer } from "./ManTagLayer";
 import { RouteLayer } from "./RouteLayer";
-import { pillMd } from "./ui";
+import { pillMd, pillSm } from "./ui";
 
 interface Props {
   players: readonly Player[];
@@ -120,6 +121,7 @@ function FieldImpl({
   const [party, setParty] = useState<{ seed: number; unlocked: EndZone | null } | null>(null);
   const endZone = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
   const team = useSyncExternalStore(subscribeLibrary, getTeam, getServerTeam);
+  const deepField = useSyncExternalStore(subscribeDeepField, getDeepField, serverDeepField);
   // classic is the band the field has always drawn; any other end zone paints its own design over it
   const designed = endZone !== "classic";
 
@@ -154,7 +156,14 @@ function FieldImpl({
       },
     };
   }), [players, live, liveWaypoint]);
-  const d = depth(effective, pane, MIN_DEPTH, los);
+  // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
+  // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
+  // pre-snap motion stays in the backfield, so drawing it leaves the card as it is
+  const fit = depth(effective, pane, MIN_DEPTH, los);
+  const deepest = depth(effective, pane, MAX_DEPTH, los);
+  const d = !readOnly && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
+  // offered only where it shows more field, and not while anything is being drawn
+  const offerDeep = !readOnly && draft === null && deepest > fit;
   const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;
   const width = cardWidth(pane, d);
@@ -526,6 +535,27 @@ function FieldImpl({
               Remove waypoint
             </button>
           </div>
+        )}
+        {offerDeep && (
+          <button
+            type="button"
+            onClick={() => { setDeepField(!deepField); }}
+            aria-pressed={deepField}
+            data-active={deepField}
+            title={
+              deepField
+                ? "Fit the field to the play"
+                : deepest >= 8 + GOAL_YARD + END_ZONE_YARDS - los
+                  ? "Show the field to the end line"
+                  : `Show ${String(deepest - 8)} yards downfield`
+            }
+            className={
+              `${pillSm} absolute right-3 top-3 z-10 shadow-tile data-[active=true]:bg-yellow data-[active=true]:on-yellow ` +
+              "data-[active=true]:hover:bg-yellow print:hidden"
+            }
+          >
+            Deep field
+          </button>
         )}
         <span className="sr-only" aria-live="polite">
           {targeting && targetOwnerName

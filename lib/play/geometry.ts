@@ -10,6 +10,8 @@ export const VW = 660;
 export const FIELD_YARDS = 30;
 /** The shallowest card the designer and the pictures show, unless the end line comes first. */
 export const MIN_DEPTH = 24;
+/** The deepest card: 37 yards past the line of scrimmage, unless a player already stands deeper. */
+export const MAX_DEPTH = 45;
 
 export function px(x: number): number {
   return x * S;
@@ -44,16 +46,23 @@ export function clamp(x: number, y: number, team: Team | null, top: number, gap 
  * so it can never lag behind a route or position change. With the ball near their goal
  * line the card ends at the end line (`los` is the play's yard line, see lib/play/field.ts),
  * so drags, preset routes, zones and playback, which all stop at the card's top, stay in
- * bounds; a player who already stands past it is never cut off.
+ * bounds; a player who already stands past it is never cut off. Nor is a custom route: its
+ * waypoints are where the coach put them (a preset route shrinks to fit the card instead), so
+ * one drawn deep on a tall screen still shows whole on a wide one and in every picture.
+ * A `minDepth` of MAX_DEPTH gives the deepest card the field allows (Deep field, or a route being drawn).
  */
 export function depth(players: readonly Player[], pane: Pane | null, minDepth = MIN_DEPTH, los = LOS_YARD): number {
   const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
+  const reach = players.reduce((m, p) => (p.route?.type === "custom" ? (p.route.pts ?? []).reduce((n, q) => Math.min(n, q[1]), m) : m), 8);
   const hasDeep = players.some((p) => p.route?.type === "zoneDeep");
   const need = hasDeep ? Math.min(deepest, Math.min(-12, deepest - 4) - 2.9) : deepest;
-  const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : 45;
-  const d = Math.max(aspect, 8 - need + 1.2);
+  const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : MAX_DEPTH;
+  // a waypoint gets a player's margin, rounded up to the half yard so the card's top never ends
+  // up closer to it than a drag or nudge allows (see clamp), which would pull it back
+  const route = Math.ceil((8 - reach + 1.2) * 2) / 2;
+  const d = Math.max(aspect, 8 - need + 1.2, route);
   // from the own goal line the end line is 58 yards off, past the deepest card, so this stays 45
-  const max = Math.min(45, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2));
+  const max = Math.min(MAX_DEPTH, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2, route));
   return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
 }
 
