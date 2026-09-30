@@ -1,9 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { GOAL_YARD } from "../../lib/play/field";
 import { S, VW } from "../../lib/play/geometry";
 import { BLITZ_DEPTH } from "../../lib/play/routes";
 import { DRAFT_KEY, type DraftRecord } from "../../lib/play/storage";
 import { advertisedFeatures, CoverageLedger } from "./coverage";
-import { DEMO_PLAYBOOK, INSIDE_HANDOFF, PLAY_ACTION_WHEEL, QUICK_SLANT, SHARED_BOOK, sharedBookFile } from "./fixtures";
+import { DEMO_PLAYBOOK, DEMO_TEAM, GOAL_TO_GO_POST, INSIDE_HANDOFF, PLAY_ACTION_WHEEL, QUICK_SLANT, SHARED_BOOK, sharedBookFile } from "./fixtures";
 import { hasAttributeNow, retryStatefulInteraction } from "./interactions";
 import type { ChapterSlug } from "./options";
 
@@ -41,6 +42,8 @@ type SidebarName = keyof typeof SIDEBARS;
 type Team = "Offense" | "Defense";
 
 const ASSERT_TIMEOUT = 5_000;
+/** How far past its promised length a chapter's last beat may end: a sliver of its final hold. */
+const OVERRUN_SECONDS = 0.25;
 
 /**
  * Drives one chapter the way a coach would: through visible, accessible controls.
@@ -55,8 +58,17 @@ const ASSERT_TIMEOUT = 5_000;
 export class ChapterDriver {
   private posterTaken = false;
   private readonly ledger: CoverageLedger;
-  /** where the caption sits: under the header on the designer, along the bottom on list screens */
-  captionEdge: "top" | "bottom" = "top";
+  /**
+   * The control a beat just used, ringed through its hold only while it is still on screen:
+   * picking a route folds the palette away, and a ring left where a tile used to be reads as
+   * a tap on nothing.
+   */
+  private ringed: Locator | null = null;
+  /**
+   * Where the caption sits: under the header on the designer, over the header's middle when the
+   * top of the field (their end zone) is the point of the chapter, along the bottom on list screens.
+   */
+  captionEdge: "top" | "header" | "bottom" = "top";
 
   constructor(
     readonly slug: ChapterSlug,
@@ -88,7 +100,8 @@ export class ChapterDriver {
       await action();
       this.ledger.prove(proves);
       this.trace(`[${this.slug} ${this.elapsed().toFixed(2)}s] ${name}${proves.length ? ` — shows ${proves.join(", ")}` : ""}`);
-      await this.page.waitForTimeout(hold);
+      await this.hold(hold);
+      this.ringed = null;
     } catch (error) {
       throw this.fail(kind, name, error);
     }
@@ -104,7 +117,8 @@ export class ChapterDriver {
           element = document.createElement("div");
           element.id = id;
           Object.assign(element.style, {
-            position: "fixed", left: "50%", zIndex: "2147483647",
+            // max-content: a pill centred from the middle would otherwise wrap at half the width
+            position: "fixed", left: "50%", zIndex: "2147483647", width: "max-content",
             transform: "translateX(-50%)", maxWidth: "760px", padding: "9px 22px",
             border: "3px solid #1b1a17", borderRadius: "26px", background: "#fffdf6",
             boxShadow: "3px 4px 0 #1b1a17", color: "#1b1a17", font: "700 27px/1.22 sans-serif",
@@ -112,6 +126,7 @@ export class ChapterDriver {
           });
           // under the header the pill sits in the field's no-run band, clear of the hint toast and the field toolbar
           if (edge === "top") element.style.top = "100px";
+          else if (edge === "header") element.style.top = "6px";
           else element.style.bottom = "14px";
           document.body.append(element);
         }
@@ -157,7 +172,7 @@ export class ChapterDriver {
       if (!response?.ok()) throw new Error(`app returned HTTP ${String(response?.status() ?? "no response")}`);
       // the first control each screen hydrates: the designer, the playbooks home, one book
       const ready = this.page.getByRole("button", { name: "Play tools", exact: true })
-        .or(this.page.getByRole("button", { name: /team & backup settings/ }))
+        .or(this.page.getByRole("button", { name: /backup settings/ }))
         .or(this.page.getByRole("textbox", { name: "Playbook name" }));
       await expect(ready).toBeVisible({ timeout: ASSERT_TIMEOUT });
     }, 160);
@@ -179,8 +194,30 @@ export class ChapterDriver {
       await this.spotlight(locator);
       await this.page.waitForTimeout(140);
       await locator.click();
+      this.ringed = locator;
     }, hold);
     await this.spotlight(null);
+  }
+
+  /** Whether the ringed control is still on screen, read without waiting for it (it may be gone for good). */
+  private async ringedStillThere(locator: Locator): Promise<boolean> {
+    return locator.evaluateAll((elements) => elements.some((element) => {
+      const r = element.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight
+        && !element.closest("[inert], [aria-hidden='true'], [hidden]") && element.checkVisibility();
+    })).catch(() => false);
+  }
+
+  /** Holds a beat's result on screen, taking the ring down the moment its control folds away. */
+  private async hold(milliseconds: number): Promise<void> {
+    const until = Date.now() + milliseconds;
+    for (let left = milliseconds; left > 0; left = until - Date.now()) {
+      await this.page.waitForTimeout(Math.min(80, left));
+      if (this.ringed && !(await this.ringedStillThere(this.ringed))) {
+        this.ringed = null;
+        await this.spotlight(null);
+      }
+    }
   }
 
   /**
@@ -199,6 +236,7 @@ export class ChapterDriver {
         isSatisfied,
         { wait: async (milliseconds) => { await this.page.waitForTimeout(milliseconds); } },
       );
+      this.ringed = locator;
     }, hold);
     await this.spotlight(null);
   }
@@ -212,6 +250,56 @@ export class ChapterDriver {
       await field.pressSequentially(text, { delay: 18 });
     }, hold, proves);
     await this.spotlight(null);
+  }
+
+  /** Picks an option from a native select. The open list is the browser's, not the page's, so the video shows the ring and then the result. */
+  async choose(locator: Locator, description: string, value: string, hold = 260): Promise<void> {
+    await this.beat("selector", description, async () => {
+      const select = await this.visible(locator, description);
+      await select.scrollIntoViewIfNeeded();
+      await this.spotlight(select);
+      await this.page.waitForTimeout(200);
+      await select.selectOption(value);
+    }, hold);
+    await this.spotlight(null);
+  }
+
+  /** Ticks or unticks a checkbox, ringing the whole label a coach taps. */
+  async setChecked(locator: Locator, description: string, checked: boolean, hold = 260): Promise<void> {
+    await this.beat("selector", description, async () => {
+      const box = await this.visible(locator, description);
+      await box.scrollIntoViewIfNeeded();
+      const label = box.locator("xpath=ancestor::label[1]");
+      await this.spotlight(await label.count() ? label : box);
+      await this.page.waitForTimeout(160);
+      await box.setChecked(checked);
+      await expect(box).toBeChecked({ checked, timeout: ASSERT_TIMEOUT });
+    }, hold);
+    await this.spotlight(null);
+  }
+
+  /** Opens a folded Play tools section (Theme, End zone) by its heading. */
+  async unfold(label: "Theme" | "End zone"): Promise<void> {
+    await this.openPanel("Play tools");
+    const heading = this.page.locator("#play-sidebar").getByRole("button", { name: new RegExp(`^${label}\\b`) });
+    await heading.scrollIntoViewIfNeeded().catch(() => undefined);
+    await this.clickUntilState(heading, `Unfold ${label}`, async () => hasAttributeNow(heading, "aria-expanded", "true"), 160);
+  }
+
+  /**
+   * Picks a look (a theme or an end zone) from its swatch and waits for the "Switching to …"
+   * interstitial to come down, so the next beat starts on the new look.
+   */
+  async pickLook(radio: Locator, description: string, hold = 360): Promise<void> {
+    await this.beat("selector", description, async () => {
+      const swatch = await this.visible(radio.locator("xpath=ancestor::label[1]"), description);
+      await swatch.scrollIntoViewIfNeeded();
+      await this.spotlight(swatch);
+      await this.page.waitForTimeout(200);
+      await radio.check();
+      await this.spotlight(null);
+      await expect(this.page.locator("[data-repainting]")).toHaveCount(0, { timeout: ASSERT_TIMEOUT });
+    }, hold);
   }
 
   /**
@@ -399,6 +487,14 @@ export class ChapterDriver {
     if (unproven) throw new ChapterBeatError(this.slug, "cover the advertised features", "coverage", new Error(unproven));
     await this.spotlight(null);
     if (!this.posterTaken) await this.poster();
+    // encoding trims every clip to the promised length, so a chapter that runs over would
+    // lose its last beats, and with them things its card promises, without a word
+    const over = this.elapsed() - targetSeconds;
+    if (over > OVERRUN_SECONDS) {
+      throw new ChapterBeatError(this.slug, "fit the promised length", "recording", new Error(
+        `the beats took ${this.elapsed().toFixed(2)}s but the tour promises ${String(targetSeconds)}s, so the clip would cut them off; shorten the holds (--trace shows where the time goes) or lengthen the chapter`,
+      ));
+    }
     const remaining = targetSeconds - this.elapsed();
     if (remaining > 0) await this.page.waitForTimeout(remaining * 1000);
     return this.elapsed();
@@ -490,36 +586,26 @@ async function runPlay(d: ChapterDriver): Promise<void> {
   await d.runPlay("Run the play-action pass", ["Play-action", "Passing plays"]);
 }
 
-/** Build the defense: hide or show the shadow offense, then a deep zone, man coverage and a legal blitz. */
+/**
+ * Build the defense: a deep zone, man coverage picked off the faded shadow offense, a legal
+ * blitz, then the offense hidden so the man defender wears its "on X" tag instead.
+ */
 async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.goto("/?open=demo-defense");
-  await d.say("Hide the shadow offense, or keep it");
-  await d.openPanel("Play tools");
-  const shadow = d.page.locator("#play-sidebar").getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true });
-  await d.click(shadow, "Hide the shadow offense", 420);
-  await d.expectState("The offense is hidden", async () => {
-    await expect(d.player("X", "Offense")).toBeHidden({ timeout: ASSERT_TIMEOUT });
-    await expect(d.player("LC", "Defense")).toBeVisible({ timeout: ASSERT_TIMEOUT });
-  }, 240, ["Defense only"]);
-  await d.click(shadow, "Show the shadow offense", 420);
-  await d.expectState("The faded offense is back as a reference", async () => {
-    await expect(d.player("X", "Offense")).toBeVisible({ timeout: ASSERT_TIMEOUT });
-  }, 200, ["Shadow offense"]);
-
   await d.say("Deep zone");
   await d.selectPlayer("LC", "Defense");
   await d.pick("Zone deep");
   await d.expectState("LC drops into a deep zone", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d1")?.route?.type)).toBe("zoneDeep");
-  }, 400, ["Zones", "Defensive plays"]);
+  }, 300, ["Zones", "Defensive plays"]);
 
-  await d.say("Man coverage on X");
+  await d.say("Man on X: tap the faded offense");
   await d.selectPlayer("LB", "Defense");
   await d.pick("Man");
   await d.click(d.page.getByRole("button", { name: "Offense X, man coverage target", exact: true }), "Choose X as the man target", 380);
-  await d.expectState("LB covers X", async () => {
+  await d.expectState("LB covers X, picked from the shadow offense", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d2")?.route)).toEqual({ type: "man", target: "o3" });
-  }, 240, ["Man coverage"]);
+  }, 200, ["Shadow offense", "Man coverage"]);
 
   await d.say("Blitz from a legal depth");
   await d.selectPlayer("R", "Defense");
@@ -528,6 +614,16 @@ async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.expectState(`The blitzer lines up at least ${String(BLITZ_DEPTH)} yards off the ball`, async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d3")?.y)).toBeLessThanOrEqual(-BLITZ_DEPTH);
   }, 240, ["Blitz"]);
+
+  await d.say("Hide the offense: “on X” tags");
+  await d.openPanel("Play tools");
+  const shadow = d.page.locator("#play-sidebar").getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true });
+  await d.click(shadow, "Hide the shadow offense", 200);
+  await d.closePanels();
+  await d.expectState("The offense is hidden and LB wears its man tag", async () => {
+    await expect(d.player("X", "Offense")).toBeHidden({ timeout: ASSERT_TIMEOUT });
+    await expect(d.field.locator('[data-man-tag="d2"]')).toHaveText("on X", { timeout: ASSERT_TIMEOUT });
+  }, 300, ["Defense only"]);
   await d.poster();
 }
 
@@ -570,7 +666,7 @@ async function playbooks(d: ChapterDriver): Promise<void> {
   const items = d.page.getByRole("list").getByRole("listitem");
 
   await d.say("Your team name goes on every export");
-  await d.click(d.page.getByRole("button", { name: /team & backup settings/ }), "Team & backup", 260);
+  await d.click(d.page.getByRole("button", { name: /backup settings/ }), "Team, theme & backup", 260);
   await d.type(d.page.getByRole("textbox", { name: "Team name" }), "Team name", "Riverside Otters", 260);
   await d.expectState("The team is named", async () => {
     await expect(d.page.getByRole("textbox", { name: "Team name" })).toHaveValue("Riverside Otters", { timeout: ASSERT_TIMEOUT });
@@ -595,6 +691,10 @@ async function playbooks(d: ChapterDriver): Promise<void> {
   await d.click(d.page.getByTitle(`Add ${QUICK_SLANT.name}`), `Add ${QUICK_SLANT.name}`, 200);
   await d.click(d.page.getByTitle(`Add ${PLAY_ACTION_WHEEL.name}`), `Add ${PLAY_ACTION_WHEEL.name}`, 300);
   await d.click(d.page.getByRole("button", { name: "Done", exact: true }), "Done", 200);
+  // the list sits at the foot of the page, under the caption: bring it up where the reorder shows
+  await d.beat("selector", "Bring the playbook's plays into view", async () => {
+    await (await d.visible(items.nth(0), "The playbook's first play")).evaluate((element) => { element.scrollIntoView({ block: "center" }); });
+  }, 120);
   await d.click(items.nth(0).getByRole("button", { name: "Move down", exact: true }), "Move the opener down", 200);
   await d.expectState("The wheel now opens the playbook", async () => {
     await expect(items).toHaveText([new RegExp(PLAY_ACTION_WHEEL.name), new RegExp(QUICK_SLANT.name)], { timeout: ASSERT_TIMEOUT });
@@ -602,7 +702,7 @@ async function playbooks(d: ChapterDriver): Promise<void> {
   await d.poster();
 }
 
-/** Print it: everything the playbook screen puts on paper, then the book as a file. */
+/** Print it or present it: everything the playbook screen puts on paper or a screen, then the book as a file. */
 async function printPlaybook(d: ChapterDriver): Promise<void> {
   d.captionEdge = "bottom";
   await d.goto(`/playbooks?book=${DEMO_PLAYBOOK.id}`);
@@ -611,20 +711,103 @@ async function printPlaybook(d: ChapterDriver): Promise<void> {
   }, 200);
 
   await d.say("Wristband inserts, at actual size");
-  await d.download("Download wristbands PDF", /\.pdf$/, ["Wristbands"], { hold: 620 });
+  await d.download("Download wristbands PDF", /\.pdf$/, ["Wristbands"], { hold: 600 });
   await d.poster();
 
   await d.say("Binder pages for the coach's folder");
-  await d.download("Download binder PDF", /\.pdf$/, ["Binder PDF"], { hold: 620 });
+  await d.download("Download binder PDF", /\.pdf$/, ["Binder PDF"], { hold: 600 });
+
+  await d.say("Slides for the team meeting");
+  await d.download("Download slides", /-slides\.pptx$/, ["Slides"], { hold: 600 });
 
   await d.say("Two-sided postcards, two-up with cut lines");
-  await d.download("Download postcards PDF", /\.pdf$/, ["Postcards"], { hold: 620 });
+  await d.download("Download postcards PDF", /\.pdf$/, ["Postcards"], { hold: 600 });
 
   await d.say("A one-page flyer for parents and players");
-  await d.download("Download flyer PDF", /\.pdf$/, ["Flyer"], { hold: 620 });
+  await d.download("Download flyer PDF", /\.pdf$/, ["Flyer"], { hold: 600 });
 
   await d.say("Or hand the whole book to an assistant");
-  await d.download("Download playbook file", /\.playbook\.json$/, ["Playbook file"], { hold: 620 });
+  await d.download("Download playbook file", /\.playbook\.json$/, ["Playbook file"], { hold: 600 });
+}
+
+/** Make the field yours: the ball's spot, the league's no-run zones, then a dark or premium theme. */
+async function fieldSetup(d: ChapterDriver): Promise<void> {
+  // the ball goes on their 10, so the top of the field is the story: keep it clear
+  d.captionEdge = "header";
+  await d.goto(`/?open=${QUICK_SLANT.id}`);
+  const tools = d.page.locator("#play-sidebar");
+
+  await d.say("Spot the ball: yards count to their goal");
+  await d.openPanel("Play tools");
+  await d.choose(tools.getByRole("combobox", { name: "Line of scrimmage" }), "Line of scrimmage", String(GOAL_YARD - 10), 160);
+  await d.closePanels();
+  await d.expectState("The ball is on their 10 and their end zone is in view", async () => {
+    await expect(d.field.locator("text", { hasText: "LOS 10" })).toBeVisible({ timeout: ASSERT_TIMEOUT });
+  }, 420, ["Line of scrimmage"]);
+
+  await d.say("No-run zones, only if your league has them");
+  await d.openPanel("Play tools");
+  await d.setChecked(tools.getByRole("checkbox", { name: "No-run zones" }), "No-run zones", false, 160);
+  await d.closePanels();
+  await d.expectState("The hatched no-run bands are gone", async () => {
+    await expect(d.field.locator('rect[fill^="url(#"]')).toHaveCount(0, { timeout: ASSERT_TIMEOUT });
+  }, 420, ["No-run zones"]);
+
+  await d.say("Dark, or a premium theme");
+  await d.unfold("Theme");
+  const theme = tools.getByRole("radiogroup", { name: "Theme" });
+  await d.pickLook(theme.getByRole("radio", { name: "Dark", exact: true }), "Dark theme", 300);
+  await d.expectState("The app is chalk on a dark board", async () => {
+    await expect(d.page.locator("html")).toHaveAttribute("data-theme", "dark", { timeout: ASSERT_TIMEOUT });
+  }, 120, ["Dark theme"]);
+  await d.pickLook(theme.getByRole("radio", { name: "Tokyo Night", exact: true }), "Tokyo Night", 200);
+  await d.pickLook(tools.getByRole("switch", { name: /Themed field/ }), "Themed field", 200);
+  await d.closePanels();
+  await d.expectState("Tokyo Night paints the app and the field", async () => {
+    await expect(d.page.locator("html")).toHaveAttribute("data-theme", "tokyo-night", { timeout: ASSERT_TIMEOUT });
+    await expect(d.page.locator("html")).toHaveAttribute("data-field", "themed", { timeout: ASSERT_TIMEOUT });
+  }, 300, ["Premium themes"]);
+  await d.poster();
+}
+
+/** Score in your own end zone: pick a design, letter the team across it, and throw a touchdown pass into it. */
+async function touchdowns(d: ChapterDriver): Promise<void> {
+  // their end zone is at the top of the field: the caption must not sit on the lettering
+  d.captionEdge = "header";
+  await d.goto(`/?open=${GOAL_TO_GO_POST.id}`);
+  const tools = d.page.locator("#play-sidebar");
+  // the field's design sits on its own layer beside the diagram, never inside it
+  const art = d.field.locator("xpath=..").locator(":scope > [data-ez-backdrop] [data-ez-art]");
+
+  await d.say("Pick an end zone");
+  await d.unfold("End zone");
+  await d.pickLook(tools.getByRole("radiogroup", { name: "End zone" }).getByRole("radio", { name: "Synthwave '84", exact: true }), "Synthwave '84", 200);
+  await d.closePanels();
+  await d.expectState("Their end zone is painted Synthwave", async () => {
+    await expect(art).toHaveAttribute("data-ez-art", "synthwave", { timeout: ASSERT_TIMEOUT });
+  }, 360, ["End zones"]);
+
+  await d.say("Letter your team's name across it");
+  await d.openPanel("Play tools");
+  await d.type(tools.getByRole("textbox", { name: "Team name" }), "Team name", DEMO_TEAM.name, 160);
+  await d.closePanels();
+  await d.expectState("The end zone letters the team", async () => {
+    await expect(art.locator("[data-ez-name]")).toHaveAttribute("data-ez-name", DEMO_TEAM.name.toUpperCase(), { timeout: ASSERT_TIMEOUT });
+  }, 420, ["Team lettering"]);
+
+  await d.say("Throw a touchdown pass, open the next one");
+  const run = d.page.getByRole("button", { name: "Run the play", exact: true });
+  const stop = d.page.getByRole("button", { name: "Stop the play", exact: true });
+  await d.clickUntilState(run, "Run the goal-to-go post", async () => hasAttributeNow(stop, "aria-pressed", "true"), 0);
+  const party = d.page.locator("[data-celebration]");
+  await d.expectState("The catch in the end zone is celebrated in Synthwave and opens Sakura", async () => {
+    await expect(party).toHaveAttribute("data-celebration", "synthwave", { timeout: 10_000 });
+    await expect(party.locator("[data-unlocked]")).toHaveText("New end zone: Sakura", { timeout: ASSERT_TIMEOUT });
+  }, 200, ["Touchdowns"]);
+  await d.poster();
+  await d.expectState("The play comes back to the whiteboard", async () => {
+    await expect(run).toBeVisible({ timeout: 15_000 });
+  }, 0);
 }
 
 export interface ChapterDefinition {
@@ -632,16 +815,24 @@ export interface ChapterDefinition {
   /** the length the tour promises for this chapter; the recorder holds the last frame to reach it */
   targetSeconds: number;
   run: (driver: ChapterDriver) => Promise<void>;
+  /**
+   * Live ▶ playback is a simulation (the primary read gets the ball most of the time). A chapter
+   * that narrates the primary pins every coin flip; it must never save a play, so nothing else
+   * draws on Math.random.
+   */
+  pinRandom?: true;
 }
 
 export const CHAPTERS: Readonly<Record<ChapterSlug, ChapterDefinition>> = {
   "build-play": { slug: "build-play", targetSeconds: 9, run: buildPlay },
   "custom-routes": { slug: "custom-routes", targetSeconds: 9, run: customRoutes },
-  "run-play": { slug: "run-play", targetSeconds: 11, run: runPlay },
+  "run-play": { slug: "run-play", targetSeconds: 11, run: runPlay, pinRandom: true },
   "build-defense": { slug: "build-defense", targetSeconds: 11, run: buildDefense },
+  "field-setup": { slug: "field-setup", targetSeconds: 10, run: fieldSetup },
+  touchdowns: { slug: "touchdowns", targetSeconds: 11, run: touchdowns, pinRandom: true },
   "save-share": { slug: "save-share", targetSeconds: 8, run: saveShare },
-  playbooks: { slug: "playbooks", targetSeconds: 8, run: playbooks },
-  "print-playbook": { slug: "print-playbook", targetSeconds: 9, run: printPlaybook },
+  playbooks: { slug: "playbooks", targetSeconds: 10, run: playbooks },
+  "print-playbook": { slug: "print-playbook", targetSeconds: 11, run: printPlaybook },
 };
 
 export interface ChapterRun {

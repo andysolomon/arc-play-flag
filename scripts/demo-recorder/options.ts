@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
 
 export const CHAPTER_SLUGS = [
-  "build-play", "custom-routes", "run-play", "build-defense",
-  "save-share", "playbooks", "print-playbook",
+  "build-play", "custom-routes", "run-play", "build-defense", "field-setup",
+  "touchdowns", "save-share", "playbooks", "print-playbook",
 ] as const;
 export type ChapterSlug = (typeof CHAPTER_SLUGS)[number];
 
