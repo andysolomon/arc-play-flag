@@ -38,3 +38,5 @@ export const swatch =
   "motion-reduce:transition-none";
 /** Small yellow sticker for a state word, e.g. "Shared". */
 export const chip = "inline-flex items-center rounded-pill border-2 border-ink bg-yellow-soft px-2 py-px text-caption leading-tight text-ink";
+/** The same sticker on a penalty flag's full yellow: something on the play a referee would flag. */
+export const flagChip = "inline-flex items-center rounded-pill border-2 border-ink bg-yellow on-yellow px-2 py-px text-caption leading-tight";

@@ -47,11 +47,13 @@ interface Props {
   /** the yard line this play's ball is on, counted from the offense's own goal line */
   los: number;
   onLos: (los: number) => void;
+  /** the play is a run called with the ball in a no-run zone (see runInNoRunZone) */
+  flagged: boolean;
 }
 
 function PlaySidebarImpl({
   name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
-  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, team, onTeam, los, onLos,
+  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, team, onTeam, los, onLos, flagged,
 }: Props) {
   const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
@@ -131,9 +133,11 @@ function PlaySidebarImpl({
         {LOS_CHOICES.map((n) => <option key={n} value={String(n)}>{losChoice(n)}</option>)}
       </select>
       <span id={losNote} aria-live="polite" className="flex-none text-caption leading-note text-ink-muted">
-        {noRunZones && inNoRunZone(los)
-          ? "Saved with this play. The ball is in a no-run zone, so no runs from here."
-          : "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20."}
+        {flagged
+          ? "Saved with this play. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball."
+          : noRunZones && inNoRunZone(los)
+            ? "Saved with this play. The ball is in a no-run zone, so no runs from here."
+            : "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20."}
       </span>
       <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
         <input

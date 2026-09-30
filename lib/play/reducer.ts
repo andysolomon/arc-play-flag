@@ -1,4 +1,5 @@
 import { LOS_YARD, losOf, readLos } from "./field";
+import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
@@ -20,6 +21,8 @@ export type Action =
   | { type: "select"; id: string | null }
   | { type: "cancelTargeting" }
   | { type: "pick"; key: RouteType }
+  | { type: "drawMotion" }
+  | { type: "removeMotion" }
   | { type: "target"; id: string }
   | { type: "setRoute"; id: string; route: Route | null }
   | { type: "draftPoint"; pt: Pair }
@@ -163,7 +166,14 @@ function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
     const a = pts[pts.length - 2], b = pts[pts.length - 1];
     if (a && b && a[0] === b[0] && a[1] === b[1]) pts = pts.slice(0, -1);
   }
-  const next = pts.length ? setRoute(s, d.id, { type: "custom", pts: [...pts] }) : s;
+  let next = s;
+  if (pts.length) {
+    if (d.kind === "motion") {
+      const c = commit(s);
+      next = { ...c, players: c.players.map(p => p.id === d.id && p.team === "offense"
+        ? { ...p, preSnap: { pts: pts.map(motionPoint) } } : withoutMotion(p)) };
+    } else next = setRoute(s, d.id, { type: "custom", pts: [...pts] });
+  }
   return { ...next, draft: null };
 }
 
@@ -189,6 +199,16 @@ export function reducer(s: PlayState, a: Action): PlayState {
     }
     case "cancelTargeting":
       return { ...s, targeting: false };
+    case "drawMotion": {
+      const p = selected(s);
+      return p?.team === "offense" ? { ...s, targeting: false, draft: { id: p.id, pts: [], kind: "motion" } } : s;
+    }
+    case "removeMotion": {
+      const p = selected(s);
+      if (!p?.preSnap) return s;
+      const c = commit(s);
+      return { ...c, draft: null, players: c.players.map(q => q.id === p.id ? withoutMotion(q) : q) };
+    }
     case "pick": {
       const p = selected(s);
       if (!p) return s;
@@ -208,10 +228,10 @@ export function reducer(s: PlayState, a: Action): PlayState {
       return setRoute(s, a.id, a.route);
     case "draftPoint":
       if (!s.draft || s.draft.pts.length >= MAX_ROUTE_POINTS) return s;
-      return { ...s, draft: { id: s.draft.id, pts: [...s.draft.pts, clampPoint(a.pt)] } };
+      return { ...s, draft: { ...s.draft, pts: [...s.draft.pts, s.draft.kind === "motion" ? motionPoint(a.pt) : clampPoint(a.pt)] } };
     case "draftPointRemove":
       if (!s.draft?.pts.length) return s;
-      return { ...s, draft: { id: s.draft.id, pts: s.draft.pts.slice(0, -1) } };
+      return { ...s, draft: { ...s.draft, pts: s.draft.pts.slice(0, -1) } };
     case "draftFinish":
       return finishDraft(s, false);
     case "draftFinishDoubleTap":
@@ -262,7 +282,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const sel = selected(s);
       if (!sel?.route || !mirrorable(sel)) return s;
       const c = commit(s);
-      return { ...c, players: patch(c.players, sel.id, { route: mirrorRoute(sel.route, sel.x).route }) };
+      return { ...c, players: patch(c.players, sel.id, { route: mirrorRoute(sel.route, atSnap(sel).x).route }) };
     }
     case "rename": {
       const base = a.commit ? commit(s) : s;
@@ -272,16 +292,17 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const c = commit(s);
       return {
         ...c,
-        players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null })),
+        players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
+          ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}) })),
       };
     }
     case "clearRoutes": {
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
-      if (!s.players.some((p) => p.route && inScope(p))) return s;
+      if (!s.players.some((p) => (p.route || p.preSnap) && inScope(p))) return s;
       const c = commit(s);
       return {
         ...c,
-        players: c.players.map((p) => (inScope(p) ? { ...p, route: null } : p)),
+        players: c.players.map((p) => (inScope(p) ? { ...withoutMotion(p), route: null } : p)),
         draft: null,
         targeting: false,
       };
