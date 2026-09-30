@@ -1,7 +1,7 @@
 import { NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { LOS_YARD, readLos } from "@/lib/play/field";
-import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
+import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
@@ -134,6 +134,12 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
   }
 
   // routes: the other team's first, then faded ones, so the highlighted route sits on top
+  for (const p of shown) {
+    const g = motionGeom(p, top);
+    if (!g) continue;
+    out.push(`<g data-pre-snap="${esc(p.id)}"${fade(opacity(p))}><path d="${g.d}" fill="none" stroke="${g.color}" stroke-width="${String(g.width)}" stroke-dasharray="${g.dash}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<polygon points="${g.arrow ?? ""}" fill="${g.color}"/></g>`);
+  }
   const routed = shown.flatMap((p) => {
     if (tagged(p, drawn)) return [];
     const g = geom(p, players, top, zones);

@@ -13,6 +13,7 @@ import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute, routeDef } from "@/lib/play/routes";
+import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
@@ -159,7 +160,7 @@ export function App() {
     const p = selected(s);
     if (p?.route && p.route.type !== "custom") watchCut(p.id, "Mirrored");
     dispatch({ type: "mirror" });
-    if (p?.route && mirrorRoute(p.route, p.x).clamped) say("Mirrored · pulled back inside the field", 2200);
+    if (p?.route && mirrorRoute(p.route, atSnap(p).x).clamped) say("Mirrored · pulled back inside the field", 2200);
   }, [s, say, watchCut]);
   const onClear = useCallback(() => {
     dispatch({ type: "clearRoutes", team: s.side });
@@ -327,7 +328,9 @@ export function App() {
   useEffect(() => install(), []);
   const sel = selected(s);
   const selCut = useMemo(() => (sel ? sidelineCut(sel) : null), [sel]);
-  const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? "Tap waypoints on the field · double-tap to finish" : null;
+  const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
+    ? "Pre-snap motion · tap waypoints behind the line · Finish when done"
+    : "Tap waypoints on the field · double-tap to finish" : null;
 
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
@@ -337,7 +340,7 @@ export function App() {
         rightOpen={rightOpen}
         canUndo={s.past.length > 0}
         canRedo={s.future.length > 0}
-        canClear={s.players.some((p) => p.route && p.team === s.side)}
+        canClear={s.players.some((p) => (p.route || p.preSnap) && p.team === s.side)}
         onClear={onClear}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
@@ -400,6 +403,8 @@ export function App() {
             cut={selCut}
             hint={hint}
             onPick={onPick}
+            onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}
+            onRemoveMotion={() => { dispatch({ type: "removeMotion" }); }}
             onDone={() => { dispatch({ type: "select", id: null }); }}
             onPrimary={onPrimary}
             onMirror={onMirror}

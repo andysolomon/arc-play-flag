@@ -1,4 +1,5 @@
 import { readLos, withLos } from "./field";
+import { motionPoint } from "./pre-snap";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, routeDef } from "./routes";
 import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
@@ -111,6 +112,7 @@ export function normalizePlayers(raw: unknown): Player[] {
   if (!Array.isArray(raw)) return [];
   const out: Player[] = [];
   const ids = new Set<string>();
+  let hasMotion = false;
   raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
     const team: Team = v.team === "defense" ? "defense" : "offense";
@@ -120,12 +122,17 @@ export function normalizePlayers(raw: unknown): Player[] {
     let id = typeof v.id === "string" && v.id ? v.id.slice(0, 40) : `p${String(i)}`;
     while (ids.has(id)) id = `${id}-${String(i)}`;
     ids.add(id);
+    const preSnap = team === "offense" && !hasMotion && isRecord(v.preSnap) && Array.isArray(v.preSnap.pts)
+      ? v.preSnap.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null).map(motionPoint)
+      : [];
+    if (preSnap.length) hasMotion = true;
     out.push({
       id,
       team,
       label: typeof v.label === "string" ? v.label.slice(0, 3) : "",
       x, y,
       route: normalizeRoute(v.route, team),
+      ...(preSnap.length ? { preSnap: { pts: preSnap } } : {}),
     });
   });
   const offense = new Set(out.filter((p) => p.team === "offense").map((p) => p.id));

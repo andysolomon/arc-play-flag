@@ -14,6 +14,8 @@ import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
 import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
+import { atSnap, motionPoint } from "@/lib/play/pre-snap";
+import { motionGeom } from "@/lib/play/geometry";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
@@ -206,7 +208,7 @@ function FieldImpl({
   const draftD = useMemo(() => {
     if (!draft) return "";
     const p = effective.find((q) => q.id === draft.id);
-    return p ? draftPath(p, draft.pts, top) : "";
+    return p ? draftPath(draft.kind === "motion" ? p : atSnap(p), draft.pts, top) : "";
   }, [draft, effective, top]);
   const editableCustom = useMemo(() => {
     const p = effective.find((q) => q.id === selectedId);
@@ -371,7 +373,8 @@ function FieldImpl({
     if (draft) {
       const pt = toYards(e.clientX, e.clientY);
       const c = clamp(snap(pt.x, snapMode), snap(pt.y, snapMode), null, top);
-      dispatch({ type: "draftPoint", pt: [c.x, c.y] });
+      const point = draft.kind === "motion" ? motionPoint([c.x, c.y]) : [c.x, c.y] as const;
+      dispatch({ type: "draftPoint", pt: point });
       e.currentTarget.focus();
       return;
     }
@@ -502,7 +505,7 @@ function FieldImpl({
         )}
         <div className="relative">
         {draft && !readOnly && (
-          <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
+          <div role="toolbar" aria-label={draft.kind === "motion" ? "Pre-snap motion controls" : "Custom route controls"} className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
             <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow on-yellow`}>
               Finish
             </button>
@@ -572,6 +575,7 @@ function FieldImpl({
           <desc>
             {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
+            {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
             {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
           <defs>
@@ -633,6 +637,10 @@ function FieldImpl({
               </text>
             </g>
           )}
+          {visible.map(p => {
+            const g = motionGeom(p, top);
+            return g ? <g key={p.id} data-pre-snap={p.id}><RouteLayer routes={[{ ...g, id: p.id, faded: isContext(p, side) }]} draftD="" /></g> : null;
+          })}
           <RouteLayer routes={routes} draftD={draftD} lane={designed && layout.endZone ? LANE_CLIP : null} />
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;
@@ -673,7 +681,8 @@ function FieldImpl({
               focusOnTarget={targeting && p.team === "offense" && p.id === visible.find((q) => q.team === "offense")?.id}
               boing={boingId === p.id}
               dragging={dragging}
-              readOnly={readOnly}
+              readOnly={readOnly || draft !== null}
+              drawing={draft !== null}
               faded={isContext(p, side)}
               onPointerDown={onDown}
               onKeyDown={onKey}

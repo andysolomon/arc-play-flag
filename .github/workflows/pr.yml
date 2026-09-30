@@ -150,6 +150,14 @@ jobs:
           path: test-results/no-run-flag-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload pre-snap motion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-snap-motion
+          path: test-results/**/motion*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
