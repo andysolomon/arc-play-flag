@@ -1,4 +1,4 @@
-import type { BallStep, Player, Team } from "./types";
+import type { Player, Team } from "./types";
 
 export const HISTORY_CAP = 60;
 
@@ -14,7 +14,6 @@ export interface Doc {
   /** the yard line the ball is on, counted from the offense's own goal line (see lib/play/field.ts) */
   los: number;
   players: readonly Player[];
-  ballPlan?: BallStep[];
 }
 
 /**
@@ -24,7 +23,6 @@ export interface Doc {
  */
 export interface Entry {
   players: readonly Player[];
-  ballPlan?: BallStep[];
 }
 
 export interface History {
@@ -34,8 +32,8 @@ export interface History {
 
 export const emptyHistory: History = { past: [], future: [] };
 
-export function push(h: History, doc: Pick<Doc, "players" | "ballPlan">): History {
-  const past = [...h.past, { players: doc.players, ...(doc.ballPlan ? { ballPlan: doc.ballPlan } : {}) }];
+export function push(h: History, doc: Pick<Doc, "players">): History {
+  const past = [...h.past, { players: doc.players }];
   return { past: past.length > HISTORY_CAP ? past.slice(-HISTORY_CAP) : past, future: [] };
 }
 
@@ -48,13 +46,12 @@ function apply(entry: Entry, current: Doc): Doc {
   return {
     id: current.id, name: current.name, notes: current.notes, side: current.side, artShadow: current.artShadow, los: current.los,
     players: entry.players,
-    ballPlan: entry.ballPlan,
   };
 }
 
 /** What the reverse step must restore: the players on the document as it is now. */
 function inverse(current: Doc): Entry {
-  return { players: current.players, ...(current.ballPlan ? { ballPlan: current.ballPlan } : {}) };
+  return { players: current.players };
 }
 
 export function undo(h: History, current: Doc): HistoryStep | null {

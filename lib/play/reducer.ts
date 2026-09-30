@@ -1,9 +1,8 @@
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
-import { readBallPlan } from "./ball-plan";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
-import type { BallStep, Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
+import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 export interface PlayState extends Doc, History {
   artShadow: boolean;
@@ -18,7 +17,6 @@ export interface PlayState extends Doc, History {
 }
 
 export type Action =
-  | { type: "setBallPlan"; ballPlan: BallStep[] }
   | { type: "move"; id: string; x: number; y: number; commit: boolean }
   | { type: "select"; id: string | null }
   | { type: "cancelTargeting" }
@@ -43,10 +41,10 @@ export type Action =
   | { type: "resetFormation"; team: Team | null }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; artShadow?: boolean; los?: number; players: Player[]; ballPlan?: BallStep[]; shadow?: boolean }
+  | { type: "load"; id?: string | null; name: string; notes?: string; side?: Team; artShadow?: boolean; los?: number; players: Player[]; shadow?: boolean }
   /** a fresh, unsaved play on the default formation. History from the play you left is dropped. */
   | { type: "newPlay"; side: Team }
-  | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; artShadow?: boolean; los?: number; players: Player[]; ballPlan?: BallStep[] }
+  | { type: "hydrate"; id?: string | null; name: string; notes?: string; side?: Team; artShadow?: boolean; los?: number; players: Player[] }
   | { type: "setName"; name: string }
   | { type: "setNotes"; notes: string }
   /** the yard line this play's ball is on; like the name, never undone */
@@ -84,10 +82,9 @@ export function selected(s: PlayState): Player | null {
 export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
   if (saved) {
     return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
-      || s.los !== losOf(saved) || JSON.stringify(s.players) !== JSON.stringify(saved.players)
-      || JSON.stringify(s.ballPlan) !== JSON.stringify(saved.ballPlan);
+      || s.los !== losOf(saved) || JSON.stringify(s.players) !== JSON.stringify(saved.players);
   }
-  return s.past.length > 0 || !!s.ballPlan?.length || s.notes !== "" || s.side !== "offense" || s.artShadow || s.los !== LOS_YARD
+  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow || s.los !== LOS_YARD
     || (s.name !== "New play" && s.name !== "");
 }
 
@@ -148,7 +145,7 @@ function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
 
 /** Replaces the whole document and drops undo and redo, which belong to the play you left. */
 function openPlay(s: PlayState, doc: Doc): PlayState {
-  return { ...s, ...emptyHistory, ...doc, ballPlan: doc.ballPlan, ...opened(s, doc), ...cleared };
+  return { ...s, ...emptyHistory, ...doc, ...opened(s, doc), ...cleared };
 }
 
 function step(s: PlayState, st: HistoryStep | null): PlayState {
@@ -189,11 +186,6 @@ const cleared = { selectedId: null, targeting: false, draft: null } as const;
 
 export function reducer(s: PlayState, a: Action): PlayState {
   switch (a.type) {
-    case "setBallPlan": {
-      const next = readBallPlan(a.ballPlan).ballPlan;
-      if (JSON.stringify(s.ballPlan) === JSON.stringify(next)) return s;
-      return { ...commit(s), ballPlan: next };
-    }
     case "move": {
       const base = a.commit ? commit(s) : s;
       return { ...base, players: patch(base.players, a.id, { x: a.x, y: a.y }) };
@@ -306,13 +298,11 @@ export function reducer(s: PlayState, a: Action): PlayState {
     }
     case "clearRoutes": {
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
-      const clearBall = a.team !== "defense";
-      if (!s.players.some((p) => (p.route || p.preSnap) && inScope(p)) && !(clearBall && s.ballPlan)) return s;
+      if (!s.players.some((p) => (p.route || p.preSnap) && inScope(p))) return s;
       const c = commit(s);
       return {
         ...c,
         players: c.players.map((p) => (inScope(p) ? { ...withoutMotion(p), route: null } : p)),
-        ballPlan: clearBall ? undefined : c.ballPlan,
         draft: null,
         targeting: false,
       };
@@ -344,7 +334,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "load": {
       const next = openPlay(s, {
         id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, los: readLos(a.los),
-        players: a.players, ballPlan: readBallPlan(a.ballPlan).ballPlan,
+        players: a.players,
       });
       // A shared snapshot opens with the other team faded, whichever side this play is.
       return a.shadow && next.vis !== "both" ? { ...next, vis: "both" } : next;
@@ -352,7 +342,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
     case "hydrate": {
       const doc: Doc = {
         id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, los: readLos(a.los),
-        players: a.players, ballPlan: readBallPlan(a.ballPlan).ballPlan,
+        players: a.players,
       };
       return { ...s, ...doc, ...opened(s, doc) };
     }

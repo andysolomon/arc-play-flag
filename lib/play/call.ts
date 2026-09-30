@@ -1,6 +1,6 @@
 import { inNoRunZone, losOf } from "./field";
 import { isPitch, isRun } from "./routes";
-import type { BallStep, Player, Team } from "./types";
+import type { Player, Team } from "./types";
 
 export type Call = "run" | "pass" | "play-action" | "option";
 
@@ -10,8 +10,7 @@ export type Call = "run" | "pass" | "play-action" | "option";
  * option (the runner can throw or keep it), any other runner beside a pass is
  * play-action, and everything else is a pass. Null when nobody has a route.
  */
-export function callOf(players: readonly Player[], ballPlan?: readonly BallStep[]): Call | null {
-  if (ballPlan?.length) return ballPlan.at(-1)?.type === "pass" ? "pass" : "run";
+export function callOf(players: readonly Player[]): Call | null {
   const offense = players.filter((p) => p.team === "offense" && p.route);
   if (!offense.length) return null;
   const runners = offense.filter((p) => p.route && isRun(p.route.type));
@@ -41,8 +40,8 @@ export const CALL_LABEL: Record<Call, string> = { run: "Run", pass: "Pass", "pla
  * - N5 the flag goes stale after the ball, a route, the primary read or the league's rule
  *   changes: nothing stores it, every surface asks again from the play as it is.
  */
-export function runInNoRunZone(play: { side: Team; players: readonly Player[]; los?: number; ballPlan?: readonly BallStep[] }, noRunZones: boolean): boolean {
-  return noRunZones && play.side === "offense" && inNoRunZone(losOf(play)) && callOf(play.players, play.ballPlan) === "run";
+export function runInNoRunZone(play: { side: Team; players: readonly Player[]; los?: number }, noRunZones: boolean): boolean {
+  return noRunZones && play.side === "offense" && inNoRunZone(losOf(play)) && callOf(play.players) === "run";
 }
 
 /** What a flagged play is called in words, on the play card, the field's caption and the notice. */

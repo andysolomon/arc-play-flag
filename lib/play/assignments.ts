@@ -20,8 +20,6 @@
  */
 
 import type { Numbered } from "@/lib/export/numbered";
-import { ballPlanLine } from "./ball-plan";
-import { quarterback } from "./geometry";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
 import { isPitch, isRun, routeDef } from "./routes";
@@ -91,7 +89,7 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
 /** "Pass", "Run", "Play-action", "Option", or "Defense" for a defensive call; null when nobody has a route. */
 export function callName(play: SavedPlay): string | null {
   if (play.side === "defense") return "Defense";
-  const call = callOf(play.players, play.ballPlan);
+  const call = callOf(play.players);
   return call ? CALL_LABEL[call] : null;
 }
 
@@ -101,7 +99,6 @@ export function callLine(play: SavedPlay): string | null {
     const cover = coverageOf(play.players);
     return cover ? `Defense, ${COVERAGE_WORDS[cover]} coverage.` : "Defense.";
   }
-  if (play.ballPlan?.length) return ballPlanLine(play.players, play.ballPlan);
   const call = callOf(play.players);
   if (!call) return null;
   const who = namer(play);
@@ -141,8 +138,6 @@ function qbJob(play: SavedPlay, who: Who): string | null {
 /** Every player on the play's own side, left to right, with their job. */
 export function assignments(play: SavedPlay): Assignment[] {
   const who = namer(play);
-  const steps = play.ballPlan ?? [];
-  const qb = quarterback(play.players);
   return play.players.filter((p) => p.team === play.side).sort(byLine).map((p) => {
     const offense = p.team === "offense";
     let job = routeJob(p, play, who);
@@ -153,25 +148,6 @@ export function assignments(play: SavedPlay): Assignment[] {
       else {
         job = offense ? "No route" : "No assignment";
         idle = true;
-      }
-    }
-    if (offense && steps.length) {
-      const jobs: string[] = [];
-      let from = qb?.id;
-      for (const [i, step] of steps.entries()) {
-        const target = play.players.find(q => q.id === step.target) ?? null;
-        if (p.id === step.target) jobs.push(`Receive ${step.type === "pass" ? "forward pass" : "lateral"} (${String(i + 1)})`);
-        if (p.id === from) jobs.push(`${step.type === "pass" ? "Throw forward pass" : "Lateral"} to ${who(target)} (${String(i + 1)})`);
-        from = step.target;
-      }
-      if (steps.at(-1)?.type !== "pass" && p.id === from) jobs.push("Keep the ball");
-      if (jobs.length) {
-        // Keep the movement assignment beside the possession jobs. QB's inferred throw
-        // is replaced, since the explicit list decides who actually passes.
-        job = [routeJob(p, play, who), ...jobs].filter(Boolean).join("; ");
-        idle = false;
-      } else if (p.id === qb?.id) {
-        job = routeJob(p, play, who) ?? "No route";
       }
     }
     if (offense && p.preSnap?.pts.length) {
