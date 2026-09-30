@@ -20,12 +20,14 @@ interface Props {
   artShadow?: boolean;
   /** the yard line the shared play's ball is on */
   los: number;
+  /** the coach's notes, as they were when the link was made; empty when there were none */
+  notes?: string;
 }
 
 const noop = (): void => undefined;
 
 /** Read-only view of a shared play, with a way back into the designer. */
-export function SharedPlay({ id, name, players, side, noRunZones, artShadow = false, los }: Props) {
+export function SharedPlay({ id, name, players, side, noRunZones, artShadow = false, los, notes = "" }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const cover = side === "defense" ? coverageOf(players) : null;
   // a defensive call says its coverage, as the stamp on its pictures does
@@ -62,6 +64,15 @@ export function SharedPlay({ id, name, players, side, noRunZones, artShadow = fa
           title={name}
         />
       </div>
+      {notes.trim() && (
+        <section
+          aria-labelledby="shared-notes-title"
+          className="max-h-[32%] flex-none overflow-y-auto border-t-2 border-ink bg-cream px-3 py-2 print:max-h-none print:overflow-visible print:border-t-0"
+        >
+          <h2 id="shared-notes-title" className="text-eyebrow tracking-eyebrow text-ink-muted">COACHING NOTES</h2>
+          <p className="whitespace-pre-line break-words text-base leading-note text-ink">{notes}</p>
+        </section>
+      )}
     </div>
   );
 }
