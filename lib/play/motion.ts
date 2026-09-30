@@ -1,5 +1,6 @@
 import { quarterback, routeYards } from "./geometry";
-import { isPitch, isRun } from "./routes";
+import { chainLinks, type Link } from "./lateral";
+import { isBallJob, isRun } from "./routes";
 import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
@@ -16,8 +17,12 @@ export const DELAY = 0.8;
 export const PRIMARY_ODDS = 0.8;
 /** A play-action fake takes this long to sell. */
 const FAKE = 0.25;
-/** How long a pitch runner takes to set their feet before throwing. */
+/** How long a carrier takes to set their feet before throwing. */
 const SET_UP = 0.2;
+/** How long a carrier holds a lateral they've caught before tossing it on. */
+const BEAT = 0.15;
+/** A lateral is a low toss: the top of its arc, as a share of a thrown ball's. */
+const TOSS_LIFT = 0.3;
 
 interface Track {
   pts: Pt[];
@@ -28,6 +33,17 @@ interface Track {
   wait: number;
   /** man coverage: the offensive player being shadowed */
   target?: string;
+  /** a lateral's target: they stop `d` yards in, at the catch, until `until` seconds after the snap, then go on */
+  hold?: { d: number; until: number };
+}
+
+/** One lateral in playback: tossed from one carrier's hands at `at` and caught at the catch point at `land`. */
+export interface Toss {
+  from: string;
+  to: string;
+  at: number;
+  land: number;
+  catch: Pt;
 }
 
 export type PlayKind = "run" | "pass" | "hold";
@@ -53,7 +69,9 @@ export interface Motion {
   /** when the runner meets the quarterback, and how long the exchange takes */
   handAt: number;
   handFor: number;
-  /** pass: who throws it — the quarterback, or the runner after a pitch */
+  /** each lateral in the chain, in order (lib/play/lateral.ts); none on a play without one */
+  laterals: Toss[];
+  /** pass: who throws it — the quarterback, or the last carrier of a lateral chain */
   passer: string | null;
   /** pass: who the ball is thrown to */
   receiver: string | null;
@@ -117,8 +135,20 @@ function at(t: Track, d: number): Pt {
   return t.pts[t.pts.length - 1] ?? first;
 }
 
-/** Where along a track a player is after `s` seconds. */
-const along = (t: Track, s: number): Pt => at(t, (s - t.wait) * SPEED);
+/** Where along a track a player is after `s` seconds, holding at the catch until the lateral is theirs. */
+function along(t: Track, s: number): Pt {
+  const d = (s - t.wait) * SPEED;
+  const h = t.hold;
+  if (!h || d <= h.d) return at(t, d);
+  const go = Math.max(t.wait + h.d / SPEED, h.until);
+  return at(t, s < go ? h.d : h.d + (s - go) * SPEED);
+}
+
+/** Seconds after the snap a track is run to its end, any hold included. */
+function endOf(t: Track): number {
+  const h = t.hold;
+  return h ? Math.max(t.wait + h.d / SPEED, h.until) + (t.len - h.d) / SPEED : t.wait + t.len / SPEED;
+}
 
 /** Seconds until a runner is closest to the quarterback, and how far away they still are. */
 function meshPoint(t: Track, qb: Pt): { at: number; gap: number } {
@@ -138,9 +168,9 @@ const pickOne = <T>(list: readonly T[], rand: () => number): T | undefined =>
  * The centre snaps to the quarterback; a run route makes it a run (the ball is handed
  * or tossed at the mesh point), otherwise it's a pass to one of the receivers — the
  * primary read when one is marked: always in teaching mode, `PRIMARY_ODDS` of the time in
- * simulation — with a play-action fake when a runner is in the mix. A pitch runner who
- * doesn't keep it stops at their set point and throws from there. The teaching default is
- * deterministic; simulation mode enables the coin flips.
+ * simulation — with a play-action fake when a runner is in the mix. A lateral chain runs
+ * each toss in order after the snap, then the last carrier sets up and throws or keeps it
+ * (see chainPlay). The teaching default is deterministic; simulation mode enables the coin flips.
  */
 export function buildMotion(
   players: readonly Player[],
@@ -157,15 +187,24 @@ export function buildMotion(
   if (!preSnapFor) return m;
   return { ...m, preSnapFor, preSnapTracks, dur: m.dur + preSnapFor,
     snapAt: m.snapAt + preSnapFor, handAt: m.handAt + preSnapFor,
-    throwAt: m.throwAt + preSnapFor, catchAt: m.catchAt + preSnapFor };
+    throwAt: m.throwAt + preSnapFor, catchAt: m.catchAt + preSnapFor,
+    laterals: m.laterals.map((l) => ({ ...l, at: l.at + preSnapFor, land: l.land + preSnapFor })) };
 }
 
 function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackMode): Motion {
   const random = mode.kind === "simulation" ? mode.random : null;
   const zones = zoneLayout(players, top);
   const tracks: Record<string, Track> = {};
+  const links = chainLinks(players);
+  for (const l of links) {
+    // a lateral's target drifts from their spot to the catch, holds there until it's theirs, then does
+    // their job from it (routeYards starts it there); the hold's end is set once the tosses are timed
+    const job = routeYards(l.to, players, top) ?? [];
+    const drift = Math.hypot(l.catch[0] - l.to.x, l.catch[1] - l.to.y);
+    tracks[l.to.id] = { ...track([[l.to.x, l.to.y], l.catch, ...job]), hold: { d: drift, until: 0 } };
+  }
   for (const p of players) {
-    if (!p.route) continue;
+    if (!p.route || tracks[p.id]) continue;
     const zone = zones[p.id];
     if (zone) {
       tracks[p.id] = track([[p.x, p.y], [zone.cx, zone.cy]]);
@@ -200,14 +239,15 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
     qb: qb?.id ?? null,
     snapAt: cl(snapGap / 10, 0.12, 0.45),
     shotgun: snapGap > 2,
-    runner: null, handAt: Infinity, handFor: 0,
+    runner: null, handAt: Infinity, handFor: 0, laterals: [],
     passer: qb?.id ?? null, receiver: null, throwAt: Infinity, catchAt: Infinity,
   };
   if (!qb) return m;
+  if (links.length) return chainPlay(m, players, tracks, links, random, run);
 
   const offense = players.filter((p) => p.team === "offense" && p.route && tracks[p.id]);
   const runners = offense.filter((p) => p.route && isRun(p.route.type));
-  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && p.id !== qb.id);
+  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.id !== qb.id);
   const primary = offense.find((p) => p.route?.primary);
   const primaryRun = primary?.route ? isRun(primary.route.type) : false;
 
@@ -237,15 +277,9 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
   }
   if (receivers.length === 0) return m;
 
-  // a pitch runner who isn't keeping it pulls up at the set point and becomes the passer
-  let setAt = 0;
-  const pitchTrack = runner && runner.route && isPitch(runner.route.type) ? tracks[runner.id] : undefined;
-  if (runner && pitchTrack && pitchTrack.pts.length > 2) {
-    const set = track(pitchTrack.pts.slice(0, -1).map((q) => [q.x, q.y] as const), pitchTrack.wait);
-    tracks[runner.id] = set;
-    m.passer = runner.id;
-    setAt = set.wait + set.len / SPEED + SET_UP;
-  }
+  // a quarterback on a throw route rolls out to the set point and throws from there
+  const rollout = qb.route?.type === "throw" ? tracks[qb.id] : undefined;
+  const setAt = rollout ? endOf(rollout) + SET_UP : 0;
 
   // Teaching always throws to the marked read, or the first drawn receiver when no read
   // is marked. Simulation throws to the marked read PRIMARY_ODDS of the time and spreads
@@ -266,6 +300,68 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
   const flight = cl(dist(guess, from) / 16, 0.35, 1.1);
   m.catchAt = m.throwAt + flight;
   m.dur = Math.max(run, m.catchAt + 0.5) + HOLD;
+  return m;
+}
+
+/**
+ * A lateral chain after the snap. Each toss leaves the carrier a beat after they have it, timed so it
+ * lands as the target gets to the catch (they drift there from the snap), and goes low and backward.
+ * Then the last carrier throws (they set up behind the line and hit the read, never another carrier),
+ * keeps it (a run, from the catch), or, with no job yet, just holds it. Everyone off the chain runs
+ * their route from the snap.
+ */
+function chainPlay(
+  m: Motion, players: readonly Player[], tracks: Record<string, Track>, links: readonly Link[],
+  random: (() => number) | null, run: number,
+): Motion {
+  let held = m.snapAt;
+  for (const l of links) {
+    const tr = tracks[l.to.id];
+    const drift = tr?.hold?.d ?? 0;
+    const flight = cl(Math.hypot(l.catch[0] - l.release[0], l.catch[1] - l.release[1]) / 12, 0.3, 0.8);
+    const at = Math.max(held + BEAT, drift / SPEED - flight);
+    const land = at + flight;
+    if (tr?.hold) tr.hold.until = land;
+    m.laterals.push({ from: l.from.id, to: l.to.id, at, land, catch: { x: l.catch[0], y: l.catch[1] } });
+    held = land;
+  }
+  const last = links[links.length - 1]?.to;
+  if (!last) return m;
+  const carried = tracks[last.id];
+  const done = carried ? endOf(carried) : held;
+  const job = last.route;
+  m.runner = null;
+  m.passer = last.id;
+  if (job && isRun(job.type)) {
+    m.kind = "run";
+    m.runner = last.id;
+    m.handAt = held;
+    m.dur = Math.max(run, done, held + 0.5) + HOLD;
+    return m;
+  }
+  m.kind = "hold";
+  m.dur = Math.max(run, done, held + 0.5) + HOLD;
+  if (job?.type !== "throw") return m;
+
+  const chain = new Set([links[0]?.from.id, ...links.map((l) => l.to.id)]);
+  const receivers = players.filter((p) =>
+    p.team === "offense" && p.route && tracks[p.id] && !chain.has(p.id) && !isRun(p.route.type) && !isBallJob(p.route.type));
+  if (!receivers.length) return m;
+  m.kind = "pass";
+  const primary = receivers.find((p) => p.route?.primary);
+  const others = receivers.filter((p) => p.id !== primary?.id);
+  const receiver = primary
+    ? !random || others.length === 0 || random() < PRIMARY_ODDS ? primary : pickOne(others, random)
+    : random ? pickOne(receivers, random) : receivers[0];
+  if (!receiver) return m;
+  m.receiver = receiver.id;
+  const rt = tracks[receiver.id];
+  const arrive = rt ? endOf(rt) : 0;
+  m.throwAt = Math.max(held + 0.15, done + SET_UP, Math.min(arrive * 0.7, run));
+  const guess = positionsAt(m, players, m.throwAt + 0.6)[receiver.id] ?? receiver;
+  const from = positionsAt(m, players, m.throwAt)[last.id] ?? last;
+  m.catchAt = m.throwAt + cl(dist(guess, from) / 16, 0.35, 1.1);
+  m.dur = Math.max(run, done, m.catchAt + 0.5) + HOLD;
   return m;
 }
 
@@ -308,7 +404,8 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
 
 /**
  * Where the ball is `t` seconds in: snapped, handed or faked, thrown in an arc, then
- * caught. On a pitch the ball is tossed to the runner first and thrown from their hands.
+ * caught. On a lateral chain it is tossed back, low, to each catch point in turn, and
+ * thrown (or carried) from the last carrier's hands.
  */
 export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | null {
   const qb = m.qb ? pos[m.qb] : undefined;
@@ -321,14 +418,25 @@ export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | nu
     return { ...lerp(c, qb, k), lift: m.shotgun ? 0.45 * Math.sin(Math.PI * k) : 0 };
   }
   const runner = m.runner ? pos[m.runner] : undefined;
-  const pitched = m.runner !== null && m.passer === m.runner;
-  if (runner && (m.kind === "run" || pitched)) {
+  if (m.laterals.length) {
+    for (const l of m.laterals) {
+      const from = pos[l.from] ?? qb;
+      if (t < l.at) return { ...from, lift: 0 };
+      if (t < l.land) {
+        const k = (t - l.at) / (l.land - l.at);
+        return { ...lerp(from, l.catch, k), lift: TOSS_LIFT * Math.sin(Math.PI * k) };
+      }
+    }
+    const last = m.laterals[m.laterals.length - 1];
+    const carrier = last ? pos[last.to] : undefined;
+    if (m.kind !== "pass") return carrier ? { ...carrier, lift: 0 } : null;
+  } else if (runner && m.kind === "run") {
     if (t < m.handAt) return { ...qb, lift: 0 };
     if (t < m.handAt + m.handFor) {
       const k = (t - m.handAt) / m.handFor;
       return { ...lerp(qb, runner, k), lift: m.handFor > 0.15 ? 0.4 * Math.sin(Math.PI * k) : 0 };
     }
-    if (m.kind === "run") return { ...runner, lift: 0 };
+    return { ...runner, lift: 0 };
   } else if (runner && Math.abs(t - m.handAt) < FAKE) {
     // play-action: the ball dips toward the runner and comes right back
     const k = 1 - Math.abs(t - m.handAt) / FAKE;

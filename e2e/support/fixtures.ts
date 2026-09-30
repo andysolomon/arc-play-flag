@@ -39,8 +39,10 @@ export const COVER_TWO_D: SavedPlay = (() => {
   return { ...p, players: p.players.map((q) => (q.team === "defense" ? { ...q, label: "" } : q)) };
 })();
 export const FAKE_DIVE = play("fx-fake-dive", "Otter Fake Dive", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "curl" } });
-export const PITCH_OPTION: SavedPlay = (() => {
-  const p = play("fx-pitch-option", "Otter Pitch Option", { o5: { type: "pitch" }, o4: { type: "corner" }, o3: { type: "custom", pts: [[3, -6], [8, -10]] } });
+export const DOUBLE_PASS: SavedPlay = (() => {
+  const p = play("fx-double-pass", "Otter Double Pass", {
+    o2: { type: "lateral", target: "o5" }, o5: { type: "throw" }, o4: { type: "corner", primary: true }, o3: { type: "custom", pts: [[3, -6], [8, -10]] },
+  });
   return { ...p, players: p.players.map((q) => (q.id === "o3" ? { ...q, label: "" } : q)) };
 })();
 // the line-of-scrimmage journey: the same call from the 5 and, carrying a ball spot, from their 5 (the 35)

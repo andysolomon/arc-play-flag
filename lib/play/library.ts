@@ -2,7 +2,8 @@ import {
   StorageError, artShadow, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
 } from "./storage";
 import { losOf, withLos } from "./field";
-import { isRun } from "./routes";
+import { callOf } from "./call";
+import { isBallJob, isRun } from "./routes";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
 
 /**
@@ -26,13 +27,17 @@ export interface PlayDiscovery {
 
 /**
  * Defense is the play's side; Run and Pass are offensive plays by what their routes do,
- * and an offensive play may match both. Blank diagrams remain under All.
+ * and an offensive play may match both. A lateral or a throw is a ball carrier's job, not
+ * a route anyone catches: a chain that ends in a throw is a pass, one that ends in a keep
+ * is a run by its keep. Blank diagrams remain under All.
  */
 export function playMatchesFilter(play: SavedPlay, filter: Exclude<PlayFilter, "all">): boolean {
   if (filter === "defense") return play.side === "defense";
   if (play.side !== "offense") return false;
   if (filter === "run") return play.players.some((p) => p.team === "offense" && p.route && isRun(p.route.type));
-  return play.players.some((p) => p.team === "offense" && p.route && !isRun(p.route.type));
+  const call = callOf(play.players);
+  return call === "double-pass" || call === "lateral-pass"
+    || play.players.some((p) => p.team === "offense" && p.route && !isRun(p.route.type) && !isBallJob(p.route.type));
 }
 
 /** Search name + notes, then return a stable name or newest-insertion-first view. */

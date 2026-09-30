@@ -1,3 +1,4 @@
+import { chainLine } from "@/lib/play/assignments";
 import { losOf } from "@/lib/play/field";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { TeamSettings, Vis } from "@/lib/play/types";
@@ -97,7 +98,10 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   const out: string[] = [];
   out.push(badge(x + pad + r, y + pad + head / 2, r, item.n));
   const nameX = x + pad + r * 2 + 3;
-  out.push(text(nameX, y + pad + head / 2 + size * 0.36, size, fit(item.play.name, x + w - pad - nameX, size)));
+  // a lateral chain says where the ball goes after the name: "Trick · QB › Z › X › Y"
+  const path = chainLine(item.play);
+  const title = path ? `${item.play.name} · ${path}` : item.play.name;
+  out.push(text(nameX, y + pad + head / 2 + size * 0.36, size, fit(title, x + w - pad - nameX, size)));
   const fy = y + pad + head + 1;
   out.push(
     field(item.play.players, x + pad, fy, w - 2 * pad, y + h - pad - fy, {

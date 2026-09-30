@@ -8,9 +8,10 @@ const GAP = 6;
 /**
  * Ink pill that floats centred under the header with a one-line instruction. Given `below`, the
  * id of an element on the page (the designer's play name), it sits just under that instead, so a
- * "Saved" never covers the name it is about.
+ * "Saved" never covers the name it is about. A `flag` note (something on the play a referee would
+ * flag, snapped back) wears the penalty flag's yellow instead, like the flag stamp and chip.
  */
-export function Hint({ text, below }: { text: string | null; below?: string }) {
+export function Hint({ text, below, flag = false }: { text: string | null; below?: string; flag?: boolean }) {
   const [top, setTop] = useState<number | null>(null);
   useLayoutEffect(() => {
     if (!text || !below) return;
@@ -32,7 +33,11 @@ export function Hint({ text, below }: { text: string | null; below?: string }) {
     <div
       role="status"
       style={below && top !== null ? { top } : undefined}
-      className="pointer-events-none fixed left-1/2 top-[58px] z-[15] max-w-[calc(100%-24px)] -translate-x-1/2 truncate rounded-pill bg-ink px-4 py-1.5 text-base text-cream shadow-toast"
+      data-flag={flag || undefined}
+      className={
+        "pointer-events-none fixed left-1/2 top-[58px] z-[15] max-w-[calc(100%-24px)] -translate-x-1/2 truncate rounded-pill px-4 py-1.5 text-base shadow-toast " +
+        (flag ? "border-2 border-ink bg-yellow on-yellow" : "bg-ink text-cream")
+      }
     >
       {text}
     </div>

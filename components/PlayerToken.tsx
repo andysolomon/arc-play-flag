@@ -10,9 +10,9 @@ interface Props {
   x: number;
   y: number;
   selected: boolean;
-  /** dashed ring while "Man" is waiting for a red player */
-  target: boolean;
-  /** move focus to the first eligible player when man-target selection begins */
+  /** dashed ring while "Man" or "Lateral" is waiting for a red player this one can answer */
+  target: "man" | "lateral" | null;
+  /** move focus to the first eligible player when target selection begins */
   focusOnTarget: boolean;
   boing: boolean;
   dragging: boolean;
@@ -41,7 +41,7 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
       pointerEvents={drawing ? "none" : undefined}
       tabIndex={readOnly ? undefined : 0}
       role={readOnly ? "img" : "button"}
-      aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id) + (target ? ", man coverage target" : "")}
+      aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id) + (target === "man" ? ", man coverage target" : target === "lateral" ? ", can take the lateral" : "")}
       aria-pressed={readOnly ? undefined : selected}
       aria-keyshortcuts={readOnly ? undefined : "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"}
       onPointerDown={readOnly ? undefined : (e) => { onPointerDown(p.id, e); }}

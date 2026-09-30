@@ -36,6 +36,10 @@ export const swatch =
   "hover:-translate-y-0.5 has-[:checked]:shadow-[0_0_0_3px_var(--color-yellow)] has-[:disabled]:cursor-not-allowed " +
   "has-[:disabled]:hover:translate-y-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink " +
   "motion-reduce:transition-none";
+/** One step of a lateral chain's ball path: white, yellow for the selected carrier, soft yellow for how it ends. */
+export const crumb =
+  "inline-flex items-center rounded-pill border-2 border-ink bg-white px-2 py-px text-caption leading-tight text-ink " +
+  "data-[active=true]:bg-yellow data-[active=true]:on-yellow data-[end=true]:bg-yellow-soft";
 /** Small yellow sticker for a state word, e.g. "Shared". */
 export const chip = "inline-flex items-center rounded-pill border-2 border-ink bg-yellow-soft px-2 py-px text-caption leading-tight text-ink";
 /** The same sticker on a penalty flag's full yellow: something on the play a referee would flag. */

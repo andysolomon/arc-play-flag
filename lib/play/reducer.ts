@@ -1,8 +1,12 @@
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
-import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
+import { carriers, catchPoint, chainOf, clampCatch, releasePoint, settleChain } from "./lateral";
+import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
+import { isLateral, type Draft, type Pair, type Player, type Route, type RouteType, type SavedPlay, type Team, type Vis } from "./types";
+
+/** What a tap on a red player is waiting to answer: who a man defender covers, or who takes a lateral. */
+export type Targeting = "man" | "lateral";
 
 export interface PlayState extends Doc, History {
   artShadow: boolean;
@@ -11,7 +15,7 @@ export interface PlayState extends Doc, History {
   /** the saved play this one came from, so Save updates it instead of adding another */
   id: string | null;
   selectedId: string | null;
-  targeting: boolean;
+  targeting: Targeting | null;
   draft: Draft | null;
   vis: Vis;
 }
@@ -24,6 +28,8 @@ export type Action =
   | { type: "drawMotion" }
   | { type: "removeMotion" }
   | { type: "target"; id: string }
+  /** a lateral's catch point dragged or nudged: clamped behind its release and the line */
+  | { type: "catchMove"; id: string; pt: Pair }
   | { type: "setRoute"; id: string; route: Route | null }
   | { type: "draftPoint"; pt: Pair }
   | { type: "draftPointRemove" }
@@ -67,7 +73,7 @@ export function initialState(): PlayState {
     los: LOS_YARD,
     players: defaults(),
     selectedId: null,
-    targeting: false,
+    targeting: null,
     draft: null,
     vis: "offense",
     ...emptyHistory,
@@ -139,7 +145,7 @@ function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "shadowFo
 /** The field's shadow shown or hidden; hiding it takes that player off the field, so stop editing them. */
 function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
   const picked = selected(s);
-  if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: false, draft: null };
+  if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: null, draft: null };
   return { ...s, vis };
 }
 
@@ -182,26 +188,41 @@ function customRoute(s: PlayState, id: string): Route | null {
   return route?.type === "custom" ? route : null;
 }
 
-const cleared = { selectedId: null, targeting: false, draft: null } as const;
+const cleared = { selectedId: null, targeting: null, draft: null } as const;
 
+/** Whether this player holds the ball: the quarterback, or anyone a lateral reaches. */
+const holds = (players: readonly Player[], id: string): boolean => chainOf(players).some((p) => p.id === id);
+
+/**
+ * Every edit lands with its lateral chain settled (lib/play/lateral.ts): a move of a player or the ball,
+ * a catch dragged, a lateral retargeted, a formation reset or flipped each re-clamp every catch in
+ * chain order, since each catch depends on the one before it. A play with nothing to settle is untouched.
+ */
 export function reducer(s: PlayState, a: Action): PlayState {
+  const next = reduce(s, a);
+  if (next.players === s.players) return next;
+  const players = settleChain(next.players);
+  return players === next.players ? next : { ...next, players };
+}
+
+function reduce(s: PlayState, a: Action): PlayState {
   switch (a.type) {
     case "move": {
       const base = a.commit ? commit(s) : s;
       return { ...base, players: patch(base.players, a.id, { x: a.x, y: a.y }) };
     }
     case "select": {
-      if (a.id === null) return { ...s, selectedId: null, targeting: false, draft: null };
+      if (a.id === null) return { ...s, selectedId: null, targeting: null, draft: null };
       const picked = s.players.find((p) => p.id === a.id);
       // either team can be selected, including the faded shadow, so they can take an assignment
       if (!picked) return s;
-      return { ...s, selectedId: a.id, targeting: false, draft: null };
+      return { ...s, selectedId: a.id, targeting: null, draft: null };
     }
     case "cancelTargeting":
-      return { ...s, targeting: false };
+      return { ...s, targeting: null };
     case "drawMotion": {
       const p = selected(s);
-      return p?.team === "offense" ? { ...s, targeting: false, draft: { id: p.id, pts: [], kind: "motion" } } : s;
+      return p?.team === "offense" ? { ...s, targeting: null, draft: { id: p.id, pts: [], kind: "motion" } } : s;
     }
     case "removeMotion": {
       const p = selected(s);
@@ -213,16 +234,44 @@ export function reducer(s: PlayState, a: Action): PlayState {
       const p = selected(s);
       if (!p) return s;
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
-      if (a.key === "man") return { ...s, targeting: true, draft: null };
-      if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: false };
+      if (a.key === "man") return { ...s, targeting: "man", draft: null };
+      // only the player with the ball can lateral it; like Man, it then asks who takes it
+      if (a.key === "lateral") return p.team === "offense" && holds(s.players, p.id) ? { ...s, targeting: "lateral", draft: null } : s;
+      if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: null };
       return setRoute(s, p.id, { type: a.key });
     }
     case "target": {
       const def = selected(s);
       const t = s.players.find((q) => q.id === a.id);
       if (!s.targeting || !t || t.team !== "offense") return s;
+      if (s.targeting === "lateral") {
+        // a red player not already holding it takes it, and is selected to be given their job with it.
+        // A new target gets a catch of their own (none stored), and a pass route they had is gone:
+        // they have the ball now
+        if (!def || holds(s.players, t.id)) return s;
+        const c = commit(s);
+        return {
+          ...c,
+          targeting: null,
+          selectedId: t.id,
+          players: c.players.map((p) => {
+            if (p.id === def.id) return { ...p, route: { type: "lateral", target: t.id } };
+            if (p.id === t.id && p.route && !isRun(p.route.type)) return { ...p, route: null };
+            return p;
+          }),
+        };
+      }
       const next = def ? setRoute(s, def.id, { type: "man", target: t.id }) : s;
-      return { ...next, targeting: false };
+      return { ...next, targeting: null };
+    }
+    case "catchMove": {
+      const p = s.players.find((q) => q.id === a.id);
+      if (!p || !isLateral(p.route) || !catchPoint(p, s.players)) return s;
+      const pt = clampCatch(a.pt, releasePoint(p, s.players));
+      const was = p.route.catch;
+      if (was?.[0] === pt[0] && was[1] === pt[1]) return s;
+      const c = commit(s);
+      return { ...c, players: patch(c.players, a.id, { route: { ...p.route, catch: pt } }) };
     }
     case "setRoute":
       return setRoute(s, a.id, a.route);
@@ -265,7 +314,8 @@ export function reducer(s: PlayState, a: Action): PlayState {
     }
     case "togglePrimary": {
       const sel = selected(s);
-      if (!sel || sel.team !== "offense" || !sel.route) return s;
+      // a carrier in a lateral chain is never the read: the final throw goes to someone else
+      if (!sel || sel.team !== "offense" || !sel.route || carriers(s.players).has(sel.id)) return s;
       const on = !sel.route.primary;
       const c = commit(s);
       return {
@@ -304,7 +354,7 @@ export function reducer(s: PlayState, a: Action): PlayState {
         ...c,
         players: c.players.map((p) => (inScope(p) ? { ...withoutMotion(p), route: null } : p)),
         draft: null,
-        targeting: false,
+        targeting: null,
       };
     }
     case "resetFormation": {

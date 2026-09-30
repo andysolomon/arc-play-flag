@@ -5,26 +5,27 @@
     "app/globals.css"
   ],
   "files": {
-    "app/globals.css": "97152cc98af22640f48d2ae77eb28bde073ba4aa06b19c45529d6a1362849b2c",
-    "components/App.tsx": "7eb8f1bf2ac6cb89edb4a33111a5fd14baf5e67cd8056086ae9759eb376ba9bf",
+    "app/globals.css": "adbe29ff46823bb9aba6b3180b4dc839919262cfd08908914532b1b393617bb7",
+    "components/App.tsx": "c164a4d5b91d37e65e4d58d11c7f5b44b12f0f0eb0d801b39edaafbff19e9beb",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "b02cfcf29e3dbff1b72d53772e39d11078aad4cd32386bbebd583a2684f66bcd",
+    "components/Field.tsx": "fdf4fd603eb8d0b3e0448e10c9ead084c70ed7fb335d934b3b4e5044983ea0d5",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "27ae56c5b4ae332ed52f4d97e484e2aa1f31e4fb55111982b76679dd2d495519",
-    "components/Hint.tsx": "9703b947d5d7b1d6f5eb6d54b929a4dc65c2cc7eaf3f18384379e084c461a21d",
+    "components/Hint.tsx": "4fb4992847285e79681a77850dba475ee3d4e537a11412051b486457ae953668",
     "components/IconTile.tsx": "d8d6e11e2930790550cf0915ef14f172bb275f1c6f6d2578ff0014296c1aea92",
+    "components/LateralLayer.tsx": "d356a181f066c3f117d0eba4b950a4721405d26efa046623d15fef1593a4bfa2",
     "components/ManTagLayer.tsx": "258c32c219b052ff21d75fa6e169e2e6abbc1b3f12036aee17a0c3a779615833",
     "components/OfflineStatus.tsx": "bf355de426d0eda57124b65468b8657713b243ff0b50fb7e1a639c4ed60aea2d",
     "components/PlaySidebar.tsx": "8f263155be4f3b5bb9e2ab788ae22149f12cfef443e72abb07cad239c30aed2c",
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "7a777ca25b6fd4428d380e92aecedcb4611a776d30a71e5e53deea19f3b2a5b0",
-    "components/PlayerToken.tsx": "5a7cc714f0f7e730b17a5445557e0c00b0f99b3e4c3f09a5904e01343f4a946a",
+    "components/PlayerToken.tsx": "973e5390c1594caf47c2c981c105720693432b3207af76e0a91a868bbec1c9bc",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RouteLayer.tsx": "5a328c1e130b66c1dd0779bac662a2c78e236ad7b2b76f4203e0c08f85086d14",
-    "components/RouteSidebar.tsx": "59c1d4be8c7c2273eeb909e7ba66cb5fb3af1df80638524259943132a7129f90",
+    "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
+    "components/RouteSidebar.tsx": "b15606d5a702854e90beba918c764f584cdae739606ba5a1d754f8e1c6bb2735",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
-    "components/SharedPlay.tsx": "41109f202e0335ad6311553697fe5dadb6e7899efb59eccecca6a0dc08911410",
+    "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",
     "components/Sidebar.tsx": "1733abd776b94df98ff4e40903cca680cba56888a26a0f8fe24536b043261436",
     "components/Sticker.tsx": "1eb0596e4b6c2c8826629dd0da9b6b6975b3e94723eabb90976d1bf42c66a825",
@@ -60,15 +61,21 @@
     "components/playbooks/SharedBook.tsx": "c1fcb10f1d2ddbd0391ad485bcb0cca07515509e3a67251f2c9b682f7e3f82ed",
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
-    "components/ui.ts": "95ec1e9af5fe4f6f12f3b36c38a00185e06b057b1244f1a073bd4706cdb2b6e1"
+    "components/ui.ts": "708637dcfd235815bdbab737b526778a9b6f6289956c01dd966fb893a1c5aaee"
   },
   "restamped": {
-    "reason": "ARC-186 changes only the Matrix end zone (its art, its rush timing, its name-plate glitch and its glyph confetti, all scoped to Matrix) plus will-change on the end zone band, which draws the same. Every clip was reviewed as frame sheets (1 fps; touchdowns at 4 fps): no clip shows the Matrix end zone, its swatch, its celebration or glyph confetti; touchdowns picks and celebrates Synthwave '84, whose band looks the same.",
+    "reason": "Lateral replaces Pitch only in the third row of the offense palette's RUN group, which no clip scrolls to (build-play stops at the pass tiles and custom-routes at the Counter/Reverse/Delay row, checked frame by frame); arcs, catch handles, the carrier palette and the flag-yellow note draw only on plays with a lateral, which no chapter has; Man targeting's rings are unchanged",
     "files": [
       "app/globals.css (changed)",
+      "components/App.tsx (changed)",
       "components/Field.tsx (changed)",
-      "components/endzone/Celebration.tsx (changed)",
-      "components/endzone/art/matrix.tsx (changed)"
+      "components/Hint.tsx (changed)",
+      "components/LateralLayer.tsx (added)",
+      "components/PlayerToken.tsx (changed)",
+      "components/RouteLayer.tsx (changed)",
+      "components/RouteSidebar.tsx (changed)",
+      "components/SharedPlay.tsx (changed)",
+      "components/ui.ts (changed)"
     ]
   }
 }

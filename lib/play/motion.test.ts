@@ -173,56 +173,14 @@ describe("the call", () => {
     const pre = positionsAt(m, ps, m.throwAt - 0.01);
     expect(ballAt(m, pre, m.throwAt - 0.01)).toEqual({ ...at(pre, "o2"), lift: 0 });
   });
-  test("a pitch with nobody to throw to is a toss and a run", () => {
-    const ps = defaults().map(withRoute("o5", { type: "pitch" }));
-    const m = buildMotion(ps, TOP);
-    expect(m.kind).toBe("run");
-    expect(m.runner).toBe("o5");
-    expect(m.passer).toBe("o2");
-    // the toss is in the air
-    const mid = m.handAt + m.handFor / 2;
-    expect(ballAt(m, positionsAt(m, ps, mid), mid)?.lift).toBeGreaterThan(0);
-    const late = positionsAt(m, ps, m.dur);
-    expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o5"), lift: 0 });
-    expect(at(late, "o5").y).toBeCloseTo(-5, 5);
-  });
-  test("a pitch beside a primary receiver: the runner takes the toss, sets up behind the line and throws", () => {
-    const ps = defaults().map(withRoute("o5", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
-    const m = buildMotion(ps, TOP);
-    expect(m.kind).toBe("pass");
-    expect(m.runner).toBe("o5");
-    expect(m.passer).toBe("o5");
-    expect(m.receiver).toBe("o3");
-    // the ball rides with the runner between the toss and the throw
-    const held = m.handAt + m.handFor + 0.05;
-    const pos = positionsAt(m, ps, held);
-    expect(ballAt(m, pos, held)).toEqual({ ...at(pos, "o5"), lift: 0 });
-    // and leaves from their set point, still behind the line
-    const pre = positionsAt(m, ps, m.throwAt);
-    const o5 = at(pre, "o5");
-    expect(o5.y).toBeGreaterThan(0.9);
-    expect(ballAt(m, pre, m.throwAt)).toEqual({ ...o5, lift: 0 });
-    expect(m.throwAt).toBeGreaterThan(m.handAt + m.handFor);
-    const late = positionsAt(m, ps, m.dur);
-    expect(at(late, "o5")).toEqual(o5);
-    expect(ballAt(m, late, m.dur)).toEqual({ ...at(late, "o3"), lift: 0 });
-  });
-  test("a primary pitch runner keeps it", () => {
-    const ps = defaults().map(withRoute("o5", { type: "pitch", primary: true })).map(withRoute("o3", { type: "go" }));
-    const m = buildMotion(ps, TOP);
-    expect(m.kind).toBe("run");
-    expect(m.passer).toBe("o2");
-    expect(at(positionsAt(m, ps, m.dur), "o5").y).toBeCloseTo(-5, 5);
-  });
-  test("a quarterback on a pitch route rolls out and throws from the edge", () => {
-    const ps = defaults().map(withRoute("o2", { type: "pitch" })).map(withRoute("o3", { type: "go", primary: true }));
+  test("a quarterback on a throw route rolls out and throws from the edge", () => {
+    const ps = defaults().map(withRoute("o2", { type: "throw" })).map(withRoute("o3", { type: "go", primary: true }));
     const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("pass");
     expect(m.passer).toBe("o2");
-    expect(m.handAt).toBe(m.snapAt);
     const pre = positionsAt(m, ps, m.throwAt);
-    expect(at(pre, "o2").x).not.toBe(15);
-    expect(at(pre, "o2").y).toBeGreaterThan(0.9);
+    expect(at(pre, "o2").x).toBeCloseTo(16.5, 5);
+    expect(at(pre, "o2").y).toBeCloseTo(2.6, 5);
     expect(ballAt(m, pre, m.throwAt)).toEqual({ ...at(pre, "o2"), lift: 0 });
   });
   test("an unmarked mixed call is teaching play-action, while simulation may choose the run", () => {
@@ -232,3 +190,95 @@ describe("the call", () => {
     expect(buildMotion(ps, TOP, simulationPlayback(flips(0.8, 0.1, 0.1))).kind).toBe("pass");
   });
 });
+
+describe("lateral chains", () => {
+  const chain = (r: Record<string, Route>): Player[] => defaults().map((p) => (r[p.id] ? { ...p, route: r[p.id] ?? null } : p));
+  const DOUBLE = { o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "throw" }, o4: { type: "go", primary: true }, o3: { type: "go" } } as const;
+  const ball = (m: ReturnType<typeof buildMotion>, ps: readonly Player[], t: number) => {
+    const b = ballAt(m, positionsAt(m, ps, t), t);
+    if (!b) throw new Error("no ball at " + String(t));
+    return b;
+  };
+
+  test("a double pass: the ball goes back to the catch as the receiver gets there, then they set up and throw to the read", () => {
+    const ps = chain(DOUBLE);
+    const m = buildMotion(ps, TOP);
+    expect(m.kind).toBe("pass");
+    const [toss, ...more] = m.laterals;
+    expect(more).toHaveLength(0);
+    expect(toss).toMatchObject({ from: "o2", to: "o5" });
+    if (!toss) return;
+    expect(toss.at).toBeGreaterThan(m.snapAt);
+    // held by the quarterback from the snap to the toss
+    expect(ball(m, ps, (m.snapAt + toss.at) / 2)).toEqual({ x: 15, y: 5, lift: 0 });
+    // never forward: level with or behind where it was let go, the whole flight, and low
+    for (let t = toss.at; t <= toss.land; t += 0.01) {
+      const b = ball(m, ps, t);
+      expect(b.y).toBeGreaterThanOrEqual(5 - 1e-9);
+      expect(b.lift).toBeLessThan(0.5);
+    }
+    // Z is at the catch when it lands, and it lands in Z's hands
+    const landed = positionsAt(m, ps, toss.land);
+    expect(at(landed, "o5").x).toBeCloseTo(22, 5);
+    expect(at(landed, "o5").y).toBeCloseTo(6, 5);
+    expect(ball(m, ps, toss.land + 0.01)).toEqual({ ...at(positionsAt(m, ps, toss.land + 0.01), "o5"), lift: 0 });
+    // then Z sets up behind the line and throws to the read
+    expect(m.passer).toBe("o5");
+    expect(m.receiver).toBe("o4");
+    expect(m.throwAt).toBeGreaterThan(toss.land);
+    const pre = positionsAt(m, ps, m.throwAt);
+    expect(at(pre, "o5").x).toBeCloseTo(23.5, 5);
+    expect(at(pre, "o5").y).toBeCloseTo(2.6, 5);
+    expect(ball(m, ps, m.throwAt)).toEqual({ ...at(pre, "o5"), lift: 0 });
+    expect(ball(m, ps, m.dur)).toEqual({ ...at(positionsAt(m, ps, m.dur), "o4"), lift: 0 });
+    // X runs the Go from the snap, the whole time
+    expect(at(positionsAt(m, ps, 1), "o3").y).toBeCloseTo(1 - SPEED, 5);
+    // simulation never throws to a carrier
+    for (const r of [0.05, 0.5, 0.95]) {
+      const sim = buildMotion(ps, TOP, simulationPlayback(flips(0.99, r)));
+      expect(["o3", "o4"]).toContain(sim.receiver ?? "");
+    }
+  });
+  test("two laterals go in order, the second from where the first was caught", () => {
+    const ps = chain({ o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "lateral", target: "o3", catch: [9, 6.8] }, o3: { type: "throw" }, o4: { type: "go", primary: true } });
+    const m = buildMotion(ps, TOP);
+    const [first, second] = m.laterals;
+    expect(second).toMatchObject({ from: "o5", to: "o3" });
+    if (!first || !second) return;
+    expect(second.at).toBeGreaterThan(first.land);
+    // Z holds it at the catch until the second toss
+    const held = positionsAt(m, ps, second.at);
+    expect(at(held, "o5").x).toBeCloseTo(22, 5);
+    expect(ball(m, ps, second.at)).toEqual({ ...at(held, "o5"), lift: 0 });
+    for (let t = second.at; t <= second.land; t += 0.01) expect(ball(m, ps, t).y).toBeGreaterThanOrEqual(6 - 1e-9);
+    expect(m.passer).toBe("o3");
+    expect(m.receiver).toBe("o4");
+    expect(m.throwAt).toBeGreaterThan(second.land);
+  });
+  test("a lateral run: the last carrier keeps it and runs from the catch", () => {
+    const ps = chain({ o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "reverse" }, o4: { type: "go" } });
+    const m = buildMotion(ps, TOP);
+    expect(m.kind).toBe("run");
+    expect(m.runner).toBe("o5");
+    const late = positionsAt(m, ps, m.dur);
+    expect(at(late, "o5").y).toBeCloseTo(-5, 5);
+    expect(ball(m, ps, m.dur)).toEqual({ ...at(late, "o5"), lift: 0 });
+  });
+  test("an unfinished chain ends with the ball in the last carrier's hands", () => {
+    const ps = chain({ o2: { type: "lateral", target: "o5" }, o4: { type: "go", primary: true } });
+    const m = buildMotion(ps, TOP);
+    expect(m.kind).toBe("hold");
+    expect(m.receiver).toBeNull();
+    expect(ball(m, ps, m.dur)).toEqual({ ...at(positionsAt(m, ps, m.dur), "o5"), lift: 0 });
+  });
+  test("pre-snap motion holds the laterals back with the snap", () => {
+    const still = chain(DOUBLE);
+    const moving = still.map((p) => (p.id === "o3" ? { ...p, preSnap: { pts: [[8, 1]] as [number, number][] } } : p));
+    const a = buildMotion(still, TOP), b = buildMotion(moving, TOP);
+    const shift = b.preSnapFor ?? 0;
+    expect(shift).toBeGreaterThan(0);
+    expect(b.laterals[0]?.at).toBeCloseTo((a.laterals[0]?.at ?? 0) + shift, 5);
+    expect(b.laterals[0]?.land).toBeCloseTo((a.laterals[0]?.land ?? 0) + shift, 5);
+  });
+});
+

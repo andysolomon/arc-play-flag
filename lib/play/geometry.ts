@@ -1,6 +1,7 @@
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
+import { chainLinks, quarterback, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
-import { DEF, INK, ROUTES, inkFor, routeDef, runLegs } from "./routes";
+import { DEF, INK, PITCH_SET, ROUTES, inkFor, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -75,18 +76,25 @@ export function cardWidth(pane: Pane | null, depthYards: number): number | null 
 const ACROSS_MIN = 1.2, ACROSS_MAX = 28.8;
 
 /**
- * A route's waypoints in absolute yards, starting at the player's spot. Shared by the
- * drawn route and the playback simulation so they can never disagree. Zone routes are
- * laid out as bubbles (see zoneLayout) and are not handled here.
+ * A route's waypoints in absolute yards, starting at the player's spot, or for a carrier who
+ * takes a lateral, at the point they catch it (see lib/play/lateral.ts). Shared by the drawn
+ * route and the playback simulation so they can never disagree. Zone routes are laid out as
+ * bubbles (see zoneLayout) and are not handled here, and a lateral is drawn as an arc (see
+ * lateralArcs), not a route.
  */
 export function routeYards(p: Player, players: readonly Player[], top: number): Pair[] | null {
-  p = atSnap(p);
+  p = startOf(p, players);
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
-  if (!def) return null;
+  if (!def || rt.type === "lateral") return null;
   const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
   if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
+  if (rt.type === "throw" && p.team === "offense") {
+    // a step toward their own sideline, up (never back) to the set depth, and throw from there
+    const set: Pair = [Math.max(ACROSS_MIN, Math.min(ACROSS_MAX, p.x + sign * 1.5)), Math.min(p.y, PITCH_SET)];
+    return [[p.x, p.y], set];
+  }
   if (rt.type === "blitz") {
     // drive past the line of scrimmage, angled at the quarterback
     const qb0 = quarterback(players);
@@ -104,11 +112,14 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     return [[p.x, p.y], [t.x - (dx / L) * 1.15, t.y - (dy / L) * 1.15]];
   }
   if (def.run && !def.pts && p.team === "offense") {
-    // through the mesh point beside the quarterback, or from their own spot on a keeper
+    // through the mesh point beside the quarterback, or from their own spot on a keeper. A carrier
+    // who took a lateral keeps it from the catch, carrying on the way the ball was going.
     const qb0 = quarterback(players);
     const qb = qb0 ? atSnap(qb0) : undefined;
-    const mesh = qb && qb.id !== p.id ? qb : p;
-    const side = (p.x < mesh.x - 0.01 ? -1 : 1) * (rt.mirror ? -1 : 1);
+    const into = chainLinks(players).find((l) => l.to.id === p.id);
+    const mesh = into || !qb || qb.id === p.id ? p : qb;
+    const across = into ? (into.catch[0] < into.release[0] - 0.01 ? -1 : 1) : p.x < mesh.x - 0.01 ? -1 : 1;
+    const side = across * (rt.mirror ? -1 : 1);
     const legs = runLegs(rt.type, mesh.x, mesh.y, side);
     return [[p.x, p.y], ...legs.map((q) => [Math.max(0.8, Math.min(29.2, q[0])), Math.max(top + 0.6, q[1])] as const)];
   }
@@ -163,10 +174,7 @@ export function sidelineCut(p: Player): SidelineCut | null {
   return cut;
 }
 
-/** The quarterback: the offensive player labelled QB, else the default QB slot. */
-export function quarterback(players: readonly Player[]): Player | undefined {
-  return players.find((q) => q.team === "offense" && q.label === "QB") ?? players.find((q) => q.id === "o2");
-}
+export { quarterback };
 
 export interface RouteGeom {
   color: string;
@@ -177,6 +185,8 @@ export interface RouteGeom {
   draw: boolean;
   arrow: string | null;
   zone: { cx: number; cy: number; rx: number; ry: number; fill: string } | null;
+  /** a throw: the ring where the carrier sets up, in SVG units */
+  set?: { cx: number; cy: number } | null;
 }
 
 const f1 = (n: number): string => n.toFixed(1);
@@ -188,7 +198,8 @@ export function geom(
   top: number,
   zones: ZoneMap,
 ): RouteGeom | null {
-  const fromMotion = motionPoints(p).length > 0;
+  // no token stands where the route starts after motion, or at a lateral's catch point
+  const detached = motionPoints(p).length > 0 || players.some((q) => q.route?.type === "lateral" && q.route.target === p.id);
   p = atSnap(p);
   const rt = p.route;
   if (!rt) return null;
@@ -230,7 +241,7 @@ export function geom(
 
   const L0 = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]) || 1;
   // At the snap spot there is no stationary token: join the motion and route without a gap.
-  const off = fromMotion ? 0 : Math.min(rt.type === "man" ? 24 : 27, L0 * 0.42);
+  const off = detached ? 0 : Math.min(rt.type === "man" ? 24 : 27, L0 * 0.42);
   pts[0] = [a0[0] + ((a1[0] - a0[0]) / L0) * off, a0[1] + ((a1[1] - a0[1]) / L0) * off];
 
   const b = pts[pts.length - 1], a = pts[pts.length - 2];
@@ -256,9 +267,53 @@ export function geom(
       f1(bx + ny * w) + "," + f1(by - nx * w);
     const inset = Math.min(s * 0.8, L * 0.9);
     pts[pts.length - 1] = [b[0] - nx * inset, b[1] - ny * inset];
+  } else if (def.end === "set") {
+    out.set = { cx: b[0], cy: b[1] };
   }
   out.d = "M" + pts.map((q) => f1(q[0]) + " " + f1(q[1])).join("L");
   return out;
+}
+
+/** One lateral as drawn: a dashed arc from where it is let go to where it is caught, bowing back. */
+export interface LateralArc {
+  /** the carrier who lets it go (the lateral is their route) */
+  id: string;
+  /** who catches it */
+  target: string;
+  /** a quadratic curve, in SVG units */
+  d: string;
+  /** the football at the curve's true midpoint, turned along the toss (degrees) */
+  ball: { x: number; y: number; angle: number };
+  /** the catch point in SVG units, where its handle sits */
+  handle: { x: number; y: number };
+  /** in yards */
+  release: Pair;
+  catch: Pair;
+}
+
+/**
+ * Every lateral in the play's chain, in order, as an arc. The control point sits behind the middle of
+ * the toss (toward the backfield), up to 2 yards for a long one and never below the field's back edge,
+ * so the whole curve stays on the field. The football sits at the curve's true midpoint,
+ * 0.25·A + 0.5·ctrl + 0.25·C, where the curve runs parallel to A→C.
+ */
+export function lateralArcs(players: readonly Player[], top: number): LateralArc[] {
+  const back = py(8, top) - 4;
+  return chainLinks(players).map((l) => {
+    const ax = px(l.release[0]), ay = py(l.release[1], top), cx = px(l.catch[0]), cy = py(l.catch[1], top);
+    const chord = Math.hypot(cx - ax, cy - ay);
+    const bow = Math.min(2 * S, Math.max(0.5 * S, chord * 0.3));
+    const qx = (ax + cx) / 2, qy = Math.min((ay + cy) / 2 + bow, Math.max(back, ay, cy));
+    return {
+      id: l.from.id,
+      target: l.to.id,
+      d: `M${f1(ax)} ${f1(ay)}Q${f1(qx)} ${f1(qy)} ${f1(cx)} ${f1(cy)}`,
+      ball: { x: 0.25 * ax + 0.5 * qx + 0.25 * cx, y: 0.25 * ay + 0.5 * qy + 0.25 * cy, angle: (Math.atan2(cy - ay, cx - ax) * 180) / Math.PI },
+      handle: { x: cx, y: cy },
+      release: l.release,
+      catch: l.catch,
+    };
+  });
 }
 
 export function draftPath(p: Player, pts: readonly Pair[], top: number): string {

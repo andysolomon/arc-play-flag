@@ -1,4 +1,4 @@
-import { CALL_LABEL, callOf } from "@/lib/play/call";
+import { CALL_LABEL, callOf, unfinished } from "@/lib/play/call";
 import { LOS_YARD, losOf } from "@/lib/play/field";
 import type { Level, Player, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
@@ -58,7 +58,7 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   if (call) {
     const label = CALL_LABEL[call];
     const pw = measure(label, 28) + 48;
-    out.push(pill(right - pw, titleY, 28, label, pw, "#ffe9a8"));
+    out.push(pill(right - pw, titleY, 28, label, pw, unfinished(call) ? "#f2b705" : "#ffe9a8"));
     right -= pw + 20;
   }
   out.push(text(x, titleY + 20, 56, fit(o.name, right - x, 56)));

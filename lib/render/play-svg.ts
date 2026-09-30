@@ -1,7 +1,7 @@
 import { NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { LOS_YARD, readLos } from "@/lib/play/field";
-import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
+import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, lateralArcs, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
@@ -155,6 +155,7 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
       (g.dash !== "900" ? ` stroke-dasharray="${g.dash}"` : "") + "/>",
     );
     if (g.arrow) out.push(`<polygon points="${g.arrow}" fill="${g.color}" stroke="${g.color}" stroke-width="2.5" stroke-linejoin="round"/>`);
+    if (g.set) out.push(`<circle cx="${f1(g.set.cx)}" cy="${f1(g.set.cy)}" r="7" fill="${TURF}" stroke="${g.color}" stroke-width="${String(width)}"/>`);
     if (g.zone) {
       out.push(
         `<ellipse cx="${f1(g.zone.cx)}" cy="${f1(g.zone.cy)}" rx="${f1(g.zone.rx)}" ry="${f1(g.zone.ry)}" fill="${g.zone.fill}"` +
@@ -171,6 +172,18 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
       }
     }
     out.push("</g>");
+  }
+
+  // each lateral, as the field draws it: a dashed arc back from its release to its catch, with a
+  // football at its midpoint. Ink, not the sticker, so it prints and reads on a mono printer
+  for (const a of lateralArcs(players, top)) {
+    const p = shown.find((q) => q.id === a.id);
+    if (!p) continue;
+    out.push(
+      `<g data-lateral="${esc(a.id)}"${fade(opacity(p))}><path d="${a.d}" fill="none" stroke="${ROUTE_INK.route}" stroke-width="4" stroke-dasharray="5 7"/>` +
+      `<g transform="translate(${f1(a.ball.x)},${f1(a.ball.y)}) rotate(${f1(a.ball.angle)})"><ellipse rx="9" ry="5.5" fill="${ROUTE_INK.route}" stroke="${TURF}" stroke-width="1.5"/>` +
+      `<line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="${TURF}" stroke-width="1.5"/></g></g>`,
+    );
   }
 
   // the other team's players first, so the play's own side sits on top

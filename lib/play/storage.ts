@@ -1,6 +1,7 @@
 import { readLos, withLos } from "./field";
+import { quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
-import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
@@ -97,21 +98,65 @@ function normalizeRoute(v: unknown, team: Team): Route | null {
   const r: Route = { type: v.type as RouteType };
   if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
+  if (r.type === "lateral" && v.catch !== undefined) {
+    const c = toPair(v.catch);
+    if (c) r.catch = c;
+  }
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;
 }
 
+/** How a Pitch was stored before laterals: the runner took a toss from the quarterback. */
+interface Pitch {
+  id: string;
+  mirror: boolean;
+  primary: boolean;
+}
+
+/**
+ * A play saved with a Pitch on player P, from before lateral chains (docs/adr/004-lateral-chains.md):
+ * the quarterback now laterals to P. Where the pitch was an option (receivers out, and no runner marked
+ * the read) P threw, so P throws; otherwise the play was a run, so P keeps it on a Stretch, the wide run
+ * the pitch was. A pitch on the quarterback was a rollout: they throw from it or keep it. With two
+ * pitches the first, left to right, takes the lateral and the other keeps running; with no
+ * quarterback nobody tosses anything, so every pitch keeps running.
+ */
+function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
+  const pitched = new Map(pitches.map((p) => [p.id, p]));
+  const offense = players.filter((p) => p.team === "offense");
+  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.label !== "QB" && !pitched.has(p.id));
+  const readRuns = offense.some((p) => pitched.get(p.id)?.primary === true || (p.route?.primary === true && isRun(p.route.type)));
+  const threw = receivers.length > 0 && !readRuns;
+  const qb = quarterback(players);
+  const first = offense
+    .filter((p) => pitched.has(p.id) && p.id !== qb?.id)
+    .sort((a, b) => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : 1))[0];
+  const keep = (f: Pitch): Route => ({ type: "stretch", ...(f.mirror ? { mirror: true } : {}), ...(f.primary ? { primary: true } : {}) });
+  return players.map((p) => {
+    if (qb && first && p.id === qb.id) return { ...p, route: { type: "lateral", target: first.id } };
+    const f = pitched.get(p.id);
+    if (!f) return p;
+    const tossed = qb && (p.id === first?.id || p.id === qb.id);
+    return { ...p, route: tossed && threw ? { type: "throw" } : keep(f) };
+  });
+}
+
 /**
  * Accepts the prototype's stored shape (and anything older that looks like it) and
  * returns players clamped back onto the field, exactly as the prototype's load does.
- * Ids are made unique, the roster is capped, and a man target that names nobody on
- * the offense drops the route rather than drawing nothing.
+ * Ids are made unique, the roster is capped, and a man or lateral target that names
+ * nobody on the offense drops the route rather than drawing nothing. A Pitch from before
+ * lateral chains becomes one (see fromPitch), and the chain is settled: every catch
+ * clamped behind its release and the line, and nothing a carrier can't have kept
+ * (lib/play/lateral.ts). Every way a play is read in (the library, the draft, a share
+ * link, a play or playbook file, a backup) comes through here.
  */
 export function normalizePlayers(raw: unknown): Player[] {
   if (!Array.isArray(raw)) return [];
   const out: Player[] = [];
   const ids = new Set<string>();
+  const pitches: Pitch[] = [];
   let hasMotion = false;
   raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
@@ -126,20 +171,23 @@ export function normalizePlayers(raw: unknown): Player[] {
       ? v.preSnap.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null).map(motionPoint)
       : [];
     if (preSnap.length) hasMotion = true;
+    const pitch = team === "offense" && isRecord(v.route) && v.route.type === "pitch";
+    if (pitch && isRecord(v.route)) pitches.push({ id, mirror: v.route.mirror === true, primary: v.route.primary === true });
     out.push({
       id,
       team,
       label: typeof v.label === "string" ? v.label.slice(0, 3) : "",
       x, y,
-      route: normalizeRoute(v.route, team),
+      route: pitch ? null : normalizeRoute(v.route, team),
       ...(preSnap.length ? { preSnap: { pts: preSnap } } : {}),
     });
   });
   const offense = new Set(out.filter((p) => p.team === "offense").map((p) => p.id));
-  return out.map((p) => {
-    if (p.route?.type !== "man") return p;
+  const aimed = out.map((p) => {
+    if (p.route?.type !== "man" && p.route?.type !== "lateral") return p;
     return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
   });
+  return settleChain(pitches.length ? fromPitch(aimed, pitches) : aimed);
 }
 
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");

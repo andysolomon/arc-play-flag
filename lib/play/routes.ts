@@ -33,18 +33,17 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   counter: { label: "Counter", pts: null, end: "arrow", run: true },
   reverse: { label: "Reverse", pts: null, end: "arrow", run: true },
   delay:   { label: "Delay",   pts: null, end: "arrow", run: true, dash: "7 6" },
-  pitch:   { label: "Pitch",   pts: null, end: "arrow", run: true, pitch: true },
+  lateral: { label: "Lateral", pts: null, end: "arrow", ball: "lateral" },
+  throw:   { label: "Throw",   pts: null, end: "set",   ball: "throw" },
 };
 
 /**
  * Run-route legs after the player's own spot, relative to the mesh point beside the
  * quarterback (qx, qy). `side` is +1 when the runner lines up to the QB's right.
- * Every leg ends 5 yards past the line of scrimmage. A pitch takes the toss wide of the
- * quarterback, sets up behind the line (the leg before last) and only then turns upfield.
+ * Every leg ends 5 yards past the line of scrimmage.
  */
 export function runLegs(type: RouteType, qx: number, qy: number, side: number): Pair[] {
   switch (type) {
-    case "pitch":   return [[qx + side * 3.5, qy + 1.2], [qx + side * 7, PITCH_SET], [qx + side * 8, -5]];
     case "stretch": return [[qx + side * 1, qy - 0.2], [qx + side * 8, qy - 2.5], [qx + side * 11, -5]];
     case "counter": return [[qx - side * 1.6, qy + 0.2], [qx + side * 3.5, qy - 2.5], [qx + side * 4.5, -5]];
     case "reverse": return [[qx + side * 0.4, qy + 1], [qx - side * 9, qy - 0.5], [qx - side * 12, -5]];
@@ -64,15 +63,17 @@ export const DROUTES: Record<DefenseRouteType, RouteDef> = {
 };
 
 export const OFFENSE_KEYS = Object.keys(ROUTES) as OffenseRouteType[];
+/** The runs: the keeps a ball carrier can take too. */
 export const RUN_KEYS = OFFENSE_KEYS.filter((k) => ROUTES[k].run);
-export const PASS_KEYS = OFFENSE_KEYS.filter((k) => !ROUTES[k].run);
+/** The passing tree. A carrier after the quarterback gets none of it. */
+export const PASS_KEYS = OFFENSE_KEYS.filter((k) => !ROUTES[k].run && !ROUTES[k].ball);
 
-/** How far behind the line of scrimmage a pitch runner sets up to throw. */
+/** How far behind the line of scrimmage a carrier sets up to throw (it was the pitch runner's set point). */
 export const PITCH_SET = 2.6;
 
-/** True for a route where the runner takes a pitch and can throw from the set point. */
-export function isPitch(type: RouteType): boolean {
-  return ROUTES[type as OffenseRouteType]?.pitch === true;
+/** True for a job only the player with the ball can take: a lateral or a throw. */
+export function isBallJob(type: RouteType): boolean {
+  return ROUTES[type as OffenseRouteType]?.ball !== undefined;
 }
 
 /** True for a route that carries the ball on the ground. */
@@ -83,10 +84,12 @@ export const DEFENSE_KEYS = Object.keys(DROUTES) as DefenseRouteType[];
 
 /** A blitzer must line up at least this many yards off the line of scrimmage. */
 export const BLITZ_DEPTH = 7;
+/** The closest anyone may sit to the line of scrimmage, and the shallowest a lateral may be caught, in yards. */
+export const LOS_GAP = 0.9;
 
 /** The closest a player may sit to the line of scrimmage, in yards, given their route. */
 export function losGap(route: Route | null | undefined): number {
-  return route?.type === "blitz" ? BLITZ_DEPTH : 0.9;
+  return route?.type === "blitz" ? BLITZ_DEPTH : LOS_GAP;
 }
 
 /** The player's spot, pushed back to the blitz line when a blitz would start too close to it. */
@@ -162,10 +165,12 @@ export function mirrorRoute(route: Route, x: number): { route: Route; clamped: b
 
 /**
  * The route as it reads after the whole play is flipped (x → 30 - x), keeping every
- * flag. Handed presets need nothing: their side is read from the player's new spot.
+ * flag, with a lateral's catch point flipped too. Handed presets need nothing: their side
+ * is read from the player's new spot.
  */
 export function flipRoute(route: Route): Route {
-  return route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
+  const out = route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
+  return out.catch ? { ...out, catch: [FIELD_W - out.catch[0], out.catch[1]] } : out;
 }
 const FIELD_W = 30;
 
