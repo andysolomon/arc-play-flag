@@ -4,15 +4,19 @@ import {
   memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
 } from "react";
+import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from "@/lib/deepfield";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
-import { LOS_YARD } from "@/lib/play/field";
-import { MIN_DEPTH, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
+import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
+import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
+import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
-import { manTags, tagged } from "@/lib/play/marks";
+import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
+import { atSnap, motionPoint } from "@/lib/play/pre-snap";
+import { motionGeom } from "@/lib/play/geometry";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
@@ -23,7 +27,7 @@ import { PlayerToken } from "./PlayerToken";
 import { FIELD } from "./fieldPaint";
 import { ManTagLayer } from "./ManTagLayer";
 import { RouteLayer } from "./RouteLayer";
-import { pillMd } from "./ui";
+import { pillMd, pillSm } from "./ui";
 
 interface Props {
   players: readonly Player[];
@@ -90,6 +94,10 @@ const TITLE_CHROME = 24;
 export const FIELD_TITLE_ID = "field-title";
 /** The clip that keeps a route's turf-coloured lane inside a designed end zone. */
 const LANE_CLIP = "ffez-lane";
+/** Where the ▶ button floats over the field's bottom-right corner, in CSS pixels: 12 in from each edge, 48 across. */
+const PLAY_BUTTON = { inset: 12, size: 48 };
+/** The field's border, in CSS pixels: the diagram's units start inside it. */
+const FIELD_BORDER = 3;
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
@@ -113,6 +121,7 @@ function FieldImpl({
   const [party, setParty] = useState<{ seed: number; unlocked: EndZone | null } | null>(null);
   const endZone = useSyncExternalStore(subscribeEndZone, getEndZone, serverEndZone);
   const team = useSyncExternalStore(subscribeLibrary, getTeam, getServerTeam);
+  const deepField = useSyncExternalStore(subscribeDeepField, getDeepField, serverDeepField);
   // classic is the band the field has always drawn; any other end zone paints its own design over it
   const designed = endZone !== "classic";
 
@@ -147,7 +156,14 @@ function FieldImpl({
       },
     };
   }), [players, live, liveWaypoint]);
-  const d = depth(effective, pane, MIN_DEPTH, los);
+  // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
+  // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
+  // pre-snap motion stays in the backfield, so drawing it leaves the card as it is
+  const fit = depth(effective, pane, MIN_DEPTH, los);
+  const deepest = depth(effective, pane, MAX_DEPTH, los);
+  const d = !readOnly && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
+  // offered only where it shows more field, and not while anything is being drawn
+  const offerDeep = !readOnly && draft === null && deepest > fit;
   const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;
   const width = cardWidth(pane, d);
@@ -168,6 +184,16 @@ function FieldImpl({
   // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
   const onField = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
   const tags = useMemo(() => manTags(visible, effective, top, layout.vh, zones), [visible, effective, top, layout.vh, zones]);
+  // a run called from a no-run zone is flagged in the backfield corner every picture of it uses,
+  // kept clear of the ▶ button on screen; a screen reader hears it with the diagram
+  const flagged = runInNoRunZone({ side, players, los }, noRunZones);
+  const flag = useMemo(() => {
+    if (!flagged) return null;
+    const k = VW / Math.max(1, (width ?? 430) - 2 * FIELD_BORDER);
+    const reach = PLAY_BUTTON.inset + PLAY_BUTTON.size - FIELD_BORDER;
+    const button = { x: VW - reach * k, y: layout.vh - reach * k, w: PLAY_BUTTON.size * k, h: PLAY_BUTTON.size * k };
+    return stampBox(NO_RUN_STAMP, visible, top, layout.vh, [button]);
+  }, [flagged, width, layout.vh, visible, top]);
   // and a screen reader hears the same, naming each defender as their token announces itself
   const tagWords = useMemo(() => {
     const who = (id: string): string => {
@@ -191,7 +217,7 @@ function FieldImpl({
   const draftD = useMemo(() => {
     if (!draft) return "";
     const p = effective.find((q) => q.id === draft.id);
-    return p ? draftPath(p, draft.pts, top) : "";
+    return p ? draftPath(draft.kind === "motion" ? p : atSnap(p), draft.pts, top) : "";
   }, [draft, effective, top]);
   const editableCustom = useMemo(() => {
     const p = effective.find((q) => q.id === selectedId);
@@ -356,7 +382,8 @@ function FieldImpl({
     if (draft) {
       const pt = toYards(e.clientX, e.clientY);
       const c = clamp(snap(pt.x, snapMode), snap(pt.y, snapMode), null, top);
-      dispatch({ type: "draftPoint", pt: [c.x, c.y] });
+      const point = draft.kind === "motion" ? motionPoint([c.x, c.y]) : [c.x, c.y] as const;
+      dispatch({ type: "draftPoint", pt: point });
       e.currentTarget.focus();
       return;
     }
@@ -487,7 +514,7 @@ function FieldImpl({
         )}
         <div className="relative">
         {draft && !readOnly && (
-          <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
+          <div role="toolbar" aria-label={draft.kind === "motion" ? "Pre-snap motion controls" : "Custom route controls"} className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
             <button type="button" onClick={finishDraft} disabled={draft.pts.length === 0} title="Finish route (Enter)" aria-keyshortcuts="Enter" className={`${pillMd} min-h-11 bg-yellow on-yellow`}>
               Finish
             </button>
@@ -508,6 +535,27 @@ function FieldImpl({
               Remove waypoint
             </button>
           </div>
+        )}
+        {offerDeep && (
+          <button
+            type="button"
+            onClick={() => { setDeepField(!deepField); }}
+            aria-pressed={deepField}
+            data-active={deepField}
+            title={
+              deepField
+                ? "Fit the field to the play"
+                : deepest >= 8 + GOAL_YARD + END_ZONE_YARDS - los
+                  ? "Show the field to the end line"
+                  : `Show ${String(deepest - 8)} yards downfield`
+            }
+            className={
+              `${pillSm} absolute right-3 top-3 z-10 shadow-tile data-[active=true]:bg-yellow data-[active=true]:on-yellow ` +
+              "data-[active=true]:hover:bg-yellow print:hidden"
+            }
+          >
+            Deep field
+          </button>
         )}
         <span className="sr-only" aria-live="polite">
           {targeting && targetOwnerName
@@ -559,6 +607,8 @@ function FieldImpl({
           <desc>
             {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
+            {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
+            {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
           <defs>
             <pattern id="ffhatch" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -604,6 +654,25 @@ function FieldImpl({
               </g>
             )}
           </g>
+          {/* under the routes, as on every picture, so it never hides the end of one */}
+          {flag && (
+            <g data-no-run-flag="" aria-hidden="true" pointerEvents="none">
+              <rect
+                x={flag.x.toFixed(1)} y={flag.y.toFixed(1)} width={flag.w.toFixed(1)} height={flag.h.toFixed(1)} rx={6}
+                fill="#f2b705" stroke="#1b1a17" strokeWidth={2.5}
+              />
+              <text
+                x={(flag.x + flag.w / 2).toFixed(1)} y={(flag.y + flag.h / 2 + 1).toFixed(1)} textAnchor="middle" dominantBaseline="central"
+                fontFamily="var(--font-hand)" fontSize={STAMP_FONT} letterSpacing={STAMP_SPACING} fill="#1b1a17" className="select-none"
+              >
+                {NO_RUN_STAMP}
+              </text>
+            </g>
+          )}
+          {visible.map(p => {
+            const g = motionGeom(p, top);
+            return g ? <g key={p.id} data-pre-snap={p.id}><RouteLayer routes={[{ ...g, id: p.id, faded: isContext(p, side) }]} draftD="" /></g> : null;
+          })}
           <RouteLayer routes={routes} draftD={draftD} lane={designed && layout.endZone ? LANE_CLIP : null} />
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;
@@ -644,7 +713,8 @@ function FieldImpl({
               focusOnTarget={targeting && p.team === "offense" && p.id === visible.find((q) => q.team === "offense")?.id}
               boing={boingId === p.id}
               dragging={dragging}
-              readOnly={readOnly}
+              readOnly={readOnly || draft !== null}
+              drawing={draft !== null}
               faded={isContext(p, side)}
               onPointerDown={onDown}
               onKeyDown={onKey}

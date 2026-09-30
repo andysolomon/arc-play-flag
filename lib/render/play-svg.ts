@@ -1,6 +1,7 @@
+import { NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { LOS_YARD, readLos } from "@/lib/play/field";
-import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
+import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
@@ -37,8 +38,8 @@ export interface ArtOptions {
   minDepth?: number;
   /**
    * The play's own side. With `show` "both", the other team is drawn beneath it at the live
-   * shadow's fade and can't be highlighted; a defensive call also gets its coverage stamp.
-   * Unset, "both" draws everyone alike.
+   * shadow's fade and can't be highlighted; a defensive call also gets its coverage stamp, and
+   * an offensive run called from a no-run zone its flag. Unset, "both" draws everyone alike.
    */
   side?: Team;
 }
@@ -107,9 +108,14 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
   // like a Madden card: a defensive call is stamped with its coverage in the empty backfield
   const cover = side === "defense" ? coverageOf(players) : null;
   const stamp = cover ? stampBox(COVERAGE_TAG[cover], shown, top, layout.vh) : null;
+  // a run called where the league allows none is flagged in the same corner, on a penalty
+  // flag's yellow, wherever the offense is drawn; ink on yellow still reads on a mono printer
+  const flag = side === "offense" && show !== "defense" && runInNoRunZone({ side, players, los }, noRunZones)
+    ? stampBox(NO_RUN_STAMP, shown, top, layout.vh)
+    : null;
   // a man defender whose receiver isn't drawn wears a name tag, never an arrow to nobody;
   // none while the players move, since the tags would stay behind
-  const tags = opts.positions ? [] : manTags(shown, players, top, layout.vh, zones, stamp ? [stamp] : []);
+  const tags = opts.positions ? [] : manTags(shown, players, top, layout.vh, zones, [stamp, flag].filter((b) => b !== null));
 
   // under the routes, so it never hides the end of one
   if (cover && stamp) {
@@ -119,8 +125,21 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
       ` font-size="${String(STAMP_FONT)}" letter-spacing="${String(STAMP_SPACING)}" fill="${PAPER_TEXT}">${esc(COVERAGE_TAG[cover])}</text></g>`,
     );
   }
+  if (flag) {
+    out.push(
+      `<g data-no-run-flag="" aria-hidden="true"><rect x="${f1(flag.x)}" y="${f1(flag.y)}" width="${f1(flag.w)}" height="${f1(flag.h)}" rx="6" fill="${YELLOW}" stroke="${INK}" stroke-width="2.5"/>` +
+      `<text x="${f1(flag.x + flag.w / 2)}" y="${f1(flag.y + flag.h / 2 + 1)}" text-anchor="middle" dominant-baseline="central"` +
+      ` font-size="${String(STAMP_FONT)}" letter-spacing="${String(STAMP_SPACING)}" fill="${INK}">${esc(NO_RUN_STAMP)}</text></g>`,
+    );
+  }
 
   // routes: the other team's first, then faded ones, so the highlighted route sits on top
+  for (const p of shown) {
+    const g = motionGeom(p, top);
+    if (!g) continue;
+    out.push(`<g data-pre-snap="${esc(p.id)}"${fade(opacity(p))}><path d="${g.d}" fill="none" stroke="${g.color}" stroke-width="${String(g.width)}" stroke-dasharray="${g.dash}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<polygon points="${g.arrow ?? ""}" fill="${g.color}"/></g>`);
+  }
   const routed = shown.flatMap((p) => {
     if (tagged(p, drawn)) return [];
     const g = geom(p, players, top, zones);

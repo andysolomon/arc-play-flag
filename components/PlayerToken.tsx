@@ -18,6 +18,8 @@ interface Props {
   dragging: boolean;
   /** read-only rendering (share page): no handlers, not focusable */
   readOnly?: boolean;
+  /** While drawing, taps over a token add path points rather than changing selection. */
+  drawing?: boolean;
   /** the opposite team, shown as faded context on the field */
   faded?: boolean;
   onPointerDown: (id: string, e: PointerEvent<SVGGElement>) => void;
@@ -26,7 +28,7 @@ interface Props {
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
 
-function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, faded = false, onPointerDown, onKeyDown }: Props) {
+function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, onPointerDown, onKeyDown }: Props) {
   const tokenRef = useRef<SVGGElement>(null);
   useEffect(() => {
     if (focusOnTarget) tokenRef.current?.focus();
@@ -36,6 +38,7 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
     <g
       ref={tokenRef}
       transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
+      pointerEvents={drawing ? "none" : undefined}
       tabIndex={readOnly ? undefined : 0}
       role={readOnly ? "img" : "button"}
       aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id) + (target ? ", man coverage target" : "")}

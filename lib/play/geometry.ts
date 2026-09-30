@@ -1,5 +1,6 @@
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
-import { DEF, ROUTES, inkFor, routeDef, runLegs } from "./routes";
+import { atSnap, motionPoints } from "./pre-snap";
+import { DEF, INK, ROUTES, inkFor, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -9,6 +10,8 @@ export const VW = 660;
 export const FIELD_YARDS = 30;
 /** The shallowest card the designer and the pictures show, unless the end line comes first. */
 export const MIN_DEPTH = 24;
+/** The deepest card: 37 yards past the line of scrimmage, unless a player already stands deeper. */
+export const MAX_DEPTH = 45;
 
 export function px(x: number): number {
   return x * S;
@@ -43,16 +46,23 @@ export function clamp(x: number, y: number, team: Team | null, top: number, gap 
  * so it can never lag behind a route or position change. With the ball near their goal
  * line the card ends at the end line (`los` is the play's yard line, see lib/play/field.ts),
  * so drags, preset routes, zones and playback, which all stop at the card's top, stay in
- * bounds; a player who already stands past it is never cut off.
+ * bounds; a player who already stands past it is never cut off. Nor is a custom route: its
+ * waypoints are where the coach put them (a preset route shrinks to fit the card instead), so
+ * one drawn deep on a tall screen still shows whole on a wide one and in every picture.
+ * A `minDepth` of MAX_DEPTH gives the deepest card the field allows (Deep field, or a route being drawn).
  */
 export function depth(players: readonly Player[], pane: Pane | null, minDepth = MIN_DEPTH, los = LOS_YARD): number {
   const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
+  const reach = players.reduce((m, p) => (p.route?.type === "custom" ? (p.route.pts ?? []).reduce((n, q) => Math.min(n, q[1]), m) : m), 8);
   const hasDeep = players.some((p) => p.route?.type === "zoneDeep");
   const need = hasDeep ? Math.min(deepest, Math.min(-12, deepest - 4) - 2.9) : deepest;
-  const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : 45;
-  const d = Math.max(aspect, 8 - need + 1.2);
+  const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : MAX_DEPTH;
+  // a waypoint gets a player's margin, rounded up to the half yard so the card's top never ends
+  // up closer to it than a drag or nudge allows (see clamp), which would pull it back
+  const route = Math.ceil((8 - reach + 1.2) * 2) / 2;
+  const d = Math.max(aspect, 8 - need + 1.2, route);
   // from the own goal line the end line is 58 yards off, past the deepest card, so this stays 45
-  const max = Math.min(45, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2));
+  const max = Math.min(MAX_DEPTH, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2, route));
   return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
 }
 
@@ -70,6 +80,7 @@ const ACROSS_MIN = 1.2, ACROSS_MAX = 28.8;
  * laid out as bubbles (see zoneLayout) and are not handled here.
  */
 export function routeYards(p: Player, players: readonly Player[], top: number): Pair[] | null {
+  p = atSnap(p);
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
@@ -78,21 +89,24 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
   if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
   if (rt.type === "blitz") {
     // drive past the line of scrimmage, angled at the quarterback
-    const qb = quarterback(players);
+    const qb0 = quarterback(players);
+    const qb = qb0 ? atSnap(qb0) : undefined;
     const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
     const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
     const reach = Math.max(1.5, L - 1.8);
     return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
   }
   if (rt.type === "man") {
-    const t = players.find((q) => q.id === rt.target);
+    const target = players.find((q) => q.id === rt.target);
+    const t = target ? atSnap(target) : undefined;
     if (!t) return null;
     const dx = t.x - p.x, dy = t.y - p.y, L = Math.hypot(dx, dy) || 1;
     return [[p.x, p.y], [t.x - (dx / L) * 1.15, t.y - (dy / L) * 1.15]];
   }
   if (def.run && !def.pts && p.team === "offense") {
     // through the mesh point beside the quarterback, or from their own spot on a keeper
-    const qb = quarterback(players);
+    const qb0 = quarterback(players);
+    const qb = qb0 ? atSnap(qb0) : undefined;
     const mesh = qb && qb.id !== p.id ? qb : p;
     const side = (p.x < mesh.x - 0.01 ? -1 : 1) * (rt.mirror ? -1 : 1);
     const legs = runLegs(rt.type, mesh.x, mesh.y, side);
@@ -133,6 +147,7 @@ export interface SidelineCut { reach: number; room: number }
  * blitz, a run laid out from the mesh point, a zone's bubble).
  */
 export function sidelineCut(p: Player): SidelineCut | null {
+  p = atSnap(p);
   const rt = p.route;
   const def = rt && routeDef(p.team, rt.type);
   if (!rt || !def?.pts || def.end === "zone" || rt.type === "blitz") return null;
@@ -173,6 +188,8 @@ export function geom(
   top: number,
   zones: ZoneMap,
 ): RouteGeom | null {
+  const fromMotion = motionPoints(p).length > 0;
+  p = atSnap(p);
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
@@ -212,7 +229,8 @@ export function geom(
   if (!a0 || !a1) return null;
 
   const L0 = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]) || 1;
-  const off = Math.min(rt.type === "man" ? 24 : 27, L0 * 0.42);
+  // At the snap spot there is no stationary token: join the motion and route without a gap.
+  const off = fromMotion ? 0 : Math.min(rt.type === "man" ? 24 : 27, L0 * 0.42);
   pts[0] = [a0[0] + ((a1[0] - a0[0]) / L0) * off, a0[1] + ((a1[1] - a0[1]) / L0) * off];
 
   const b = pts[pts.length - 1], a = pts[pts.length - 2];
@@ -245,6 +263,26 @@ export function geom(
 
 export function draftPath(p: Player, pts: readonly Pair[], top: number): string {
   return "M" + [[p.x, p.y] as const, ...pts].map((q) => f1(px(q[0])) + " " + f1(py(q[1], top))).join("L");
+}
+
+/** Dashed motion with an arrow, distinct from the solid post-snap route. */
+export function motionGeom(p: Player, top: number): RouteGeom | null {
+  const pts = motionPoints(p);
+  if (!pts.length) return null;
+  const all: Pair[] = [[p.x, p.y], ...pts];
+  let a = all[0];
+  const b = all.at(-1);
+  for (let i = all.length - 2; i >= 0; i--) {
+    const q = all[i];
+    if (q && b && Math.hypot(q[0] - b[0], q[1] - b[1]) > 0.01) { a = q; break; }
+  }
+  if (!a || !b || Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.01) return null;
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const nx = (b[0] - a[0]) / len, ny = (b[1] - a[1]) / len;
+  const x = px(b[0]), y = py(b[1], top);
+  return { color: INK.flat, d: draftPath(p, pts, top), width: 4, dash: "6 7", draw: false,
+    arrow: `${f1(x)},${f1(y)} ${f1(x - nx * 13 - ny * 7)},${f1(y - ny * 13 + nx * 7)} ${f1(x - nx * 13 + ny * 7)},${f1(y - ny * 13 - nx * 7)}`,
+    zone: null };
 }
 
 export interface Band { y: number; h: number }

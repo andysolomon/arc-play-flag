@@ -118,6 +118,22 @@ jobs:
           path: test-results/phone-palette-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the deep field
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-field
+          path: test-results/deep-field-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the team color palettes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: team-colors
+          path: test-results/**/team-colors*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the route fit
         if: always()
         uses: actions/upload-artifact@v4
@@ -140,6 +156,22 @@ jobs:
         with:
           name: coach-polish
           path: test-results/coach-polish-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the no-run flag
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: no-run-flag
+          path: test-results/no-run-flag-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload pre-snap motion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-snap-motion
+          path: test-results/**/motion*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload traces and screenshots

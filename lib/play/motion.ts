@@ -1,5 +1,6 @@
 import { quarterback, routeYards } from "./geometry";
 import { isPitch, isRun } from "./routes";
+import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
 
@@ -32,6 +33,9 @@ interface Track {
 export type PlayKind = "run" | "pass" | "hold";
 
 export interface Motion {
+  /** Seconds before the snap begins, and the independent pre-snap paths. */
+  preSnapFor?: number;
+  preSnapTracks?: Record<string, Track>;
   /** total playback length in seconds, hold included */
   dur: number;
   /** the card's top edge the play was laid out against: the end line once the ball is near their goal */
@@ -143,6 +147,20 @@ export function buildMotion(
   top: number,
   mode: PlaybackMode = TEACHING_PLAYBACK,
 ): Motion {
+  const preSnapTracks: Record<string, Track> = {};
+  for (const p of players) {
+    const pts = motionPoints(p);
+    if (pts.length) preSnapTracks[p.id] = track([[p.x, p.y], ...pts]);
+  }
+  const preSnapFor = Object.values(preSnapTracks).reduce((n, tr) => Math.max(n, tr.len / SPEED), 0);
+  const m = buildAfterSnap(players.map(atSnap), top, mode);
+  if (!preSnapFor) return m;
+  return { ...m, preSnapFor, preSnapTracks, dur: m.dur + preSnapFor,
+    snapAt: m.snapAt + preSnapFor, handAt: m.handAt + preSnapFor,
+    throwAt: m.throwAt + preSnapFor, catchAt: m.catchAt + preSnapFor };
+}
+
+function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackMode): Motion {
   const random = mode.kind === "simulation" ? mode.random : null;
   const zones = zoneLayout(players, top);
   const tracks: Record<string, Track> = {};
@@ -254,7 +272,16 @@ export function buildMotion(
 /** Every player's spot `t` seconds into the play (players without a route stay put). */
 export function positionsAt(m: Motion, players: readonly Player[], t: number): Record<string, Pt> {
   const pos: Record<string, Pt> = {};
-  const s = Math.max(0, t);
+  const preSnapFor = m.preSnapFor ?? 0;
+  if (t < preSnapFor) {
+    for (const p of players) {
+      const tr = m.preSnapTracks?.[p.id];
+      pos[p.id] = tr ? along(tr, Math.max(0, t)) : { x: p.x, y: p.y };
+    }
+    return pos;
+  }
+  const s = Math.max(0, t - preSnapFor);
+  players = players.map(atSnap);
   // offense first: man defenders shadow where their receiver is right now
   for (const p of players) {
     const tr = m.tracks[p.id];
@@ -286,9 +313,11 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
 export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | null {
   const qb = m.qb ? pos[m.qb] : undefined;
   const c = m.center ? pos[m.center] : undefined;
+  const preSnapFor = m.preSnapFor ?? 0;
+  if (t < preSnapFor) return c ? { ...c, lift: 0 } : qb ? { ...qb, lift: 0 } : null;
   if (!qb) return c ? { ...c, lift: 0 } : null;
   if (c && t < m.snapAt) {
-    const k = cl(t / m.snapAt, 0, 1);
+    const k = cl((t - preSnapFor) / (m.snapAt - preSnapFor), 0, 1);
     return { ...lerp(c, qb, k), lift: m.shotgun ? 0.45 * Math.sin(Math.PI * k) : 0 };
   }
   const runner = m.runner ? pos[m.runner] : undefined;

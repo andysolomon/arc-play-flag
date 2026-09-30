@@ -93,13 +93,16 @@ interface Token { id: string; cx: number; cy: number }
 const tokensOf = (drawn: readonly Player[], top: number): Token[] => drawn.map((p) => ({ id: p.id, cx: px(p.x), cy: py(p.y, top) }));
 
 /**
- * Where the coverage stamp goes: the bottom-left corner, in the backfield, where a
- * defense-only picture is empty (as on a Madden card); the bottom-right if a player sits there.
+ * Where a stamp goes: the bottom-left corner, in the backfield, where a defense-only picture
+ * is empty (as on a Madden card); the bottom-right if a player sits there. The coverage stamp
+ * and a run's no-run flag both go here. `avoid` is anything else the right corner must keep
+ * clear of: on the live field, the ▶ button floating over it.
  */
-export function stampBox(text: string, drawn: readonly Player[], top: number, vh: number): Box {
+export function stampBox(text: string, drawn: readonly Player[], top: number, vh: number, avoid: readonly Box[] = []): Box {
   const w = stampWidth(text), h = STAMP_H, y = vh - 10 - h;
   const left: Box = { x: 10, y, w, h }, right: Box = { x: VW - 10 - w, y, w, h };
-  const clear = (b: Box): boolean => !tokensOf(drawn, top).some((t) => hitsCircle(inflate(b, 4), t.cx, t.cy, TOKEN_R));
+  const clear = (b: Box): boolean =>
+    !tokensOf(drawn, top).some((t) => hitsCircle(inflate(b, 4), t.cx, t.cy, TOKEN_R)) && !avoid.some((a) => hitsBox(inflate(b, 4), a));
   return clear(left) || !clear(right) ? left : right;
 }
 
