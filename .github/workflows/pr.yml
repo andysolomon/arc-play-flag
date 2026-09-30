@@ -118,6 +118,14 @@ jobs:
           path: test-results/phone-palette-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the team color palettes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: team-colors
+          path: test-results/**/team-colors*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the route fit
         if: always()
         uses: actions/upload-artifact@v4
