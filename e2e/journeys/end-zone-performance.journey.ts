@@ -22,6 +22,13 @@ import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
  *    blinking), so the band repaints on nearly every frame again; or its touchdown clocks fall
  *    off the lattice: a column on a clock of its own, a speed that doesn't divide 12, or a
  *    cursor off the beat → "the Matrix rain"
+ *  - a Matrix touchdown drops frames (ARC-186), measured on a scoring play at 4× CPU throttle
+ *    against Classic on the same play: every column draws two loops of code above the band where
+ *    one covers its fall, or its rush and its own clock add up past one loop so a gap opens at the
+ *    top of the band; something in the band scales or shears while it plays, so its text is laid
+ *    out again on every frame; each glyph of the confetti is its own font size, so the first frame
+ *    builds a font for every one; the band shares a layer with the players; or the whole
+ *    touchdown lays out for far longer than Classic's → "a Matrix touchdown"
  *
  * Paint cost is measured in the page, by drawing the band's own SVG onto a canvas at its size on
  * this screen, and taken against a fixed calibration picture drawn the same way at the same
@@ -33,7 +40,10 @@ import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
  * Artifact, in test-results/: end-zones-perf-<device>.json, every design's cost (in ms and in
  * calibration frames) for the shallow band, the deep band and its swatch, with its budget, the
  * calibration frame's own cost, each design's element counts, how often each repaints in the
- * browser, and the Matrix clocks; asserted against the budgets below before it is written.
+ * browser, and the Matrix clocks; and each touchdown's frames a second, 95th percentile and worst
+ * frame, the frames around the celebration's arrival, long tasks, layout and style ms and the
+ * band's glyphs at rest and in the celebration, for Classic and Matrix, with how far the Matrix
+ * columns fall; asserted against the budgets below before it is written.
  */
 
 /** A phone's window, and a short one: from midfield the tall one shows the whole end zone, the short one cuts the card to a sliver of it. */
@@ -59,6 +69,16 @@ const MATRIX_REPAINTS_PER_SECOND = 4;
 const MATRIX_LATTICE_HZ = 12;
 /** No design draws more elements than this on the deep band. */
 const MOST_ELEMENTS = 450;
+/**
+ * A touchdown with the ball on the 5, measured under this CPU throttle, this many times for each of
+ * Classic and Matrix. Matrix may draw this many glyphs in the band during it (1,527 when a column
+ * drew two loops of code above the band, 1,167 now), and lay out for at most this many times as
+ * long as Classic over the same plays (5.4 to 6 times before, 2 to 2.5 now).
+ */
+const TOUCHDOWN_THROTTLE = 4;
+const TOUCHDOWN_RUNS = 2;
+const MATRIX_PARTY_GLYPHS = 1250;
+const MATRIX_LAYOUT_VS_CLASSIC = 3.5;
 
 const art = (page: Page) => page.locator("[data-ez-backdrop] [data-ez-art]");
 
@@ -192,6 +212,183 @@ async function repaints(page: Page, seconds = 2): Promise<{ layoutsPerSecond: nu
   return { layoutsPerSecond: Math.round(d("LayoutCount") / seconds), mainThreadMsPerSecond: Math.round((d("TaskDuration") * 1000) / seconds) };
 }
 
+/** ▶ throws to the primary read when Math.random() < 0.8: pinned, every run is the same scoring play. */
+async function pinRandom(page: Page): Promise<void> {
+  await page.addInitScript(() => { Math.random = () => 0.1; });
+}
+
+interface Band {
+  /** every character of every <text> in the band, and the animations running in it */
+  glyphs: number;
+  animations: number;
+  /** whether a celebration is on screen */
+  celebrated: boolean;
+  /** each animation in the band whose keyframes scale, skew, rotate or set a matrix */
+  scalingTransforms: string[];
+  /** the distinct font sizes of the confetti's glyphs */
+  confettiFontSizes: string[];
+  /** the band's own layer's will-change */
+  bandWillChange: string;
+}
+
+/** What the band holds, and what the celebration over it is drawn with. */
+const bandLoad = (page: Page): Promise<Band> => page.evaluate(() => {
+  const band = document.querySelector("[data-ez-backdrop]");
+  const texts = band ? Array.from(band.querySelectorAll("text")) : [];
+  const inBand = document.getAnimations().filter((a) => a.effect instanceof KeyframeEffect && a.effect.target instanceof Element && band?.contains(a.effect.target));
+  return {
+    glyphs: texts.reduce((n, t) => n + Array.from(t.textContent ?? "").length, 0),
+    animations: inBand.length,
+    celebrated: document.querySelector("[data-celebration]") !== null,
+    scalingTransforms: inBand.flatMap((a) => {
+      const frames = a.effect instanceof KeyframeEffect ? a.effect.getKeyframes() : [];
+      const bad = frames.map((k) => String(k.transform ?? "")).filter((t) => /scale|skew|rotate|matrix/.test(t));
+      return bad.length > 0 ? [`${a instanceof CSSAnimation ? a.animationName : "script"}: ${bad.join(" / ")}`] : [];
+    }),
+    confettiFontSizes: [...new Set(Array.from(document.querySelectorAll("[data-confetti='glyph']"), (p) => getComputedStyle(p).fontSize))],
+    bandWillChange: band ? getComputedStyle(band).willChange : "",
+  };
+});
+
+/** How the Matrix rain's columns fall in a touchdown, against the code each one drew. */
+interface Columns {
+  /** the band's rows, and how many columns were checked */
+  rows: number;
+  columns: number;
+  /** the furthest any column falls, rush and its own clock together, in rows */
+  furthest: number;
+  /** "<column x> +<rows fallen>: row <band row>" for each row brought into the band whose glyph was never drawn */
+  missing: string[];
+}
+
+/**
+ * Mid-touchdown, steps the Matrix band's own animations through the whole celebration (and a
+ * second more, should its end be late) and, at every step, checks that each column drew the glyph
+ * of every row its fall brings into the band. The code repeats every PERIOD rows, so a row is
+ * owed a glyph wherever the rows a loop above or below it drew one.
+ */
+const matrixColumns = (page: Page): Promise<Columns> => page.evaluate(() => {
+  /** PERIOD and ROW in components/endzone/art/matrix.tsx */
+  const PERIOD = 24;
+  const ROW = 10;
+  const mod = (a: number, n: number): number => ((a % n) + n) % n;
+  const band = document.querySelector("[data-ez-backdrop] [data-ez-art='matrix']");
+  if (!band) throw new Error("no Matrix band");
+  const k = Number(/scale\(([\d.]+)\)/.exec(band.querySelector("g[transform^='scale']")?.getAttribute("transform") ?? "")?.[1]);
+  const h = Number(band.querySelector("rect")?.getAttribute("height"));
+  const rows = Math.round(h / k / ROW);
+  const seconds = parseFloat(getComputedStyle(document.querySelector("[data-touchdown]") ?? document.body).animationDuration) + 1;
+  const animations = document.getAnimations().filter((a): a is CSSAnimation => a instanceof CSSAnimation && a.effect instanceof KeyframeEffect && a.effect.target instanceof Element && band.contains(a.effect.target));
+  const rush = band.querySelector(".ez-matrix-rush");
+  const falls = Array.from(band.querySelectorAll(".ez-matrix-fall"));
+  for (const a of animations) a.pause();
+  const rowsDown = (el: Element | null): number => (el ? new DOMMatrix(getComputedStyle(el).transform).f / ROW : 0);
+  // every distinct fall of each clock over the celebration
+  const offsets = falls.map(() => new Set<number>());
+  for (let t = 0; t <= seconds; t += 1 / 96) {
+    for (const a of animations) a.currentTime = t * 1000;
+    const r = rowsDown(rush);
+    falls.forEach((f, i) => offsets[i]?.add(Math.round((r + rowsDown(f)) * 1000) / 1000));
+  }
+  const missing: string[] = [];
+  let columns = 0;
+  falls.forEach((f, i) => {
+    for (const col of Array.from(f.children)) {
+      columns++;
+      const [, x = "?", y = "0"] = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(col.getAttribute("transform") ?? "") ?? [];
+      const shift = Math.round(Number(y) / ROW);
+      for (const text of Array.from(col.querySelectorAll("text"))) {
+        const drawn = new Set((text.getAttribute("y") ?? "").split(" ").filter(Boolean).map((v) => Math.floor(Number(v) / ROW)));
+        const phases = new Set([...drawn].map((r) => mod(r, PERIOD)));
+        for (const down of offsets[i] ?? []) {
+          // the band's rows, and a row's grace either side for a glyph's own height
+          for (let b = -1; b <= rows; b++) {
+            const r = b - shift - down;
+            if (Number.isInteger(r) && phases.has(mod(r, PERIOD)) && !drawn.has(r)) missing.push(`${x} +${String(down)}: row ${String(b)}`);
+          }
+        }
+      }
+    }
+  });
+  for (const a of animations) a.play();
+  return { rows, columns, furthest: Math.max(0, ...offsets.flatMap((o) => [...o])), missing: [...new Set(missing)].slice(0, 20) };
+});
+
+interface Touchdown {
+  /** frames a second from ▶ to the whiteboard coming back, the 95th percentile and worst frame, in ms */
+  fps: number;
+  p95Ms: number;
+  worstMs: number;
+  /** the slowest frame around the one the celebration first shows on, in ms */
+  touchdownFrameMs: number;
+  longTasksMs: number[];
+  /** main-thread ms of layout and of style over the whole run, from the browser's own counters */
+  layoutMs: number;
+  styleMs: number;
+  /** the band at rest and in the celebration */
+  rest: Band;
+  party: Band;
+}
+
+/**
+ * Presses ▶ on a scoring play under CPU throttle and records every frame in the page until the
+ * whiteboard comes back, with the frames around the celebration's arrival, long tasks, and the
+ * browser's layout and style time over the run.
+ */
+async function touchdown(page: Page): Promise<Touchdown> {
+  const rest = await bandLoad(page);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Performance.enable");
+  const read = async (): Promise<Record<string, number>> => {
+    const { metrics } = await cdp.send("Performance.getMetrics");
+    return Object.fromEntries(metrics.map((m) => [m.name, m.value]));
+  };
+  await page.evaluate(() => {
+    const w = window as unknown as { __td: { frames: number[]; party: number | null; long: number[]; done: boolean } };
+    w.__td = { frames: [], party: null, long: [], done: false };
+    new PerformanceObserver((l) => { for (const e of l.getEntries()) w.__td.long.push(Math.round(e.duration)); }).observe({ type: "longtask" });
+    const tick = (t: number): void => {
+      if (w.__td.done) return;
+      w.__td.frames.push(t);
+      if (w.__td.party === null && document.querySelector("[data-celebration]")) w.__td.party = w.__td.frames.length - 1;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await new Designer(page).foldOverlays();
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: TOUCHDOWN_THROTTLE });
+  const a = await read();
+  await page.getByRole("button", { name: "Run the play" }).click();
+  await expect(page.locator("[data-celebration]")).toBeVisible({ timeout: 20_000 });
+  const party = await bandLoad(page);
+  await expect(page.getByRole("button", { name: "Run the play" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("[data-celebration]")).toHaveCount(0, { timeout: 10_000 });
+  const b = await read();
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  await cdp.detach();
+  const { frames, party: at, long } = await page.evaluate(() => {
+    const w = window as unknown as { __td: { frames: number[]; party: number | null; long: number[]; done: boolean } };
+    w.__td.done = true;
+    return w.__td;
+  });
+  const gaps = frames.slice(1).map((t, i) => t - (frames[i] ?? t));
+  const sorted = [...gaps].sort((x, y) => x - y);
+  const d = (k: string): number => Math.round(((b[k] ?? 0) - (a[k] ?? 0)) * 1000);
+  const span = (frames.at(-1) ?? 0) - (frames[0] ?? 0);
+  const round = (x: number): number => Math.round(x * 10) / 10;
+  return {
+    fps: round((gaps.length / span) * 1000),
+    p95Ms: round(sorted[Math.floor(sorted.length * 0.95)] ?? 0),
+    worstMs: round(sorted.at(-1) ?? 0),
+    touchdownFrameMs: at === null ? -1 : round(Math.max(...gaps.slice(Math.max(0, at - 1), at + 2))),
+    longTasksMs: long,
+    layoutMs: d("LayoutDuration"),
+    styleMs: d("RecalcStyleDuration"),
+    rest,
+    party,
+  };
+}
+
 test.describe("end zone performance", () => {
   test.describe.configure({ mode: "serial" });
   // the designs animate: this is what they cost with motion allowed
@@ -204,7 +401,13 @@ test.describe("end zone performance", () => {
     matrixRepaintsPerSecondBudget: number;
     zones: Record<string, { shallow?: Frame; deep?: Frame; swatch?: Frame; repaints?: { layoutsPerSecond: number; mainThreadMsPerSecond: number } }>;
     matrix: { clocks: { durationS: number; stepsPerSecond: number; delayS: number }[]; cursorS: number | null; latticeHz: number } | null;
-  } = { project: "", windows: null, budgets: BUDGETS, matrixRepaintsPerSecondBudget: MATRIX_REPAINTS_PER_SECOND, zones: {}, matrix: null };
+    touchdown: {
+      throttle: number;
+      budgets: { partyGlyphs: number; layoutVsClassic: number };
+      runs: Record<"classic" | "matrix", Touchdown[]>;
+      columns: Columns;
+    } | null;
+  } = { project: "", windows: null, budgets: BUDGETS, matrixRepaintsPerSecondBudget: MATRIX_REPAINTS_PER_SECOND, zones: {}, matrix: null, touchdown: null };
 
   test.beforeEach(async ({ page }, testInfo) => {
     manifest.project = testInfo.project.name;
@@ -261,6 +464,57 @@ test.describe("end zone performance", () => {
     }
   });
 
+  test("a Matrix touchdown, at 4× CPU throttle, draws every column whole with a fraction of the old glyphs and lays out within a small multiple of Classic's", async ({ page }, testInfo) => {
+    test.slow();
+    await page.setViewportSize(testInfo.project.use.viewport ?? PHONE);
+    await pinRandom(page);
+    const d = new Designer(page);
+    const runs: Record<"classic" | "matrix", Touchdown[]> = { classic: [], matrix: [] };
+    // turn about, so a runner slowing down part way weighs on both alike
+    for (let run = 0; run < TOUCHDOWN_RUNS; run++) {
+      for (const zone of ["classic", "matrix"] as const) {
+        await store(page, zone);
+        await d.goto(`?open=${GOAL_LINE_FADE.id}`);
+        if (zone === "matrix") await expect(art(page)).toBeVisible();
+        await d.settle();
+        runs[zone].push(await touchdown(page));
+      }
+    }
+    // and one more, unmeasured, to step the rain through its celebration column by column
+    await d.goto(`?open=${GOAL_LINE_FADE.id}`);
+    await expect(art(page)).toBeVisible();
+    await d.settle();
+    await d.foldOverlays();
+    await page.getByRole("button", { name: "Run the play" }).click();
+    await expect(page.locator("[data-celebration]")).toBeVisible({ timeout: 20_000 });
+    const columns = await matrixColumns(page);
+    const layout = (z: "classic" | "matrix"): number => runs[z].reduce((n, r) => n + r.layoutMs, 0);
+    const [classicLayout, matrixLayout] = [layout("classic"), layout("matrix")];
+    manifest.touchdown = { throttle: TOUCHDOWN_THROTTLE, budgets: { partyGlyphs: MATRIX_PARTY_GLYPHS, layoutVsClassic: MATRIX_LAYOUT_VS_CLASSIC }, runs, columns };
+    const matrix = runs.matrix[0];
+    if (!matrix) throw new Error("no Matrix touchdown was measured");
+
+    // the play scores, and the band holds what a touchdown draws
+    expect(matrix.party.animations, "the Matrix band's touchdown animations").toBeGreaterThan(matrix.rest.animations);
+    expect(matrix.party.glyphs, `the Matrix band drew ${String(matrix.party.glyphs)} glyphs in its touchdown`).toBeLessThanOrEqual(MATRIX_PARTY_GLYPHS);
+    // no column ever falls further than it drew code for: a gap would open at the top of the band
+    expect(columns.columns, "Matrix columns checked").toBeGreaterThan(10);
+    expect(columns.furthest, "the rain falls in a touchdown").toBeGreaterThan(0);
+    expect(columns.missing, `rows the Matrix rain brings into the band without a glyph (furthest fall ${String(columns.furthest)} rows)`).toEqual([]);
+    // nothing in the band scales, shears or turns while it plays: SVG text is laid out afresh at every new scale
+    expect(matrix.party.scalingTransforms, "animations in the band that scale, skew or rotate").toEqual([]);
+    // every glyph of the confetti is the same font, sized by a transform: a font per size is built on the touchdown's first frame
+    expect(matrix.party.confettiFontSizes.length, `the confetti's font sizes: ${matrix.party.confettiFontSizes.join(", ")}`).toBe(1);
+    // the band is its own compositor layer: players crossing it don't repaint the design, nor its steps them
+    expect(matrix.party.bandWillChange).toContain("transform");
+    for (const r of runs.classic) expect(r.party.celebrated, "Classic celebrates").toBe(true);
+    for (const r of runs.matrix) expect(r.party.celebrated, "Matrix celebrates").toBe(true);
+    expect(
+      matrixLayout,
+      `Matrix laid out for ${String(matrixLayout)}ms over its touchdowns against Classic's ${String(classicLayout)}ms`,
+    ).toBeLessThanOrEqual(classicLayout * MATRIX_LAYOUT_VS_CLASSIC);
+  });
+
   test("the Matrix rain holds still at rest, only the cursor blinking, and its touchdown clocks sit on a 12 Hz lattice", async ({ page }, testInfo) => {
     await store(page, "matrix");
     const d = new Designer(page);
@@ -310,6 +564,7 @@ test.describe("end zone performance", () => {
       }
       expect(zone?.swatch, `${z.id} swatch`).toBeTruthy();
     }
+    expect(manifest.touchdown, "the touchdowns were measured").toBeTruthy();
     writeFileSync(`test-results/end-zones-perf-${testInfo.project.name}.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   });
 });

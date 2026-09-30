@@ -521,6 +521,8 @@ function FieldImpl({
           the diagram: animated inside the diagram (or on a layer the size of the field) it made Safari
           repaint every line, route and player on every frame, a few frames a second on a phone. Over
           the band the diagram is see-through; print and every export keep its own classic band.
+          will-change gives the layer to the compositor outright, so players running over the band
+          during a touchdown never repaint the design, and the design's own steps never repaint them.
         */}
         {band && (
           <svg
@@ -529,7 +531,7 @@ function FieldImpl({
             preserveAspectRatio="none"
             aria-hidden
             className={
-              "pointer-events-none absolute left-[3px] w-[calc(100%-6px)] print:hidden " +
+              "pointer-events-none absolute left-[3px] w-[calc(100%-6px)] will-change-transform print:hidden " +
               (band.y < 1 ? "rounded-t-[calc(var(--radius-field)-3px)]" : "")
             }
             style={{ top: `calc(3px + (100% - 6px) * ${share(band.y)})`, height: `calc((100% - 6px) * ${share(band.h)})` }}

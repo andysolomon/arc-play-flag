@@ -99,7 +99,7 @@ function CelebrationImpl({ zone, teamColor, seed, unlocked, originY }: Props) {
     >
       {list.map((p, i) => (
         <span key={i} data-confetti={p.shape} className="ez-piece" style={{ ...p.style, color: p.color }}>
-          {p.shape === "glyph" ? p.glyph : null}
+          {p.shape === "glyph" ? <span>{p.glyph}</span> : null}
         </span>
       ))}
       <div
