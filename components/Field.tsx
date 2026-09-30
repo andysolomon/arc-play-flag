@@ -9,7 +9,7 @@ import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { LOS_YARD } from "@/lib/play/field";
 import { MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, px, py, snap } from "@/lib/play/geometry";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
-import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
+import { ballAt, buildMotion, carrierAt, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action } from "@/lib/play/reducer";
 import { isContext, shown } from "@/lib/play/reducer";
 import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
@@ -24,10 +24,12 @@ import { PlayerToken } from "./PlayerToken";
 import { FIELD } from "./fieldPaint";
 import { ManTagLayer } from "./ManTagLayer";
 import { RouteLayer } from "./RouteLayer";
+import { ballPlanArt } from "@/lib/render/ball-plan";
 import { pillMd } from "./ui";
 
 interface Props {
   players: readonly Player[];
+  ballPlan?: import("@/lib/play/types").BallStep[];
   vis: Vis;
   /** the play's own side: the other team is faded when shown, and can still take an assignment */
   side: Team;
@@ -98,7 +100,7 @@ const FIELD_BORDER = 3;
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, ballPlan,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -175,7 +177,9 @@ function FieldImpl({
   const tags = useMemo(() => manTags(visible, effective, top, layout.vh, zones), [visible, effective, top, layout.vh, zones]);
   // a run called from a no-run zone is flagged in the backfield corner every picture of it uses,
   // kept clear of the ▶ button on screen; a screen reader hears it with the diagram
-  const flagged = runInNoRunZone({ side, players, los }, noRunZones);
+  const flagged = runInNoRunZone({ side, players, los, ballPlan }, noRunZones);
+  const ballMotion = useMemo(() => ballPlan?.length ? buildMotion(players, top, undefined, ballPlan) : null, [players, top, ballPlan]);
+  const ballArt = useMemo(() => side === "offense" ? ballPlanArt(players, ballPlan, top) : "", [players, ballPlan, top, side]);
   const flag = useMemo(() => {
     if (!flagged) return null;
     const k = VW / Math.max(1, (width ?? 430) - 2 * FIELD_BORDER);
@@ -451,7 +455,8 @@ function FieldImpl({
     endDrag();
     dispatch({ type: "select", id: null });
     setParty(null);
-    const motion = buildMotion(players, topRef.current, simulationPlayback(Math.random));
+    const motion = buildMotion(players, topRef.current, simulationPlayback(Math.random), ballPlan);
+    if (motion.ballError) return;
     // the moment a caught pass is first over the goal line, if it ever is: a touchdown. Only the
     // play's own offense scores; on a defensive call a completion by the shadow offense is being scored on
     const td = side === "offense" ? touchdownAt(motion, players, los) : null;
@@ -471,9 +476,9 @@ function FieldImpl({
     };
     setRun({ motion, t: 0 });
     playRef.current = requestAnimationFrame(tick);
-  }, [dispatch, endDrag, los, players, side]);
+  }, [dispatch, endDrag, los, players, side, ballPlan]);
   // a playback, and the touchdown it is watching for, belong to the spot it started on: moving the ball ends it
-  useEffect(() => stop, [stop, los]);
+  useEffect(() => stop, [stop, los, players, ballPlan]);
   useEffect(() => {
     if (!party) return;
     const t = window.setTimeout(() => { setParty(null); }, CELEBRATION_MS);
@@ -500,6 +505,7 @@ function FieldImpl({
             )}
           </div>
         )}
+        {ballMotion?.ballError && <p role="alert" className="mb-1 rounded-tile border-2 border-ink bg-yellow-soft px-2 py-1 text-caption leading-note">{ballMotion.ballError}</p>}
         <div className="relative">
         {draft && !readOnly && (
           <div role="toolbar" aria-label="Custom route controls" className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1.5 print:hidden">
@@ -567,6 +573,7 @@ function FieldImpl({
           role={readOnly ? "img" : "group"}
           tabIndex={!readOnly && draft ? 0 : undefined}
           aria-keyshortcuts={!readOnly && draft ? "Enter Escape Delete Backspace" : undefined}
+          data-ball-holder={run && run.motion.exchanges.length ? carrierAt(run.motion, run.t) ?? "in-flight" : undefined}
           aria-label="Play diagram"
         >
           <desc>
@@ -634,6 +641,7 @@ function FieldImpl({
             </g>
           )}
           <RouteLayer routes={routes} draftD={draftD} lane={designed && layout.endZone ? LANE_CLIP : null} />
+          {ballArt && <g dangerouslySetInnerHTML={{ __html: ballArt }} />}
           {editableCustom && !draft && customPoints.map((point, index) => {
             const active = activeWaypoint === index;
             return (
@@ -696,7 +704,7 @@ function FieldImpl({
         <span className="sr-only" aria-live="polite">
           {party ? `Touchdown!${party.unlocked ? ` The ${party.unlocked.name} end zone is open.` : ""}` : ""}
         </span>
-        <PlayButton playing={playing} onClick={playing ? stop : play} />
+        <PlayButton playing={playing} disabled={!playing && !!ballMotion?.ballError} onClick={playing ? stop : play} />
         </div>
       </div>
     </main>

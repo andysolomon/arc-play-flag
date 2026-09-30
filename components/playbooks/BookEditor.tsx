@@ -94,7 +94,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
               <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-label={`Play ${String(it.n)}`}>
                 {it.n}
               </span>
-              <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} side={it.play.side} artShadow={it.play.artShadow} los={it.play.los} /></div>
+              <div className="w-[84px] flex-none"><PlayThumb ballPlan={it.play.ballPlan} players={it.play.players} name={it.play.name} side={it.play.side} artShadow={it.play.artShadow} los={it.play.los} /></div>
               <div className="min-w-0 flex-1">
                 <span className="block truncate text-base" title={it.play.name}>{it.play.name}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">

@@ -73,7 +73,7 @@ function PlayToggle({ play: p, added, onToggle }: { play: SavedPlay; added: bool
       title={added ? `Remove ${p.name}` : `Add ${p.name}`}
       className={`${card} flex cursor-pointer flex-col gap-2 text-left transition-transform duration-[120ms] hover:-translate-y-0.5 hover:bg-yellow-soft aria-pressed:bg-yellow-soft motion-reduce:transition-none`}
     >
-      <PlayThumb players={p.players} name={p.name} side={p.side} artShadow={p.artShadow} los={p.los} />
+      <PlayThumb ballPlan={p.ballPlan} players={p.players} name={p.name} side={p.side} artShadow={p.artShadow} los={p.los} />
       <span className="truncate text-base">{p.name}</span>
       <span className="text-caption text-ink-muted">{added ? "✓ In playbook" : "+ Add"}</span>
     </button>

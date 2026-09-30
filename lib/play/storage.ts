@@ -1,6 +1,7 @@
 import { readLos, withLos } from "./field";
+import { readBallPlan } from "./ball-plan";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, routeDef } from "./routes";
-import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
+import type { BallStep, Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
 /** The prototype's library, keyed by play name. Read once and migrated into v2. */
@@ -14,6 +15,7 @@ export type Playbooks = Record<string, Playbook>;
 export interface DraftRecord {
   name: string;
   players: Player[];
+  ballPlan?: BallStep[];
   /** the saved play this draft came from, when it did */
   id?: string | null;
   notes?: string;
@@ -164,6 +166,7 @@ export function normalizeSavedPlay(raw: unknown, fallbackId = newId()): SavedPla
     notes: cleanNotes(raw.notes),
     side: readSide(raw.side, players),
     ...artShadow(raw.artShadow),
+    ...readBallPlan(raw.ballPlan),
   }, readLos(raw.los));
 }
 
@@ -405,6 +408,7 @@ export function normalizeDraft(raw: unknown): DraftRecord | null {
     notes: cleanNotes(raw.notes),
     side: readSide(raw.side, players),
     ...artShadow(raw.artShadow),
+    ...readBallPlan(raw.ballPlan),
   }, readLos(raw.los));
 }
 
