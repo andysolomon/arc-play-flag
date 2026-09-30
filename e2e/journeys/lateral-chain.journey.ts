@@ -39,13 +39,6 @@ async function catchOf(page: Page, id: string): Promise<Pair | undefined> {
   return (await storedDraft(page))?.players.find((p) => p.id === id)?.route?.catch;
 }
 
-/** Picks Lateral for the selected carrier and taps the red player who takes it. */
-async function lateralTo(d: Designer, label: string): Promise<void> {
-  await d.pick("Lateral");
-  await d.foldOverlays();
-  await takes(d, label).click();
-}
-
 /** Drags a catch handle to a yard point, and reads what the coach sees while it is still held. */
 async function dragCatch(d: Designer, thrower: string, to: Pair): Promise<{ shook: boolean }> {
   await d.closeSidebars();

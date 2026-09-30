@@ -12,7 +12,7 @@
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "27ae56c5b4ae332ed52f4d97e484e2aa1f31e4fb55111982b76679dd2d495519",
-    "components/Hint.tsx": "4fb4992847285e79681a77850dba475ee3d4e537a11412051b486457ae953668",
+    "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "d8d6e11e2930790550cf0915ef14f172bb275f1c6f6d2578ff0014296c1aea92",
     "components/LateralLayer.tsx": "d356a181f066c3f117d0eba4b950a4721405d26efa046623d15fef1593a4bfa2",
     "components/ManTagLayer.tsx": "258c32c219b052ff21d75fa6e169e2e6abbc1b3f12036aee17a0c3a779615833",
@@ -64,18 +64,9 @@
     "components/ui.ts": "708637dcfd235815bdbab737b526778a9b6f6289956c01dd966fb893a1c5aaee"
   },
   "restamped": {
-    "reason": "Lateral replaces Pitch only in the third row of the offense palette's RUN group, which no clip scrolls to (build-play stops at the pass tiles and custom-routes at the Counter/Reverse/Delay row, checked frame by frame); arcs, catch handles, the carrier palette and the flag-yellow note draw only on plays with a lateral, which no chapter has; Man targeting's rings are unchanged",
+    "reason": "Lateral replaces Pitch only in the third row of the offense palette's RUN group, which no clip scrolls to (build-play stops at the pass tiles and custom-routes at the Counter/Reverse/Delay row, checked frame by frame); arcs, catch handles, the carrier palette and the flag-yellow note (which wraps rather than cuts off) draw only on plays with a lateral, which no chapter has; Man targeting's rings are unchanged",
     "files": [
-      "app/globals.css (changed)",
-      "components/App.tsx (changed)",
-      "components/Field.tsx (changed)",
-      "components/Hint.tsx (changed)",
-      "components/LateralLayer.tsx (added)",
-      "components/PlayerToken.tsx (changed)",
-      "components/RouteLayer.tsx (changed)",
-      "components/RouteSidebar.tsx (changed)",
-      "components/SharedPlay.tsx (changed)",
-      "components/ui.ts (changed)"
+      "components/Hint.tsx (changed)"
     ]
   }
 }
