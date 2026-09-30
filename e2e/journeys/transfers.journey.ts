@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { encodePlayFile } from "../../lib/export/transfer";
 import { jsonUpload, playbook, seed, SLANT_LEFT, WHEEL_RIGHT, COVER_TWO, storageSnapshot, storedPlaybooks, storedPlays } from "../support/fixtures";
 import { armSabotage, downloadText, sabotage } from "../support/designer";
+import { freshShareBudget } from "../support/share-budget";
 
 test("standalone play export/import previews first, preserves notes, and creates no book", async ({ page, browser }) => {
   await seed(page, { plays: [SLANT_LEFT] });
@@ -51,6 +52,7 @@ test("a failed standalone import leaves the library intact and the preview can r
 
 test("short link opens on another device, imports a snapshot, survives reload, and can be revoked", async ({ page, browser }) => {
   test.skip(!process.env.SHARING_TEST_REDIS_URL, "Requires disposable Redis REST adapter; enabled in CI");
+  await freshShareBudget();
   const book = playbook("share-book", "Otter Shared Calls", [WHEEL_RIGHT, SLANT_LEFT, COVER_TWO]);
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [book] });
   await page.goto("/playbooks");
@@ -107,6 +109,7 @@ test("short link opens on another device, imports a snapshot, survives reload, a
 
 test("gallery copies a short standalone link, reuses it, previews without writes and imports only the play", async ({ page, browser, context }) => {
   test.skip(!process.env.SHARING_TEST_REDIS_URL, "Requires disposable Redis REST adapter");
+  await freshShareBudget();
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await seed(page, { plays: [SLANT_LEFT] });
   await page.goto("/playbooks");
