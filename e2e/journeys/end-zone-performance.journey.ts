@@ -28,7 +28,7 @@ import { GOAL_LINE_FADE, OTTERS, SLANT_LEFT, seed } from "../support/fixtures";
  *    top of the band; something in the band scales or shears while it plays, so its text is laid
  *    out again on every frame; each glyph of the confetti is its own font size, so the first frame
  *    builds a font for every one; the band shares a layer with the players; or the whole
- *    touchdown lays out for far longer than Classic's → "a Matrix touchdown"
+ *    touchdown lays out for far longer than Classic's      → "a Matrix touchdown"
  *
  * Paint cost is measured in the page, by drawing the band's own SVG onto a canvas at its size on
  * this screen, and taken against a fixed calibration picture drawn the same way at the same
@@ -72,16 +72,16 @@ const MOST_ELEMENTS = 450;
 /**
  * A touchdown with the ball on the 5, measured under this CPU throttle, this many times for each of
  * Classic and Matrix. Matrix may draw this many glyphs in the band during it (1,527 when a column
- * drew two loops of code above the band, 1,167 now), and lay out for at most this many times as
- * long as Classic over the same plays. Classic's own layout time differs more from machine to
- * machine than Matrix's: 2 to 2.5 times it on one machine where Matrix was 5.4 to 6 times it
- * before, 3.5 to 4.1 times it on CI's runners where Classic lays out in half the time. Matrix as
- * it was (1,148ms against 197ms) is well past the budget on either.
+ * drew two loops of code above the band, 1,167 now), and lay out for at most this many ms more
+ * than Classic over the same plays. What Matrix adds holds steady from machine to machine, where
+ * Classic's own share does not (it lays out in half the time on CI's runners), so a multiple of
+ * Classic's swung from 2 to 5.1 on the same code: the fix adds 119 to 197ms on CI and 69 to 263ms
+ * on a dev machine; before it, Matrix added 951ms (1,148ms against Classic's 197ms).
  */
 const TOUCHDOWN_THROTTLE = 4;
 const TOUCHDOWN_RUNS = 2;
 const MATRIX_PARTY_GLYPHS = 1250;
-const MATRIX_LAYOUT_VS_CLASSIC = 6;
+const MATRIX_EXTRA_LAYOUT_MS = 500;
 
 const art = (page: Page) => page.locator("[data-ez-backdrop] [data-ez-art]");
 
@@ -406,7 +406,7 @@ test.describe("end zone performance", () => {
     matrix: { clocks: { durationS: number; stepsPerSecond: number; delayS: number }[]; cursorS: number | null; latticeHz: number } | null;
     touchdown: {
       throttle: number;
-      budgets: { partyGlyphs: number; layoutVsClassic: number };
+      budgets: { partyGlyphs: number; extraLayoutMs: number };
       runs: Record<"classic" | "matrix", Touchdown[]>;
       columns: Columns;
     } | null;
@@ -467,7 +467,7 @@ test.describe("end zone performance", () => {
     }
   });
 
-  test("a Matrix touchdown, at 4× CPU throttle, draws every column whole with a fraction of the old glyphs and lays out within a small multiple of Classic's", async ({ page }, testInfo) => {
+  test("a Matrix touchdown, at 4× CPU throttle, draws every column whole with a fraction of the old glyphs and lays out for at most half a second more than Classic", async ({ page }, testInfo) => {
     test.slow();
     await page.setViewportSize(testInfo.project.use.viewport ?? PHONE);
     await pinRandom(page);
@@ -493,7 +493,7 @@ test.describe("end zone performance", () => {
     const columns = await matrixColumns(page);
     const layout = (z: "classic" | "matrix"): number => runs[z].reduce((n, r) => n + r.layoutMs, 0);
     const [classicLayout, matrixLayout] = [layout("classic"), layout("matrix")];
-    manifest.touchdown = { throttle: TOUCHDOWN_THROTTLE, budgets: { partyGlyphs: MATRIX_PARTY_GLYPHS, layoutVsClassic: MATRIX_LAYOUT_VS_CLASSIC }, runs, columns };
+    manifest.touchdown = { throttle: TOUCHDOWN_THROTTLE, budgets: { partyGlyphs: MATRIX_PARTY_GLYPHS, extraLayoutMs: MATRIX_EXTRA_LAYOUT_MS }, runs, columns };
     const matrix = runs.matrix[0];
     if (!matrix) throw new Error("no Matrix touchdown was measured");
 
@@ -515,7 +515,7 @@ test.describe("end zone performance", () => {
     expect(
       matrixLayout,
       `Matrix laid out for ${String(matrixLayout)}ms over its touchdowns against Classic's ${String(classicLayout)}ms`,
-    ).toBeLessThanOrEqual(classicLayout * MATRIX_LAYOUT_VS_CLASSIC);
+    ).toBeLessThanOrEqual(classicLayout + MATRIX_EXTRA_LAYOUT_MS);
   });
 
   test("the Matrix rain holds still at rest, only the cursor blinking, and its touchdown clocks sit on a 12 Hz lattice", async ({ page }, testInfo) => {
