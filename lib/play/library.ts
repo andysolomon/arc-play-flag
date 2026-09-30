@@ -2,6 +2,7 @@ import {
   StorageError, artShadow, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
 } from "./storage";
 import { losOf, withLos } from "./field";
+import { readBallPlan } from "./ball-plan";
 import { isRun } from "./routes";
 import type { Playbook, SavedPlay, TeamSettings } from "./types";
 
@@ -31,6 +32,7 @@ export interface PlayDiscovery {
 export function playMatchesFilter(play: SavedPlay, filter: Exclude<PlayFilter, "all">): boolean {
   if (filter === "defense") return play.side === "defense";
   if (play.side !== "offense") return false;
+  if (play.ballPlan?.length) return filter === (play.ballPlan.at(-1)?.type === "pass" ? "pass" : "run");
   if (filter === "run") return play.players.some((p) => p.team === "offense" && p.route && isRun(p.route.type));
   return play.players.some((p) => p.team === "offense" && p.route && !isRun(p.route.type));
 }
@@ -120,6 +122,7 @@ export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): 
   // the ball spot goes last and only off the own goal line, as normalizeSavedPlay reads it back
   const rec: SavedPlay = withLos({
     id: play.id ?? newId(), name: play.name, players: [...play.players], notes: play.notes, side: play.side, ...artShadow(play.artShadow),
+    ...readBallPlan(play.ballPlan),
   }, losOf(play));
   return attempt(() => {
     plays = Object.values(store(rec));

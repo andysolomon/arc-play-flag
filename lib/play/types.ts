@@ -2,6 +2,14 @@ export type Team = "offense" | "defense";
 export type Vis = "both" | Team;
 export type SnapMode = "half" | "one" | "free";
 
+/** Ordered possession changes. The source is the current carrier, starting with QB. */
+export interface BallStep {
+  type: "lateral" | "pass";
+  target: string;
+  /** Seconds the carrier waits after receiving the ball before releasing it. */
+  delay: number;
+}
+
 export interface Pt {
   x: number;
   y: number;
@@ -77,6 +85,8 @@ export interface SavedPlay {
   notes: string;
   /** which side of the ball this play is drawn for: an offensive play or a defensive call */
   side: Team;
+  /** Explicit ball assignments; absent keeps the existing route-based playback. */
+  ballPlan?: BallStep[];
   /**
    * The other team is drawn, faded, on this play's pictures: thumbnails, the share snapshot and
    * every printout. Stored only when true, so a play from before the choice reads and writes the same.
