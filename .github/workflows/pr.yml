@@ -134,6 +134,14 @@ jobs:
           path: test-results/wristbands-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the coach-workflow polish
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coach-polish
+          path: test-results/coach-polish-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the demo tour
         if: always()
         uses: actions/upload-artifact@v4

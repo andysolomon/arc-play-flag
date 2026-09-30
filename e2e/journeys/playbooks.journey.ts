@@ -79,7 +79,7 @@ test("exports are disabled for an empty book, download as real files for a full 
   await page.getByRole("combobox", { name: "Binder layout" }).selectOption("four");
   const [pdf] = await Promise.all([page.waitForEvent("download", { timeout: 40_000 }), page.getByRole("button", { name: "Download binder PDF" }).click()]);
   await expect(toast(page)).toHaveText("Saved", { timeout: 40_000 });
-  expect(pdf.suggestedFilename()).toBe("otter-road-book-binder.pdf");
+  expect(pdf.suggestedFilename()).toBe("otter-road-book-binder-four-up.pdf");
   expect((await downloadBytes(pdf)).subarray(0, 5).toString("latin1")).toBe("%PDF-");
 
   // a page that cannot be drawn is a failure, not a "Saved"

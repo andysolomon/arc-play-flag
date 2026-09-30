@@ -1,5 +1,5 @@
 import { LOS_YARD, losOf, readLos, withLos } from "./field";
-import { artShadow, normalizePlayers, readSide, type DraftRecord } from "./storage";
+import { artShadow, cleanNotes, normalizePlayers, readSide, type DraftRecord } from "./storage";
 import type { Player, Team } from "./types";
 
 /** Share links carry the whole play as base64url JSON in the path: /p/<id>. No backend. */
@@ -47,14 +47,17 @@ export interface SharedRecord extends DraftRecord {
  * the other team faded only when the play includes it in its pictures; "Open in designer"
  * restores the other team as the faded shadow. `side` is written only for a defensive
  * call, so an offensive play's link is unchanged from before plays had a side. No-run
- * zones are written only when they are off, the pictures' choice only when it is on, and
- * the ball spot only when it is off the own goal line, for the same reason. A `vis` field from an
- * older link is ignored: those links still carry every player.
+ * zones are written only when they are off, the pictures' choice only when it is on, the
+ * ball spot only when it is off the own goal line, and the coaching notes only when there are
+ * some, for the same reason. A `vis` field from an older link is ignored: those links still
+ * carry every player.
  */
 export function encodeShare(rec: DraftRecord, noRunZones = true): string {
-  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false; artShadow?: true; los?: number } = {
+  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false; artShadow?: true; los?: number; notes?: string } = {
     name: rec.name, players: rec.players.map(compact),
   };
+  const notes = cleanNotes(rec.notes);
+  if (notes.trim()) payload.notes = notes;
   if (rec.side === "defense") payload.side = "defense";
   if (!noRunZones) payload.noRunZones = false;
   if (rec.artShadow) payload.artShadow = true;
@@ -76,9 +79,11 @@ export function decodeShare(id: string): SharedRecord | null {
     // links without a side predate the choice: read the side off the routes, as storage does
     const side = readSide("side" in parsed ? parsed.side : undefined, players);
     const noRunZones = !("noRunZones" in parsed) || parsed.noRunZones !== false;
+    // links from before notes travelled carry none
+    const notes = cleanNotes("notes" in parsed ? parsed.notes : undefined);
     // links without a spot put the ball where every drive starts, the own goal line
     return withLos(
-      { name, players, side, noRunZones, ...artShadow("artShadow" in parsed ? parsed.artShadow : undefined) },
+      { name, ...(notes ? { notes } : {}), players, side, noRunZones, ...artShadow("artShadow" in parsed ? parsed.artShadow : undefined) },
       readLos("los" in parsed ? parsed.los : undefined),
     );
   } catch {

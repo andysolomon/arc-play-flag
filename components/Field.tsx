@@ -86,6 +86,8 @@ const STEP: Record<string, readonly [number, number]> = {
 
 /** Name + status line above the diagram; subtracted from the pane so the field still fits. */
 const TITLE_CHROME = 24;
+/** The name + status line, for the toast to sit under instead of over. */
+export const FIELD_TITLE_ID = "field-title";
 /** The clip that keeps a route's turf-coloured lane inside a designed end zone. */
 const LANE_CLIP = "ffez-lane";
 
@@ -474,7 +476,7 @@ function FieldImpl({
       {title !== undefined && !showTitle && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
       <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         {title !== undefined && showTitle && (
-          <div className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
+          <div id={FIELD_TITLE_ID} className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
             <h1 className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
             {status !== undefined && (
               <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">

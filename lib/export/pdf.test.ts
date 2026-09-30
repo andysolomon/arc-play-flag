@@ -19,7 +19,7 @@ describe("pdf writer", () => {
     const start = Number(/startxref\n(\d+)/.exec(s)?.[1]);
     expect(s.slice(start, start + 4)).toBe("xref");
     const entries = s.slice(start).split("\n").slice(2).filter((l) => / n $/.test(l));
-    expect(entries).toHaveLength(3 + 2 * 3);
+    expect(entries).toHaveLength(4 + 2 * 3);
     entries.forEach((e, i) => {
       const off = Number(e.slice(0, 10));
       const head = `${String(i + 1)} 0 obj`;
