@@ -110,9 +110,11 @@ describe("geom", () => {
     const g = geom(at("o3", { type: "go" }), players, top, {});
     // 15 yards of route must fit into 1 - (-16 + 0.6) - 0.6 = 15.8 → k = 15.8/15 → clipped to 1
     expect(g?.d).toBe("M66.0 347.0L66.0 57.6");
-    // a right-side player's out route heads for the near sideline: k = (29.4 - 0.6 - 27)/6 = 0.3
+    // a right-side player's out route heads for the near sideline: it still breaks at 5 yards, and
+    // the break stops at the sideline (28.8) instead of shrinking the whole route
     const out = geom(at("o4", { type: "out" }), players, TOP, {});
-    expect(out?.d).toBe("M594.0 668.1L594.0 649.0L620.0 649.0");
+    expect(out?.d).toBe("M594.0 655.0L594.0 572.0L620.0 572.0");
+    expect(out?.arrow).toBe("633.6,572.0 616.6,580.5 616.6,563.5");
     // handedness: a left-side player's cross breaks toward the middle, nothing to shrink
     const cross = geom(at("o3", { type: "cross" }, { x: 2, y: 1 }), players, TOP, {});
     expect(cross?.d).toBe("M44.0 655.0L44.0 594.0L316.7 531.1");
@@ -120,7 +122,7 @@ describe("geom", () => {
   test("honours mirror and the near sideline", () => {
     const left = geom(at("o3", { type: "out" }), players, TOP, {});
     const mirrored = geom(at("o3", { type: "out", mirror: true }), players, TOP, {});
-    expect(left?.d).toBe("M66.0 668.1L66.0 649.0L40.0 649.0");
+    expect(left?.d).toBe("M66.0 655.0L66.0 572.0L40.0 572.0");
     expect(mirrored?.d).toBe("M66.0 655.0L66.0 572.0L184.4 572.0");
   });
   test("a pitch runs wide of the quarterback, sets up behind the line, then turns upfield", () => {

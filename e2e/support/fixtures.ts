@@ -33,7 +33,11 @@ export const COVER_TWO = play("fx-cover-two", "Otter Cover Two", {
 // the slides journey's book: every call type, both sides, idle and unlabelled players, a deleted man target (loading
 // drops that route, so the defender has no assignment), an empty side
 export const HOOK_LADDER = play("fx-hook-ladder", 'Otter "Hook" & <Ladder>', { o3: { type: "go" }, o4: { type: "post" }, o5: { type: "handoff", primary: true } }, 'Z takes it & runs <behind> the C.\n\nShout "hut" on two.');
-export const COVER_TWO_D = play("fx-cover-two-d", "Otter Cover Two D", { d1: { type: "zoneDeep" }, d4: { type: "zoneDeep" }, d2: { type: "man", target: "o3" }, d3: { type: "man", target: "fx-gone" } }, "Deep halves.\nNobody gets behind you.", "defense");
+/** A call saved before defenders came with tags, so the slides name them "Defender 1" to "Defender 5". */
+export const COVER_TWO_D: SavedPlay = (() => {
+  const p = play("fx-cover-two-d", "Otter Cover Two D", { d1: { type: "zoneDeep" }, d4: { type: "zoneDeep" }, d2: { type: "man", target: "o3" }, d3: { type: "man", target: "fx-gone" } }, "Deep halves.\nNobody gets behind you.", "defense");
+  return { ...p, players: p.players.map((q) => (q.team === "defense" ? { ...q, label: "" } : q)) };
+})();
 export const FAKE_DIVE = play("fx-fake-dive", "Otter Fake Dive", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "curl" } });
 export const PITCH_OPTION: SavedPlay = (() => {
   const p = play("fx-pitch-option", "Otter Pitch Option", { o5: { type: "pitch" }, o4: { type: "corner" }, o3: { type: "custom", pts: [[3, -6], [8, -10]] } });
@@ -42,6 +46,8 @@ export const PITCH_OPTION: SavedPlay = (() => {
 // the line-of-scrimmage journey: the same call from the 5 and, carrying a ball spot, from their 5 (the 35)
 export const RED_ZONE_FADE = play("fx-red-zone-fade", "Otter Red Zone Fade", { o3: { type: "go", primary: true }, o4: { type: "corner" } });
 export const GOAL_LINE_FADE: SavedPlay = { ...play("fx-goal-line-fade", "Otter Goal Line Fade", { o3: { type: "go", primary: true }, o4: { type: "corner" } }), los: 35 };
+// the route-fit journey: the wide receivers break for the sideline from 3 yards off it; Z's wheel has room
+export const SIDELINE_OUT = play("fx-sideline-out", "Otter Sideline Out", { o3: { type: "out", primary: true }, o4: { type: "corner" }, o5: { type: "wheel" } });
 /** Longer than the panel's three reserved lines, so the face cuts it and the notes keep it whole. */
 export const WALKTHROUGH_NOTES = "Walk it at half speed, then at full speed. ".repeat(13).trim();
 export const WALKTHROUGH: SavedPlay = { ...play("fx-walkthrough", "Otter Walkthrough", {}, WALKTHROUGH_NOTES), players: formation().filter((p) => p.team === "defense") };

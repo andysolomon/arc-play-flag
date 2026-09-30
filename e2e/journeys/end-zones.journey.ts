@@ -652,7 +652,8 @@ test("a completion short of the goal line, a throw to someone else while the pri
   await playEnds(page);
   r = await lastRun(page);
   expect(r.party).toBeNull();
-  expect(r.deepest).toBeGreaterThan(-3);
+  // the ball goes no deeper than Y's out, which breaks 5 yards on (y = -4), 15 short of the goal line
+  expect(r.deepest).toBeGreaterThan(-5);
 
   // the touchdown play, stopped before the throw: nothing more happens once the whiteboard is back
   await d.goto("?open=fx-td-carry");

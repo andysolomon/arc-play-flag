@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { record } from "@/lib/diagnostics";
 import { binderPages } from "@/lib/export/binder";
 import { flyerDefault, flyerPage } from "@/lib/export/flyer";
-import { artView, type Numbered } from "@/lib/export/numbered";
+import { artView, untagged, type Numbered } from "@/lib/export/numbered";
 import { PAPERS, defaultPaper, type PaperKey } from "@/lib/export/pages";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
 import { POSTCARD_SIZES, postcardPages, type PostcardSize } from "@/lib/export/postcard";
@@ -27,6 +27,22 @@ interface Props {
 
 const numberField = `${input} w-[76px] px-2 text-center`;
 const first = BAND_PRESETS[0];
+
+/** What the wristband inserts hold, for the sides this book's plays are drawn for. */
+function bandsBlurb(items: readonly Numbered[]): string {
+  const defense = items.some((i) => i.play.side === "defense");
+  if (!defense) return "One insert per position with that route bold, plus one for the quarterback and coach.";
+  if (items.every((i) => i.play.side === "defense")) return "One insert per defender with their coverage bold, plus one for the coach.";
+  return "One insert per position with that route or coverage bold, plus one for the quarterback and coach.";
+}
+
+/** Which plays have a player on their own side with no tag, who gets no insert of their own; null when none do. */
+function untaggedNote(items: readonly Numbered[]): string | null {
+  const ns = untagged(items).map((i) => String(i.n));
+  if (!ns.length) return null;
+  const which = ns.length === 1 ? `play ${ns.join("")}` : `plays ${ns.slice(0, -1).join(", ")} and ${ns[ns.length - 1] ?? ""}`;
+  return `Players without a tag on ${which} print only on the Everyone insert. Tap a player in the designer to tag them.`;
+}
 
 export function ExportPanel({ book, items, team, say }: Props) {
   const [paper, setPaper] = useState<PaperKey>(() => defaultPaper());
@@ -101,6 +117,8 @@ export function ExportPanel({ book, items, team, say }: Props) {
 
   const perCard = size.rows * size.cols;
   const inserts = Math.max(1, Math.ceil(items.length / perCard));
+  const bands = bandsBlurb(items);
+  const unnamed = untaggedNote(items);
 
   return (
     <div className="flex flex-col gap-3" aria-label="Export playbook">
@@ -122,7 +140,8 @@ export function ExportPanel({ book, items, team, say }: Props) {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3">
       <div className={`${card} flex flex-col gap-2`}>
         <span className={eyebrow}>WRISTBANDS</span>
-        <span className="text-caption leading-note text-ink-muted">One insert per position with that route bold, plus one for the quarterback and coach.</span>
+        <span className="text-caption leading-note text-ink-muted">{bands}</span>
+        {unnamed && <span className="text-caption leading-note text-ink-muted">{unnamed}</span>}
         <select value={presetKey} onChange={(e) => { pickPreset(e.target.value); }} aria-label="Wristband size" className={select}>
           {BAND_PRESETS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
           <option value="custom">Custom size…</option>
