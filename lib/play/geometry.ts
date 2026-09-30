@@ -61,6 +61,9 @@ export function cardWidth(pane: Pane | null, depthYards: number): number | null 
   return Math.min(pane.pw, (pane.ph * FIELD_YARDS) / depthYards, 1200);
 }
 
+/** How far across the field a preset route may run: 1.2 yards inside either sideline, where a player may stand (see clamp). */
+const ACROSS_MIN = 1.2, ACROSS_MAX = 28.8;
+
 /**
  * A route's waypoints in absolute yards, starting at the player's spot. Shared by the
  * drawn route and the playback simulation so they can never disagree. Zone routes are
@@ -95,20 +98,54 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     const legs = runLegs(rt.type, mesh.x, mesh.y, side);
     return [[p.x, p.y], ...legs.map((q) => [Math.max(0.8, Math.min(29.2, q[0])), Math.max(top + 0.6, q[1])] as const)];
   }
-  const defPts = def.pts ?? ROUTES.go.pts ?? [];
-  // shrink the whole route uniformly so nothing — including a zone bubble — leaves the card
-  const deep = top + 0.6;
+  // across the field the route stops at the sideline and every point keeps its depth, so an Out from
+  // a wide split still breaks at 5 yards and runs to the sideline (sidelineCut says what that cuts)
+  const lo = Math.min(0, ACROSS_MIN - p.x), hi = Math.max(0, ACROSS_MAX - p.x);
+  const rel = (def.pts ?? ROUTES.go.pts ?? []).map((q) => [Math.max(lo, Math.min(hi, sign * q[0])), q[1]] as const);
+  // up and down, the whole route shrinks uniformly to stay on the card, whose top can be the end line
+  const deep = top + 1.2;
   let k = 1;
-  for (const q of defPts) {
-    const m = 0.6;
-    const dx = sign * q[0], dy = q[1];
-    if (dx > 0.001) k = Math.min(k, (29.4 - m - p.x) / dx);
-    if (dx < -0.001) k = Math.min(k, (p.x - 0.6 - m) / -dx);
-    if (dy > 0.001) k = Math.min(k, (7.6 - m - p.y) / dy);
-    if (dy < -0.001) k = Math.min(k, (p.y - deep - m) / -dy);
+  for (const q of rel) {
+    if (q[1] > 0.001) k = Math.min(k, (7 - p.y) / q[1]);
+    if (q[1] < -0.001) k = Math.min(k, (p.y - deep) / -q[1]);
   }
   k = Math.max(0, Math.min(1, k));
-  return defPts.map((q) => [p.x + sign * q[0] * k, p.y + q[1] * k] as const);
+  const out: Pair[] = [];
+  for (const q of rel) {
+    const pt = [p.x + q[0] * k, p.y + q[1] * k] as const;
+    const last = out[out.length - 1];
+    // a break with no room left lands on the stem's end: one point, so no leg runs nowhere
+    if (!last || Math.abs(last[0] - pt[0]) > 0.001 || Math.abs(last[1] - pt[1]) > 0.001) out.push(pt);
+  }
+  return out;
+}
+
+/**
+ * How much of a preset route the sideline cuts off: `reach` is how far across the field the route is
+ * designed to run toward that sideline, `room` how far the player can go before it, both in yards.
+ */
+export interface SidelineCut { reach: number; room: number }
+
+/**
+ * What the sideline cuts off the player's preset route. routeYards draws it to the sideline with its
+ * depth intact; this is what the coach is told. Null for a route that fits, or would lose less than
+ * half a yard (drawn, that is the same route), and for anything not drawn from a preset (custom, man,
+ * blitz, a run laid out from the mesh point, a zone's bubble).
+ */
+export function sidelineCut(p: Player): SidelineCut | null {
+  const rt = p.route;
+  const def = rt && routeDef(p.team, rt.type);
+  if (!rt || !def?.pts || def.end === "zone" || rt.type === "blitz") return null;
+  const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
+  let cut: SidelineCut | null = null;
+  for (const q of def.pts) {
+    const dx = sign * q[0];
+    if (Math.abs(dx) < 0.001) continue;
+    const reach = Math.abs(dx);
+    const room = Math.max(0, dx > 0 ? ACROSS_MAX - p.x : p.x - ACROSS_MIN);
+    if (reach - room >= 0.5 && (!cut || reach - room > cut.reach - cut.room)) cut = { reach, room };
+  }
+  return cut;
 }
 
 /** The quarterback: the offensive player labelled QB, else the default QB slot. */

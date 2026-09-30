@@ -118,6 +118,22 @@ jobs:
           path: test-results/phone-palette-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the route fit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-fit
+          path: test-results/route-fit-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the wristbands
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wristbands
+          path: test-results/wristbands-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the demo tour
         if: always()
         uses: actions/upload-artifact@v4

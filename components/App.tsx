@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { initialState, reducer, selected, unsaved } from "@/lib/play/reducer";
+import { initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { withLos } from "@/lib/play/field";
-import type { RouteType, Team, TeamSettings } from "@/lib/play/types";
+import { sidelineCut } from "@/lib/play/geometry";
+import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { mirrorRoute } from "@/lib/play/routes";
+import { mirrorRoute, routeDef } from "@/lib/play/routes";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
@@ -34,6 +35,19 @@ const examplePlayers = () => initialState().players.map((p) => {
   if (p.id === "o4") return { ...p, route: { type: "out" as const } };
   return p;
 });
+
+/**
+ * The route an edit leaves cut short at the sideline, by name, or null: a route newly cut, another
+ * route, or the same one cut further. One the edit cuts no further than before goes unsaid.
+ */
+function cutNews(was: Player | undefined, now: Player | undefined): string | null {
+  const cut = now ? sidelineCut(now) : null;
+  if (!now?.route || !cut) return null;
+  const before = was ? sidelineCut(was) : null;
+  const same = before && was?.route?.type === now.route.type && !!was.route.mirror === !!now.route.mirror;
+  if (same && cut.room >= before.room - 0.01) return null;
+  return routeDef(now.team, now.route.type)?.label ?? null;
+}
 
 const isEditable = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
@@ -108,21 +122,44 @@ export function App() {
     dispatch({ type: "select", id });
     openRight(true);
   }, [openRight]);
+  // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
+  // short there, the toast says so once it is drawn, and the palette says by how much
+  const playersRef = useRef(s.players);
+  const cutWatch = useRef<{ id: string; was: Player | undefined; what?: string } | null>(null);
+  const watchCut = useCallback((id: string, what?: string) => {
+    cutWatch.current = { id, was: playersRef.current.find((p) => p.id === id), what };
+  }, []);
+  useEffect(() => {
+    playersRef.current = s.players;
+    const w = cutWatch.current;
+    if (!w) return;
+    cutWatch.current = null;
+    const news = cutNews(w.was, s.players.find((p) => p.id === w.id));
+    if (news) say(`${w.what ?? news} · cut short at the sideline`, 2200);
+  }, [s.players, say]);
+  // a player dragged or stepped with the arrow keys can take their route to the sideline
+  const fieldDispatch = useCallback((a: Action) => {
+    if (a.type === "move" && a.commit) watchCut(a.id);
+    dispatch(a);
+  }, [watchCut]);
   // on a phone/tablet the palette covers the field, so it folds away once a route is chosen
   const onPick = useCallback((key: RouteType) => {
+    if (s.selectedId && key !== "man" && key !== "custom") watchCut(s.selectedId);
     dispatch({ type: "pick", key });
     if (compactRef.current) setRightOpen(false);
-  }, []);
+  }, [s.selectedId, watchCut]);
   const onPrimary = useCallback(() => {
     dispatch({ type: "togglePrimary" });
     if (compactRef.current) setRightOpen(false);
   }, []);
-  // a custom route mirrored off the field is pulled back to the edge: say so, since the shape changes
+  // a custom route mirrored off the field is pulled back to the edge, and a preset one mirrored toward
+  // the sideline is cut short there: say so, since the shape changes
   const onMirror = useCallback(() => {
     const p = selected(s);
+    if (p?.route && p.route.type !== "custom") watchCut(p.id, "Mirrored");
     dispatch({ type: "mirror" });
     if (p?.route && mirrorRoute(p.route, p.x).clamped) say("Mirrored · pulled back inside the field", 2200);
-  }, [s, say]);
+  }, [s, say, watchCut]);
   const onClear = useCallback(() => {
     dispatch({ type: "clearRoutes", team: s.side });
   }, [s.side]);
@@ -279,6 +316,7 @@ export function App() {
   // errors nobody caught are remembered (scrubbed, on this device only) for "Report a problem"
   useEffect(() => install(), []);
   const sel = selected(s);
+  const selCut = useMemo(() => (sel ? sidelineCut(sel) : null), [sel]);
   const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? "Tap waypoints on the field · double-tap to finish" : null;
 
   return (
@@ -336,7 +374,7 @@ export function App() {
           selectedId={s.selectedId}
           targeting={s.targeting}
           draft={s.draft}
-          dispatch={dispatch}
+          dispatch={fieldDispatch}
           onSelect={onSelect}
           svgRef={svgRef}
           title={s.name || "Untitled play"}
@@ -348,6 +386,7 @@ export function App() {
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
           <RouteSidebar
             selected={sel}
+            cut={selCut}
             hint={hint}
             onPick={onPick}
             onDone={() => { dispatch({ type: "select", id: null }); }}

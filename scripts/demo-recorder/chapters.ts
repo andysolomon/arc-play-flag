@@ -593,22 +593,22 @@ async function runPlay(d: ChapterDriver): Promise<void> {
 async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.goto("/?open=demo-defense");
   await d.say("Deep zone");
-  await d.selectPlayer("d1", "Defense");
+  await d.selectPlayer("LC", "Defense");
   await d.pick("Zone deep");
-  await d.expectState("d1 drops into a deep zone", async () => {
+  await d.expectState("LC drops into a deep zone", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d1")?.route?.type)).toBe("zoneDeep");
   }, 300, ["Zones", "Defensive plays"]);
 
   await d.say("Man on X: tap the faded offense");
-  await d.selectPlayer("d2", "Defense");
+  await d.selectPlayer("LB", "Defense");
   await d.pick("Man");
   await d.click(d.page.getByRole("button", { name: "Offense X, man coverage target", exact: true }), "Choose X as the man target", 380);
-  await d.expectState("d2 covers X, picked from the shadow offense", async () => {
+  await d.expectState("LB covers X, picked from the shadow offense", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "d2")?.route)).toEqual({ type: "man", target: "o3" });
   }, 200, ["Shadow offense", "Man coverage"]);
 
   await d.say("Blitz from a legal depth");
-  await d.selectPlayer("d3", "Defense");
+  await d.selectPlayer("R", "Defense");
   await d.pick("Blitz");
   await d.closePanels();
   await d.expectState(`The blitzer lines up at least ${String(BLITZ_DEPTH)} yards off the ball`, async () => {
@@ -620,7 +620,7 @@ async function buildDefense(d: ChapterDriver): Promise<void> {
   const shadow = d.page.locator("#play-sidebar").getByRole("group", { name: "Shadow offense" }).getByRole("button", { name: "Shadow offense", exact: true });
   await d.click(shadow, "Hide the shadow offense", 200);
   await d.closePanels();
-  await d.expectState("The offense is hidden and d2 wears its man tag", async () => {
+  await d.expectState("The offense is hidden and LB wears its man tag", async () => {
     await expect(d.player("X", "Offense")).toBeHidden({ timeout: ASSERT_TIMEOUT });
     await expect(d.field.locator('[data-man-tag="d2"]')).toHaveText("on X", { timeout: ASSERT_TIMEOUT });
   }, 300, ["Defense only"]);
