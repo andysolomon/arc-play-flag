@@ -89,14 +89,18 @@ export async function validateTools(): Promise<string[]> {
   return [ffmpeg, ffprobe, `@playwright/test ${version}`, `chromium ${executable}`];
 }
 
+/** The screens the chapters open, each loaded once before the first chapter records. */
+const WARM_PATHS = ["/", "/playbooks"] as const;
+
 /**
- * Asks the running app for every screen the chapters open before the first one records. A
- * freshly started `next start` renders its first pages slowly, and that second or two would
- * otherwise come out of the first chapter's promised length. Also says early, and plainly,
- * when nothing is serving.
+ * Opens every screen the chapters use once before the first one records. A freshly built and
+ * started app renders its first pages and serves its first scripts slowly, and the browser's
+ * first launch is slow too; that second or two would come out of the first chapter's promised
+ * length and fail it. So the pages are fetched, then loaded in a throwaway headless browser with
+ * its own disposable profile. Also says early, and plainly, when nothing is serving.
  */
 export async function warmUp(baseUrl: string): Promise<void> {
-  for (const path of ["/", "/playbooks"]) {
+  for (const path of WARM_PATHS) {
     let response: Response;
     try {
       response = await fetch(`${baseUrl}${path}`);
@@ -106,6 +110,15 @@ export async function warmUp(baseUrl: string): Promise<void> {
     if (!response.ok) throw new Error(`${baseUrl}${path} answered HTTP ${String(response.status)}`);
     await response.arrayBuffer();
   }
+  await usingDisposableDirectory("arc-demo-warm-", async (profileDir) => {
+    const context = await chromium.launchPersistentContext(profileDir, { executablePath: chromiumExecutable(), headless: true, viewport: VIDEO_SIZE });
+    try {
+      const page = context.pages()[0] ?? await context.newPage();
+      for (const path of WARM_PATHS) await page.goto(`${baseUrl}${path}`, { waitUntil: "load" });
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 interface RawCapture {

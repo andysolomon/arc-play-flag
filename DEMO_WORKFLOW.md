@@ -135,7 +135,7 @@ For every chapter the recorder:
 4. Probes each file: exactly one video stream, no audio, 960×540, the expected codec, 6–12 seconds, and more than 1 KB.
 5. Moves the three files into the output directory together, from a staging directory, only after every check passes.
 
-Before the first chapter it asks the app for each screen once, so a freshly started server's slow first render does not eat into a chapter's length. An `all` run finally adds up the twenty-seven files, fails if they reach 2,000,000 bytes, and writes `recorded-from.json`: the fingerprint of the UI in this checkout when the run began (the app it recorded must be built from the same checkout).
+Before the first chapter it opens each screen once in a throwaway headless browser, so a freshly built server's slow first render and scripts, and the browser's slow first launch, do not eat into the first chapter's length. An `all` run finally adds up the twenty-seven files, fails if they reach 2,000,000 bytes, and writes `recorded-from.json`: the fingerprint of the UI in this checkout when the run began (the app it recorded must be built from the same checkout).
 
 A chapter also fails before any of that if it did not demonstrate every feature its `/demo` card advertises.
 
