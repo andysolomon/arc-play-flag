@@ -12,12 +12,6 @@ bun run test:e2e:report  # open the last HTML report (traces for failures)
 
 First time only: `bunx playwright install chromium`.
 
-The [lateral ball assignments workflow](../docs/workflows/lateral-assignments.md)
-documents `lateral-chain.journey.ts`: uncapped chains, returning to a previous
-carrier, passing after a lateral, LOS validation, save/share/export/import and
-undo/redo. Its repeatable screenshots, playback frames, assignment text and SVG
-are uploaded by CI as `lateral-chains`.
-
 ## Rules
 
 - **Fictional fixtures, per test.** Everything comes from `support/fixtures.ts` (the Riverside Otters, a team that does not exist). Each test gets a fresh browser context, so no test can see another's storage, and none of them can ever read or write a real browser profile.
@@ -29,8 +23,6 @@ are uploaded by CI as `lateral-chains`.
 ## Coverage
 
 Pre-snap motion is covered by `pre-snap-motion.journey.ts`: draw and clamp the path, keep the route, undo/redo, save/reload, hold the ball and formation during motion, then snap and run, flip, snapshot sharing, redraw/cancel, transfer, removal, and play-file export/import on another device. Its per-test screenshots, manifest and exported JSON are uploaded as `pre-snap-motion`.
-
-`motion-lateral-chain.journey.ts` checks motion followed by repeated laterals and a forward pass: possession stays with the center during motion, each transfer starts after the snap, and save/reload, assignment text, Clear routes and Undo keep both features together. Its screenshot and playback manifest are included in `pre-snap-motion`.
 
 | Journey | File |
 | --- | --- |

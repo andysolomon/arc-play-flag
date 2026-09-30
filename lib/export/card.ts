@@ -14,7 +14,6 @@ export const CARD_W = 1080;
 export const CARD_H = 1350;
 
 export interface CardOptions {
-  ballPlan?: import("@/lib/play/types").BallStep[];
   name: string;
   players: readonly Player[];
   /** the play's number in its playbook, when it has one */
@@ -55,7 +54,7 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   let x = m;
   if (o.n) { out.push(badge(m + r, titleY, r, o.n)); x = m + 2 * r + 20; }
   let right = W - m;
-  const call = o.side === "defense" ? null : callOf(o.players, o.ballPlan);
+  const call = o.side === "defense" ? null : callOf(o.players);
   if (call) {
     const label = CALL_LABEL[call];
     const pw = measure(label, 28) + 48;
@@ -77,7 +76,6 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
     ball: vis === "defense" || o.side === "defense" ? null : frame.ball,
     show: vis,
     side: o.side,
-    ballPlan: o.ballPlan,
     noRunZones: hasNoRunZones(o.team),
     los,
   }, 5));

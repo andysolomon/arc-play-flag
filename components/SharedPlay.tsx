@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { COVERAGE_WORDS, coverageOf } from "@/lib/play/coverage";
-import { ballPlanLine } from "@/lib/play/ball-plan";
 import type { Player, Team } from "@/lib/play/types";
 import { Field } from "./Field";
 import { pillSm } from "./ui";
 import { Sticker } from "./Sticker";
 
 interface Props {
-  ballPlan?: import("@/lib/play/types").BallStep[];
   id: string;
   name: string;
   players: Player[];
@@ -29,7 +27,7 @@ interface Props {
 const noop = (): void => undefined;
 
 /** Read-only view of a shared play, with a way back into the designer. */
-export function SharedPlay({ id, name, players, side, noRunZones, artShadow = false, los, notes = "", ballPlan }: Props) {
+export function SharedPlay({ id, name, players, side, noRunZones, artShadow = false, los, notes = "" }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const cover = side === "defense" ? coverageOf(players) : null;
   // a defensive call says its coverage, as the stamp on its pictures does
@@ -52,7 +50,6 @@ export function SharedPlay({ id, name, players, side, noRunZones, artShadow = fa
       <div className="flex min-h-0 flex-1 items-stretch">
         <Field
           players={players}
-          ballPlan={ballPlan}
           vis={artShadow ? "both" : side}
           side={side}
           selectedId={null}
@@ -67,7 +64,6 @@ export function SharedPlay({ id, name, players, side, noRunZones, artShadow = fa
           title={name}
         />
       </div>
-      {!!ballPlan?.length && side === "offense" && <p className="max-h-[24%] flex-none overflow-y-auto border-t-2 border-ink bg-cream px-3 py-2 text-small leading-note">{ballPlanLine(players, ballPlan)}</p>}
       {notes.trim() && (
         <section
           aria-labelledby="shared-notes-title"

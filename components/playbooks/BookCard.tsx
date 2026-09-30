@@ -36,11 +36,11 @@ export function BookCard({ book: b, plays, team, say }: Props) {
           {/* every picture in the stack is framed alike, so a deep defensive call can't push this card's title below its neighbours' */}
           {rest.slice(0, 2).map((p, i) => (
             <div key={p.id} aria-hidden className={`absolute inset-0 ${behind[i] ?? ""}`}>
-              <PlayThumb ballPlan={p.ballPlan} players={p.players} name="" side={p.side} artShadow={p.artShadow} los={p.los} className="opacity-90" framed />
+              <PlayThumb players={p.players} name="" side={p.side} artShadow={p.artShadow} los={p.los} className="opacity-90" framed />
             </div>
           ))}
           {cover ? (
-            <PlayThumb ballPlan={cover.ballPlan} players={cover.players} name={cover.name} side={cover.side} artShadow={cover.artShadow} los={cover.los} className="relative" framed />
+            <PlayThumb players={cover.players} name={cover.name} side={cover.side} artShadow={cover.artShadow} los={cover.los} className="relative" framed />
           ) : (
             <div className="relative">
               {/* an empty field keeps the cover the same size as a full one */}
