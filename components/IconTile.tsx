@@ -9,13 +9,20 @@ interface Props {
   /** a small yellow dot in the corner: this tile has something in it */
   dot?: boolean;
   title?: string;
+  /** hatched like the field's no-run band: this choice is flagged where the ball is */
+  hatched?: boolean;
+  /** the id of the words that say why it is marked */
+  describedBy?: string;
   onClick: () => void;
 }
 
 /** Square-ish sticker + label tile, laid out 3-up in a grid. */
-export function IconTile({ icon, label, active = false, dot = false, title, onClick }: Props) {
+export function IconTile({ icon, label, active = false, dot = false, title, hatched = false, describedBy, onClick }: Props) {
   return (
-    <button type="button" onClick={onClick} title={title} aria-pressed={active} data-active={active} className={`relative ${tile}`}>
+    <button
+      type="button" onClick={onClick} title={title} aria-pressed={active} aria-describedby={describedBy} data-active={active}
+      data-hatched={hatched || undefined} className={`relative ${tile} ${hatched ? "hatched" : ""}`}
+    >
       {dot && <span aria-hidden className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-ink bg-yellow" />}
       <Sticker icon={icon} size={40} />
       <span className="text-center text-caption leading-tight">{label}</span>

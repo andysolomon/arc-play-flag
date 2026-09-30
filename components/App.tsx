@@ -5,13 +5,15 @@ import { install, record } from "@/lib/diagnostics";
 import { initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
-import { withLos } from "@/lib/play/field";
+import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
+import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute, routeDef } from "@/lib/play/routes";
+import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
@@ -158,7 +160,7 @@ export function App() {
     const p = selected(s);
     if (p?.route && p.route.type !== "custom") watchCut(p.id, "Mirrored");
     dispatch({ type: "mirror" });
-    if (p?.route && mirrorRoute(p.route, p.x).clamped) say("Mirrored · pulled back inside the field", 2200);
+    if (p?.route && mirrorRoute(p.route, atSnap(p).x).clamped) say("Mirrored · pulled back inside the field", 2200);
   }, [s, say, watchCut]);
   const onClear = useCallback(() => {
     dispatch({ type: "clearRoutes", team: s.side });
@@ -313,11 +315,22 @@ export function App() {
   const openShare = useCallback(() => { setShareOpen(true); }, []);
   const onArtShadow = useCallback((on: boolean) => { dispatch({ type: "setArtShadow", on }); }, []);
   const other = s.side === "defense" ? "offense" : "defense";
+  // a run called where the league allows none: flagged on the field, in Play tools and on every picture.
+  // It is said once as it happens, however it happens: a run picked, the ball moved onto the 5, the read
+  // moved onto the runner, the receivers cleared, the zones turned back on, or a flagged play opened.
+  const flagged = runInNoRunZone(s, noRunZones);
+  const wasFlagged = useRef(false);
+  useEffect(() => {
+    if (flagged && !wasFlagged.current) say(`Flagged · ${NO_RUN_FLAG.toLowerCase()}`, 3200);
+    wasFlagged.current = flagged;
+  }, [flagged, say]);
   // errors nobody caught are remembered (scrubbed, on this device only) for "Report a problem"
   useEffect(() => install(), []);
   const sel = selected(s);
   const selCut = useMemo(() => (sel ? sidelineCut(sel) : null), [sel]);
-  const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? "Tap waypoints on the field · double-tap to finish" : null;
+  const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
+    ? "Pre-snap motion · tap waypoints behind the line · Finish when done"
+    : "Tap waypoints on the field · double-tap to finish" : null;
 
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
@@ -327,7 +340,7 @@ export function App() {
         rightOpen={rightOpen}
         canUndo={s.past.length > 0}
         canRedo={s.future.length > 0}
-        canClear={s.players.some((p) => p.route && p.team === s.side)}
+        canClear={s.players.some((p) => (p.route || p.preSnap) && p.team === s.side)}
         onClear={onClear}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
@@ -365,6 +378,7 @@ export function App() {
             onTeam={onTeam}
             los={s.los}
             onLos={onLos}
+            flagged={flagged}
           />
         </Sidebar>
         <Field
@@ -389,10 +403,13 @@ export function App() {
             cut={selCut}
             hint={hint}
             onPick={onPick}
+            onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}
+            onRemoveMotion={() => { dispatch({ type: "removeMotion" }); }}
             onDone={() => { dispatch({ type: "select", id: null }); }}
             onPrimary={onPrimary}
             onMirror={onMirror}
             onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
+            noRunZone={s.side === "offense" && noRunZones && inNoRunZone(s.los)}
           />
         </Sidebar>
       </div>
