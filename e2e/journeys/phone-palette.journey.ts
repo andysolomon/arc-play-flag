@@ -153,7 +153,7 @@ for (const size of SIZES) {
     await d.foldOverlays();
     await d.settle();
     const defClosed = await d.field.boundingBox();
-    await d.select("d1", "Defense");
+    await d.select("LC", "Defense");
     await d.settle();
     const defense = await layout(page);
     const defOpen = await d.field.boundingBox();

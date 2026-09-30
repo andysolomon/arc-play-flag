@@ -2,7 +2,7 @@
 
 import { memo, useId, useRef, type ChangeEvent } from "react";
 import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, mirrorable, tableFor } from "@/lib/play/routes";
-import { teamFill } from "@/lib/play/geometry";
+import { teamFill, type SidelineCut } from "@/lib/play/geometry";
 import type { Player, RouteType } from "@/lib/play/types";
 import { Note } from "./Hint";
 import { IconTile } from "./IconTile";
@@ -11,6 +11,8 @@ import { Sticker } from "./Sticker";
 
 interface Props {
   selected: Player | null;
+  /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
+  cut: SidelineCut | null;
   hint: string | null;
   onPick: (key: RouteType) => void;
   onDone: () => void;
@@ -24,7 +26,10 @@ interface Props {
   noRunZone: boolean;
 }
 
-function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMirror, onRename, noRunZone }: Props) {
+/** Yards as a coach reads them off the field, to the half yard. */
+const yards = (v: number): string => String(Math.round(v * 2) / 2);
+
+function RouteSidebarImpl({ selected: sel, cut, hint, onPick, onDone, onPrimary, onMirror, onRename, noRunZone }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
   const noRunNote = useId();
@@ -101,6 +106,11 @@ function RouteSidebarImpl({ selected: sel, hint, onPick, onDone, onPrimary, onMi
                 </button>
               )}
             </div>
+          )}
+          {cut && sel.route && (
+            <Note
+              text={`The sideline cuts this ${tableFor(sel.team)[sel.route.type]?.label ?? "route"}: ${yards(cut.room)} of its ${yards(cut.reach)} yards across fit. Move ${sel.label || "this player"} inside to run all of it.`}
+            />
           )}
           <div className={tileGrid} role="group" aria-label={sel.team === "offense" ? "Routes" : "Coverages"}>
             {keys.map((k) => (

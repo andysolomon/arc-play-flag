@@ -20,7 +20,7 @@ export interface ArtOptions {
   /** Embedded sticker for standalone SVG images (external assets cannot load there). */
   footballHref?: string;
   level?: Level;
-  /** an offensive player whose route is drawn bold while every other route fades */
+  /** a player on the play's own side whose route is drawn bold, and ringed, while every other route fades */
   highlight?: string | null;
   /** which team is drawn; routes are still laid out against the whole play, as on the live field */
   show?: Vis;

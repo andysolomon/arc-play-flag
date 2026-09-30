@@ -279,8 +279,9 @@ test("a flagged play carries its flag onto its card, the playbook, the share lin
   expect(printed).toEqual({
     binder: FLAGGED.map((f) => placed(f ? 1 : 0)),
     binderFourUp: placed(1),
-    // one insert for each position (C, X, Y, Z) and one for everyone, each carrying the whole book
-    wristbands: placed(5),
+    // one insert for each position on each play's own side (C, X, Y and Z, and the defensive call's
+    // LC, LB, R, RC and S) and one for everyone, each carrying the whole book
+    wristbands: placed(10),
     postcards: placed(1),
     flyer: placed(1),
     slideFaces: [0, 1, 1, 0, 0, 0, 0],

@@ -1,7 +1,7 @@
 import { losOf } from "@/lib/play/field";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { TeamSettings, Vis } from "@/lib/play/types";
-import { artView, playerWithLabel, positionsOf, type Numbered } from "./numbered";
+import { artView, playerAt, positionName, positionsOf, type Numbered, type Position } from "./numbered";
 import { IN, MUTED, PAPERS, badge, cutRect, field, page, text, type PaperKey, type SvgPage } from "./pages";
 import { measure } from "./raster";
 
@@ -36,16 +36,22 @@ export interface WristbandOptions {
 
 export interface BandCard {
   /** the position this card highlights, or null for the unhighlighted set */
-  position: string | null;
+  position: Position | null;
+  /** what the card is titled: the position's name, or "Everyone" */
+  name: string;
   /** which card of the set this is when the plays overflow one insert */
   index: number;
   count: number;
   cells: (Numbered | null)[];
 }
 
-/** One card set per position plus one unhighlighted set, each overflowing onto extra cards. */
+/**
+ * One card set per position plus one unhighlighted set, each overflowing onto extra cards. On
+ * each card, every play highlights the player holding that position on its own side, if any.
+ */
 export function planCards(plays: readonly Numbered[], perCard: number): BandCard[] {
-  const sets: (string | null)[] = [...positionsOf(plays), null];
+  const positions = positionsOf(plays);
+  const sets: (Position | null)[] = [...positions, null];
   const per = Math.max(1, perCard);
   const count = Math.max(1, Math.ceil(plays.length / per));
   const cards: BandCard[] = [];
@@ -53,7 +59,7 @@ export function planCards(plays: readonly Numbered[], perCard: number): BandCard
     for (let i = 0; i < count; i++) {
       const slice = plays.slice(i * per, (i + 1) * per);
       const cells: (Numbered | null)[] = Array.from({ length: per }, (_, k) => slice[k] ?? null);
-      cards.push({ position, index: i, count, cells });
+      cards.push({ position, name: position ? positionName(position, positions) : "Everyone", index: i, count, cells });
     }
   }
   return cards;
@@ -82,7 +88,7 @@ export function fit(s: string, maxWidth: number, size: number): string {
   return t.trimEnd() + "…";
 }
 
-function cell(x: number, y: number, w: number, h: number, item: Numbered | null, position: string | null, o: WristbandOptions): string {
+function cell(x: number, y: number, w: number, h: number, item: Numbered | null, position: Position | null, o: WristbandOptions): string {
   if (!item) return "";
   const pad = Math.min(3, w * 0.03);
   const head = Math.min(0.2 * IN, h * 0.22);
@@ -95,7 +101,7 @@ function cell(x: number, y: number, w: number, h: number, item: Numbered | null,
   const fy = y + pad + head + 1;
   out.push(
     field(item.play.players, x + pad, fy, w - 2 * pad, y + h - pad - fy, {
-      highlight: playerWithLabel(item.play, position),
+      highlight: playerAt(item.play, position),
       ...artView(item.play, o.vis),
       showYardNumbers: false,
       noRunZones: hasNoRunZones(o.team),
@@ -111,9 +117,8 @@ function card(x: number, y: number, c: BandCard, o: WristbandOptions): string {
   const size = o.size;
   const cw = size.w * IN, ch = size.h * IN;
   const out: string[] = [];
-  const who = c.position ?? "Everyone";
   const more = c.count > 1 ? ` · ${String(c.index + 1)} of ${String(c.count)}` : "";
-  out.push(text(x, y + CAPTION - 4, 8, fit(`${who} · ${o.bookName}${more}`, cw, 8), { fill: MUTED }));
+  out.push(text(x, y + CAPTION - 4, 8, fit(`${c.name} · ${o.bookName}${more}`, cw, 8), { fill: MUTED }));
   const top = y + CAPTION;
   out.push(cutRect(x, top, cw, ch));
   const gw = (cw - 2 * SAFE) / size.cols, gh = (ch - 2 * SAFE) / size.rows;
