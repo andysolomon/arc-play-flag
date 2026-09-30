@@ -1,7 +1,7 @@
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 export interface PlayState extends Doc, History {
@@ -172,7 +172,10 @@ function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
       const c = commit(s);
       next = { ...c, players: c.players.map(p => p.id === d.id && p.team === "offense"
         ? { ...p, preSnap: { pts: pts.map(motionPoint) } } : withoutMotion(p)) };
-    } else next = setRoute(s, d.id, { type: "custom", pts: [...pts] });
+    } else {
+      // a custom route drawn over X's Out (or over an earlier custom route) is still X's route: the read stays (#109)
+      next = setRoute(s, d.id, keepRead(s.players.find((p) => p.id === d.id)?.route, { type: "custom", pts: [...pts] }));
+    }
   }
   return { ...next, draft: null };
 }
@@ -215,7 +218,8 @@ export function reducer(s: PlayState, a: Action): PlayState {
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
       if (a.key === "man") return { ...s, targeting: true, draft: null };
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: false };
-      return setRoute(s, p.id, { type: a.key });
+      // a preset picked over the current route keeps the read; picking the same one again takes the route away, read and all
+      return setRoute(s, p.id, keepRead(p.route, { type: a.key }));
     }
     case "target": {
       const def = selected(s);

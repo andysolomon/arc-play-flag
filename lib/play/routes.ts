@@ -161,6 +161,15 @@ export function mirrorRoute(route: Route, x: number): { route: Route; clamped: b
 }
 
 /**
+ * A route replacing another on the same player keeps that player's primary read: changing what X
+ * runs never changes who the quarterback looks to first (#109). Only taking the route away takes
+ * the read with it.
+ */
+export function keepRead(prev: Route | null | undefined, next: Route): Route {
+  return prev?.primary ? { ...next, primary: true } : next;
+}
+
+/**
  * The route as it reads after the whole play is flipped (x → 30 - x), keeping every
  * flag. Handed presets need nothing: their side is read from the player's new spot.
  */
