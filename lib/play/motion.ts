@@ -1,6 +1,6 @@
 import { quarterback, routeYards } from "./geometry";
 import { isPitch, isRun } from "./routes";
-import type { Pair, Player, Pt } from "./types";
+import type { BallStep, Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
 
 /** Yards per second a player covers during playback — brisk, but slow enough to read. */
@@ -31,7 +31,20 @@ interface Track {
 
 export type PlayKind = "run" | "pass" | "hold";
 
+export interface BallExchange {
+  type: BallStep["type"];
+  from: string;
+  to: string;
+  releaseAt: number;
+  catchAt: number;
+  fromPt: Pt;
+  toPt: Pt;
+}
+
 export interface Motion {
+  /** Explicit, ordered possession changes; no limit on chain length. */
+  exchanges: BallExchange[];
+  ballError: string | null;
   /** total playback length in seconds, hold included */
   dur: number;
   /** the card's top edge the play was laid out against: the end line once the ball is near their goal */
@@ -142,6 +155,7 @@ export function buildMotion(
   players: readonly Player[],
   top: number,
   mode: PlaybackMode = TEACHING_PLAYBACK,
+  ballPlan?: readonly BallStep[],
 ): Motion {
   const random = mode.kind === "simulation" ? mode.random : null;
   const zones = zoneLayout(players, top);
@@ -174,6 +188,7 @@ export function buildMotion(
   const snapGap = qb && center && center.id !== qb.id ? dist(qb, center) : 0;
 
   const m: Motion = {
+    exchanges: [], ballError: null,
     dur: run + HOLD,
     top,
     tracks,
@@ -185,6 +200,7 @@ export function buildMotion(
     runner: null, handAt: Infinity, handFor: 0,
     passer: qb?.id ?? null, receiver: null, throwAt: Infinity, catchAt: Infinity,
   };
+  if (ballPlan?.length) return planExchanges(m, players, ballPlan);
   if (!qb) return m;
 
   const offense = players.filter((p) => p.team === "offense" && p.route && tracks[p.id]);
@@ -251,6 +267,74 @@ export function buildMotion(
   return m;
 }
 
+/** An explicit chain overrides inferred fakes/options and is deterministic in both modes. */
+function planExchanges(m: Motion, players: readonly Player[], steps: readonly BallStep[]): Motion {
+  const fail = (n: number, message: string): Motion => ({
+    ...m, kind: "hold", exchanges: [], runner: null, receiver: null,
+    throwAt: Infinity, catchAt: Infinity, ballError: `Ball step ${String(n)}: ${message}`,
+  });
+  let holder = players.find(p => p.id === m.qb && p.team === "offense");
+  if (!holder) return fail(1, "Choose a quarterback to start the ball assignments.");
+  let receivedAt = m.snapAt;
+  let passed = false;
+  for (const [index, step] of steps.entries()) {
+    const n = index + 1;
+    if (passed) return fail(n, "Only one forward pass is allowed; it must finish the ball assignments.");
+    const target = players.find(p => p.id === step.target && p.team === "offense");
+    if (!target || target.id === holder.id) return fail(n, "Choose another offensive player to receive the ball.");
+    if ((step.type !== "lateral" && step.type !== "pass") || !Number.isFinite(step.delay) || step.delay < 0) return fail(n, "Choose a valid transfer and a wait of zero seconds or more.");
+    const releaseAt = receivedAt + step.delay;
+    if (!Number.isFinite(releaseAt)) return fail(n, "The wait is too long to play back.");
+    const fromPt = positionsAt(m, players, releaseAt)[holder.id] ?? holder;
+    // Check every route bend while this player possessed the ball, not just the release.
+    const tr = m.tracks[holder.id];
+    const bends = tr?.cum.map((d, i) => ({ t: tr.wait + d / SPEED, y: tr.pts[i]?.y ?? fromPt.y })) ?? [];
+    if (fromPt.y <= 0 || (positionsAt(m, players, receivedAt)[holder.id] ?? holder).y <= 0
+      || bends.some(b => b.t >= receivedAt && b.t <= releaseAt && b.y <= 0)) {
+      return fail(n, "The ball carrier must stay behind the LOS before throwing or lateraling. Change the route or wait.");
+    }
+    const speed = step.type === "lateral" ? 12 : 16;
+    // Lead the moving target using the same track the field animates.
+    let flight = 0.3;
+    for (let i = 0; i < 4; i++) {
+      const aim = positionsAt(m, players, releaseAt + flight)[target.id] ?? target;
+      flight = cl(dist(fromPt, aim) / speed, 0.2, 1.5);
+    }
+    const catchAt = releaseAt + flight;
+    const toPt = positionsAt(m, players, catchAt)[target.id] ?? target;
+    if (step.type === "lateral") {
+      if (toPt.y <= 0) return fail(n, "A lateral must be received behind the LOS. Change the receiver's route or wait.");
+      if (toPt.y < fromPt.y - 0.0001) return fail(n, "A lateral must travel sideways or backward. Move the receiver back or change the timing.");
+    } else {
+      if (toPt.y >= fromPt.y) return fail(n, "A forward pass must travel forward. Choose a receiver ahead of the passer.");
+      passed = true;
+      m.passer = holder.id;
+      m.receiver = target.id;
+      m.throwAt = releaseAt;
+      m.catchAt = catchAt;
+    }
+    m.exchanges.push({ type: step.type, from: holder.id, to: target.id, releaseAt, catchAt, fromPt, toPt });
+    holder = target;
+    receivedAt = catchAt;
+  }
+  m.kind = passed ? "pass" : "run";
+  m.runner = passed ? null : holder.id;
+  const routesEnd = Object.values(m.tracks).reduce((end, tr) => Math.max(end, tr.wait + tr.len / SPEED), 0);
+  m.dur = Math.max(routesEnd, receivedAt + 0.5) + HOLD;
+  return m;
+}
+
+/** Possession during explicit playback. Null while a transfer is in flight. */
+export function carrierAt(m: Motion, t: number): string | null {
+  let holder = t < m.snapAt ? m.center : m.qb;
+  for (const e of m.exchanges) {
+    if (t < e.releaseAt) break;
+    if (t < e.catchAt) return null;
+    holder = e.to;
+  }
+  return holder;
+}
+
 /** Every player's spot `t` seconds into the play (players without a route stay put). */
 export function positionsAt(m: Motion, players: readonly Player[], t: number): Record<string, Pt> {
   const pos: Record<string, Pt> = {};
@@ -290,6 +374,19 @@ export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | nu
   if (c && t < m.snapAt) {
     const k = cl(t / m.snapAt, 0, 1);
     return { ...lerp(c, qb, k), lift: m.shotgun ? 0.45 * Math.sin(Math.PI * k) : 0 };
+  }
+  if (m.exchanges.length) {
+    let holder = m.qb;
+    for (const e of m.exchanges) {
+      if (t < e.releaseAt) break;
+      if (t < e.catchAt) {
+        const k = cl((t - e.releaseAt) / (e.catchAt - e.releaseAt), 0, 1);
+        return { ...lerp(e.fromPt, e.toPt, k), lift: Math.sin(Math.PI * k) * (e.type === "lateral" ? 0.4 : 1) };
+      }
+      holder = e.to;
+    }
+    const spot = holder ? pos[holder] : undefined;
+    return spot ? { ...spot, lift: 0 } : null;
   }
   const runner = m.runner ? pos[m.runner] : undefined;
   const pitched = m.runner !== null && m.passer === m.runner;

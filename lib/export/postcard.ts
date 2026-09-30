@@ -1,4 +1,4 @@
-import type { Team, TeamSettings, Vis } from "@/lib/play/types";
+import type { SavedPlay, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { CARD_H, CARD_W, cardBody } from "./card";
 import { artView, type Numbered } from "./numbered";
 import { IN, INK, MUTED, PAPERS, appMark, badge, cutRect, f2, page, rect, text, type SvgPage, type PaperKey } from "./pages";
@@ -103,7 +103,7 @@ function face(body: string, s: Slot): string {
 }
 
 /** A play's art view as the card takes it. */
-const cardView = (v: ReturnType<typeof artView>): { vis: Vis; side: Team } => ({ vis: v.show, side: v.side });
+const cardView = (v: ReturnType<typeof artView>): { vis: Vis; side: Team; ballPlan?: SavedPlay["ballPlan"] } => ({ vis: v.show, side: v.side, ballPlan: v.ballPlan });
 
 function sheet(items: readonly Numbered[], o: PostcardOptions, side: "front" | "back"): SvgPage {
   const { w, h, slots } = postcardSheet(o);

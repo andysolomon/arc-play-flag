@@ -12,6 +12,12 @@ bun run test:e2e:report  # open the last HTML report (traces for failures)
 
 First time only: `bunx playwright install chromium`.
 
+The [lateral ball assignments workflow](../docs/workflows/lateral-assignments.md)
+documents `lateral-chain.journey.ts`: uncapped chains, returning to a previous
+carrier, passing after a lateral, LOS validation, save/share/export/import and
+undo/redo. Its repeatable screenshots, playback frames, assignment text and SVG
+are uploaded by CI as `lateral-chains`.
+
 ## Rules
 
 - **Fictional fixtures, per test.** Everything comes from `support/fixtures.ts` (the Riverside Otters, a team that does not exist). Each test gets a fresh browser context, so no test can see another's storage, and none of them can ever read or write a real browser profile.

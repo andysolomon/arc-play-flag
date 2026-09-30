@@ -55,7 +55,7 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   const play = item.play;
   const view = artView(play, o.vis);
   // the offense's call; a defensive call is stamped with its coverage in the picture instead
-  const call = play.side === "offense" ? callOf(play.players) : null;
+  const call = play.side === "offense" ? callOf(play.players, play.ballPlan) : null;
 
   // header: number, name, the call
   const r = 15;

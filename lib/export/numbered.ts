@@ -9,8 +9,8 @@ export function playShow(play: SavedPlay, vis?: Vis): Vis {
 }
 
 /** The art options that draw a play as its pictures should: who is shown, and whose side it is. */
-export function artView(play: SavedPlay, vis?: Vis): { show: Vis; side: Team } {
-  return { show: playShow(play, vis), side: play.side };
+export function artView(play: SavedPlay, vis?: Vis): { show: Vis; side: Team; ballPlan?: SavedPlay["ballPlan"] } {
+  return { show: playShow(play, vis), side: play.side, ...(play.ballPlan ? { ballPlan: play.ballPlan } : {}) };
 }
 
 /** A play with its number: its position in the playbook, counted from 1. */

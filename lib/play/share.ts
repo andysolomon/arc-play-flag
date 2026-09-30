@@ -1,6 +1,7 @@
 import { LOS_YARD, losOf, readLos, withLos } from "./field";
+import { readBallPlan } from "./ball-plan";
 import { artShadow, cleanNotes, normalizePlayers, readSide, type DraftRecord } from "./storage";
-import type { Player, Team } from "./types";
+import type { BallStep, Player, Team } from "./types";
 
 /** Share links carry the whole play as base64url JSON in the path: /p/<id>. No backend. */
 
@@ -53,8 +54,9 @@ export interface SharedRecord extends DraftRecord {
  * carry every player.
  */
 export function encodeShare(rec: DraftRecord, noRunZones = true): string {
-  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false; artShadow?: true; los?: number; notes?: string } = {
+  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false; artShadow?: true; los?: number; notes?: string; ballPlan?: BallStep[] } = {
     name: rec.name, players: rec.players.map(compact),
+    ...readBallPlan(rec.ballPlan),
   };
   const notes = cleanNotes(rec.notes);
   if (notes.trim()) payload.notes = notes;
@@ -83,7 +85,8 @@ export function decodeShare(id: string): SharedRecord | null {
     const notes = cleanNotes("notes" in parsed ? parsed.notes : undefined);
     // links without a spot put the ball where every drive starts, the own goal line
     return withLos(
-      { name, ...(notes ? { notes } : {}), players, side, noRunZones, ...artShadow("artShadow" in parsed ? parsed.artShadow : undefined) },
+      { name, ...(notes ? { notes } : {}), players, side, noRunZones, ...artShadow("artShadow" in parsed ? parsed.artShadow : undefined),
+        ...readBallPlan("ballPlan" in parsed ? parsed.ballPlan : undefined) },
       readLos("los" in parsed ? parsed.los : undefined),
     );
   } catch {

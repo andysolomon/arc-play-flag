@@ -6,6 +6,7 @@ import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "
 import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
+import { ballPlanArt } from "./ball-plan";
 
 /**
  * The play as SVG markup, drawn from the same pure geometry as the live field but with
@@ -14,6 +15,7 @@ import { zoneLayout } from "@/lib/play/zones";
  * weight plus a fade, never hue alone.
  */
 export interface ArtOptions {
+  ballPlan?: import("@/lib/play/types").BallStep[];
   /** Animated tokens over the original, stationary field and routes. */
   positions?: Record<string, Pt>;
   ball?: { x: number; y: number; lift: number } | null;
@@ -110,7 +112,7 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
   const stamp = cover ? stampBox(COVERAGE_TAG[cover], shown, top, layout.vh) : null;
   // a run called where the league allows none is flagged in the same corner, on a penalty
   // flag's yellow, wherever the offense is drawn; ink on yellow still reads on a mono printer
-  const flag = side === "offense" && show !== "defense" && runInNoRunZone({ side, players, los }, noRunZones)
+  const flag = side === "offense" && show !== "defense" && runInNoRunZone({ side, players, los, ballPlan: opts.ballPlan }, noRunZones)
     ? stampBox(NO_RUN_STAMP, shown, top, layout.vh)
     : null;
   // a man defender whose receiver isn't drawn wears a name tag, never an arrow to nobody;
@@ -167,6 +169,7 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
     out.push("</g>");
   }
 
+  if (side !== "defense" && show !== "defense") out.push(ballPlanArt(players, opts.ballPlan, top, highlight));
   // the other team's players first, so the play's own side sits on top
   const tokens = [...shown].sort((a, b) => Number(!context(a)) - Number(!context(b)));
   for (const p of tokens) {

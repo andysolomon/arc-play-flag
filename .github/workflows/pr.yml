@@ -158,6 +158,14 @@ jobs:
           path: test-results/no-run-flag-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload lateral-chain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lateral-chains
+          path: test-results/**/lateral-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
