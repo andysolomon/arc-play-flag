@@ -1,7 +1,7 @@
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
 import type { Draft, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 export interface PlayState extends Doc, History {
@@ -276,9 +276,10 @@ export function reducer(s: PlayState, a: Action): PlayState {
         ...c,
         players: c.players.map((p) => {
           if (!p.route) return p;
-          if (p.id === sel.id) return { ...p, route: { ...p.route, primary: on } };
+          // a read taken off a player leaves no `primary: false` behind, so the play stores as it reads (#113)
+          if (p.id === sel.id) return { ...p, route: trimFlags({ ...p.route, primary: on }) };
           if (!p.route.primary) return p;
-          return { ...p, route: { ...p.route, primary: false } };
+          return { ...p, route: trimFlags({ ...p.route, primary: false }) };
         }),
       };
     }
