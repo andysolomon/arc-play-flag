@@ -1,5 +1,6 @@
 import { FIRST_USE_KEY } from "../../components/FirstUse";
 import { encodePlaybookFile } from "../../lib/export/playbook-file";
+import { GOAL_YARD } from "../../lib/play/field";
 import { defaults } from "../../lib/play/routes";
 import { DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
 import type { Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
@@ -16,8 +17,8 @@ function formation(routes: Readonly<Record<string, Route>> = {}): Player[] {
   return defaults().map((player) => ({ ...player, route: routes[player.id] ?? null }));
 }
 
-function play(id: string, name: string, routes: Readonly<Record<string, Route>>, notes = "", side: Team = "offense"): SavedPlay {
-  return { id, name, notes, side, players: formation(routes) };
+function play(id: string, name: string, routes: Readonly<Record<string, Route>>, notes = "", side: Team = "offense", los?: number): SavedPlay {
+  return { id, name, notes, side, players: formation(routes), ...(los === undefined ? {} : { los }) };
 }
 
 /** The finished slant the library shows; `build-play` draws this play from a blank field. */
@@ -26,7 +27,7 @@ export const QUICK_SLANT = play("demo-slant", "Otter Quick Slant", {
   o5: { type: "custom", pts: [[19, -1], [13, -6]] },
 }, "X wins inside; Z's custom route clears the middle.");
 
-/** Play-action to the wheel: `run-play` runs it, `save-export` saves and shares it. */
+/** Play-action to the wheel: `run-play` runs it, `save-share` saves and shares it. */
 export const PLAY_ACTION_WHEEL = play("demo-play-action", "Otter Play-Action Wheel", {
   o3: { type: "go" },
   o4: { type: "corner" },
@@ -45,9 +46,18 @@ export const INSIDE_HANDOFF = play("demo-handoff", "Otter Inside Handoff", {
   o5: { type: "handoff", primary: true },
 }, "Z takes it inside off the centre's hip.");
 
-export const DEMO_PLAYS: readonly SavedPlay[] = [QUICK_SLANT, INSIDE_HANDOFF, PLAY_ACTION_WHEEL, COVER_TWO_PRESSURE];
+/**
+ * Goal to go from their 10 (the 30 counted from the own goal line): X's post finishes in the
+ * end zone, so `touchdowns` scores on camera. Y's corner is only a decoy.
+ */
+export const GOAL_TO_GO_POST = play("demo-goal-to-go", "Otter Goal-to-Go Post", {
+  o3: { type: "post", primary: true },
+  o4: { type: "corner" },
+}, "Y clears the corner; X settles in the end zone.", "offense", GOAL_YARD - 10);
 
-/** Another coach's book, handed over as a file; `print-playbook` imports it on camera. */
+export const DEMO_PLAYS: readonly SavedPlay[] = [QUICK_SLANT, INSIDE_HANDOFF, PLAY_ACTION_WHEEL, COVER_TWO_PRESSURE, GOAL_TO_GO_POST];
+
+/** Another coach's book, handed over as a file; `playbooks` imports it on camera. */
 export const RED_ZONE_FADE = play("demo-red-zone", "Otter Red Zone Fade", {
   o4: { type: "corner", primary: true },
 }, "Fictional install from a visiting coach.");
@@ -74,12 +84,17 @@ export const CHAPTER_PLAY: Readonly<Partial<Record<ChapterSlug, SavedPlay>>> = {
   "run-play": INSIDE_HANDOFF,
   "build-defense": COVER_TWO_PRESSURE,
   "save-share": PLAY_ACTION_WHEEL,
+  "field-setup": QUICK_SLANT,
+  touchdowns: GOAL_TO_GO_POST,
 };
 
 /** A blank, unnamed formation: `build-play` names it and draws its routes on camera. */
 export const BLANK_DRAFT: DraftRecord = { id: null, name: "", notes: "", players: formation() };
 
-const draftOf = (saved: SavedPlay): DraftRecord => ({ id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, players: saved.players });
+const draftOf = (saved: SavedPlay): DraftRecord => ({
+  id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, players: saved.players,
+  ...(saved.los === undefined ? {} : { los: saved.los }),
+});
 
 /** Where `custom-routes` picks up from `build-play`: the slant is drawn, Z is still empty. */
 export const SLANT_IN_PROGRESS: DraftRecord = {
@@ -87,9 +102,10 @@ export const SLANT_IN_PROGRESS: DraftRecord = {
   players: QUICK_SLANT.players.map((player) => (player.id === "o5" ? { ...player, route: null } : player)),
 };
 
-/** `playbooks` types the team name on camera, so it starts with the name still empty. */
+/** `playbooks` and `touchdowns` type the team name on camera, so they start with the name still empty. */
 const CHAPTER_TEAM: Readonly<Partial<Record<ChapterSlug, TeamSettings>>> = {
   playbooks: { name: "", color: DEMO_TEAM.color },
+  touchdowns: { name: "", color: DEMO_TEAM.color },
 };
 
 /** A chapter that must start mid-edit seeds the draft directly instead of opening a saved play. */

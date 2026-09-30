@@ -20,7 +20,7 @@ export function DemoScreen() {
               <span className="text-eyebrow tracking-eyebrow">START HERE</span>
               <h2 className="mt-1 text-[28px] leading-tight">Learn the whole play designer in {DEMOS.length} short clips.</h2>
               <p className="mb-0 mt-2 max-w-[680px] text-base leading-body text-ink-2">
-                The tour follows the same path as a real practice: draw the offense, run it, add the defense, save and share it, then build the playbook you print.
+                The tour follows the same path as a real practice: draw the offense, run it, add the defense, set up the field and score in it, save and share it, then build the playbook you print or present.
               </p>
             </div>
             <span className="w-fit rounded-pill border-2 border-ink bg-cream px-3 py-1 text-base">Under {Math.ceil(TOUR_SECONDS / 30) * 30} seconds</span>

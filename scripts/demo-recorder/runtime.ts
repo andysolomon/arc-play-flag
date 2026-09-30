@@ -33,7 +33,12 @@ async function command(command: string, args: readonly string[], label: string):
   });
 }
 
-export async function prepareOutputDirectory(options: Pick<RecorderOptions, "outputDir" | "force" | "keepRaw" | "contactSheets">, slugs: readonly ChapterSlug[]): Promise<void> {
+export async function prepareOutputDirectory(
+  options: Pick<RecorderOptions, "outputDir" | "force" | "keepRaw" | "contactSheets">,
+  slugs: readonly ChapterSlug[],
+  /** files the run writes for the set as a whole, beside the chapters' own */
+  setNames: readonly string[] = [],
+): Promise<void> {
   await mkdir(options.outputDir, { recursive: true });
   const info = await stat(options.outputDir);
   if (!info.isDirectory()) throw new Error(`output path is not a directory: ${options.outputDir}`);
@@ -49,10 +54,8 @@ export async function prepareOutputDirectory(options: Pick<RecorderOptions, "out
 
   if (options.force) return;
   const collisions: string[] = [];
-  for (const slug of slugs) {
-    for (const name of outputNames(slug, options)) {
-      try { await access(join(options.outputDir, name)); collisions.push(name); } catch { /* absent */ }
-    }
+  for (const name of [...slugs.flatMap((slug) => outputNames(slug, options)), ...setNames]) {
+    try { await access(join(options.outputDir, name)); collisions.push(name); } catch { /* absent */ }
   }
   if (collisions.length) {
     throw new Error(`refusing to replace existing output: ${collisions.join(", ")} (pass --force to replace)`);
@@ -61,6 +64,14 @@ export async function prepareOutputDirectory(options: Pick<RecorderOptions, "out
 
 const REQUIRED_ENCODERS = ["libvpx-vp9", "libx264", "libwebp"] as const;
 
+/**
+ * The locked Chromium, unless PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH names another build
+ * (the same override `playwright.config.ts` honours, for machines that ship their own).
+ */
+function chromiumExecutable(): string {
+  return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || chromium.executablePath();
+}
+
 /** Confirms the encoders and the locked Chromium are present, and reports the versions used. */
 export async function validateTools(): Promise<string[]> {
   const ffmpeg = (await command("ffmpeg", ["-version"], "recording tool check")).split("\n")[0] ?? "ffmpeg";
@@ -68,7 +79,7 @@ export async function validateTools(): Promise<string[]> {
   const encoders = await command("ffmpeg", ["-hide_banner", "-encoders"], "recording tool check");
   const missing = REQUIRED_ENCODERS.filter((name) => !encoders.includes(` ${name} `));
   if (missing.length) throw new Error(`recording tool check: ffmpeg is built without ${missing.join(", ")}`);
-  const executable = chromium.executablePath();
+  const executable = chromiumExecutable();
   try {
     await access(executable);
   } catch (error) {
@@ -76,6 +87,25 @@ export async function validateTools(): Promise<string[]> {
   }
   const { version } = JSON.parse(await readFile(new URL("../../node_modules/@playwright/test/package.json", import.meta.url), "utf8")) as { version: string };
   return [ffmpeg, ffprobe, `@playwright/test ${version}`, `chromium ${executable}`];
+}
+
+/**
+ * Asks the running app for every screen the chapters open before the first one records. A
+ * freshly started `next start` renders its first pages slowly, and that second or two would
+ * otherwise come out of the first chapter's promised length. Also says early, and plainly,
+ * when nothing is serving.
+ */
+export async function warmUp(baseUrl: string): Promise<void> {
+  for (const path of ["/", "/playbooks"]) {
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}${path}`);
+    } catch (error) {
+      throw new Error(`nothing answered at ${baseUrl}${path}; start the production build first (bun run build && bun run start)`, { cause: error });
+    }
+    if (!response.ok) throw new Error(`${baseUrl}${path} answered HTTP ${String(response.status)}`);
+    await response.arrayBuffer();
+  }
 }
 
 interface RawCapture {
@@ -93,6 +123,7 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
     // the video starts with the browser, so the chapter clock starts before the launch
     const startedAt = Date.now();
     const context = await chromium.launchPersistentContext(profileDir, {
+      executablePath: chromiumExecutable(),
       headless: !options.headed,
       viewport: VIDEO_SIZE,
       deviceScaleFactor: 1,
@@ -122,12 +153,8 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
           // about:blank has no storage origin; the same script runs again on the app URL
         }
       }, Object.entries(storageFor(slug)));
-      if (slug === "run-play") {
-        // Live ▶ playback is a simulation (the primary read gets the ball most of the
-        // time). The recording narrates the primary, so pin every coin flip for this
-        // chapter only; it never saves a play, so nothing else draws on Math.random.
-        await context.addInitScript(() => { Math.random = () => 0; });
-      }
+      // the chapter narrates the primary read on ▶, so every coin flip is pinned (see ChapterDefinition)
+      if (CHAPTERS[slug].pinRandom) await context.addInitScript(() => { Math.random = () => 0; });
       const page = context.pages()[0] ?? await context.newPage();
       const video = page.video();
       if (!video) throw new Error("Playwright did not create a video for the page");

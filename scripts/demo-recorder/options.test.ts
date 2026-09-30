@@ -70,20 +70,21 @@ describe("Demo recorder chapters and fixtures", () => {
 
   test("encoding trims normalized source timestamps to fixed manifest durations", () => {
     expect(CHAPTER_SLUGS.map(chapterVideoFilter)).toEqual(
-      [9, 9, 11, 11, 8, 8, 9].map((seconds) => `trim=start=0:duration=${seconds.toFixed(3)},setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos`),
+      [9, 9, 11, 11, 10, 11, 8, 10, 11].map((seconds) => `trim=start=0:duration=${seconds.toFixed(3)},setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos`),
     );
   });
 
   test("fixtures are fictional, stable, and seed only the app's own storage keys", () => {
-    expect(DEMO_PLAYS.map((play) => play.id)).toEqual(["demo-slant", "demo-handoff", "demo-play-action", "demo-defense"]);
+    expect(DEMO_PLAYS.map((play) => play.id)).toEqual(["demo-slant", "demo-handoff", "demo-play-action", "demo-defense", "demo-goal-to-go"]);
     expect(DEMO_PLAYS.every((play) => play.name.startsWith("Otter "))).toBe(true);
     expect(Object.values(STORAGE_KEYS).sort()).toEqual(["ffpd.draft.v1", "ffpd.first-use.v1", "ffpd.playbooks.v1", "ffpd.plays.v2", "ffpd.team.v1"]);
     for (const slug of CHAPTER_SLUGS) {
       const storage = storageFor(slug);
       expect(Object.keys(storage).sort()).toEqual(Object.values(STORAGE_KEYS).sort());
       expect(storage[STORAGE_KEYS.firstUse]).toBe("done");
-      // `playbooks` types the team name on camera, so only that chapter starts without one
-      expect(JSON.parse(storage[STORAGE_KEYS.team] ?? "")).toEqual({ name: slug === "playbooks" ? "" : "Riverside Otters", color: "#2a9d8f" });
+      // `playbooks` and `touchdowns` type the team name on camera, so only they start without one
+      const typesName = slug === "playbooks" || slug === "touchdowns";
+      expect(JSON.parse(storage[STORAGE_KEYS.team] ?? "")).toEqual({ name: typesName ? "" : "Riverside Otters", color: "#2a9d8f" });
       const draft = JSON.parse(storage[STORAGE_KEYS.draft] ?? "") as { id: string | null; name: string };
       const opened = CHAPTER_PLAY[slug] ?? (slug === "custom-routes" ? QUICK_SLANT : undefined);
       expect(draft.id).toBe(opened ? opened.id : null);
@@ -134,6 +135,10 @@ describe("Demo recorder isolation", () => {
     } catch (error) { collision = error; }
     expect(collision).toBeInstanceOf(Error);
     expect((collision as Error).message).toBe("refusing to replace existing output: run-play.webm (pass --force to replace)");
+    // a whole set's own files collide too, and only when the run writes them
+    await writeFile(join(outputDir, "recorded-from.json"), "{}");
+    expect(await rejection(prepareOutputDirectory(base, ["playbooks"]))).toBeNull();
+    expect(await rejection(prepareOutputDirectory(base, ["playbooks"], ["recorded-from.json"]))).toContain("recorded-from.json");
     // extras only collide when they were asked for
     expect(await rejection(prepareOutputDirectory({ ...base, contactSheets: true }, ["playbooks"]))).toBeNull();
     expect(await rejection(prepareOutputDirectory({ ...base, contactSheets: true }, ["run-play"]))).toContain("run-play.webm, run-play.sheet.png");
