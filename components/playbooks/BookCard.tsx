@@ -33,17 +33,18 @@ export function BookCard({ book: b, plays, team, say }: Props) {
       {/* a compact row on phones, a cover on top from sm up */}
       <Link href={href} className="group grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3 !text-ink no-underline sm:flex sm:flex-col sm:items-stretch sm:gap-2">
         <div className="relative m-1 transition-transform duration-[120ms] group-hover:-translate-y-0.5 motion-reduce:transition-none">
+          {/* every picture in the stack is framed alike, so a deep defensive call can't push this card's title below its neighbours' */}
           {rest.slice(0, 2).map((p, i) => (
             <div key={p.id} aria-hidden className={`absolute inset-0 ${behind[i] ?? ""}`}>
-              <PlayThumb players={p.players} name="" side={p.side} artShadow={p.artShadow} los={p.los} className="opacity-90" />
+              <PlayThumb players={p.players} name="" side={p.side} artShadow={p.artShadow} los={p.los} className="opacity-90" framed />
             </div>
           ))}
           {cover ? (
-            <PlayThumb players={cover.players} name={cover.name} side={cover.side} artShadow={cover.artShadow} los={cover.los} className="relative" />
+            <PlayThumb players={cover.players} name={cover.name} side={cover.side} artShadow={cover.artShadow} los={cover.los} className="relative" framed />
           ) : (
             <div className="relative">
               {/* an empty field keeps the cover the same size as a full one */}
-              <PlayThumb players={[]} name="" side="offense" los={undefined} className="opacity-40" />
+              <PlayThumb players={[]} name="" side="offense" los={undefined} className="opacity-40" framed />
               <span className="absolute inset-0 flex items-center justify-center rounded-field border-2 border-dashed border-ink text-caption text-ink">Empty</span>
             </div>
           )}

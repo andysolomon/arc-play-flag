@@ -1,5 +1,5 @@
 import { FONT } from "@/lib/render/play-svg";
-import type { PdfImage } from "./pdf";
+import type { PdfImage, PdfText } from "./pdf";
 import { PPTX_TYPE } from "./pptx";
 import { clean } from "./xml";
 
@@ -71,6 +71,48 @@ export async function rasterise(svg: string, width: number, height: number, back
   g.fillRect(0, 0, c.width, c.height);
   g.drawImage(img, 0, 0, c.width, c.height);
   return c;
+}
+
+/**
+ * Where a page's words are drawn, in its own points, for the PDF's invisible text layer. The page
+ * is laid out once off screen with the same face, and every `<text>` is read back through the
+ * transforms and nested pictures it sits in. Anything that cannot be measured is left out: the
+ * words are a convenience under the picture, never a reason for an export to fail.
+ */
+export function textOf(svg: string): PdfText[] {
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.cssText = "position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none;contain:layout";
+  try {
+    const doc = new DOMParser().parseFromString(clean(svg), "image/svg+xml");
+    const root = doc.documentElement;
+    if (!(root instanceof SVGSVGElement)) return [];
+    host.appendChild(document.importNode(root, true));
+    document.body.appendChild(host);
+    const svgEl = host.firstElementChild;
+    const base = svgEl instanceof SVGSVGElement ? svgEl.getScreenCTM()?.inverse() : undefined;
+    if (!svgEl || !base) return [];
+    const out: PdfText[] = [];
+    for (const el of Array.from(svgEl.querySelectorAll("text"))) {
+      const s = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+      const ctm = el.getScreenCTM();
+      if (!s || !ctm) continue;
+      const box = el.getBBox();
+      if (!(box.width > 0) || !(box.height > 0)) continue;
+      const m = base.multiply(ctm);
+      const scale = Math.hypot(m.a, m.b);
+      const size = parseFloat(getComputedStyle(el).fontSize) * scale;
+      const tl = new DOMPoint(box.x, box.y).matrixTransform(m);
+      const br = new DOMPoint(box.x + box.width, box.y + box.height).matrixTransform(m);
+      // the box runs from the face's ascent to its descent; the baseline sits about four fifths down
+      out.push({ s, x: Math.min(tl.x, br.x), y: Math.min(tl.y, br.y) + Math.abs(br.y - tl.y) * 0.8, size, width: Math.abs(br.x - tl.x) });
+    }
+    return out;
+  } catch {
+    return [];
+  } finally {
+    host.remove();
+  }
 }
 
 async function deflate(bytes: Uint8Array): Promise<Uint8Array | null> {

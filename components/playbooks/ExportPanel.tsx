@@ -87,7 +87,9 @@ export function ExportPanel({ book, items, team, say }: Props) {
   const onBinder = () => {
     run("Drawing binder pages", async (progress) => {
       const pages = binderPages(items, { layout, paper, bookName: book.name, team });
-      await exportPdf(pages, `${kebab(book.name)}-binder.pdf`, `${book.name} - binder`, { dpi: 220, onProgress: progress });
+      // the two layouts are different printouts, so the second download never lands on the first's name
+      const four = layout === "four";
+      await exportPdf(pages, `${kebab(book.name)}-binder${four ? "-four-up" : ""}.pdf`, `${book.name} - binder${four ? " (four up)" : ""}`, { dpi: 220, onProgress: progress });
     });
   };
   const onPostcards = () => {
@@ -229,6 +231,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
         <select value={paper} onChange={(e) => { setPaper(e.target.value === "a4" ? "a4" : "letter"); }} aria-label="Paper size" className={select}>
           {Object.values(PAPERS).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
+        <span className="text-caption leading-note text-ink-muted">Every PDF keeps its words under the pictures: search it for a play, copy your notes out, or have it read aloud.</span>
         <span className="text-caption leading-note text-ink-muted">A playbook file carries the plays too. Send it to an assistant coach, or keep it as a backup.</span>
         <button type="button" onClick={onFile} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download playbook file</button>
       </div>
