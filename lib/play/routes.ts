@@ -144,12 +144,23 @@ export const MAX_ROUTE_POINTS = 60;
 export const clampPoint = (q: Pair): Pair => [Math.max(X_MIN, Math.min(X_MAX, q[0])), Math.max(Y_MIN, Math.min(Y_MAX, q[1]))];
 
 /**
+ * The route with only the flags that are on. Storage reads `mirror: false` and `primary: false` as
+ * nothing, so a play stored with either would not read back byte for byte, and the strict reader
+ * behind Create link and the file import called it repaired (#113): a preset mirrored back, or a
+ * read unmarked, could not be shared until the route was toggled off and on.
+ */
+export function trimFlags(route: Route): Route {
+  const { mirror, primary, ...rest } = route;
+  return { ...rest, ...(mirror ? { mirror: true } : {}), ...(primary ? { primary: true } : {}) };
+}
+
+/**
  * The route mirrored left/right about x, keeping everything but its geometry: the
  * primary read, a man target, the mirror flag. Custom waypoints that would land off
  * the field are pulled back to its edge, and `clamped` says whether any were.
  */
 export function mirrorRoute(route: Route, x: number): { route: Route; clamped: boolean } {
-  if (route.type !== "custom") return { route: { ...route, mirror: !route.mirror }, clamped: false };
+  if (route.type !== "custom") return { route: trimFlags({ ...route, mirror: !route.mirror }), clamped: false };
   let clamped = false;
   const pts = (route.pts ?? []).map((q): Pair => {
     const raw: Pair = [2 * x - q[0], q[1]];
