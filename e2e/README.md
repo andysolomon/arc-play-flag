@@ -17,6 +17,7 @@ First time only: `bunx playwright install chromium`.
 - **Fictional fixtures, per test.** Everything comes from `support/fixtures.ts` (the Riverside Otters, a team that does not exist). Each test gets a fresh browser context, so no test can see another's storage, and none of them can ever read or write a real browser profile.
 - **Assert what a coach sees**, then what was durably stored. Reading the test's own `localStorage` is fine; it is how we prove a "Saved" was true and a refused import changed nothing.
 - **Failure states are induced, not simulated.** `armSabotage` makes storage throw `QuotaExceededError` or canvases refuse a 2D context while a flag is up (or, with `canvasBudget`, once a set number of full-page canvases have drawn), so the app's real failure paths run.
+- **Each test that shares starts with a fresh share budget.** The share API allows 20 writes an hour per client address, and off Vercel every test would count against one bucket, so a test that writes through it calls `freshShareBudget` (`support/share-budget.ts`), which clears the rate-limit counters, and nothing else, in the disposable Redis.
 - **Spec files end in `.journey.ts`.** `bun test` picks up `*.spec.*` and `*.test.*`; this suffix keeps the two runners apart.
 - Only add a journey for behaviour a coach would notice breaking. Lint, typecheck, unit tests and build stay the fast gates; this suite is for the slow, whole-app promises.
 

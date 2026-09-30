@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { Designer, downloadText } from "../support/designer";
 import { KEYS, OTTERS, SLANT_LEFT, jsonUpload, play, playbook, playbookFile, seed, storedDraft, storedPlays } from "../support/fixtures";
+import { freshShareBudget } from "../support/share-budget";
 import type { Route, SavedPlay } from "../../lib/play/types";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -175,6 +176,7 @@ test("a file from an older build that carries false flags imports without a word
 
 test("Create link shares a book, and the play's own Share button a play, saved after mirroring back and unmarking a read", async ({ page, browser }, testInfo) => {
   test.skip(!process.env.SHARING_TEST_REDIS_URL, "Requires disposable Redis REST adapter; enabled in CI");
+  await freshShareBudget();
   const steps: Step[] = [];
   await seed(page, { plays: [Y_CROSS], playbooks: [BOOK], team: OTTERS });
   const d = await drawAndSave(page, steps);
