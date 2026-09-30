@@ -567,13 +567,19 @@
   }
   .ez-piece[data-confetti="pixel"] { width: calc(9px * var(--ez-size)); height: calc(9px * var(--ez-size)); border-radius: 0; animation-timing-function: steps(16); }
   .ez-piece[data-confetti="spark"] { width: 3px; height: calc(16px * var(--ez-size)); border-radius: 2px; box-shadow: 0 0 6px currentColor; }
+  /*
+   * One font size for every glyph, each sized by a scale on its own <span> instead: a font size of
+   * its own per glyph had the browser build sixty-odd fonts on the touchdown's first frame, most of
+   * what that frame cost in Matrix.
+   */
   .ez-piece[data-confetti="glyph"] {
     width: auto;
     height: auto;
     background: none;
-    font: 700 calc(15px * var(--ez-size)) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font: 700 15px / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     text-shadow: 0 0 6px currentColor;
   }
+  .ez-piece[data-confetti="glyph"] > span { display: block; transform: scale(var(--ez-size)); transform-origin: 0 0; }
   [data-motion="drift"] > .ez-piece { animation-name: ez-drift; animation-timing-function: ease-in-out; }
   [data-motion="rain"] > .ez-piece { animation-name: ez-rain; animation-timing-function: linear; }
   [data-motion="burst"] > .ez-piece {
@@ -852,12 +858,14 @@
 
 /* Matrix: the rain holds still at rest and only the cursor blinks; a touchdown sets the code falling a row at a time, floods the band with a sheet of drops, rushes every column, flashes the screen and decodes the lettering from falling code. */
 .ez-matrix-fall, .ez-matrix-rush, .ez-matrix-wave, .ez-matrix-reel { transform-box: view-box; transform-origin: 0 0; }
-.ez-matrix-glitch { transform-box: fill-box; transform-origin: center; }
 .ez-matrix-cursor { animation: ez-matrix-blink 1s step-end infinite; }
 
-/* PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next. matrix.tsx sets each clock's duration (8s, 6s or 4s) so every step, and the cursor's blink, lands on a 12 Hz lattice. */
-.ez-matrix-party .ez-matrix-fall { animation: ez-matrix-fall 6s steps(24) infinite; }
-.ez-matrix-party .ez-matrix-rush { animation: ez-matrix-fall 0.8s steps(24) 4; }
+/*
+ * PERIOD (24 rows of 10) in components/endzone/art/matrix.tsx: one loop carries each drop onto the next. matrix.tsx sets each clock's duration (8s, 6s or 4s) so every step, and the cursor's blink, lands on a 12 Hz lattice.
+ * The rush (four loops in 3s) and then the columns' own clocks take turns, never adding up: a column is never more than one loop down, so it draws one loop of code above the band, not two (a quarter of the glyphs, and of the touchdown's first frame).
+ */
+.ez-matrix-party .ez-matrix-fall { animation: ez-matrix-fall 6s steps(24) 3s infinite; }
+.ez-matrix-party .ez-matrix-rush { animation: ez-matrix-fall 0.75s steps(24) 4; }
 .ez-matrix-party .ez-matrix-cursor { animation-duration: 0.3s; }
 .ez-matrix-party .ez-matrix-glitch { animation: ez-matrix-glitch 3.4s linear both; }
 .ez-matrix-party .ez-matrix-frame { animation: ez-matrix-flicker 3.4s linear both; }
@@ -889,16 +897,21 @@
   from { transform: translateY(-116px); }
   to { transform: translateY(0); }
 }
+/*
+ * Side to side only: SVG text is laid out afresh at every scale it is drawn at, so a plate sheared
+ * or squashed a little more on every frame had its lettering and each letter's reel of code laid
+ * out again on every frame of the glitch, most of what a touchdown cost after its first frame.
+ */
 @keyframes ez-matrix-glitch {
   0%, 18%, 66%, 74%, 100% { transform: none; }
-  2% { transform: translateX(-3px) skewX(-8deg); }
+  2% { transform: translateX(-3px); }
   5% { transform: translateX(2.5px); }
-  8% { transform: translateX(-1.5px) skewX(6deg); }
-  11% { transform: translateX(2px) scaleY(0.9); }
+  8% { transform: translateX(-1.5px); }
+  11% { transform: translateX(2px); }
   14% { transform: translateX(-1px); }
-  68% { transform: translateX(2px) skewX(-6deg); }
+  68% { transform: translateX(2px); }
   70% { transform: translateX(-2px); }
-  72% { transform: translateX(1px) skewX(4deg); }
+  72% { transform: translateX(1px); }
 }
 @keyframes ez-matrix-flicker {
   0%, 1.9%, 4%, 5.9%, 8%, 9.9%, 12%, 13.9% { opacity: 1; }

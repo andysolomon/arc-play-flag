@@ -274,8 +274,9 @@ export function MatrixArt({ w, h, label, celebrate, name }: ArtProps) {
   const faded = residue.filter((c) => !c.newest).map(({ x, r }): Cell => [x, r]);
   const newest = residue.filter((c) => c.newest).map(({ x, r }): Cell => [x, r]);
   const chars = (cells: readonly Cell[], salt: number): string => cells.map(([x, r]) => pick(Math.round(x * 3) + r * 257, salt)).join("");
-  // how far a column falls: not at all at rest; in a touchdown, one loop of its own and the rush on top
-  const reach = celebrate ? PERIOD * 2 : 0;
+  // how far a column falls: not at all at rest; in a touchdown, the rush and then its own clock, one after the other
+  // (globals.css), so never more than a loop's rows, and the code repeats every loop
+  const reach = celebrate ? PERIOD - 1 : 0;
   return (
     <g className={celebrate ? "ez-matrix-party" : undefined}>
       <rect width={w} height={h} fill={BLACK} />
