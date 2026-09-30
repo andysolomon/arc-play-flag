@@ -28,6 +28,10 @@ are uploaded by CI as `lateral-chains`.
 
 ## Coverage
 
+Pre-snap motion is covered by `pre-snap-motion.journey.ts`: draw and clamp the path, keep the route, undo/redo, save/reload, hold the ball and formation during motion, then snap and run, flip, snapshot sharing, redraw/cancel, transfer, removal, and play-file export/import on another device. Its per-test screenshots, manifest and exported JSON are uploaded as `pre-snap-motion`.
+
+`motion-lateral-chain.journey.ts` checks motion followed by repeated laterals and a forward pass: possession stays with the center during motion, each transfer starts after the snap, and save/reload, assignment text, Clear routes and Undo keep both features together. Its screenshot and playback manifest are included in `pre-snap-motion`.
+
 | Journey | File |
 | --- | --- |
 | Name, draw, save, reload, reopen; failed save → warning, recovery file, retry | `save-and-reopen` |

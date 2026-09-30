@@ -42,6 +42,8 @@ export interface Player {
   x: number;
   y: number;
   route: Route | null;
+  /** Absolute yard waypoints before the snap; independent of the post-snap route. */
+  preSnap?: { pts: Pair[] };
 }
 
 export type RouteEnd = "arrow" | "zone";
@@ -71,6 +73,7 @@ export interface Pane {
 export interface Draft {
   id: string;
   pts: Pair[];
+  kind?: "motion";
 }
 
 /** A play in the on-device library. Keyed by a generated id, so it can be renamed freely. */

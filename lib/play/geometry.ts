@@ -1,5 +1,6 @@
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
-import { DEF, ROUTES, inkFor, routeDef, runLegs } from "./routes";
+import { atSnap, motionPoints } from "./pre-snap";
+import { DEF, INK, ROUTES, inkFor, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -70,6 +71,7 @@ const ACROSS_MIN = 1.2, ACROSS_MAX = 28.8;
  * laid out as bubbles (see zoneLayout) and are not handled here.
  */
 export function routeYards(p: Player, players: readonly Player[], top: number): Pair[] | null {
+  p = atSnap(p);
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
@@ -78,21 +80,24 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
   if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
   if (rt.type === "blitz") {
     // drive past the line of scrimmage, angled at the quarterback
-    const qb = quarterback(players);
+    const qb0 = quarterback(players);
+    const qb = qb0 ? atSnap(qb0) : undefined;
     const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
     const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
     const reach = Math.max(1.5, L - 1.8);
     return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
   }
   if (rt.type === "man") {
-    const t = players.find((q) => q.id === rt.target);
+    const target = players.find((q) => q.id === rt.target);
+    const t = target ? atSnap(target) : undefined;
     if (!t) return null;
     const dx = t.x - p.x, dy = t.y - p.y, L = Math.hypot(dx, dy) || 1;
     return [[p.x, p.y], [t.x - (dx / L) * 1.15, t.y - (dy / L) * 1.15]];
   }
   if (def.run && !def.pts && p.team === "offense") {
     // through the mesh point beside the quarterback, or from their own spot on a keeper
-    const qb = quarterback(players);
+    const qb0 = quarterback(players);
+    const qb = qb0 ? atSnap(qb0) : undefined;
     const mesh = qb && qb.id !== p.id ? qb : p;
     const side = (p.x < mesh.x - 0.01 ? -1 : 1) * (rt.mirror ? -1 : 1);
     const legs = runLegs(rt.type, mesh.x, mesh.y, side);
@@ -133,6 +138,7 @@ export interface SidelineCut { reach: number; room: number }
  * blitz, a run laid out from the mesh point, a zone's bubble).
  */
 export function sidelineCut(p: Player): SidelineCut | null {
+  p = atSnap(p);
   const rt = p.route;
   const def = rt && routeDef(p.team, rt.type);
   if (!rt || !def?.pts || def.end === "zone" || rt.type === "blitz") return null;
@@ -173,6 +179,8 @@ export function geom(
   top: number,
   zones: ZoneMap,
 ): RouteGeom | null {
+  const fromMotion = motionPoints(p).length > 0;
+  p = atSnap(p);
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
@@ -212,7 +220,8 @@ export function geom(
   if (!a0 || !a1) return null;
 
   const L0 = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]) || 1;
-  const off = Math.min(rt.type === "man" ? 24 : 27, L0 * 0.42);
+  // At the snap spot there is no stationary token: join the motion and route without a gap.
+  const off = fromMotion ? 0 : Math.min(rt.type === "man" ? 24 : 27, L0 * 0.42);
   pts[0] = [a0[0] + ((a1[0] - a0[0]) / L0) * off, a0[1] + ((a1[1] - a0[1]) / L0) * off];
 
   const b = pts[pts.length - 1], a = pts[pts.length - 2];
@@ -245,6 +254,26 @@ export function geom(
 
 export function draftPath(p: Player, pts: readonly Pair[], top: number): string {
   return "M" + [[p.x, p.y] as const, ...pts].map((q) => f1(px(q[0])) + " " + f1(py(q[1], top))).join("L");
+}
+
+/** Dashed motion with an arrow, distinct from the solid post-snap route. */
+export function motionGeom(p: Player, top: number): RouteGeom | null {
+  const pts = motionPoints(p);
+  if (!pts.length) return null;
+  const all: Pair[] = [[p.x, p.y], ...pts];
+  let a = all[0];
+  const b = all.at(-1);
+  for (let i = all.length - 2; i >= 0; i--) {
+    const q = all[i];
+    if (q && b && Math.hypot(q[0] - b[0], q[1] - b[1]) > 0.01) { a = q; break; }
+  }
+  if (!a || !b || Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.01) return null;
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const nx = (b[0] - a[0]) / len, ny = (b[1] - a[1]) / len;
+  const x = px(b[0]), y = py(b[1], top);
+  return { color: INK.flat, d: draftPath(p, pts, top), width: 4, dash: "6 7", draw: false,
+    arrow: `${f1(x)},${f1(y)} ${f1(x - nx * 13 - ny * 7)},${f1(y - ny * 13 + nx * 7)} ${f1(x - nx * 13 + ny * 7)},${f1(y - ny * 13 - nx * 7)}`,
+    zone: null };
 }
 
 export interface Band { y: number; h: number }

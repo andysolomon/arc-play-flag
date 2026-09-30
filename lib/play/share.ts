@@ -33,6 +33,7 @@ function compact(p: Player): Player {
     if (p.route.mirror) out.route.mirror = true;
     if (p.route.primary) out.route.primary = true;
   }
+  if (p.preSnap?.pts.length) out.preSnap = { pts: p.preSnap.pts };
   return out;
 }
 

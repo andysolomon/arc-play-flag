@@ -174,6 +174,10 @@ export function assignments(play: SavedPlay): Assignment[] {
         job = routeJob(p, play, who) ?? "No route";
       }
     }
+    if (offense && p.preSnap?.pts.length) {
+      job = idle ? "Pre-snap motion, then hold" : `Pre-snap motion, then ${job}`;
+      idle = false;
+    }
     return { id: p.id, team: p.team, label: p.label, who: who(p), job, primary: offense && p.route?.primary === true, idle };
   });
 }

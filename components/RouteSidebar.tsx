@@ -15,6 +15,8 @@ interface Props {
   cut: SidelineCut | null;
   hint: string | null;
   onPick: (key: RouteType) => void;
+  onMotion: () => void;
+  onRemoveMotion: () => void;
   onDone: () => void;
   onPrimary: () => void;
   onMirror: () => void;
@@ -29,7 +31,7 @@ interface Props {
 /** Yards as a coach reads them off the field, to the half yard. */
 const yards = (v: number): string => String(Math.round(v * 2) / 2);
 
-function RouteSidebarImpl({ selected: sel, cut, hint, onPick, onDone, onPrimary, onMirror, onRename, noRunZone }: Props) {
+function RouteSidebarImpl({ selected: sel, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
   const noRunNote = useId();
@@ -111,6 +113,18 @@ function RouteSidebarImpl({ selected: sel, cut, hint, onPick, onDone, onPrimary,
             <Note
               text={`The sideline cuts this ${tableFor(sel.team)[sel.route.type]?.label ?? "route"}: ${yards(cut.room)} of its ${yards(cut.reach)} yards across fit. Move ${sel.label || "this player"} inside to run all of it.`}
             />
+          )}
+          {sel.team === "offense" && (
+            <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Pre-snap motion">
+              <span className={eyebrow}>PRE-SNAP</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" onClick={onMotion} aria-label={sel.preSnap ? "Redraw pre-snap motion" : "Draw pre-snap motion"} className={`${pill} min-h-11 px-3 py-1 text-small`}>
+                  {sel.preSnap ? "Redraw motion" : "Pre-snap motion"}
+                </button>
+                {sel.preSnap && <button type="button" onClick={onRemoveMotion} aria-label="Remove pre-snap motion" className={`${pill} min-h-11 px-3 py-1 text-small`}>Remove motion</button>}
+              </div>
+              <span className="text-caption leading-note text-ink-muted">Draw a dashed path behind the line. The route starts where motion ends. One player motions per play; choosing another transfers motion.</span>
+            </div>
           )}
           <div className={tileGrid} role="group" aria-label={sel.team === "offense" ? "Routes" : "Coverages"}>
             {keys.map((k) => (
