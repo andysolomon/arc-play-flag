@@ -9,7 +9,6 @@ import type { Player, Team } from "@/lib/play/types";
 import { playArt } from "@/lib/render/play-svg";
 
 interface Props {
-  ballPlan?: import("@/lib/play/types").BallStep[];
   players: readonly Player[];
   name: string;
   /** the play's own side: the other team is left off playbook pictures, unless the play includes it */
@@ -27,16 +26,16 @@ interface Props {
 }
 
 /** A small static picture of a play, drawn from the same geometry as the field. */
-function PlayThumbImpl({ players, name, side, artShadow = false, los, className = "", framed = false, ballPlan }: Props) {
+function PlayThumbImpl({ players, name, side, artShadow = false, los, className = "", framed = false }: Props) {
   const noRunZones = hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam));
   const art = useMemo(
-    () => playArt(players, { ballPlan, showYardNumbers: false, noRunZones, los, show: artShadow ? "both" : side, side }),
-    [players, side, artShadow, noRunZones, los, ballPlan],
+    () => playArt(players, { showYardNumbers: false, noRunZones, los, show: artShadow ? "both" : side, side }),
+    [players, side, artShadow, noRunZones, los],
   );
   const frame = useMemo(() => (framed ? playArt([], { showYardNumbers: false, noRunZones, los }) : null), [framed, noRunZones, los]);
   // what the stamps and the fade show, in words, for a named picture
   const cover = side === "defense" ? coverageOf(players) : null;
-  const flagged = runInNoRunZone({ side, players, los, ballPlan }, noRunZones);
+  const flagged = runInNoRunZone({ side, players, los }, noRunZones);
   const label = !name ? name : [
     name,
     cover ? `${COVERAGE_WORDS[cover]} coverage` : null,

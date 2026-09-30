@@ -113,8 +113,7 @@ export interface ImportPlan {
 
 const same = (a: SavedPlay, b: SavedPlay): boolean =>
   a.name === b.name && a.notes === b.notes && a.side === b.side && (a.artShadow === true) === (b.artShadow === true) &&
-  losOf(a) === losOf(b) && JSON.stringify(a.players) === JSON.stringify(b.players)
-  && JSON.stringify(a.ballPlan) === JSON.stringify(b.ballPlan);
+  losOf(a) === losOf(b) && JSON.stringify(a.players) === JSON.stringify(b.players);
 
 /**
  * Nothing on the device changes: a play whose id is here and identical is reused, one

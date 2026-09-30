@@ -5,16 +5,14 @@ import { memo } from "react";
 interface ButtonProps {
   playing: boolean;
   onClick: () => void;
-  disabled?: boolean;
 }
 
 /** Round yellow ▶ in the corner of the field: run the play, or ■ to stop it early. */
-function PlayButtonImpl({ playing, onClick, disabled = false }: ButtonProps) {
+function PlayButtonImpl({ playing, onClick }: ButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       title={playing ? "Stop (Esc)" : "Run the play (the primary read gets the ball most of the time)"}
       aria-label={playing ? "Stop the play" : "Run the play"}
       aria-pressed={playing}
@@ -22,7 +20,7 @@ function PlayButtonImpl({ playing, onClick, disabled = false }: ButtonProps) {
       className={
         "absolute bottom-3 right-3 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full " +
         "border-2 border-ink bg-yellow text-[22px] leading-none text-ink shadow-tile transition-transform duration-[120ms] " +
-        "hover:-translate-y-0.5 data-[active=false]:on-yellow data-[active=true]:bg-white disabled:opacity-50 disabled:cursor-default print:hidden motion-reduce:transition-none"
+        "hover:-translate-y-0.5 data-[active=false]:on-yellow data-[active=true]:bg-white print:hidden motion-reduce:transition-none"
       }
     >
       {playing ? (
