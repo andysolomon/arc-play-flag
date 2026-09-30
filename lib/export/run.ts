@@ -1,7 +1,7 @@
 import type { SvgPage } from "./pages";
 import { buildPdf, type PdfPage } from "./pdf";
 import { buildPptx, slidePicture, type DeckSlide } from "./pptx";
-import { PT, download, ensureFont, rasterise, toPdfImage, toPng } from "./raster";
+import { PT, download, ensureFont, rasterise, textOf, toPdfImage, toPng } from "./raster";
 import { SLIDE_BG, SLIDE_PX, SLIDE_PY, type DeckPlan } from "./slides";
 
 export interface RunOptions {
@@ -10,7 +10,7 @@ export interface RunOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
-/** Rasterises each page in turn, wraps them in a PDF and saves it. */
+/** Rasterises each page in turn, reads where its words are, wraps them in a PDF and saves it. */
 export async function exportPdf(pages: readonly SvgPage[], filename: string, title: string, o: RunOptions = {}): Promise<void> {
   const dpi = o.dpi ?? 300;
   await ensureFont();
@@ -19,7 +19,7 @@ export async function exportPdf(pages: readonly SvgPage[], filename: string, tit
   for (const pg of pages) {
     o.onProgress?.(i, pages.length);
     const c = await rasterise(pg.svg, (pg.w / PT) * dpi, (pg.h / PT) * dpi);
-    out.push({ w: pg.w, h: pg.h, image: await toPdfImage(c) });
+    out.push({ w: pg.w, h: pg.h, image: await toPdfImage(c), text: textOf(pg.svg) });
     c.width = 0; // release the bitmap early on phones
     i++;
     await new Promise((r) => { window.setTimeout(r, 0); });
