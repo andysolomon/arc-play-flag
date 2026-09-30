@@ -461,7 +461,7 @@ test("near their goal, ▶ keeps every player on the field, a man defender inclu
   await d.goto(`?open=${call.id}`);
   await expect(page.getByRole("heading", { name: call.name })).toBeVisible();
   await d.closeSidebars();
-  await expect(d.field.getByRole("button", { name: "Defense d1", exact: true })).toBeVisible();
+  await expect(d.field.getByRole("button", { name: "Defense LC", exact: true })).toBeVisible();
   const before = await readField(d.field);
   expectField(before, 35);
 

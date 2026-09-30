@@ -53,12 +53,12 @@ test("a defensive call can hide or show the shadow offense, and never offers bot
   await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "true");
   await expect(d.page.getByRole("group", { name: "Shadow defense" })).toHaveCount(0);
   await expect(d.player("X")).toBeVisible();
-  await expect(d.player("d1", "Defense")).toBeVisible();
+  await expect(d.player("LC", "Defense")).toBeVisible();
 
   await shadowTile(d, "offense").click();
   await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "false");
   await expect(d.player("X")).toHaveCount(0);
-  await expect(d.player("d1", "Defense")).toBeVisible();
+  await expect(d.player("LC", "Defense")).toBeVisible();
   await expect(d.field.getByRole("button")).toHaveCount(5);
 
   await shadowTile(d, "offense").click();
@@ -72,8 +72,8 @@ test("a defensive call can hide or show the shadow offense, and never offers bot
   await expect(d.page.getByRole("heading", { name: "Pick a route" })).toBeVisible();
   await d.pick("Slant");
   await expect(d.routes).toHaveCount(1);
-  await d.select("d1", "Defense");
-  await expect(d.player("d1", "Defense")).toHaveAttribute("aria-pressed", "true");
+  await d.select("LC", "Defense");
+  await expect(d.player("LC", "Defense")).toHaveAttribute("aria-pressed", "true");
   await expect(d.page.getByRole("heading", { name: "Pick a coverage" })).toBeVisible();
 });
 
@@ -102,10 +102,10 @@ test("the playbook gallery labels each play's side and filters defensive calls b
 test("the shadow offense is faded context, and hiding it leaves only the defense", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
-  await expect(d.player("d1", "Defense")).toBeHidden();
+  await expect(d.player("LC", "Defense")).toBeHidden();
   await d.newPlay("Defense");
   const offense = d.player("X", "Offense");
-  const defense = d.player("d1", "Defense");
+  const defense = d.player("LC", "Defense");
   await expect(offense).toBeVisible();
   await expect(offense).toHaveCSS("opacity", "0.4");
   await expect(defense).toHaveCSS("opacity", "1");
@@ -120,18 +120,18 @@ test("an offensive play can give a faded defender a coverage", async ({ page }) 
   await d.goto();
   await d.tools();
   await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
-  await expect(d.player("d1", "Defense")).toHaveCount(0);
+  await expect(d.player("LC", "Defense")).toHaveCount(0);
 
   await shadowTile(d, "defense").click();
   await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "true");
-  const defense = d.player("d1", "Defense");
+  const defense = d.player("LC", "Defense");
   await expect(defense).toBeVisible();
   await expect(defense).toHaveCSS("opacity", "0.4");
   await expect(d.player("X", "Offense")).toHaveCSS("opacity", "1");
   await expect(d.field.getByRole("button")).toHaveCount(10);
 
   await d.closeSidebars();
-  await d.select("d1", "Defense");
+  await d.select("LC", "Defense");
   await expect(defense).toHaveCSS("opacity", "0.4");
   await expect(d.page.getByRole("heading", { name: "Pick a coverage" })).toBeVisible();
   await d.pick("Zone deep");
