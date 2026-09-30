@@ -157,11 +157,12 @@ function FieldImpl({
     };
   }), [players, live, liveWaypoint]);
   // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
-  // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card
+  // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
+  // pre-snap motion stays in the backfield, so drawing it leaves the card as it is
   const fit = depth(effective, pane, MIN_DEPTH, los);
   const deepest = depth(effective, pane, MAX_DEPTH, los);
-  const d = !readOnly && (deepField || draft !== null) ? deepest : fit;
-  // offered only where it shows more field, and not while a route is drawn on the deepest card already
+  const d = !readOnly && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
+  // offered only where it shows more field, and not while anything is being drawn
   const offerDeep = !readOnly && draft === null && deepest > fit;
   const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;

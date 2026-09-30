@@ -11,6 +11,7 @@ import { OTTERS, play, playbook, seed, storedDraft } from "../support/fixtures";
  * coach could not draw a deep route (a waypoint stopped 14.8 yards on) or see one drawn on a phone
  * (issue #106). How this could break, and the check that catches each:
  *  - drawing on a wide screen still stops short                                   → while a custom route is drawn the card reaches 37 yards on (the deepest card), and a tap 24 yards on is stored at 24
+ *  - drawing pre-snap motion (always behind the line) resizes the card for nothing → while motion is drawn the card stays the 16-yard one, with no Deep field offered
  *  - the card deepens but a tap lands on the wrong yard (a stale top or size)    → every tapped waypoint is stored exactly where it was tapped
  *  - once drawn, the card snaps back to 16 yards and cuts the route off          → after Finish the card's top is past the deepest waypoint and every route and arrowhead lies on the card
  *  - the card stops so close to a waypoint that a nudge pulls it back            → the deepest waypoint sits at least 1.2 yards under the top, and an arrow key moves it the way it points
@@ -175,7 +176,20 @@ for (const size of LAPTOPS) {
     await expect(deepToggle(page)).toHaveAttribute("title", `Show ${String(DEEPEST)} yards downfield`);
     await shot("short");
 
-    // drawing opens the deepest card, and the post is stored where it was tapped
+    // pre-snap motion stays behind the line of scrimmage: drawing it leaves the short card as it is
+    await d.select("Z");
+    await d.palette();
+    await page.getByRole("button", { name: "Draw pre-snap motion", exact: true }).click();
+    await expect(finish(page)).toBeDisabled();
+    await d.closeSidebars();
+    await d.settle();
+    const motion = await read(page);
+    expect(motion.downfield, "drawing motion leaves the card as it was").toBe(SHORT);
+    expect(motion.toggle, "no Deep field while anything is drawn").toBeNull();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await showing(page, d, SHORT);
+
+    // drawing a route opens the deepest card, and the post is stored where it was tapped
     const { drawing, drawn } = await drawPost(page, d);
     expectFits(drawing, "drawing");
     expect(drawing.toggle, "no Deep field while a route is drawn").toBeNull();
@@ -271,7 +285,7 @@ for (const size of LAPTOPS) {
     await keep(testInfo, `deep-field-${testInfo.project.name}-${at}`, {
       project: testInfo.project.name,
       viewport: size,
-      steps: { short, drawing, drawn, deep, reloaded, fitted, tenShort, tenDeep, fiveDeep },
+      steps: { short, motion, drawing, drawn, deep, reloaded, fitted, tenShort, tenDeep, fiveDeep },
     });
   });
 }
