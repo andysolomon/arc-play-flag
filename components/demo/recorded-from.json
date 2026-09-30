@@ -5,10 +5,10 @@
     "app/globals.css"
   ],
   "files": {
-    "app/globals.css": "f1efc8a7eb7953239691e2258acb57304265cf0820a98dfe627ab79e591b112b",
+    "app/globals.css": "97152cc98af22640f48d2ae77eb28bde073ba4aa06b19c45529d6a1362849b2c",
     "components/App.tsx": "7eb8f1bf2ac6cb89edb4a33111a5fd14baf5e67cd8056086ae9759eb376ba9bf",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "fceb1a865edc55284144dc8913c9f50d01fb56f943462ba7eb6dd32fede9245b",
+    "components/Field.tsx": "b02cfcf29e3dbff1b72d53772e39d11078aad4cd32386bbebd583a2684f66bcd",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "27ae56c5b4ae332ed52f4d97e484e2aa1f31e4fb55111982b76679dd2d495519",
@@ -31,7 +31,7 @@
     "components/Support.tsx": "06c306c59aeb7a559f612a51f61bb597cdfa3e689f9a26efdd5362051a94f7d7",
     "components/TeamFields.tsx": "6bf0e2d533341f7918aae1da11f65c455ab18351274a3c45cbe0bd23f2d2e842",
     "components/ThemePicker.tsx": "51b354c0d739756810783b83d0ea98ea10f716bec0d63393e9a8fc81928e7df6",
-    "components/endzone/Celebration.tsx": "0e08ed6f33f89f245f08cd9efd836a695f82d6556703a0812efae11231a798c2",
+    "components/endzone/Celebration.tsx": "c28ea5f099813da7cd5e88128e4c2a5fb6969e2975a1b2cfde1042134a7f1eb0",
     "components/endzone/EndZoneArt.tsx": "5f905577f143ea8ef22535ce445fc4b73f2c6bbbcdfbc0d2a5140b835c86b048",
     "components/endzone/EndZonePicker.tsx": "e2f22e37fc3f27267e4c07e624ef1e4590616a09e10975d48782c713289ca0b2",
     "components/endzone/art/classic.tsx": "69ebd781aabd7129c04c6b19253f70d67e4554e69b5d66f9131bc3a73e57bc17",
@@ -39,7 +39,7 @@
     "components/endzone/art/event-horizon.tsx": "b6cdbb1b72e196e08b6382bd194b66fa2bbaf27a216de71e9dcd0875bd5bc8b7",
     "components/endzone/art/great-wave.tsx": "450e54f4698fe780cca5efc5768aa038237bc914d45979de2e5e80844b5e7ee7",
     "components/endzone/art/home.tsx": "c2eb3318c952085861df7c709625393e469cb8bb96e8e01a35b3e9832dde71cc",
-    "components/endzone/art/matrix.tsx": "2ff8d23a3d02520e448fb9d5dfa0b9bc88a344a686c1a4c1db709a7f45c01925",
+    "components/endzone/art/matrix.tsx": "23d84c60b78c44596a0f03820090f80c5ea8712e258cc5fbe0b28a5d3bd19075",
     "components/endzone/art/sakura.tsx": "9d64d39e9504465bf82e1cc8c4de93d7bdf7aba4d58fb3af601a1e866f41c0a3",
     "components/endzone/art/shared.ts": "e687f5e449daab7de85cbdbda32c60e83900b5444cc89ab805bcee7119bfe412",
     "components/endzone/art/synthwave.tsx": "76c3021a3fed4dc97b99645a5b2d570842b07b4bf3daf535cd82c3ce765e5c15",
@@ -61,5 +61,14 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "95ec1e9af5fe4f6f12f3b36c38a00185e06b057b1244f1a073bd4706cdb2b6e1"
+  },
+  "restamped": {
+    "reason": "ARC-186 changes only the Matrix end zone (its art, its rush timing, its name-plate glitch and its glyph confetti, all scoped to Matrix) plus will-change on the end zone band, which draws the same. Every clip was reviewed as frame sheets (1 fps; touchdowns at 4 fps): no clip shows the Matrix end zone, its swatch, its celebration or glyph confetti; touchdowns picks and celebrates Synthwave '84, whose band looks the same.",
+    "files": [
+      "app/globals.css (changed)",
+      "components/Field.tsx (changed)",
+      "components/endzone/Celebration.tsx (changed)",
+      "components/endzone/art/matrix.tsx (changed)"
+    ]
   }
 }
