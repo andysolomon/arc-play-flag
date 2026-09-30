@@ -35,6 +35,7 @@
  */
 
 import { assignmentLine, assignments, callLine, callName, headerLine, type Assignment } from "@/lib/play/assignments";
+import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { losOf } from "@/lib/play/field";
 import { teamFill } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
@@ -263,6 +264,8 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   out.push(footer(teamName, bookTitle));
 
   const cl = callLine(play);
+  // the face carries the flag in its picture; the alt text and notes say it in words
+  const flagged = runInNoRunZone(play, hasNoRunZones(team)) ? `Flagged: ${NO_RUN_FLAG.toLowerCase()}.` : null;
   const lines = as.map(assignmentLine);
   return {
     page: page(SLIDE_W, SLIDE_H, out.join("")),
@@ -272,6 +275,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
     alt: [
       `Play ${String(item.n)}: ${play.name}.`,
       cl,
+      flagged,
       play.artShadow ? `The ${play.side === "defense" ? "offense" : "defense"} is drawn faded.` : null,
       lines.length ? `Left to right: ${lines.join("; ")}.` : "Nobody on this side yet.",
       notes ? `Coaching points: ${notes.replace(/\s+/g, " ")}` : null,
@@ -279,6 +283,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
     notes: [
       headerLine(item),
       cl,
+      flagged,
       notes || null,
       lines.length ? ["Left to right:", ...lines].join("\n") : "Nobody on this side yet.",
     ].filter((l) => l !== null).join("\n\n"),

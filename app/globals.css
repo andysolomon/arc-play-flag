@@ -525,6 +525,17 @@
 }
 
 /*
+ * The no-run band's hatching on a control: the palette's run tiles while the ball is in a no-run
+ * zone. The field's 45° lines, 1.6px of ink at 19% every 11px, in whatever ink the page is in,
+ * over the control's own fill (a picked tile stays yellow under it).
+ */
+@utility hatched {
+  background-image: repeating-linear-gradient(
+    45deg, color-mix(in srgb, var(--color-ink) 19%, transparent) 0 1.6px, transparent 1.6px 11px
+  );
+}
+
+/*
  * End zones (lib/endzone.ts, components/endzone). Each design animates with its own keyframes on
  * transform and opacity, and is drawn complete without them: the picker's swatches (.ez-still) and
  * reduced motion hold every design still. None of it prints (the field marks it print:hidden).

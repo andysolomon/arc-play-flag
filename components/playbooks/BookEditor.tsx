@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { numbered } from "@/lib/export/numbered";
+import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import {
   deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam,
   subscribe, swapPlaybookReferences, updatePlaybook,
 } from "@/lib/play/library";
-import { failureMessage } from "@/lib/play/storage";
+import { failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
-import { card, divider, eyebrow, input, pill, pillDark, pillSm } from "../ui";
+import { card, divider, eyebrow, flagChip, input, pill, pillDark, pillSm } from "../ui";
 import { AddPlaysModal } from "./AddPlays";
 import { ShareBook } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
@@ -98,6 +99,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
                 <span className="block truncate text-base" title={it.play.name}>{it.play.name}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <SideBadge side={it.play.side} />
+                  {runInNoRunZone(it.play, hasNoRunZones(team)) && <span className={flagChip}>{NO_RUN_FLAG}</span>}
                   <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
                 </span>
               </div>
