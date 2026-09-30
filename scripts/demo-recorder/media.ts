@@ -12,9 +12,12 @@ export const MIN_FILE_BYTES = 1_000;
  * components/demo/demos.test.ts. The service worker precaches all of it, so this is
  * what an offline install costs. Raised from 1,250,000 when five crammed chapters were
  * split into eight focused ones (issue #36): the same material, told in smaller pieces,
- * at a higher encoding CRF to pay for the extra chapters.
+ * at a higher encoding CRF to pay for the extra chapters. Raised again from 1,700,000
+ * for nine chapters (issue #107: the field, end zones and slides) rather than raising the
+ * CRF further: the nine came to about 1.85 MB, and the rest is room for an encoder version
+ * to land a few percent either way.
  */
-export const MAX_SET_BYTES = 1_700_000;
+export const MAX_SET_BYTES = 2_000_000;
 
 export type DeliveryKind = "webm" | "mp4" | "poster";
 

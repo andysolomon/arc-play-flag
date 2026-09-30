@@ -7,7 +7,7 @@ export interface DemoChapter {
 }
 
 /**
- * Seven short chapters, each one small enough to watch on a phone at the field.
+ * Nine short chapters, each one small enough to watch on a phone at the field.
  * Every entry in `covers` is a promise: `scripts/demo-recorder` refuses to record a
  * chapter unless each one was demonstrated by an action that completed on camera.
  */
@@ -37,8 +37,22 @@ export const DEMOS: readonly DemoChapter[] = [
     slug: "build-defense",
     title: "Build the defense",
     time: "11 sec",
-    summary: "Show or hide the shadow offense, then assign a deep zone, man coverage and a legal blitz.",
+    summary: "Drop a deep zone, put a man on X by tapping the faded shadow offense, send a legal blitz, then hide the offense: the man defender wears an “on X” tag.",
     covers: ["Shadow offense", "Defense only", "Defensive plays", "Zones", "Man coverage", "Blitz"],
+  },
+  {
+    slug: "field-setup",
+    title: "Make the field yours",
+    time: "10 sec",
+    summary: "Spot the ball on their 10 with yards counting down to their goal, turn off the no-run zones your league skips, then go dark or pick a premium theme that paints the field too.",
+    covers: ["Line of scrimmage", "No-run zones", "Dark theme", "Premium themes"],
+  },
+  {
+    slug: "touchdowns",
+    title: "Score in your own end zone",
+    time: "11 sec",
+    summary: "Pick an end zone design, letter your team's name across it, then throw a touchdown pass into it: the end zone celebrates and the next design opens.",
+    covers: ["End zones", "Team lettering", "Touchdowns"],
   },
   {
     slug: "save-share",
@@ -50,16 +64,16 @@ export const DEMOS: readonly DemoChapter[] = [
   {
     slug: "playbooks",
     title: "Build a playbook",
-    time: "8 sec",
+    time: "10 sec",
     summary: "Name the team, take a book handed over as a file, start one of your own, then add plays and put them in calling order.",
     covers: ["Team setup", "Import", "Playbook creation", "Play ordering"],
   },
   {
     slug: "print-playbook",
-    title: "Print it for the sideline",
-    time: "9 sec",
-    summary: "Turn a playbook into wristband inserts, binder pages, two-sided postcards and a parents' flyer, or hand the whole book over as a file.",
-    covers: ["Wristbands", "Binder PDF", "Postcards", "Flyer", "Playbook file"],
+    title: "Print it or present it",
+    time: "11 sec",
+    summary: "Turn a playbook into wristband inserts, binder pages, slides for the team meeting, two-sided postcards and a parents' flyer, or hand the whole book over as a file.",
+    covers: ["Wristbands", "Binder PDF", "Slides", "Postcards", "Flyer", "Playbook file"],
   },
 ] as const;
 

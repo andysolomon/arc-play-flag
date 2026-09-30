@@ -16,6 +16,7 @@
     "test:e2e:report": "playwright show-report",
     "demo:setup": "playwright install chromium",
     "demo:record": "bun run scripts/demo-recorder.ts",
+    "demo:restamp": "bun run scripts/demo-restamp.ts",
     "icons": "bun run scripts/optimize-icons.ts",
     "release": "semantic-release"
   },
