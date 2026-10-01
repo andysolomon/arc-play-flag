@@ -109,7 +109,7 @@ describe("reducer", () => {
     s = reducer(s, { type: "select", id: "o4" });
     s = reducer(s, { type: "pick", key: "post" });
     s = reducer(s, { type: "togglePrimary" });
-    expect(find(s, "o3")?.route?.primary).toBe(false);
+    expect(find(s, "o3")?.route).toEqual({ type: "go" });
     expect(find(s, "o4")?.route?.primary).toBe(true);
   });
   test("mirror flips handed routes and custom waypoints", () => {

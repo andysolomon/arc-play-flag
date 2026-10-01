@@ -166,6 +166,14 @@ jobs:
           path: test-results/no-run-flag-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the share repair
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-repair
+          path: test-results/share-repair-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload pre-snap motion evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -188,6 +196,12 @@ jobs:
         with:
           name: demo-tour
           path: test-results/demo-tour-*
+      - name: Upload the primary read
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: primary-read
+          path: test-results/primary-read-*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload traces and screenshots

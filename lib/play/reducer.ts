@@ -2,7 +2,7 @@ import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import { carriers, catchPoint, chainOf, clampCatch, releasePoint, settleChain } from "./lateral";
-import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
 import { isLateral, type Draft, type Pair, type Player, type Route, type RouteType, type SavedPlay, type Team, type Vis } from "./types";
 
 /** What a tap on a red player is waiting to answer: who a man defender covers, or who takes a lateral. */
@@ -178,7 +178,10 @@ function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
       const c = commit(s);
       next = { ...c, players: c.players.map(p => p.id === d.id && p.team === "offense"
         ? { ...p, preSnap: { pts: pts.map(motionPoint) } } : withoutMotion(p)) };
-    } else next = setRoute(s, d.id, { type: "custom", pts: [...pts] });
+    } else {
+      // a custom route drawn over X's Out (or over an earlier custom route) is still X's route: the read stays (#109)
+      next = setRoute(s, d.id, keepRead(s.players.find((p) => p.id === d.id)?.route, { type: "custom", pts: [...pts] }));
+    }
   }
   return { ...next, draft: null };
 }
@@ -238,7 +241,8 @@ function reduce(s: PlayState, a: Action): PlayState {
       // only the player with the ball can lateral it; like Man, it then asks who takes it
       if (a.key === "lateral") return p.team === "offense" && holds(s.players, p.id) ? { ...s, targeting: "lateral", draft: null } : s;
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: null };
-      return setRoute(s, p.id, { type: a.key });
+      // a preset picked over the current route keeps the read; picking the same one again takes the route away, read and all
+      return setRoute(s, p.id, keepRead(p.route, { type: a.key }));
     }
     case "target": {
       const def = selected(s);
@@ -322,9 +326,10 @@ function reduce(s: PlayState, a: Action): PlayState {
         ...c,
         players: c.players.map((p) => {
           if (!p.route) return p;
-          if (p.id === sel.id) return { ...p, route: { ...p.route, primary: on } };
+          // a read taken off a player leaves no `primary: false` behind, so the play stores as it reads (#113)
+          if (p.id === sel.id) return { ...p, route: trimFlags({ ...p.route, primary: on }) };
           if (!p.route.primary) return p;
-          return { ...p, route: { ...p.route, primary: false } };
+          return { ...p, route: trimFlags({ ...p.route, primary: false }) };
         }),
       };
     }
