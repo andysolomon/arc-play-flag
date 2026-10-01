@@ -46,14 +46,15 @@
     "components/fieldPaint.ts": "4b96f84aeb7050c7003e3adbfa8fb061bbc6e1736b51543f7a106ae95608ecee",
     "components/playbooks/AddPlays.tsx": "cd56b66ad16a72d30ef3f3c0017e9f0e5bd01ee99f89f90d14b1e4ed63980a9a",
     "components/playbooks/BookCard.tsx": "ecf90a7e3e3cbdbe017f901da644c7bfffdd3ea7d29d88f1c140f915799b1479",
-    "components/playbooks/BookEditor.tsx": "1cdead7773d4625171408ba9e8219c60c5eddab634c2a44a14bcb392d0deceea",
+    "components/playbooks/BookEditor.tsx": "245718a919adf54fd5d52ca87ad1e3adf3672a947cbdb244b1a5805f15c7bb05",
+    "components/playbooks/BookReader.tsx": "fe2cf87af37c6d90a7cd264dad3e58459a66099ea97b0e1e624c72a068520db6",
     "components/playbooks/ExportPanel.tsx": "ff6ab9ae00f0cf4a2e46cc5a6b85465d9354feaaeb6255461033332ec3b2958b",
     "components/playbooks/Home.tsx": "8e1348c35cbf7ad076d9e842121b9bab3211204de6158c6558b5c909d5be1dc9",
     "components/playbooks/ImportLink.tsx": "e0dc65811b5ed2fffb85e8cf53e6e1ee8de388802a77e19e72df785104197d6f",
     "components/playbooks/ImportPreview.tsx": "3a1e7b7b7245664e070c2b9a41024e6a301b5ba74926a15a36b5f65cab1cade1",
     "components/playbooks/MoreMenu.tsx": "7ded2f798f9c06bdf08589aad943d5581f8e784e9c080083c047018131a4cc1c",
     "components/playbooks/PlayCard.tsx": "81dbcf049a620de45cbdd37db32dd82d465512770c9b1dad5278cf33f029763d",
-    "components/playbooks/PlaybooksScreen.tsx": "26dc200e309b66d4ccf43f9a411c19e29c37c57ad56cbe1dd78bae93157af74a",
+    "components/playbooks/PlaybooksScreen.tsx": "a26737f50bc31e10b6a62c4ba9b5286ab6bb93c843e6b42dc2ae2146d90feb8f",
     "components/playbooks/PreviewModal.tsx": "ee85b1f37797b0fb1601b7982006e7b80252a49a253e3308fb86df6b9a1743f3",
     "components/playbooks/Settings.tsx": "8631747d8affb78d106dae27327f1664c5736e5385da1d1b3917c15fb4c143b1",
     "components/playbooks/ShareBook.tsx": "8ffb1cf7a9480cf64faf2ecabfa913bc76b87dcc1ceec2da4dac9b50fce0e479",
@@ -61,14 +62,5 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "95ec1e9af5fe4f6f12f3b36c38a00185e06b057b1244f1a073bd4706cdb2b6e1"
-  },
-  "restamped": {
-    "reason": "ARC-186 changes only the Matrix end zone (its art, its rush timing, its name-plate glitch and its glyph confetti, all scoped to Matrix) plus will-change on the end zone band, which draws the same. Every clip was reviewed as frame sheets (1 fps; touchdowns at 4 fps): no clip shows the Matrix end zone, its swatch, its celebration or glyph confetti; touchdowns picks and celebrates Synthwave '84, whose band looks the same.",
-    "files": [
-      "app/globals.css (changed)",
-      "components/Field.tsx (changed)",
-      "components/endzone/Celebration.tsx (changed)",
-      "components/endzone/art/matrix.tsx (changed)"
-    ]
   }
 }
