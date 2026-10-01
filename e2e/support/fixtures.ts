@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { FILE_KIND, FILE_VERSION } from "../../lib/export/playbook-file";
 import { defaults } from "../../lib/play/routes";
 import { DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
-import type { Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
+import type { Hop, Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
 
 /**
  * Fictional fixtures for the Riverside Otters, a team that does not exist. Every test
@@ -17,6 +17,11 @@ export function formation(routes: Record<string, Route> = {}): Player[] {
 
 export function play(id: string, name: string, routes: Record<string, Route> = {}, notes = "", side: Team = "offense"): SavedPlay {
   return { id, name, notes, side, players: formation(routes) };
+}
+
+/** The play with the quarterback's laterals (lib/play/lateral.ts): each hop the id of who takes it, with a catch when given. */
+export function lateraled(p: SavedPlay, hops: readonly (string | Hop)[]): SavedPlay {
+  return { ...p, players: p.players.map((q) => (q.id === "o2" ? { ...q, laterals: hops.map((h) => (typeof h === "string" ? { to: h } : h)) } : q)) };
 }
 
 export const SLANT_LEFT = play("fx-slant-left", "Otter Slant Left", { o3: { type: "slant" }, o4: { type: "out" } }, "X wins inside.");
@@ -40,9 +45,9 @@ export const COVER_TWO_D: SavedPlay = (() => {
 })();
 export const FAKE_DIVE = play("fx-fake-dive", "Otter Fake Dive", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "curl" } });
 export const DOUBLE_PASS: SavedPlay = (() => {
-  const p = play("fx-double-pass", "Otter Double Pass", {
-    o2: { type: "lateral", target: "o5" }, o5: { type: "throw" }, o4: { type: "corner", primary: true }, o3: { type: "custom", pts: [[3, -6], [8, -10]] },
-  });
+  const p = lateraled(play("fx-double-pass", "Otter Double Pass", {
+    o5: { type: "throw" }, o4: { type: "corner", primary: true }, o3: { type: "custom", pts: [[3, -6], [8, -10]] },
+  }), ["o5"]);
   return { ...p, players: p.players.map((q) => (q.id === "o3" ? { ...q, label: "" } : q)) };
 })();
 // the line-of-scrimmage journey: the same call from the 5 and, carrying a ball spot, from their 5 (the 35)

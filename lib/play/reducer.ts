@@ -1,9 +1,9 @@
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { carriers, catchPoint, chainOf, clampCatch, releasePoint, settleChain } from "./lateral";
+import { carriers, chainLinks, chainOf, clampCatch, quarterback, settleChain, visits } from "./lateral";
 import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, legalSpot, mirrorRoute, mirrorable, routeDef } from "./routes";
-import { isLateral, type Draft, type Pair, type Player, type Route, type RouteType, type SavedPlay, type Team, type Vis } from "./types";
+import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 /** What a tap on a red player is waiting to answer: who a man defender covers, or who takes a lateral. */
 export type Targeting = "man" | "lateral";
@@ -15,6 +15,11 @@ export interface PlayState extends Doc, History {
   /** the saved play this one came from, so Save updates it instead of adding another */
   id: string | null;
   selectedId: string | null;
+  /**
+   * The place in the lateral chain being edited, for a player who has the ball more than once: 0 is the
+   * quarterback at the snap. Null means the selected player's last time with it.
+   */
+  visit: number | null;
   targeting: Targeting | null;
   draft: Draft | null;
   vis: Vis;
@@ -28,8 +33,15 @@ export type Action =
   | { type: "drawMotion" }
   | { type: "removeMotion" }
   | { type: "target"; id: string }
+  /**
+   * the Lateral tile: the selected carrier's last time with it asks who takes it, like Man; a time they
+   * toss it on takes off that lateral and every one after
+   */
+  | { type: "lateral" }
+  /** a place in the ball path picked, to edit that time the player has it */
+  | { type: "selectVisit"; index: number }
   /** a lateral's catch point dragged or nudged: clamped behind its release and the line */
-  | { type: "catchMove"; id: string; pt: Pair }
+  | { type: "catchMove"; hop: number; pt: Pair }
   | { type: "setRoute"; id: string; route: Route | null }
   | { type: "draftPoint"; pt: Pair }
   | { type: "draftPointRemove" }
@@ -73,6 +85,7 @@ export function initialState(): PlayState {
     los: LOS_YARD,
     players: defaults(),
     selectedId: null,
+    visit: null,
     targeting: null,
     draft: null,
     vis: "offense",
@@ -145,7 +158,7 @@ function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "shadowFo
 /** The field's shadow shown or hidden; hiding it takes that player off the field, so stop editing them. */
 function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
   const picked = selected(s);
-  if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, targeting: null, draft: null };
+  if (picked && !shown(picked, vis)) return { ...s, vis, selectedId: null, visit: null, targeting: null, draft: null };
   return { ...s, vis };
 }
 
@@ -188,10 +201,31 @@ function customRoute(s: PlayState, id: string): Route | null {
   return route?.type === "custom" ? route : null;
 }
 
-const cleared = { selectedId: null, targeting: null, draft: null } as const;
+const cleared = { selectedId: null, visit: null, targeting: null, draft: null } as const;
 
-/** Whether this player holds the ball: the quarterback, or anyone a lateral reaches. */
-const holds = (players: readonly Player[], id: string): boolean => chainOf(players).some((p) => p.id === id);
+/** The place in the chain the selected player is being edited at: the one picked, else their last; null off it. */
+export function editedVisit(s: Pick<PlayState, "players" | "selectedId" | "visit">, chain = chainOf(s.players)): number | null {
+  if (s.selectedId === null) return null;
+  if (s.visit !== null && chain[s.visit]?.id === s.selectedId) return s.visit;
+  return visits(chain, s.selectedId).at(-1) ?? null;
+}
+
+/** The quarterback's laterals that make up the chain, the first `n` of them. */
+function hopsUpTo(players: readonly Player[], n: number): Hop[] {
+  const qb = quarterback(players);
+  return chainLinks(players).slice(0, n).map((l) => qb?.laterals?.[l.index] ?? { to: l.to.id });
+}
+
+/** The players with the quarterback's laterals replaced, the key gone when there are none. */
+function withHops(players: readonly Player[], hops: readonly Hop[]): Player[] {
+  const qb = quarterback(players);
+  return players.map((p) => {
+    if (p.id !== qb?.id) return p;
+    const out: Player = { ...p, laterals: [...hops] };
+    if (!hops.length) delete out.laterals;
+    return out;
+  });
+}
 
 /**
  * Every edit lands with its lateral chain settled (lib/play/lateral.ts): a move of a player or the ball,
@@ -212,11 +246,15 @@ function reduce(s: PlayState, a: Action): PlayState {
       return { ...base, players: patch(base.players, a.id, { x: a.x, y: a.y }) };
     }
     case "select": {
-      if (a.id === null) return { ...s, selectedId: null, targeting: null, draft: null };
+      if (a.id === null) return { ...s, selectedId: null, visit: null, targeting: null, draft: null };
       const picked = s.players.find((p) => p.id === a.id);
       // either team can be selected, including the faded shadow, so they can take an assignment
       if (!picked) return s;
-      return { ...s, selectedId: a.id, targeting: null, draft: null };
+      return { ...s, selectedId: a.id, visit: null, targeting: null, draft: null };
+    }
+    case "selectVisit": {
+      const p = chainOf(s.players)[a.index];
+      return p ? { ...s, selectedId: p.id, visit: a.index, targeting: null, draft: null } : s;
     }
     case "cancelTargeting":
       return { ...s, targeting: null };
@@ -233,45 +271,61 @@ function reduce(s: PlayState, a: Action): PlayState {
     case "pick": {
       const p = selected(s);
       if (!p) return s;
+      const chain = chainOf(s.players);
+      const at = editedVisit(s, chain);
+      if (at !== null && at < chain.length - 1 && a.key !== "man") {
+        // a job for a time the ball goes on from them ends the chain there, with that job
+        const c = commit(s);
+        const cut = withHops(c.players, hopsUpTo(c.players, at));
+        if (a.key === "custom") return { ...c, players: patch(cut, p.id, { route: null }), visit: at, draft: { id: p.id, pts: [] }, targeting: null };
+        return { ...c, players: cut.map((q) => (q.id === p.id ? legalSpot({ ...q, route: { type: a.key } }) : q)), visit: at };
+      }
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
       if (a.key === "man") return { ...s, targeting: "man", draft: null };
-      // only the player with the ball can lateral it; like Man, it then asks who takes it
-      if (a.key === "lateral") return p.team === "offense" && holds(s.players, p.id) ? { ...s, targeting: "lateral", draft: null } : s;
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: null };
       return setRoute(s, p.id, { type: a.key });
+    }
+    case "lateral": {
+      const p = selected(s);
+      const chain = chainOf(s.players);
+      const at = editedVisit(s, chain);
+      if (!p || p.team !== "offense" || at === null) return s;
+      // the last time they have it: like Man, ask who takes it
+      if (at === chain.length - 1) return { ...s, visit: at, targeting: "lateral", draft: null };
+      // a time they toss it on: that lateral and every one after come off, and they have no job yet
+      const c = commit(s);
+      return { ...c, visit: at, targeting: null, players: patch(withHops(c.players, hopsUpTo(c.players, at)), p.id, { route: null }) };
     }
     case "target": {
       const def = selected(s);
       const t = s.players.find((q) => q.id === a.id);
       if (!s.targeting || !t || t.team !== "offense") return s;
       if (s.targeting === "lateral") {
-        // a red player not already holding it takes it, and is selected to be given their job with it.
-        // A new target gets a catch of their own (none stored), and a pass route they had is gone:
-        // they have the ball now
-        if (!def || holds(s.players, t.id)) return s;
+        // any other red player takes it, the same one again included, and is selected to be given their
+        // job with it. The lateral goes after the carrier's time with it (anything after is replaced), with
+        // a catch of its own; a pass route the target had is gone, since they have the ball now
+        const chain = chainOf(s.players);
+        const at = editedVisit(s, chain);
+        if (!def || at === null || chain[at]?.id === t.id) return s;
         const c = commit(s);
-        return {
-          ...c,
-          targeting: null,
-          selectedId: t.id,
-          players: c.players.map((p) => {
-            if (p.id === def.id) return { ...p, route: { type: "lateral", target: t.id } };
-            if (p.id === t.id && p.route && !isRun(p.route.type)) return { ...p, route: null };
-            return p;
-          }),
-        };
+        const players = withHops(c.players, [...hopsUpTo(c.players, at), { to: t.id }]).map((p) => {
+          if (p.id === t.id && p.route && !isRun(p.route.type)) return { ...p, route: null };
+          return p;
+        });
+        return { ...c, targeting: null, selectedId: t.id, visit: at + 1, players };
       }
       const next = def ? setRoute(s, def.id, { type: "man", target: t.id }) : s;
       return { ...next, targeting: null };
     }
     case "catchMove": {
-      const p = s.players.find((q) => q.id === a.id);
-      if (!p || !isLateral(p.route) || !catchPoint(p, s.players)) return s;
-      const pt = clampCatch(a.pt, releasePoint(p, s.players));
-      const was = p.route.catch;
-      if (was?.[0] === pt[0] && was[1] === pt[1]) return s;
+      const link = chainLinks(s.players)[a.hop];
+      const hops = hopsUpTo(s.players, Infinity);
+      const hop = hops[a.hop];
+      if (!link || !hop) return s;
+      const pt = clampCatch(a.pt, link.release);
+      if (hop.catch?.[0] === pt[0] && hop.catch[1] === pt[1]) return s;
       const c = commit(s);
-      return { ...c, players: patch(c.players, a.id, { route: { ...p.route, catch: pt } }) };
+      return { ...c, players: withHops(c.players, hops.map((h, i) => (i === a.hop ? { to: h.to, catch: pt } : h))) };
     }
     case "setRoute":
       return setRoute(s, a.id, a.route);
@@ -343,16 +397,23 @@ function reduce(s: PlayState, a: Action): PlayState {
       return {
         ...c,
         players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
-          ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}) })),
+          ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
+          // every lateral's catch flips with the field (R13)
+          ...(p.laterals ? { laterals: p.laterals.map((h) => (h.catch ? { to: h.to, catch: [30 - h.catch[0], h.catch[1]] as const } : h)) } : {}) })),
       };
     }
     case "clearRoutes": {
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
-      if (!s.players.some((p) => (p.route || p.preSnap) && inScope(p))) return s;
+      if (!s.players.some((p) => (p.route || p.preSnap || p.laterals) && inScope(p))) return s;
       const c = commit(s);
+      const clear = (p: Player): Player => {
+        const out = { ...withoutMotion(p), route: null };
+        delete out.laterals;
+        return out;
+      };
       return {
         ...c,
-        players: c.players.map((p) => (inScope(p) ? { ...withoutMotion(p), route: null } : p)),
+        players: c.players.map((p) => (inScope(p) ? clear(p) : p)),
         draft: null,
         targeting: null,
       };

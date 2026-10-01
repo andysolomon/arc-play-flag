@@ -445,12 +445,21 @@ describe("play side", () => {
 });
 
 describe("lateral chains", () => {
+  const hops = (s: PlayState) => find(s, "o2")?.laterals;
   const lateralToZ = (): PlayState => run(
     { type: "select", id: "o5" }, { type: "pick", key: "go" },
-    { type: "select", id: "o2" }, { type: "pick", key: "lateral" }, { type: "target", id: "o5" },
+    { type: "select", id: "o2" }, { type: "lateral" }, { type: "target", id: "o5" },
   );
-  test("Lateral asks who takes it, like Man: only a red player off the chain, then that player is selected", () => {
-    let s = run({ type: "select", id: "o2" }, { type: "pick", key: "lateral" });
+  /** QB → Z → QB → X, X throws. */
+  const backAndOn = (): PlayState => {
+    let s = reducer(lateralToZ(), { type: "lateral" });
+    s = reducer(s, { type: "target", id: "o2" });
+    s = reducer(s, { type: "lateral" });
+    s = reducer(s, { type: "target", id: "o3" });
+    return reducer(s, { type: "pick", key: "throw" });
+  };
+  test("Lateral asks who takes it, like Man: any other red player, then that player is selected", () => {
+    let s = run({ type: "select", id: "o2" }, { type: "lateral" });
     expect(s.targeting).toBe("lateral");
     const before = s;
     // the carrier themself, and a defender, are not choices
@@ -459,59 +468,88 @@ describe("lateral chains", () => {
     s = reducer(s, { type: "target", id: "o5" });
     expect(s.targeting).toBeNull();
     expect(s.selectedId).toBe("o5");
-    expect(find(s, "o2")?.route).toEqual({ type: "lateral", target: "o5" });
+    expect(hops(s)).toEqual([{ to: "o5" }]);
+    expect(find(s, "o2")?.route).toBeNull();
     expect(s.past).toHaveLength(1);
   });
   test("taking a lateral ends a pass route: a carrier has no route to run", () => {
-    const s = lateralToZ();
-    expect(find(s, "o5")?.route).toBeNull();
+    expect(find(lateralToZ(), "o5")?.route).toBeNull();
   });
-  test("a carrier can't lateral back to anyone already holding it", () => {
-    let s = reducer(lateralToZ(), { type: "pick", key: "lateral" });
-    expect(s.targeting).toBe("lateral");
-    expect(reducer(s, { type: "target", id: "o2" }).targeting).toBe("lateral");
+  test("the ball can come back: Z laterals to the QB, who laterals on to X, who throws (R2)", () => {
+    let s = reducer(lateralToZ(), { type: "lateral" });
+    // Z can't toss it to Z, but the QB is a choice again
+    expect(reducer(s, { type: "target", id: "o5" })).toBe(s);
+    s = reducer(s, { type: "target", id: "o2" });
+    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o2" }]);
+    expect(s.selectedId).toBe("o2");
+    s = reducer(s, { type: "lateral" });
     s = reducer(s, { type: "target", id: "o3" });
-    expect(find(s, "o5")?.route).toEqual({ type: "lateral", target: "o3" });
-    expect(s.selectedId).toBe("o3");
+    s = reducer(s, { type: "pick", key: "throw" });
+    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o2" }, { to: "o3" }]);
+    expect(find(s, "o3")?.route).toEqual({ type: "throw" });
+    expect(backAndOn().players).toEqual(s.players);
+  });
+  test("a toss picked in the ball path is the one edited: a throw there ends the chain there (R8)", () => {
+    let s = reducer(backAndOn(), { type: "selectVisit", index: 1 });
+    expect(s.selectedId).toBe("o5");
+    expect(s.visit).toBe(1);
+    s = reducer(s, { type: "pick", key: "throw" });
+    expect(hops(s)).toEqual([{ to: "o5" }]);
+    expect(find(s, "o5")?.route).toEqual({ type: "throw" });
+    expect(find(s, "o3")?.route).toBeNull();
+  });
+  test("Lateral on a toss the ball goes on from takes off the rest; tapped again it asks for a new target (R9)", () => {
+    // the QB's last toss is their second: taking it off leaves QB → Z → QB, with the QB to pick a job
+    let s = reducer(reducer(backAndOn(), { type: "select", id: "o2" }), { type: "lateral" });
+    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o2" }]);
+    expect(find(s, "o2")?.route).toBeNull();
+    // from Z's toss: cut there, then lateral again to Y instead
+    s = reducer(reducer(backAndOn(), { type: "selectVisit", index: 1 }), { type: "lateral" });
+    expect(hops(s)).toEqual([{ to: "o5" }]);
+    s = reducer(s, { type: "lateral" });
+    expect(s.targeting).toBe("lateral");
+    s = reducer(s, { type: "target", id: "o4" });
+    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o4" }]);
+    // from the QB's first toss, every lateral goes
+    s = reducer(reducer(backAndOn(), { type: "selectVisit", index: 0 }), { type: "lateral" });
+    expect(hops(s)).toBeUndefined();
   });
   test("dragging a catch forward snaps it level with the release, and past the line snaps it behind it", () => {
-    let s = reducer(lateralToZ(), { type: "catchMove", id: "o2", pt: [22, 2] });
-    expect(find(s, "o2")?.route?.catch).toEqual([22, 5]);
-    s = reducer(s, { type: "catchMove", id: "o2", pt: [30, 6.5] });
-    expect(find(s, "o2")?.route?.catch).toEqual([28.8, 6.5]);
-    // nothing to move on a player with no lateral
-    expect(reducer(s, { type: "catchMove", id: "o3", pt: [5, 5] })).toBe(s);
+    let s = reducer(lateralToZ(), { type: "catchMove", hop: 0, pt: [22, 2] });
+    expect(hops(s)).toEqual([{ to: "o5", catch: [22, 5] }]);
+    s = reducer(s, { type: "catchMove", hop: 0, pt: [30, 6.5] });
+    expect(hops(s)).toEqual([{ to: "o5", catch: [28.8, 6.5] }]);
+    // nothing to move past the last toss
+    expect(reducer(s, { type: "catchMove", hop: 1, pt: [5, 5] })).toBe(s);
   });
   test("dragging a player re-clamps every catch downstream of them", () => {
-    let s = reducer(lateralToZ(), { type: "catchMove", id: "o2", pt: [22, 5.5] });
-    s = reducer(s, { type: "pick", key: "lateral" });
-    s = reducer(s, { type: "target", id: "o3" });
-    s = reducer(s, { type: "catchMove", id: "o5", pt: [9, 6] });
-    expect(find(s, "o5")?.route?.catch).toEqual([9, 6]);
-    // the quarterback drops back to 7: Z's catch comes with the release, and X's follows Z's
+    let s = reducer(lateralToZ(), { type: "catchMove", hop: 0, pt: [22, 5.5] });
+    s = reducer(s, { type: "lateral" });
+    s = reducer(s, { type: "target", id: "o2" });
+    s = reducer(s, { type: "catchMove", hop: 1, pt: [12, 6] });
+    expect(hops(s)?.[1]?.catch).toEqual([12, 6]);
+    // the quarterback drops back to 7: Z's catch comes with the release, and the QB's own second catch follows Z's
     s = reducer(s, { type: "move", id: "o2", x: 15, y: 7, commit: true });
-    expect(find(s, "o2")?.route?.catch).toEqual([22, 7]);
-    expect(find(s, "o5")?.route?.catch).toEqual([9, 7]);
-    // undo puts every catch back with the quarterback
+    expect(hops(s)?.map((h) => h.catch)).toEqual([[22, 7], [12, 7]]);
     s = reducer(s, { type: "undo" });
-    expect(find(s, "o2")?.route?.catch).toEqual([22, 5.5]);
-    expect(find(s, "o5")?.route?.catch).toEqual([9, 6]);
+    expect(hops(s)?.map((h) => h.catch)).toEqual([[22, 5.5], [12, 6]]);
   });
-  test("flipping the play flips each catch, still behind its release", () => {
-    let s = reducer(lateralToZ(), { type: "catchMove", id: "o2", pt: [22, 6] });
+  test("flipping the play flips each catch, still behind its release (R13)", () => {
+    let s = reducer(lateralToZ(), { type: "catchMove", hop: 0, pt: [22, 6] });
     s = reducer(s, { type: "flip" });
-    expect(find(s, "o2")?.route?.catch).toEqual([8, 6]);
+    expect(hops(s)).toEqual([{ to: "o5", catch: [8, 6] }]);
   });
-  test("a carrier can't be the read, and a lateral taken away takes the rest of the chain with it", () => {
+  test("a carrier can't be the read; Lateral on the QB takes the whole chain off, like Man", () => {
     let s = reducer(lateralToZ(), { type: "pick", key: "throw" });
     expect(find(s, "o5")?.route).toEqual({ type: "throw" });
-    const read = reducer(s, { type: "togglePrimary" });
-    expect(read).toBe(s);
-    // tapping the Lateral tile again on the quarterback takes the lateral off, like Man
+    expect(reducer(s, { type: "togglePrimary" })).toBe(s);
     s = reducer(s, { type: "select", id: "o2" });
-    s = reducer(s, { type: "pick", key: "lateral" });
-    expect(find(s, "o2")?.route).toBeNull();
+    s = reducer(s, { type: "lateral" });
+    expect(hops(s)).toBeUndefined();
     expect(find(s, "o5")?.route).toBeNull();
   });
+  test("clearing routes clears the laterals too", () => {
+    const s = reducer(backAndOn(), { type: "clearRoutes", team: "offense" });
+    expect(hops(s)).toBeUndefined();
+  });
 });
-

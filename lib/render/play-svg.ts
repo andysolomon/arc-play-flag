@@ -177,10 +177,10 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
   // each lateral, as the field draws it: a dashed arc back from its release to its catch, with a
   // football at its midpoint. Ink, not the sticker, so it prints and reads on a mono printer
   for (const a of lateralArcs(players, top)) {
-    const p = shown.find((q) => q.id === a.id);
+    const p = shown.find((q) => q.id === a.from);
     if (!p) continue;
     out.push(
-      `<g data-lateral="${esc(a.id)}"${fade(opacity(p))}><path d="${a.d}" fill="none" stroke="${ROUTE_INK.route}" stroke-width="4" stroke-dasharray="5 7"/>` +
+      `<g data-lateral="${String(a.hop)}"${fade(opacity(p))}><path d="${a.d}" fill="none" stroke="${ROUTE_INK.route}" stroke-width="4" stroke-dasharray="5 7"/>` +
       `<g transform="translate(${f1(a.ball.x)},${f1(a.ball.y)}) rotate(${f1(a.ball.angle)})"><ellipse rx="9" ry="5.5" fill="${ROUTE_INK.route}" stroke="${TURF}" stroke-width="1.5"/>` +
       `<line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="${TURF}" stroke-width="1.5"/></g></g>`,
     );

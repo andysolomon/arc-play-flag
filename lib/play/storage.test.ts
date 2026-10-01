@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { MAX_LATERALS } from "./lateral";
 import { defaults } from "./routes";
+import type { Player } from "./types";
 import {
   DRAFT_KEY, LEGACY_PLAYS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, StorageError, TEAM_KEY, failureMessage, importAll, kebab, newId,
   inferSide, normalizeDraft, normalizePlayers, normalizeSavedPlay, readAll, readDraft, readPlaybooks, readTeam, remove, store, storePlaybook, writeDraft, writeTeam,
@@ -235,12 +237,15 @@ describe("play side", () => {
 
 describe("lateral chains in storage", () => {
   /** Stored players as JSON would give them back: the default formation with raw routes on the named players. */
-  const raw = (routes: Record<string, unknown>): unknown => defaults().map((p) => ({ ...p, route: routes[p.id] ?? null }));
+  const raw = (routes: Record<string, unknown>, laterals?: unknown): unknown =>
+    defaults().map((p) => ({ ...p, route: routes[p.id] ?? null, ...(p.id === "o2" && laterals !== undefined ? { laterals } : {}) }));
   const routeOf = (players: readonly { id: string; route: unknown }[], id: string): unknown => players.find((p) => p.id === id)?.route;
+  const hopsOf = (players: readonly Player[]): unknown => players.find((p) => p.id === "o2")?.laterals;
 
   test("a pitch beside a receiver was an option, so the quarterback laterals to the runner, who throws (M1)", () => {
     const ps = normalizePlayers(raw({ o5: { type: "pitch" }, o4: { type: "corner" } }));
-    expect(routeOf(ps, "o2")).toEqual({ type: "lateral", target: "o5" });
+    expect(hopsOf(ps)).toEqual([{ to: "o5" }]);
+    expect(routeOf(ps, "o2")).toBeNull();
     expect(routeOf(ps, "o5")).toEqual({ type: "throw" });
     expect(routeOf(ps, "o4")).toEqual({ type: "corner" });
     // the read on a receiver stays with them
@@ -250,16 +255,17 @@ describe("lateral chains in storage", () => {
   });
   test("a pitch with nobody to throw to, or marked as the read, was a run: the runner keeps it (M2)", () => {
     const alone = normalizePlayers(raw({ o5: { type: "pitch" } }));
-    expect(routeOf(alone, "o2")).toEqual({ type: "lateral", target: "o5" });
+    expect(hopsOf(alone)).toEqual([{ to: "o5" }]);
     expect(routeOf(alone, "o5")).toEqual({ type: "stretch" });
     const read = normalizePlayers(raw({ o5: { type: "pitch", primary: true, mirror: true }, o3: { type: "go" } }));
-    expect(routeOf(read, "o2")).toEqual({ type: "lateral", target: "o5" });
+    expect(hopsOf(read)).toEqual([{ to: "o5" }]);
     // the read went to the keep itself; a carrier is never the read
     expect(routeOf(read, "o5")).toEqual({ type: "stretch", mirror: true });
   });
   test("a pitch beside a runner marked as the read: the read still gets the ball, and the pitch runs as a decoy (M7)", () => {
     // before laterals the words and ▶ gave it to X, the primary Dive: no lateral may take it to Z
     const ps = normalizePlayers(raw({ o3: { type: "dive", primary: true }, o5: { type: "pitch" }, o4: { type: "corner" } }));
+    expect(hopsOf(ps)).toBeUndefined();
     expect(routeOf(ps, "o2")).toBeNull();
     expect(routeOf(ps, "o3")).toEqual({ type: "dive", primary: true });
     expect(routeOf(ps, "o5")).toEqual({ type: "stretch" });
@@ -268,12 +274,12 @@ describe("lateral chains in storage", () => {
   test("with no read and nobody to throw to, the first runner left to right had it; the pitch is a lateral only if that was them (M8)", () => {
     // X (on the left) dives, Z pitches: X carried it
     const dive = normalizePlayers(raw({ o3: { type: "dive" }, o5: { type: "pitch" } }));
-    expect(routeOf(dive, "o2")).toBeNull();
+    expect(hopsOf(dive)).toBeUndefined();
     expect(routeOf(dive, "o3")).toEqual({ type: "dive" });
     expect(routeOf(dive, "o5")).toEqual({ type: "stretch" });
     // X pitches, Z dives: X carried it, so X takes the lateral and keeps it
     const pitch = normalizePlayers(raw({ o3: { type: "pitch" }, o5: { type: "dive" } }));
-    expect(routeOf(pitch, "o2")).toEqual({ type: "lateral", target: "o3" });
+    expect(hopsOf(pitch)).toEqual([{ to: "o3" }]);
     expect(routeOf(pitch, "o3")).toEqual({ type: "stretch" });
     expect(routeOf(pitch, "o5")).toEqual({ type: "dive" });
   });
@@ -283,7 +289,7 @@ describe("lateral chains in storage", () => {
   });
   test("two pitches: the first, left to right, takes the lateral and the other keeps running (M4)", () => {
     const ps = normalizePlayers(raw({ o5: { type: "pitch" }, o3: { type: "pitch" }, o4: { type: "go" } }));
-    expect(routeOf(ps, "o2")).toEqual({ type: "lateral", target: "o3" });
+    expect(hopsOf(ps)).toEqual([{ to: "o3" }]);
     expect(routeOf(ps, "o3")).toEqual({ type: "throw" });
     expect(routeOf(ps, "o5")).toEqual({ type: "stretch" });
   });
@@ -291,22 +297,49 @@ describe("lateral chains in storage", () => {
     const ps = normalizePlayers((raw({ o5: { type: "pitch" } }) as { id: string }[]).filter((p) => p.id !== "o2"));
     expect(routeOf(ps, "o5")).toEqual({ type: "stretch" });
   });
-  test("a lateral must go to someone on the offense, and a stored catch is clamped behind the line (M6, K8)", () => {
-    expect(routeOf(normalizePlayers(raw({ o2: { type: "lateral", target: "gone" } })), "o2")).toBeNull();
-    expect(routeOf(normalizePlayers(raw({ o2: { type: "lateral", target: "d1" } })), "o2")).toBeNull();
-    expect(routeOf(normalizePlayers(raw({ o2: { type: "lateral" } })), "o2")).toBeNull();
-    const clamped = normalizePlayers(raw({ o2: { type: "lateral", target: "o5", catch: [22, -4] }, o5: { type: "throw" } }));
-    expect(routeOf(clamped, "o2")).toEqual({ type: "lateral", target: "o5", catch: [22, 5] });
-    const junk = normalizePlayers(raw({ o2: { type: "lateral", target: "o5", catch: ["x", 3] }, o5: { type: "throw" } }));
-    expect(routeOf(junk, "o2")).toEqual({ type: "lateral", target: "o5" });
-    // a throw nobody laterals to is no job at all
+  test("a chain saved one lateral per carrier (before laterals could come back) reads as the same hops, the last job kept (R6)", () => {
+    const ps = normalizePlayers(raw({
+      o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "lateral", target: "o3" }, o3: { type: "throw" }, o4: { type: "go", primary: true },
+    }));
+    expect(hopsOf(ps)).toEqual([{ to: "o5", catch: [22, 6] }, { to: "o3" }]);
+    expect(routeOf(ps, "o2")).toBeNull();
+    expect(routeOf(ps, "o5")).toBeNull();
+    expect(routeOf(ps, "o3")).toEqual({ type: "throw" });
+    expect(routeOf(ps, "o4")).toEqual({ type: "go", primary: true });
+    // a keep at the end stays the keep, and a lateral that went nowhere ends the chain at its thrower
+    const keep = normalizePlayers(raw({ o2: { type: "lateral", target: "o5" }, o5: { type: "reverse" } }));
+    expect(hopsOf(keep)).toEqual([{ to: "o5" }]);
+    expect(routeOf(keep, "o5")).toEqual({ type: "reverse" });
+    const dangling = normalizePlayers(raw({ o2: { type: "lateral", target: "o5" }, o5: { type: "lateral", target: "gone" } }));
+    expect(hopsOf(dangling)).toEqual([{ to: "o5" }]);
+    expect(routeOf(dangling, "o5")).toBeNull();
+  });
+  test("each hop must go to someone else on the offense; the chain ends at the first that doesn't (M6, R1, R3)", () => {
+    expect(hopsOf(normalizePlayers(raw({}, [{ to: "gone" }])))).toBeUndefined();
+    expect(hopsOf(normalizePlayers(raw({}, [{ to: "d1" }])))).toBeUndefined();
+    expect(hopsOf(normalizePlayers(raw({}, [{ to: "o5" }, { to: "o5" }, { to: "o3" }])))).toEqual([{ to: "o5" }]);
+    expect(hopsOf(normalizePlayers(raw({}, [{ to: "o5" }, "junk", { to: "o3" }])))).toEqual([{ to: "o5" }]);
+    expect(hopsOf(normalizePlayers(raw({}, "not a list")))).toBeUndefined();
+    // back to the quarterback is a hop like any other
+    expect(hopsOf(normalizePlayers(raw({ o2: { type: "throw" } }, [{ to: "o5" }, { to: "o2" }])))).toEqual([{ to: "o5" }, { to: "o2" }]);
+  });
+  test("a stored catch is clamped behind its release and the line, and a broken one dropped (K8)", () => {
+    expect(hopsOf(normalizePlayers(raw({ o5: { type: "throw" } }, [{ to: "o5", catch: [22, -4] }])))).toEqual([{ to: "o5", catch: [22, 5] }]);
+    expect(hopsOf(normalizePlayers(raw({ o5: { type: "throw" } }, [{ to: "o5", catch: ["x", 3] }])))).toEqual([{ to: "o5" }]);
+    // a throw nobody laterals to is no job at all, and laterals belong to the quarterback alone
     expect(routeOf(normalizePlayers(raw({ o4: { type: "throw" } })), "o4")).toBeNull();
+    const stray = normalizePlayers(defaults().map((p) => (p.id === "o5" ? { ...p, laterals: [{ to: "o3" }] } : p)));
+    expect(stray.find((p) => p.id === "o5")?.laterals).toBeUndefined();
+  });
+  test("keeps no more laterals than the cap (R4)", () => {
+    const hops = Array.from({ length: MAX_LATERALS + 5 }, (_, i) => ({ to: i % 2 === 0 ? "o5" : "o2" }));
+    expect(hopsOf(normalizePlayers(raw({}, hops)))).toHaveLength(MAX_LATERALS);
   });
   test("a migrated play reads back the same the second time, through the library", () => {
     const s = memory();
     s.setItem(PLAYS_KEY, JSON.stringify({ old: { id: "old", name: "Otter Pitch Option", notes: "", side: "offense", players: raw({ o5: { type: "pitch" }, o4: { type: "corner" } }) } }));
     const once = readAll(s);
-    expect(routeOf(once.old?.players ?? [], "o2")).toEqual({ type: "lateral", target: "o5" });
+    expect(hopsOf(once.old?.players ?? [])).toEqual([{ to: "o5" }]);
     store(once.old ?? { id: "x", name: "x", notes: "", side: "offense", players: [] }, s);
     expect(readAll(s)).toEqual(once);
     expect(normalizePlayers(once.old?.players)).toEqual(once.old?.players ?? []);

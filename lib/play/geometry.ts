@@ -76,18 +76,17 @@ export function cardWidth(pane: Pane | null, depthYards: number): number | null 
 const ACROSS_MIN = 1.2, ACROSS_MAX = 28.8;
 
 /**
- * A route's waypoints in absolute yards, starting at the player's spot, or for a carrier who
- * takes a lateral, at the point they catch it (see lib/play/lateral.ts). Shared by the drawn
- * route and the playback simulation so they can never disagree. Zone routes are laid out as
- * bubbles (see zoneLayout) and are not handled here, and a lateral is drawn as an arc (see
- * lateralArcs), not a route.
+ * A route's waypoints in absolute yards, starting at the player's spot, or for the last carrier of a
+ * lateral chain, at the point they catch the last lateral (see lib/play/lateral.ts). Shared by the drawn
+ * route and the playback simulation so they can never disagree. Zone routes are laid out as bubbles
+ * (see zoneLayout) and are not handled here, and laterals are drawn as arcs (see lateralArcs).
  */
 export function routeYards(p: Player, players: readonly Player[], top: number): Pair[] | null {
   p = startOf(p, players);
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
-  if (!def || rt.type === "lateral") return null;
+  if (!def) return null;
   const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
   if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
   if (rt.type === "throw" && p.team === "offense") {
@@ -116,7 +115,9 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     // who took a lateral keeps it from the catch, carrying on the way the ball was going.
     const qb0 = quarterback(players);
     const qb = qb0 ? atSnap(qb0) : undefined;
-    const into = chainLinks(players).find((l) => l.to.id === p.id);
+    // the last toss, when it is this player who keeps it
+    const links = chainLinks(players);
+    const into = links.length && links[links.length - 1]?.to.id === p.id ? links[links.length - 1] : undefined;
     const mesh = into || !qb || qb.id === p.id ? p : qb;
     const across = into ? (into.catch[0] < into.release[0] - 0.01 ? -1 : 1) : p.x < mesh.x - 0.01 ? -1 : 1;
     const side = across * (rt.mirror ? -1 : 1);
@@ -198,9 +199,11 @@ export function geom(
   top: number,
   zones: ZoneMap,
 ): RouteGeom | null {
-  // no token stands where the route starts after motion, or at a lateral's catch point
-  const detached = motionPoints(p).length > 0 || players.some((q) => q.route?.type === "lateral" && q.route.target === p.id);
-  p = atSnap(p);
+  // no token stands where the route starts after motion, or at the last lateral's catch point
+  const start = startOf(p, players);
+  const lined = atSnap(p);
+  const detached = motionPoints(p).length > 0 || start.x !== lined.x || start.y !== lined.y;
+  p = lined;
   const rt = p.route;
   if (!rt) return null;
   const def = routeDef(p.team, rt.type);
@@ -276,8 +279,10 @@ export function geom(
 
 /** One lateral as drawn: a dashed arc from where it is let go to where it is caught, bowing back. */
 export interface LateralArc {
-  /** the carrier who lets it go (the lateral is their route) */
-  id: string;
+  /** which of the quarterback's laterals this is, in order from 0 */
+  hop: number;
+  /** the carrier who lets it go */
+  from: string;
   /** who catches it */
   target: string;
   /** a quadratic curve, in SVG units */
@@ -305,7 +310,8 @@ export function lateralArcs(players: readonly Player[], top: number): LateralArc
     const bow = Math.min(2 * S, Math.max(0.5 * S, chord * 0.3));
     const qx = (ax + cx) / 2, qy = Math.min((ay + cy) / 2 + bow, Math.max(back, ay, cy));
     return {
-      id: l.from.id,
+      hop: l.index,
+      from: l.from.id,
       target: l.to.id,
       d: `M${f1(ax)} ${f1(ay)}Q${f1(qx)} ${f1(qy)} ${f1(cx)} ${f1(cy)}`,
       ball: { x: 0.25 * ax + 0.5 * qx + 0.25 * cx, y: 0.25 * ay + 0.5 * qy + 0.25 * cy, angle: (Math.atan2(cy - ay, cx - ax) * 180) / Math.PI },

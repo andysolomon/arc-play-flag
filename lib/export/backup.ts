@@ -48,7 +48,8 @@ const POLLUTION_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const safeId = (id: unknown): id is string => typeof id === "string" && id.length > 0 && !POLLUTION_KEYS.has(id);
 
 function safePlayers(players: SavedPlay["players"]): boolean {
-  return players.every((player) => safeId(player.id) && (!player.route || player.route.target === undefined || safeId(player.route.target)));
+  return players.every((player) => safeId(player.id) && (!player.route || player.route.target === undefined || safeId(player.route.target))
+    && (player.laterals ?? []).every((hop) => safeId(hop.to)));
 }
 
 /** Compares JSON data without depending on object-key order. */

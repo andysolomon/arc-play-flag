@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
+import { editedVisit, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
@@ -147,10 +147,16 @@ export function App() {
   }, [watchCut]);
   // on a phone/tablet the palette covers the field, so it folds away once a route is chosen
   const onPick = useCallback((key: RouteType) => {
-    if (s.selectedId && key !== "man" && key !== "custom" && key !== "lateral") watchCut(s.selectedId);
+    if (s.selectedId && key !== "man" && key !== "custom") watchCut(s.selectedId);
     dispatch({ type: "pick", key });
     if (compactRef.current) setRightOpen(false);
   }, [s.selectedId, watchCut]);
+  // like Man, Lateral asks for a red player on the field, so on a phone the palette folds away for it
+  const onLateral = useCallback(() => {
+    dispatch({ type: "lateral" });
+    if (compactRef.current) setRightOpen(false);
+  }, []);
+  const onVisit = useCallback((index: number) => { dispatch({ type: "selectVisit", index }); }, []);
   const onPrimary = useCallback(() => {
     dispatch({ type: "togglePrimary" });
     if (compactRef.current) setRightOpen(false);
@@ -331,6 +337,7 @@ export function App() {
   const selCut = useMemo(() => (sel ? sidelineCut(sel) : null), [sel]);
   // who holds the ball, in order: the palette shows a carrier their jobs with it and the path it takes
   const chain = useMemo(() => chainOf(s.players), [s.players]);
+  const visit = editedVisit(s, chain);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
   const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
@@ -396,6 +403,7 @@ export function App() {
           dispatch={fieldDispatch}
           onSelect={onSelect}
           onCatchNote={onCatchNote}
+          lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
           title={s.name || "Untitled play"}
           showTitle
@@ -407,6 +415,9 @@ export function App() {
           <RouteSidebar
             selected={sel}
             chain={chain}
+            visit={visit}
+            onLateral={onLateral}
+            onVisit={onVisit}
             cut={selCut}
             hint={hint}
             onPick={onPick}

@@ -125,9 +125,9 @@ describe("geom", () => {
     expect(left?.d).toBe("M66.0 655.0L66.0 572.0L40.0 572.0");
     expect(mirrored?.d).toBe("M66.0 655.0L66.0 572.0L184.4 572.0");
   });
-  test("a carrier's job starts where they catch the lateral, not where they lined up", () => {
+  test("the last carrier's job starts where they catch the lateral, not where they lined up", () => {
     const chain = (z: Player["route"]): Player[] => players.map((p) =>
-      p.id === "o2" ? { ...p, route: { type: "lateral", target: "o5", catch: [22, 6] } } : p.id === "o5" ? { ...p, route: z } : p);
+      p.id === "o2" ? { ...p, laterals: [{ to: "o5", catch: [22, 6] as const }] } : p.id === "o5" ? { ...p, route: z } : p);
     const throws = chain({ type: "throw" });
     const z = throws.find((p) => p.id === "o5") as Player;
     // set up at the pitch depth, a step toward their own sideline
@@ -138,14 +138,18 @@ describe("geom", () => {
     // a keep runs its legs from the catch, carrying on the way the ball was going
     const keeps = chain({ type: "reverse" });
     expect(routeYards(keeps.find((p) => p.id === "o5") as Player, keeps, TOP)).toEqual([[22, 6], [22.4, 7], [13, 5.5], [10, -5]]);
-    // the lateral itself is an arc, not a route
+    // the quarterback who tossed it has no route of their own
     expect(routeYards(throws.find((p) => p.id === "o2") as Player, throws, TOP)).toBeNull();
+  });
+  test("a quarterback who takes it back throws from their second catch", () => {
+    const ps = players.map((p) => (p.id === "o2" ? { ...p, route: { type: "throw" as const }, laterals: [{ to: "o5", catch: [22, 6] as const }, { to: "o2", catch: [12, 7] as const }] } : p));
+    expect(routeYards(ps.find((p) => p.id === "o2") as Player, ps, TOP)).toEqual([[12, 7], [10.5, PITCH_SET]]);
   });
   test("a quarterback's throw rolls out to the set depth from their own spot", () => {
     expect(routeYards(at("o2", { type: "throw" }), players, TOP)).toEqual([[15, 5], [16.5, PITCH_SET]]);
   });
   test("a lateral is a dashed arc bowing back from release to catch, with the football at its true midpoint", () => {
-    const ps = players.map((p) => (p.id === "o2" ? { ...p, route: { type: "lateral" as const, target: "o5", catch: [22, 6] as const } } : p));
+    const ps = players.map((p) => (p.id === "o2" ? { ...p, laterals: [{ to: "o5", catch: [22, 6] as const }] } : p));
     const [arc, ...rest] = lateralArcs(ps, TOP);
     expect(rest).toHaveLength(0);
     // release (15,5) → (330,770), catch (22,6) → (484,792), the control two yards further back than their middle
@@ -153,12 +157,16 @@ describe("geom", () => {
     expect(arc?.ball.x).toBeCloseTo(0.25 * 330 + 0.5 * 407 + 0.25 * 484, 5);
     expect(arc?.ball.y).toBeCloseTo(0.25 * 770 + 0.5 * 825 + 0.25 * 792, 5);
     expect(arc?.handle).toEqual({ x: 484, y: 792 });
-    expect(arc).toMatchObject({ id: "o2", target: "o5", release: [15, 5], catch: [22, 6] });
+    expect(arc).toMatchObject({ hop: 0, from: "o2", target: "o5", release: [15, 5], catch: [22, 6] });
     // right at the back of the field the bow stays on it
-    const deep = players.map((p) => (p.id === "o2" ? { ...p, y: 7.4, route: { type: "lateral" as const, target: "o5", catch: [22, 7.4] as const } } : p));
+    const deep = players.map((p) => (p.id === "o2" ? { ...p, y: 7.4, laterals: [{ to: "o5", catch: [22, 7.4] as const }] } : p));
     const [low] = lateralArcs(deep, TOP);
     const ctrlY = Number(/Q[\d.]+ ([\d.]+)/.exec(low?.d ?? "")?.[1]);
     expect(ctrlY).toBeLessThanOrEqual(py(8, TOP));
+  });
+  test("every toss is an arc of its own, a return to the QB included", () => {
+    const ps = players.map((p) => (p.id === "o2" ? { ...p, laterals: [{ to: "o5" }, { to: "o2" }, { to: "o3" }] } : p));
+    expect(lateralArcs(ps, TOP).map((a) => [a.hop, a.from, a.target])).toEqual([[0, "o2", "o5"], [1, "o5", "o2"], [2, "o2", "o3"]]);
   });
   test("primary read is thicker and red", () => {
     const g = geom(at("o1", { type: "go", primary: true }), players, TOP, {});

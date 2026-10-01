@@ -9,7 +9,7 @@ import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZ
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
 import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, snap } from "@/lib/play/geometry";
-import { catchClamp, catchNote, chainOf, clampCatch, releasePoint } from "@/lib/play/lateral";
+import { catchClamp, catchNote, clampCatch, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action, Targeting } from "@/lib/play/reducer";
@@ -44,6 +44,8 @@ interface Props {
   onSelect: (id: string) => void;
   /** a lateral's catch was dragged or nudged somewhere illegal and snapped back: say why */
   onCatchNote?: (text: string) => void;
+  /** while Lateral asks who takes it: the carrier tossing it, who can't take it from themself */
+  lateralFrom?: string | null;
   svgRef: RefObject<SVGSVGElement | null>;
   snapMode?: SnapMode;
   showYardNumbers?: boolean;
@@ -81,8 +83,8 @@ interface Live {
 }
 
 interface CatchDrag {
-  /** the carrier whose lateral this catch is */
-  id: string;
+  /** which of the quarterback's laterals this catch is */
+  hop: number;
   moved: boolean;
   last: { x: number; y: number } | null;
   /** the rule the live spot is being held to, so the note and shake come once as it starts */
@@ -114,7 +116,7 @@ const PLAY_BUTTON = { inset: 12, size: 48 };
 const FIELD_BORDER = 3;
 
 function FieldImpl({
-  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onCatchNote, svgRef, snapMode = "half", showYardNumbers = true,
+  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onCatchNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
   noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
@@ -123,8 +125,8 @@ function FieldImpl({
   const [liveWaypoint, setLiveWaypoint] = useState<{ id: string; index: number; x: number; y: number } | null>(null);
   const [selectedWaypoint, setSelectedWaypoint] = useState<{ id: string; index: number } | null>(null);
   const [boingId, setBoingId] = useState<string | null>(null);
-  const [liveCatch, setLiveCatch] = useState<{ id: string; pt: Pair } | null>(null);
-  const [shakeId, setShakeId] = useState<string | null>(null);
+  const [liveCatch, setLiveCatch] = useState<{ hop: number; pt: Pair } | null>(null);
+  const [shakeHop, setShakeHop] = useState<number | null>(null);
   const shakeTimer = useRef(0);
   const catchDragRef = useRef<CatchDrag | null>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -165,8 +167,10 @@ function FieldImpl({
   // the dragged player's live spot overrides its committed spot until pointer-up
   const effective = useMemo(() => players.map((p) => {
     const moved = live?.id === p.id ? { ...p, x: live.x, y: live.y } : p;
-    // a catch being dragged moves its lateral's arc and every job downstream of it, live
-    if (liveCatch?.id === p.id && moved.route) return { ...moved, route: { ...moved.route, catch: liveCatch.pt } };
+    // a catch being dragged moves its lateral's arc and every one after it, live
+    if (liveCatch && moved.laterals?.[liveCatch.hop]) {
+      return { ...moved, laterals: moved.laterals.map((h, i) => (i === liveCatch.hop ? { to: h.to, catch: liveCatch.pt } : h)) };
+    }
     if (liveWaypoint?.id !== p.id || moved.route?.type !== "custom" || !moved.route.pts) return moved;
     return {
       ...moved,
@@ -201,12 +205,11 @@ function FieldImpl({
     () => effective.filter((p) => shown(p, vis) || (targeting !== null && p.team === "offense")),
     [effective, targeting, vis],
   );
-  // who can take a lateral: a red player not already holding the ball
+  // who can take a lateral: any red player but the one tossing it, those who had it before included
   const canTake = useMemo(() => {
     if (targeting !== "lateral") return new Set<string>();
-    const held = new Set(chainOf(players).map((p) => p.id));
-    return new Set(players.filter((p) => p.team === "offense" && !held.has(p.id)).map((p) => p.id));
-  }, [players, targeting]);
+    return new Set(players.filter((p) => p.team === "offense" && p.id !== lateralFrom).map((p) => p.id));
+  }, [lateralFrom, players, targeting]);
   const targetOf = useCallback(
     (p: Player): "man" | "lateral" | null =>
       targeting === "man" && p.team === "offense" ? "man" : targeting === "lateral" && canTake.has(p.id) ? "lateral" : null,
@@ -234,7 +237,7 @@ function FieldImpl({
     return tags.length ? ` Man coverage: ${tags.map((t) => `${who(t.id)} ${t.text}`).join("; ")}.` : "";
   }, [tags, effective]);
   // each lateral as an arc from its release to its catch, drawn with its thrower
-  const arcs = useMemo(() => lateralArcs(effective, top).filter((a) => onField.has(a.id)), [effective, top, onField]);
+  const arcs = useMemo(() => lateralArcs(effective, top).filter((a) => onField.has(a.from)), [effective, top, onField]);
   const arcsFaded = arcs.length > 0 && side === "defense";
   const names = useMemo(() => Object.fromEntries(effective.map((p) => [p.id, p.label || p.id])), [effective]);
   const routes = useMemo(
@@ -334,20 +337,20 @@ function FieldImpl({
   }, [dispatch, snapMode, toYards]);
 
   // a catch that breaks a rule shakes and says which, once as it starts breaking it
-  const snapBack = useCallback((id: string, rule: "line" | "forward") => {
-    setShakeId(id);
+  const snapBack = useCallback((hop: number, rule: "line" | "forward") => {
+    setShakeHop(hop);
     window.clearTimeout(shakeTimer.current);
-    shakeTimer.current = window.setTimeout(() => { setShakeId(null); }, 400);
-    onCatchNote?.(catchNote(rule, names[id] ?? ""));
-  }, [names, onCatchNote]);
+    shakeTimer.current = window.setTimeout(() => { setShakeHop(null); }, 400);
+    const from = arcs.find((a) => a.hop === hop)?.from;
+    onCatchNote?.(catchNote(rule, from ? names[from] ?? "" : ""));
+  }, [arcs, names, onCatchNote]);
   useEffect(() => () => { window.clearTimeout(shakeTimer.current); }, []);
 
   /** The catch a pointer is over, in yards: snapped like a waypoint, then clamped behind its release and the line. */
-  const catchAt = useCallback((id: string, cx: number, cy: number) => {
-    const p = players.find((q) => q.id === id);
+  const catchAt = useCallback((hop: number, cx: number, cy: number) => {
     const pt = toYards(cx, cy);
     const raw: Pair = [snap(pt.x, snapMode), snap(pt.y, snapMode)];
-    const release = p ? releasePoint(p, players) : raw;
+    const release = releasePoint(players, hop) ?? raw;
     return { pt: clampCatch(raw, release), rule: catchClamp(raw, release) };
   }, [players, snapMode, toYards]);
 
@@ -355,40 +358,39 @@ function FieldImpl({
     const dr = catchDragRef.current;
     if (!dr?.last) return;
     dr.moved = true;
-    const c = catchAt(dr.id, dr.last.x, dr.last.y);
-    if (c.rule && c.rule !== dr.clamp) snapBack(dr.id, c.rule);
+    const c = catchAt(dr.hop, dr.last.x, dr.last.y);
+    if (c.rule && c.rule !== dr.clamp) snapBack(dr.hop, c.rule);
     dr.clamp = c.rule;
-    setLiveCatch({ id: dr.id, pt: c.pt });
+    setLiveCatch({ hop: dr.hop, pt: c.pt });
   }, [catchAt, snapBack]);
 
   const endCatchDrag = useCallback(() => {
     const dr = catchDragRef.current;
     if (!dr) return;
     catchDragRef.current = null;
-    if (dr.moved && dr.last) dispatch({ type: "catchMove", id: dr.id, pt: catchAt(dr.id, dr.last.x, dr.last.y).pt });
+    if (dr.moved && dr.last) dispatch({ type: "catchMove", hop: dr.hop, pt: catchAt(dr.hop, dr.last.x, dr.last.y).pt });
     setLiveCatch(null);
   }, [catchAt, dispatch]);
 
-  const onCatchDown = useCallback((id: string, e: PointerEvent<SVGGElement>) => {
+  const onCatchDown = useCallback((hop: number, e: PointerEvent<SVGGElement>) => {
     if (e.button !== 0 || playRef.current) return;
     e.preventDefault();
     e.stopPropagation();
-    catchDragRef.current = { id, moved: false, last: null, clamp: null };
+    catchDragRef.current = { hop, moved: false, last: null, clamp: null };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   }, []);
 
-  const onCatchKey = useCallback((id: string, e: KeyboardEvent<SVGGElement>) => {
+  const onCatchKey = useCallback((hop: number, e: KeyboardEvent<SVGGElement>) => {
     const step = STEP[e.key];
-    const p = players.find((q) => q.id === id);
-    const arc = arcs.find((a) => a.id === id);
-    if (!step || !p || !arc || playRef.current) return;
+    const arc = arcs.find((a) => a.hop === hop);
+    if (!step || !arc || playRef.current) return;
     e.preventDefault();
     const distance = e.shiftKey ? 1 : 0.5;
     const raw: Pair = [arc.catch[0] + step[0] * distance, arc.catch[1] + step[1] * distance];
-    const rule = catchClamp(raw, releasePoint(p, players));
-    if (rule) snapBack(id, rule);
-    dispatch({ type: "catchMove", id, pt: raw });
-  }, [arcs, dispatch, players, snapBack]);
+    const rule = catchClamp(raw, arc.release);
+    if (rule) snapBack(hop, rule);
+    dispatch({ type: "catchMove", hop, pt: raw });
+  }, [arcs, dispatch, snapBack]);
 
   useEffect(() => {
     const move = (e: globalThis.PointerEvent) => {
@@ -663,7 +665,7 @@ function FieldImpl({
         )}
         <span className="sr-only" aria-live="polite">
           {targeting === "lateral" && targetOwnerName
-            ? `Lateral from ${targetOwnerName}. Focus an offense player who isn't holding the ball and press Enter or Space. Escape cancels.`
+            ? `Lateral from ${targetOwnerName}. Focus any other offense player, one who had it before included, and press Enter or Space. Escape cancels.`
             : targeting && targetOwnerName
             ? `Targeting for ${targetOwnerName}. Focus an offense player and press Enter or Space. Escape cancels.`
             : selectedPoint
@@ -714,7 +716,7 @@ function FieldImpl({
             {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
             {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
-            {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.id] ?? ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
+            {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.from] ?? ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
             {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
           <defs>
@@ -832,7 +834,7 @@ function FieldImpl({
           {!playing && <ManTagLayer tags={tags} />}
           {/* each catch point's handle, over the players so one never hides it; not while running, drawing or on the share page */}
           {!playing && !readOnly && draft === null && arcs.length > 0 && (
-            <LateralLayer arcs={arcs} part="handles" names={names} shake={shakeId} faded={arcsFaded} onHandleDown={onCatchDown} onHandleKey={onCatchKey} />
+            <LateralLayer arcs={arcs} part="handles" names={names} shake={shakeHop} faded={arcsFaded} onHandleDown={onCatchDown} onHandleKey={onCatchKey} />
           )}
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>

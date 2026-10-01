@@ -46,25 +46,25 @@ describe("play side in links", () => {
 });
 
 describe("lateral chains in links", () => {
-  const chain = (catches: { o2?: readonly [number, number]; o5?: readonly [number, number] }) => defaults().map((p) => {
-    if (p.id === "o2") return { ...p, route: { type: "lateral" as const, target: "o5", ...(catches.o2 ? { catch: catches.o2 } : {}) } };
-    if (p.id === "o5") return { ...p, route: { type: "lateral" as const, target: "o3", ...(catches.o5 ? { catch: catches.o5 } : {}) } };
+  /** QB → Z → QB → X, X throws; each hop's catch where given. */
+  const chain = (catches: readonly ((readonly [number, number]) | null)[]) => defaults().map((p) => {
+    if (p.id === "o2") return { ...p, laterals: ["o5", "o2", "o3"].map((to, i) => (catches[i] ? { to, catch: catches[i] } : { to })) };
     if (p.id === "o3") return { ...p, route: { type: "throw" as const } };
     return p;
   });
-  test("a catch the coach moved travels with the link, so the recipient sees the same tosses", () => {
-    const players = chain({ o2: [20, 7], o5: [9, 7.4] });
+  test("every lateral and the catch the coach moved travel with the link, a return to the QB included (R14)", () => {
+    const players = chain([[20, 7], [12, 7.4], null]);
     expect(decodeShare(encodeShare({ name: "Trick", players }))?.players).toEqual(players);
   });
   test("a lateral with no catch of its own gets none on the way", () => {
-    const players = chain({});
+    const players = chain([null, null, null]);
     const back = decodeShare(encodeShare({ name: "Trick", players }))?.players;
     expect(back).toEqual(players);
-    expect(back?.find((p) => p.id === "o2")?.route).not.toHaveProperty("catch");
+    expect(back?.find((p) => p.id === "o2")?.laterals?.[0]).not.toHaveProperty("catch");
   });
   test("a link carrying a catch ahead of its release opens with it snapped back behind it", () => {
-    const players = chain({ o2: [20, 2] });
+    const players = chain([[20, 2], null, null]);
     const tampered = Buffer.from(JSON.stringify({ name: "Trick", players })).toString("base64url");
-    expect(decodeShare(tampered)?.players.find((p) => p.id === "o2")?.route?.catch).toEqual([20, 5]);
+    expect(decodeShare(tampered)?.players.find((p) => p.id === "o2")?.laterals?.[0]?.catch).toEqual([20, 5]);
   });
 });
