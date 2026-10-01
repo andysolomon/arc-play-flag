@@ -95,7 +95,17 @@ function toPair(v: unknown): Pair | null {
 /** A route this team can run, or null: an offensive type on a defender (or the reverse) is no route at all. */
 function normalizeRoute(v: unknown, team: Team): Route | null {
   if (!isRecord(v) || typeof v.type !== "string" || !routeDef(team, v.type as RouteType)) return null;
-  const r: Route = { type: v.type as RouteType };
+  return cleanRoute(v, v.type as RouteType);
+}
+
+/** A route as some version stored it: today's, or an older one with a type that is gone (a Pitch, before lateral chains). */
+export type StoredRoute = Omit<Route, "type"> & { type: string };
+/** A player as some version stored them. */
+export type StoredPlayer = Omit<Player, "route"> & { route: StoredRoute | null };
+
+/** A route's fields as stored, for a type already known to be one. */
+function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit<Route, "type"> & { type: T } {
+  const r: Omit<Route, "type"> & { type: T } = { type };
   if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
   if (v.mirror === true) r.mirror = true;
@@ -193,11 +203,33 @@ function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
  * link, a play or playbook file, a backup) comes through here.
  */
 export function normalizePlayers(raw: unknown): Player[] {
-  if (!Array.isArray(raw)) return [];
+  return readPlayers(raw).players;
+}
+
+/**
+ * The players as the earlier version that saved them would have stored them: for a play saved with a
+ * Pitch before lateral chains, cleaned like any play but with the Pitch kept and only routes that
+ * version had (no lateral or throw). It now reads back migrated, so a backup from that version is
+ * checked against this instead (lib/export/backup.ts). Null for players in today's shape.
+ */
+export function storedPlayers(raw: unknown): StoredPlayer[] | null {
+  return readPlayers(raw).stored;
+}
+
+/** A player as a version before ADR 005 stored them: with no list of laterals. */
+function withoutLaterals(p: Player): StoredPlayer {
+  const q: StoredPlayer = { ...p };
+  delete q.laterals;
+  return q;
+}
+
+function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] | null } {
+  if (!Array.isArray(raw)) return { players: [], stored: null };
   const out: Player[] = [];
   const ids = new Set<string>();
   const pitches: Pitch[] = [];
   const carried = new Map<string, Hop>();
+  const pitchRoutes = new Map<string, StoredRoute>();
   let hasMotion = false;
   raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
@@ -213,7 +245,10 @@ export function normalizePlayers(raw: unknown): Player[] {
       : [];
     if (preSnap.length) hasMotion = true;
     const pitch = team === "offense" && isRecord(v.route) && v.route.type === "pitch";
-    if (pitch && isRecord(v.route)) pitches.push({ id, mirror: v.route.mirror === true, primary: v.route.primary === true });
+    if (pitch && isRecord(v.route)) {
+      pitches.push({ id, mirror: v.route.mirror === true, primary: v.route.primary === true });
+      pitchRoutes.set(id, cleanRoute(v.route, "pitch"));
+    }
     // a lateral stored as this carrier's route, before laterals moved to the quarterback (ADR 004)
     const tossed = team === "offense" && isRecord(v.route) && v.route.type === "lateral"
       ? toHop({ to: v.route.target, catch: v.route.catch })
@@ -236,7 +271,14 @@ export function normalizePlayers(raw: unknown): Player[] {
     return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
   });
   const chained = carried.size ? fromCarrierLaterals(aimed, carried) : aimed;
-  return settleChain(pitches.length ? fromPitch(chained, pitches) : chained);
+  const players = settleChain(pitches.length ? fromPitch(chained, pitches) : chained);
+  if (!pitches.length) return { players, stored: null };
+  // as that version stored it: its Pitch back, and nothing it never had (a throw, a lateral, a list of laterals)
+  const stored = aimed.map((p): StoredPlayer => {
+    const r = pitchRoutes.get(p.id);
+    return { ...withoutLaterals(p), route: r ?? (p.route && isBallJob(p.route.type) ? null : p.route) };
+  });
+  return { players, stored };
 }
 
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");

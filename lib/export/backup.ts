@@ -1,6 +1,7 @@
 import {
   DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, kebab, normalizeDraft, normalizePlaybook, normalizeSavedPlay, normalizeTeam,
-  readAll, readDraft, readPlaybooks, readTeam, writeMany, type DraftRecord, type Library, type Playbooks, type StorageLike,
+  readAll, readDraft, readPlaybooks, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks, type StorageLike,
+  type StoredPlayer,
 } from "@/lib/play/storage";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 
@@ -47,7 +48,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const POLLUTION_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const safeId = (id: unknown): id is string => typeof id === "string" && id.length > 0 && !POLLUTION_KEYS.has(id);
 
-function safePlayers(players: SavedPlay["players"]): boolean {
+function safePlayers(players: readonly StoredPlayer[]): boolean {
   return players.every((player) => safeId(player.id) && (!player.route || player.route.target === undefined || safeId(player.route.target))
     && (player.laterals ?? []).every((hop) => safeId(hop.to)));
 }
@@ -63,10 +64,34 @@ function sameData(a: unknown, b: unknown): boolean {
   return ak.length === bk.length && ak.every((k, i) => k === bk[i] && sameData(a[k], b[k]));
 }
 
+/**
+ * A backup is restored only if every play reads back exactly as stored, so a file that was edited or
+ * damaged changes nothing. A play saved by an earlier version reads back migrated, though, so for that
+ * play "as stored" means as that version stored it. Ways that could go wrong, written down first:
+ *
+ * - B1 a play or draft saved with a Pitch before lateral chains is refused because it now reads back
+ *   as a lateral: it is checked against what that version stored, and restored migrated.
+ * - B2 the migration path lets malformed data through: everything but the route shapes that version
+ *   had (ids, labels, spots, motion, the name, notes, side, line) is checked as strictly as today.
+ * - B3 a damaged Pitch (an unknown key, a flag that isn't `true`, a defender's Pitch) is accepted:
+ *   the route has to be the Pitch exactly as that version stored it.
+ * - B4 a play mixing two versions' shapes (a Pitch beside a lateral or a throw) is accepted, though no
+ *   version ever stored it: the older version's routes don't include the newer ones.
+ * - B5 a hostile id on a route only the older version had is accepted because migration drops it: ids
+ *   are checked on the play as stored too, not just as restored.
+ * - B6 a play in today's shape is checked any less strictly: it still has to read back exactly.
+ * - B7 the restored library holds the old shape: what is restored is the play as read today.
+ */
 function canonicalPlay(raw: unknown): SavedPlay | null {
   if (!isRecord(raw) || !safeId(raw.id)) return null;
   const play = normalizeSavedPlay(raw, raw.id);
-  return play && sameData(raw, play) && safePlayers(play.players) ? play : null;
+  return play && asStored(raw, play) ? play : null;
+}
+
+/** True when a play or draft read from `raw` is exactly what was stored, by today's version or the earlier one that saved it (B1–B6). */
+function asStored(raw: Record<string, unknown>, read: { players: SavedPlay["players"] }): boolean {
+  const old = storedPlayers(raw.players);
+  return sameData(raw, old ? { ...read, players: old } : read) && safePlayers(read.players) && (!old || safePlayers(old));
 }
 
 function canonicalBook(raw: unknown): Playbook | null {
@@ -139,7 +164,7 @@ export function readBackupFile(json: string): BackupRead {
   if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team)) {
     return { ok: false, error: "invalidData" };
   }
-  if (raw.draft !== null && (!draft || !sameData(raw.draft, draft))) return { ok: false, error: "invalidData" };
+  if (raw.draft !== null && (!draft || !isRecord(raw.draft) || !asStored(raw.draft, draft))) return { ok: false, error: "invalidData" };
   const validPlays = plays as SavedPlay[];
   const validBooks = playbooks as Playbook[];
   if (validBooks.some((b) => !safeId(b.id) || b.plays.some((id) => !safeId(id)))

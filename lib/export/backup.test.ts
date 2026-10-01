@@ -183,6 +183,86 @@ describe("on-device backup", () => {
     expect(target.data.size).toBe(0);
   });
 
+  describe("a backup made before lateral chains (B1–B7)", () => {
+    type RawRoute = Record<string, unknown> | null;
+    type RawPlayer = Record<string, unknown> & { id: string; route: RawRoute };
+    type RawPlay = Record<string, unknown> & { players: RawPlayer[] };
+    // a play exactly as a version before laterals stored it: a Pitch was a route like any other
+    const old = (id: string, routes: Record<string, RawRoute>): RawPlay => ({
+      id, name: `Old ${id}`, notes: "From before laterals", side: "offense",
+      players: defaults().map((p) => ({ ...p, route: routes[p.id] ?? null })),
+    });
+    const OPTION = old("old-option", { o5: { type: "pitch" }, o4: { type: "corner" } });
+    const SWEEP = old("old-sweep", { o5: { type: "pitch", mirror: true, primary: true } });
+    const DECOY = old("old-decoy", { o3: { type: "dive", primary: true }, o5: { type: "pitch" }, o4: { type: "corner" } });
+    const backup = (patch: { plays?: RawPlay[]; playbooks?: unknown[]; draft?: Record<string, unknown> | null }): string => JSON.stringify({
+      ...(JSON.parse(encodeBackupFile(memory()).json) as Record<string, unknown>),
+      plays: [OPTION, SWEEP, DECOY],
+      playbooks: [{ id: "old-book", name: "Old book", plays: ["old-sweep", "old-option"] }],
+      draft: { id: "old-option", name: "Old draft", notes: "", side: "offense", players: OPTION.players },
+      ...patch,
+    });
+    // each player's job: the quarterback's laterals when there are some, else their route
+    const routes = (players: readonly { label: string; route: unknown; laterals?: unknown }[]): Record<string, unknown> =>
+      Object.fromEntries(players.filter((p) => p.route || p.laterals).map((p) => [p.label, p.laterals ?? p.route]));
+
+    test("restores every Pitch play and the draft as the lateral it reads as today (B1, B7)", () => {
+      const read = readBackupFile(backup({}));
+      if (!read.ok) throw new Error(read.error);
+      const [option, sweep, decoy] = read.file.plays;
+      expect(routes(option?.players ?? [])).toEqual({ QB: [{ to: "o5" }], Z: { type: "throw" }, Y: { type: "corner" } });
+      expect(routes(sweep?.players ?? [])).toEqual({ QB: [{ to: "o5" }], Z: { type: "stretch", mirror: true } });
+      expect(routes(decoy?.players ?? [])).toEqual({ X: { type: "dive", primary: true }, Z: { type: "stretch" }, Y: { type: "corner" } });
+      expect(routes(read.file.draft?.players ?? [])).toEqual(routes(option?.players ?? []));
+      expect(read.file.playbooks[0]?.plays).toEqual(["old-sweep", "old-option"]);
+
+      const target = memory();
+      applyBackupRestore(planBackupRestore(read.file, readBackupState(target), "replace"), target);
+      expect(target.data.get(PLAYS_KEY)).not.toContain("pitch");
+      expect(target.data.get(DRAFT_KEY)).not.toContain("pitch");
+      expect(readAll(target)["old-option"]).toEqual(option);
+      // restored once, it is in today's shape: a backup of it reads back exactly
+      expect(readBackupFile(encodeBackupFile(target).json).ok).toBe(true);
+    });
+
+    test("still refuses one that was damaged, or that no version ever stored (B2–B5)", () => {
+      const damaged = (label: string, change: (p: RawPlay) => void) => {
+        const play = structuredClone(OPTION);
+        change(play);
+        expect(readBackupFile(backup({ plays: [play, SWEEP, DECOY] })), `play: ${label}`).toEqual({ ok: false, error: "invalidData" });
+        expect(readBackupFile(backup({ draft: { id: null, name: "Draft", notes: "", side: "offense", players: play.players } })), `draft: ${label}`)
+          .toEqual({ ok: false, error: "invalidData" });
+      };
+      const player = (p: RawPlay, id: string): RawPlayer => {
+        const q = p.players.find((v) => v.id === id);
+        if (!q) throw new Error(`missing ${id}`);
+        return q;
+      };
+      damaged("a spot off the field", (p) => { player(p, "o3").x = 99; });
+      damaged("a hostile player id", (p) => { player(p, "o3").id = "__proto__"; });
+      damaged("a label too long", (p) => { player(p, "o3").label = "WIDE"; });
+      damaged("a Pitch read flag that isn't true", (p) => { player(p, "o5").route = { type: "pitch", primary: "yes" }; });
+      damaged("a Pitch with a key it never had", (p) => { player(p, "o5").route = { type: "pitch", speed: 3 }; });
+      damaged("a Pitch on a defender", (p) => { player(p, "d1").route = { type: "pitch" }; });
+      damaged("a Pitch beside a throw", (p) => { player(p, "o3").route = { type: "throw" }; });
+      damaged("a Pitch beside a lateral", (p) => { player(p, "o2").route = { type: "lateral", target: "o3" }; });
+      damaged("a Pitch beside a list of laterals", (p) => { player(p, "o2").laterals = [{ to: "o3" }]; });
+      damaged("a hostile id on a Pitch", (p) => { player(p, "o5").route = { type: "pitch", target: "__proto__" }; });
+      const notes = { ...OPTION, notes: 42 };
+      expect(readBackupFile(backup({ plays: [notes, SWEEP, DECOY] }))).toEqual({ ok: false, error: "invalidData" });
+    });
+
+    test("checks a play in today's shape as strictly as before (B6)", () => {
+      const thrown = (id: string, c: [number, number]): RawPlay => {
+        const p = old(id, { o5: { type: "throw" } });
+        return { ...p, players: p.players.map((q) => (q.id === "o2" ? { ...q, laterals: [{ to: "o5", catch: c }] } : q)) };
+      };
+      // a lateral caught in front of the QB's spot reads back snapped, so it isn't what was stored
+      expect(readBackupFile(backup({ plays: [thrown("forward", [20, 2])], playbooks: [], draft: null }))).toEqual({ ok: false, error: "invalidData" });
+      expect(readBackupFile(backup({ plays: [thrown("legal", [20, 6])], playbooks: [], draft: null })).ok).toBe(true);
+    });
+  });
+
   test("previews and applies merge or replace without changing playbook order", () => {
     const currentStore = memory();
     store(play("same", "Local version"), currentStore);
