@@ -6,6 +6,7 @@ import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { Hint } from "../Hint";
 import { pillSm } from "../ui";
 import { BookEditor } from "./BookEditor";
+import { BookReader } from "./BookReader";
 import { Home } from "./Home";
 import { Sticker } from "../Sticker";
 
@@ -13,9 +14,14 @@ export type Say = (text: string, ms?: number) => void;
 
 const noSubscribe = (): (() => void) => () => undefined;
 
-/** The playbook screens: the list (and team, file, gallery) or one book when ?book=<id> is set. */
+/**
+ * The playbook screens: the list (and team, file, gallery), one book when ?book=<id> is set, or that
+ * book's game-day reader when &read=<n> is set too. All three are this one static shell, so each opens offline.
+ */
 export function PlaybooksScreen() {
-  const bookId = useSearchParams().get("book");
+  const params = useSearchParams();
+  const bookId = params.get("book");
+  const read = params.get("read");
   // the page is prerendered without a query string, so which screen shows is decided after mount
   const mounted = useSyncExternalStore(noSubscribe, () => true, () => false);
   const [toast, setToast] = useState<string | null>(null);
@@ -26,6 +32,7 @@ export function PlaybooksScreen() {
     if (ms > 0) timer.current = window.setTimeout(() => { setToast(null); }, ms);
   }, []);
 
+  if (mounted && bookId && read !== null) return <BookReader id={bookId} read={read} />;
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
