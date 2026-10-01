@@ -1,5 +1,5 @@
 import { readLos, withLos } from "./field";
-import { MAX_LATERALS, quarterback, settleChain } from "./lateral";
+import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Hop, Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
@@ -98,8 +98,11 @@ function normalizeRoute(v: unknown, team: Team): Route | null {
   return cleanRoute(v, v.type as RouteType);
 }
 
-/** A route as some version stored it: today's, or an older one with a type that is gone (a Pitch, before lateral chains). */
-export type StoredRoute = Omit<Route, "type"> & { type: string };
+/**
+ * A route as some version stored it: today's, or an older one with a type that is gone (a Pitch,
+ * before lateral chains, or a carrier's `lateral` with its catch, before ADR 005).
+ */
+export type StoredRoute = Omit<Route, "type"> & { type: string; catch?: Pair };
 /** A player as some version stored them. */
 export type StoredPlayer = Omit<Player, "route"> & { route: StoredRoute | null };
 
@@ -207,10 +210,13 @@ export function normalizePlayers(raw: unknown): Player[] {
 }
 
 /**
- * The players as the earlier version that saved them would have stored them: for a play saved with a
- * Pitch before lateral chains, cleaned like any play but with the Pitch kept and only routes that
- * version had (no lateral or throw). It now reads back migrated, so a backup from that version is
- * checked against this instead (lib/export/backup.ts). Null for players in today's shape.
+ * The players as the earlier version that saved them would have stored them, cleaned like any play:
+ * - saved with a Pitch before lateral chains, the Pitch kept and only routes that version had (no
+ *   lateral, throw or list of laterals);
+ * - saved with one lateral per carrier (ADR 004), each carrier's lateral kept as their route and no
+ *   list of laterals, when the chain needs nothing settled, since that version settled it too.
+ * Such a play now reads back migrated, so a backup from that version is checked against this instead
+ * (lib/export/backup.ts). Null for players in today's shape, and for a chain that version never stored.
  */
 export function storedPlayers(raw: unknown): StoredPlayer[] | null {
   return readPlayers(raw).stored;
@@ -230,6 +236,7 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
   const pitches: Pitch[] = [];
   const carried = new Map<string, Hop>();
   const pitchRoutes = new Map<string, StoredRoute>();
+  const lateralRoutes = new Map<string, StoredRoute>();
   let hasMotion = false;
   raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
@@ -253,7 +260,13 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
     const tossed = team === "offense" && isRecord(v.route) && v.route.type === "lateral"
       ? toHop({ to: v.route.target, catch: v.route.catch })
       : null;
-    if (tossed) carried.set(id, tossed);
+    if (tossed && isRecord(v.route)) {
+      carried.set(id, tossed);
+      // as ADR 004 stored it, where a carrier tossing it on was never the read
+      const route: StoredRoute = cleanRoute(v.route, "lateral");
+      delete route.primary;
+      lateralRoutes.set(id, tossed.catch ? { ...route, catch: tossed.catch } : route);
+    }
     const laterals = team === "offense" ? readHops(v.laterals) : [];
     out.push({
       id,
@@ -271,14 +284,29 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
     return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
   });
   const chained = carried.size ? fromCarrierLaterals(aimed, carried) : aimed;
-  const players = settleChain(pitches.length ? fromPitch(chained, pitches) : chained);
-  if (!pitches.length) return { players, stored: null };
-  // as that version stored it: its Pitch back, and nothing it never had (a throw, a lateral, a list of laterals)
-  const stored = aimed.map((p): StoredPlayer => {
-    const r = pitchRoutes.get(p.id);
-    return { ...withoutLaterals(p), route: r ?? (p.route && isBallJob(p.route.type) ? null : p.route) };
-  });
-  return { players, stored };
+  const migrated = pitches.length ? fromPitch(chained, pitches) : chained;
+  const players = settleChain(migrated);
+  if (pitches.length) {
+    // before lateral chains: its Pitch back, and nothing that version never had (a throw, a lateral, a list of laterals)
+    return {
+      players,
+      stored: aimed.map((p): StoredPlayer => ({ ...withoutLaterals(p), route: pitchRoutes.get(p.id) ?? (p.route && isBallJob(p.route.type) ? null : p.route) })),
+    };
+  }
+  if (carried.size && players === migrated) {
+    // ADR 004's chain: each carrier's lateral back as their route, and no list of laterals, which it never had.
+    // A lateral that version settled away (off the chain, back into it, to nobody), or a chain it clamped or
+    // trimmed, reads back changed, as it did there, so it is no play that version stored.
+    const throwers = new Set(chainLinks(players).map((l) => l.from.id));
+    return {
+      players,
+      stored: aimed.map((p): StoredPlayer => {
+        const r = lateralRoutes.get(p.id);
+        return r && throwers.has(p.id) ? { ...withoutLaterals(p), route: r } : withoutLaterals(p);
+      }),
+    };
+  }
+  return { players, stored: null };
 }
 
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");

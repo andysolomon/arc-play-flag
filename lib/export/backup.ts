@@ -81,6 +81,14 @@ function sameData(a: unknown, b: unknown): boolean {
  *   are checked on the play as stored too, not just as restored.
  * - B6 a play in today's shape is checked any less strictly: it still has to read back exactly.
  * - B7 the restored library holds the old shape: what is restored is the play as read today.
+ * - B8 a chain backed up by ADR 004's version, one `lateral` route per carrier, is refused because it
+ *   now reads back as the quarterback's laterals: it is checked against that version's shape too.
+ * - B9 a per-carrier chain that version would never have stored is let through because migration
+ *   quietly repairs it. Examples: a catch in front of its release or past the line; a lateral to a
+ *   defender, to nobody, back into the chain or on a player off it; a read on a carrier; a pass route
+ *   on the last one. That version read each back changed, so each is refused here too.
+ * - B10 a per-carrier chain beside a list of laterals, or beside a Pitch, is accepted, though no
+ *   version stored both.
  */
 function canonicalPlay(raw: unknown): SavedPlay | null {
   if (!isRecord(raw) || !safeId(raw.id)) return null;

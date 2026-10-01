@@ -252,6 +252,62 @@ describe("on-device backup", () => {
       expect(readBackupFile(backup({ plays: [notes, SWEEP, DECOY] }))).toEqual({ ok: false, error: "invalidData" });
     });
 
+    describe("from ADR 004's version, one lateral per carrier (B8–B10)", () => {
+      // QB → Z → X, X throws to Y, as that version stored it: each carrier's lateral is their route
+      const CHAIN = old("old-chain", {
+        o2: { type: "lateral", target: "o5", catch: [22, 6] },
+        o5: { type: "lateral", target: "o3", catch: [9, 6.5] },
+        o3: { type: "throw" },
+        o4: { type: "go", primary: true },
+      });
+      const KEEP = old("old-keep", { o2: { type: "lateral", target: "o5" }, o5: { type: "reverse" } });
+      const draft = (p: RawPlay) => ({ id: null, name: "Draft", notes: "", side: "offense", players: p.players });
+      const chainBackup = (plays: RawPlay[], d: RawPlay | null = null) => backup({ plays, playbooks: [], draft: d && draft(d) });
+
+      test("restores it as the quarterback's laterals, in order, with the same catches (B8)", () => {
+        const read = readBackupFile(chainBackup([CHAIN, KEEP], CHAIN));
+        if (!read.ok) throw new Error(read.error);
+        const [chain, keep] = read.file.plays;
+        expect(routes(chain?.players ?? [])).toEqual({
+          QB: [{ to: "o5", catch: [22, 6] }, { to: "o3", catch: [9, 6.5] }], X: { type: "throw" }, Y: { type: "go", primary: true },
+        });
+        expect(routes(keep?.players ?? [])).toEqual({ QB: [{ to: "o5" }], Z: { type: "reverse" } });
+        expect(routes(read.file.draft?.players ?? [])).toEqual(routes(chain?.players ?? []));
+
+        const target = memory();
+        applyBackupRestore(planBackupRestore(read.file, readBackupState(target), "replace"), target);
+        expect(target.data.get(PLAYS_KEY)).not.toContain("\"lateral\"");
+        expect(readBackupFile(encodeBackupFile(target).json).ok).toBe(true);
+      });
+
+      test("still refuses one that version would never have stored, or one mixed with another version's (B9, B10)", () => {
+        const damaged = (label: string, change: (p: RawPlay) => void) => {
+          const play = structuredClone(CHAIN);
+          change(play);
+          expect(readBackupFile(chainBackup([play])), `play: ${label}`).toEqual({ ok: false, error: "invalidData" });
+          expect(readBackupFile(chainBackup([], play)), `draft: ${label}`).toEqual({ ok: false, error: "invalidData" });
+        };
+        const player = (p: RawPlay, id: string): RawPlayer => {
+          const q = p.players.find((v) => v.id === id);
+          if (!q) throw new Error(`missing ${id}`);
+          return q;
+        };
+        damaged("a catch in front of its release", (p) => { player(p, "o5").route = { type: "lateral", target: "o3", catch: [9, 3] }; });
+        damaged("a catch past the line", (p) => { player(p, "o2").route = { type: "lateral", target: "o5", catch: [22, 0.5] }; });
+        damaged("a lateral to a defender", (p) => { player(p, "o5").route = { type: "lateral", target: "d1" }; });
+        damaged("a lateral to nobody", (p) => { player(p, "o5").route = { type: "lateral", target: "zz" }; });
+        damaged("a hostile id on a lateral", (p) => { player(p, "o5").route = { type: "lateral", target: "__proto__" }; });
+        damaged("a lateral back into the chain", (p) => { player(p, "o3").route = { type: "lateral", target: "o2" }; });
+        damaged("a lateral on a player off the chain", (p) => { player(p, "o4").route = { type: "lateral", target: "o1" }; });
+        damaged("a read on a carrier's lateral", (p) => { player(p, "o5").route = { type: "lateral", target: "o3", catch: [9, 6.5], primary: true }; });
+        damaged("a read on the last carrier", (p) => { player(p, "o3").route = { type: "throw", primary: true }; });
+        damaged("a pass route on the last carrier", (p) => { player(p, "o3").route = { type: "go" }; });
+        damaged("a catch that isn't a point", (p) => { player(p, "o2").route = { type: "lateral", target: "o5", catch: "deep" }; });
+        damaged("beside a list of laterals", (p) => { player(p, "o2").laterals = [{ to: "o5" }]; });
+        damaged("beside a Pitch", (p) => { player(p, "o1").route = { type: "pitch" }; });
+      });
+    });
+
     test("checks a play in today's shape as strictly as before (B6)", () => {
       const thrown = (id: string, c: [number, number]): RawPlay => {
         const p = old(id, { o5: { type: "throw" } });
