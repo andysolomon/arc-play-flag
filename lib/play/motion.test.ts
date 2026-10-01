@@ -283,6 +283,29 @@ describe("lateral chains", () => {
     expect(m.passer).toBe("o3");
     expect(m.receiver).toBe("o4");
   });
+  test("a toss flies from where it was let go, not with a thrower who moves on to take it again (T1)", () => {
+    // a level toss at the QB's depth, then back to the QB, who drifts to 7 yards deep while it's in the air
+    const ps = chain([["o5", [22, 5]], ["o2", [12, 7]]], { o2: { type: "throw" }, o4: { type: "go", primary: true } });
+    const m = buildMotion(ps, TOP);
+    const [first, back] = m.laterals;
+    if (!first || !back) throw new Error("two tosses");
+    expect(first.release).toEqual({ x: 15, y: 5 });
+    expect(back.release).toEqual({ x: 22, y: 5 });
+    // the QB is already on the move toward their next catch before the first toss lands
+    const qbMid = at(positionsAt(m, ps, (first.at + first.land) / 2), "o2");
+    expect(qbMid.y).toBeGreaterThan(5);
+    // each flight stays on the straight line from its release to its catch, and a level toss stays level
+    for (const l of [first, back]) {
+      for (let t = l.at; t <= l.land; t += 0.01) {
+        const b = ball(m, ps, t);
+        const cross = (l.catch.x - l.release.x) * (b.y - l.release.y) - (l.catch.y - l.release.y) * (b.x - l.release.x);
+        expect(Math.abs(cross)).toBeLessThan(1e-9);
+        expect(b.x).toBeGreaterThanOrEqual(Math.min(l.release.x, l.catch.x) - 1e-9);
+        expect(b.x).toBeLessThanOrEqual(Math.max(l.release.x, l.catch.x) + 1e-9);
+      }
+    }
+    for (let t = first.at; t <= first.land; t += 0.01) expect(ball(m, ps, t).y).toBeCloseTo(5, 9);
+  });
   test("a lateral run: the last carrier keeps it and runs from the catch", () => {
     const ps = chain([["o5", [22, 6]]], { o5: { type: "reverse" }, o4: { type: "go" } });
     const m = buildMotion(ps, TOP);

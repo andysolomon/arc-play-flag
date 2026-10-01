@@ -47,6 +47,13 @@ The chain lives on a player, not on the play, so everything that already carries
 - **ADR 004's chain**, one `{ type: "lateral", target, catch }` route per carrier. It is walked from the quarterback the way that version did, stopping at a player already in it or one who isn't there, and becomes the quarterback's `laterals` in the same order with the same catches. The last carrier's own route was already their job.
 - **Pitch**, as ADR 004 describes: the ball stays with the carrier the old words named. When that was the pitch runner, the quarterback's `laterals` is `[{ to: runner }]`.
 
+A device backup is restored only if each play reads back exactly as stored. A play in either older shape now reads back migrated, so `storedPlayers` gives its players as that version stored them, and `lib/export/backup.ts` checks the play against that:
+
+- For ADR 004's chain, each carrier keeps their `lateral` route with its catch, and there is no `laterals` list.
+- For a Pitch, the Pitch is kept, with no lateral, throw or `laterals` list.
+
+ADR 004's version settled its chain on every read, so a per-carrier chain it would have changed was never in one of its backups, and is refused. That covers a catch in front of its release or past the line, and a lateral to nobody, to a defender, back into the chain or off it. It also covers a read on a carrier and a pass route on the last one. A chain beside a `laterals` list, or beside a Pitch, mixes two versions and is refused too.
+
 ## In the designer
 
 - **Lateral** asks "Lateral to who?" and rings every red player except the one tossing it. Players who had the ball before are included. The player tapped is selected next.
@@ -62,11 +69,12 @@ The chain lives on a player, not on the play, so everything that already carries
 - Each carrier runs one track: from their spot to each of their catches in turn, with a hold at each one. At a catch they wait for the ball, then hold it until they toss it on, or until they do their job if they're last.
 - A quarterback who takes it back holds their spot until their first toss leaves, then drifts to their next catch.
 - Each toss is timed to land as its target arrives, a beat after the toss before it lands, and never goes forward.
+- A toss flies in a straight line from where it was let go to the catch. Each `Toss` stores both points. A quarterback who drifts back to take it again doesn't drag the ball in the air with them.
 - The call line names every toss, for example "Lateral pass: QB laterals to Z, Z laterals to QB, QB laterals to X, X throws."
 - A player's job lists each time they have it: "Lateral to Z, then lateral to X", or "Lateral to Z, then take the lateral, throw, look to Y first".
 - The wristband line repeats them too: `QB › Z › QB › X › Y`.
 
 ## Verification
 
-- Unit tests: `lib/play/lateral.test.ts` (revisits, a toss to oneself, broken hops, the cap, defaults for a player who had it before, settling), `reducer.test.ts` (back to the QB, picking a time in the path, cutting and re-targeting from it, catch moves by hop, flip, clear), `motion.test.ts` (the QB holding, drifting back and taking it again), `assignments.test.ts`, `call.test.ts`, `share.test.ts` and `storage.test.ts` (ADR 004's per-carrier chain and Pitch migrations).
-- `e2e/journeys/lateral-chain.journey.ts` also draws QB → Z → QB → X, plays it with the ball reaching every catch in order before the throw, changes Z's time from the ball path, undoes it, and opens a play saved in ADR 004's shape. It leaves `lateral-chain-<device>-boomerang.json` with the playback samples.
+- Unit tests: `lib/play/lateral.test.ts` (revisits, a toss to oneself, broken hops, the cap, defaults for a player who had it before, settling), `reducer.test.ts` (back to the QB, picking a time in the path, cutting and re-targeting from it, catch moves by hop, flip, clear), `motion.test.ts` (the QB holding, drifting back and taking it again, every toss on its line from release to catch), `assignments.test.ts`, `call.test.ts`, `share.test.ts`, `storage.test.ts` (ADR 004's per-carrier chain and Pitch migrations) and `backup.test.ts` (backups in either older shape restored, damaged or mixed ones refused).
+- `e2e/journeys/lateral-chain.journey.ts` also draws QB → Z → QB → X, plays it with the ball reaching every catch in order before the throw, changes Z's time from the ball path, undoes it, and opens a play saved in ADR 004's shape. It restores a device backup holding a Pitch and a per-carrier chain, and refuses a mixed one. It leaves `lateral-chain-<device>-boomerang.json` with the playback samples and the first toss's distance from its line.

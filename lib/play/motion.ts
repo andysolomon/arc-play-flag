@@ -45,12 +45,20 @@ interface Hold {
   until: number;
 }
 
-/** One lateral in playback: tossed from one carrier's hands at `at` and caught at the catch point at `land`. */
+/**
+ * One lateral in playback: let go from `release` at `at`, and caught at the catch point at `land`. The
+ * ball flies between those two fixed points. Ways it could go wrong:
+ * - T1 the thrower moves on once it's gone (a quarterback drifting back to take it again) and drags the
+ *   ball in the air with them: it would bow off its line, and a level toss would dip deeper and back.
+ * - T2 the ball leaves from somewhere other than the thrower's hands: `release` is where they hold it, at
+ *   their spot or their catch, the same point the arc on the field is drawn from.
+ */
 export interface Toss {
   from: string;
   to: string;
   at: number;
   land: number;
+  release: Pt;
   catch: Pt;
 }
 
@@ -396,7 +404,7 @@ function chainPlay(
       h.from.until = at;
       h.to.until = land;
     }
-    m.laterals.push({ from: l.from.id, to: l.to.id, at, land, catch: { x: l.catch[0], y: l.catch[1] } });
+    m.laterals.push({ from: l.from.id, to: l.to.id, at, land, release: { x: l.release[0], y: l.release[1] }, catch: { x: l.catch[0], y: l.catch[1] } });
     held = land;
   });
   const last = links[links.length - 1]?.to;
@@ -494,11 +502,11 @@ export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | nu
   const runner = m.runner ? pos[m.runner] : undefined;
   if (m.laterals.length) {
     for (const l of m.laterals) {
-      const from = pos[l.from] ?? qb;
-      if (t < l.at) return { ...from, lift: 0 };
+      if (t < l.at) return { ...(pos[l.from] ?? qb), lift: 0 };
       if (t < l.land) {
+        // from where it was let go (T1): the thrower may already be on their way to take it again
         const k = (t - l.at) / (l.land - l.at);
-        return { ...lerp(from, l.catch, k), lift: TOSS_LIFT * Math.sin(Math.PI * k) };
+        return { ...lerp(l.release, l.catch, k), lift: TOSS_LIFT * Math.sin(Math.PI * k) };
       }
     }
     const last = m.laterals[m.laterals.length - 1];

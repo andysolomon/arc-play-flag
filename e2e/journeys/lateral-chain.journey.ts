@@ -213,6 +213,13 @@ test("the ball comes back: QB → Z → QB → X, X throws, and any toss in the 
   expect(backToQB).toBeGreaterThan(atZ);
   expect(atX).toBeGreaterThan(backToQB);
   expect(forward).toBeGreaterThan(atX);
+  // the first toss flies straight from the QB's spot to Z's catch, though the QB is already drifting back to
+  // take it again: the ball in the air doesn't go with them
+  const released = samples.findLastIndex((s, i) => i < atZ && Math.hypot(s.x - 15, s.y - 5) < 0.05);
+  const offLine = (s: { x: number; y: number }) => Math.abs(7 * (s.y - 5) - 1 * (s.x - 15)) / Math.hypot(7, 1);
+  const firstTossOffLine = Math.max(...samples.slice(released, atZ + 1).map(offLine));
+  expect(released).toBeGreaterThan(0);
+  expect(firstTossOffLine).toBeLessThan(0.1);
 
   // the Z step in the path is Z's time with it: a throw there ends the chain there
   await d.select("QB");
@@ -227,7 +234,7 @@ test("the ball comes back: QB → Z → QB → X, X throws, and any toss in the 
   await d.undo.click();
   await expect.poll(() => hops(page)).toEqual([{ to: "o5" }, { to: "o2" }, { to: "o3" }]);
 
-  writeFileSync(`${out(info, "boomerang")}.json`, `${JSON.stringify({ project: info.project.name, atZ, backToQB, atX, forward, hops: await hops(page), samples }, null, 2)}\n`);
+  writeFileSync(`${out(info, "boomerang")}.json`, `${JSON.stringify({ project: info.project.name, atZ, backToQB, atX, forward, firstTossOffLine, hops: await hops(page), samples }, null, 2)}\n`);
 });
 
 test("a catch never goes forward or past the line, and follows its release when the QB drops back", async ({ page }, info) => {
@@ -384,13 +391,17 @@ test("a play saved with a Pitch opens as the QB's lateral to the runner, who thr
   writeFileSync(`${out(info, "migration")}.json`, `${JSON.stringify({ project: info.project.name, read }, null, 2)}\n`);
 });
 
-test("a device backup made before laterals restores each Pitch as the lateral it reads as today, and a damaged one changes nothing", async ({ page }, info) => {
+test("a device backup from an older version restores each Pitch and per-carrier chain as the laterals it reads as today, and a damaged one changes nothing", async ({ page }, info) => {
   const OPTION = legacy("fx-old-option", "Otter Old Option", { o5: { type: "pitch" }, o4: { type: "corner" } });
   // Z's Pitch was the read: Z keeps it on a Stretch, and the keep says so instead
   const SWEEP = legacy("fx-old-sweep", "Otter Old Sweep", { o5: { type: "pitch", mirror: true, primary: true } });
+  // backed up by ADR 004's version: one lateral per carrier
+  const CHAIN = legacy("fx-old-chain", "Otter Old Chain", {
+    o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "lateral", target: "o3", catch: [9, 6.5] }, o3: { type: "throw" }, o4: { type: "go", primary: true },
+  });
   const backup = {
     kind: "ffpd.backup", version: 1, exported: "2026-09-01T12:00:00.000Z",
-    plays: [OPTION, SWEEP],
+    plays: [OPTION, SWEEP, CHAIN],
     playbooks: [{ id: "fx-old-book", name: "Otter Old Book", plays: [SWEEP.id, OPTION.id] }],
     team: OTTERS,
     draft: { id: OPTION.id, name: OPTION.name, notes: "", side: "offense", players: OPTION.players },
@@ -410,23 +421,34 @@ test("a device backup made before laterals restores each Pitch as the lateral it
   await expect(page.locator("div[role='status']")).toHaveText("That backup is incomplete or contains invalid data. Nothing was changed.");
   await expect(preview).toHaveCount(0);
   expect(await storageSnapshot(page)).toEqual(before);
+  // B10: and so is a per-carrier chain beside a list of laterals
+  const both = structuredClone(backup);
+  both.plays[2] = { ...CHAIN, players: CHAIN.players.map((q) => (q.id === "o2" ? { ...q, laterals: [{ to: "o5" }] } : q)) };
+  await restore.setInputFiles(jsonUpload("old-both-backup.json", JSON.stringify(both)));
+  await expect(page.locator("div[role='status']")).toHaveText("That backup is incomplete or contains invalid data. Nothing was changed.");
+  await expect(preview).toHaveCount(0);
+  expect(await storageSnapshot(page)).toEqual(before);
 
   // B1: the backup as that version wrote it is offered, and restores migrated
   await restore.setInputFiles(jsonUpload("old-device-backup.json", JSON.stringify(backup)));
-  await expect(preview).toContainText("2 plays");
+  await expect(preview).toContainText("3 plays");
   await preview.getByRole("button", { name: "Replace device data" }).click();
   const stored = await storedPlays(page);
-  expect(Object.keys(stored)).toEqual([OPTION.id, SWEEP.id]);
+  expect(Object.keys(stored)).toEqual([OPTION.id, SWEEP.id, CHAIN.id]);
   expect(JSON.stringify(stored)).not.toContain("pitch");
+  expect(JSON.stringify(stored)).not.toContain('"lateral"');
   const routes = (p: SavedPlay | undefined) => Object.fromEntries((p?.players ?? []).filter((q) => q.route || q.laterals).map((q) => [q.label, q.laterals ?? q.route]));
   expect(routes(stored[OPTION.id])).toEqual({ QB: [{ to: "o5" }], Z: { type: "throw" }, Y: { type: "corner" } });
   expect(routes(stored[SWEEP.id])).toEqual({ QB: [{ to: "o5" }], Z: { type: "stretch", mirror: true } });
+  expect(routes(stored[CHAIN.id])).toEqual({
+    QB: [{ to: "o5", catch: [22, 6] }, { to: "o3", catch: [9, 6.5] }], X: { type: "throw" }, Y: { type: "go", primary: true },
+  });
   expect((await storedPlaybooks(page))["fx-old-book"]?.plays).toEqual([SWEEP.id, OPTION.id]);
 
   await page.goto("/playbooks");
-  for (const p of [OPTION, SWEEP]) {
+  for (const [p, n] of [[OPTION, 1], [SWEEP, 1], [CHAIN, 2]] as const) {
     const card = page.getByRole("link", { name: `Open ${p.name} in the designer` }).locator("xpath=..");
-    await expect(card.getByRole("img").first().locator("[data-lateral]")).toHaveCount(1);
+    await expect(card.getByRole("img").first().locator("[data-lateral]")).toHaveCount(n);
   }
   await page.screenshot({ path: `${out(info, "backup")}-gallery.png` });
   const d = new Designer(page);
@@ -435,8 +457,8 @@ test("a device backup made before laterals restores each Pitch as the lateral it
   await expect(page.getByRole("heading", { name: "Z has the ball" })).toBeVisible();
   await expect(group(page, "With the ball").getByRole("button", { name: "Throw" })).toHaveAttribute("aria-pressed", "true");
   writeFileSync(`${out(info, "backup")}.json`, `${JSON.stringify({
-    project: info.project.name, mixedRefused: true,
-    restored: { [OPTION.name]: routes(stored[OPTION.id]), [SWEEP.name]: routes(stored[SWEEP.id]) },
+    project: info.project.name, mixedRefused: true, bothRefused: true,
+    restored: { [OPTION.name]: routes(stored[OPTION.id]), [SWEEP.name]: routes(stored[SWEEP.id]), [CHAIN.name]: routes(stored[CHAIN.id]) },
   }, null, 2)}\n`);
 });
 
