@@ -4,7 +4,7 @@ Status: implemented. It replaces the Pitch route. An earlier attempt (#122, reve
 
 ## Rules
 
-In flag football a ball lateraled behind the line of scrimmage can still be thrown forward, and whoever takes a lateral can lateral again. A play may have any number of laterals, as long as every one is behind the line and none goes forward.
+In flag football a ball lateraled behind the line of scrimmage can still be thrown forward, and whoever takes a lateral can lateral again. The game puts no limit on how many laterals a play has, as long as every one is behind the line and none goes forward. This model has one: each player is in the chain at most once (rule 4), so a play has at most one lateral fewer than it has offensive players (four for a five-player offense). See "Known limit".
 
 1. The chain starts with the quarterback, who takes the snap. Each carrier does one of three things: **lateral** to another offensive player, **throw** forward, or **keep** it on any run route.
 2. **A lateral is never forward.** Its catch point is level with or behind where it is let go: `catch.y >= release.y`, where +y points to the offense's backfield. The quarterback lets it go where they stand at the snap, after any pre-snap motion. Every later carrier lets it go where they caught it.
@@ -33,12 +33,11 @@ Every edit settles, because the reducer runs `settleChain` after each action tha
 
 ## Migration
 
-`normalizePlayers` is where every play is read in: the library, the draft, share links, play and playbook files, and backups. A stored `pitch` on player P becomes the quarterback's `lateral → P`:
+`normalizePlayers` is where every play is read in: the library, the draft, share links, play and playbook files, and backups. The ball stays with whoever the play's words gave it to before laterals (`runnerOf`), so no saved play changes hands. That carrier is a runner marked as the read. Failing that, with receivers out, it is the first pitch runner from left to right, who threw it (the call was an option). Otherwise it is the first runner from left to right.
 
-- If the old call was an option (receivers out, and no runner marked as the read), P threw from the set point, so P gets `throw`.
-- Otherwise the pitch was a run, so P keeps it on a Stretch, the wide run the pitch was. A pitch runner marked as the read loses the mark, because the keep now says it.
-- A pitch on the quarterback was a rollout, so it becomes the quarterback's own `throw`, or a Stretch keep.
-- With two pitches, the first from left to right takes the lateral and the other keeps running. With no quarterback, every pitch keeps running.
+- If that carrier is a pitch runner P, the quarterback laterals to P. P throws if the play was an option. Otherwise P keeps it on a Stretch, the wide run the pitch was. A pitch runner marked as the read loses the mark, because the keep now says it.
+- If the carrier is the quarterback on a pitch, that was a rollout, so it becomes the quarterback's own `throw`, or a Stretch keep.
+- Every other pitch becomes a Stretch decoy with no lateral, and the carrier keeps their own route and read. This covers a primary Dive beside a Pitch, a second pitch, and a play with no quarterback to toss it.
 
 A migrated play reads back identically the second time. `lib/play/storage.test.ts` covers each case, and `lateral-chain.journey.ts` opens a stored pitch in the gallery and the designer.
 
@@ -60,9 +59,10 @@ The call is named by how the chain ends: **Double pass** (one lateral, then a th
 
 ## Known limit
 
-A route belongs to one player, so a chain can't revisit a player: QB → Z → QB isn't drawable. The quarterback can't take the ball back after lateraling it. A lateral back to someone already in the chain is never offered, and one stored that way ends the chain at the thrower (`chainOf`) and is settled away. Allowing it would need the chain stored as its own list of hops, which is what the reverted attempt did.
+A route belongs to one player, so a chain can't revisit a player: QB → Z → QB isn't drawable, and the quarterback can't take the ball back after lateraling it. It also caps a chain at one lateral fewer than the offense has players: four with five on offense, eleven with the twelve a play may hold. The game allows more, so this model doesn't give "unlimited" laterals. A lateral back to someone already in the chain is never offered, and one stored that way ends the chain at the thrower (`chainOf`) and is settled away. Lifting the limit would need the chain stored as its own ordered list of hops, each with its own target, catch and job, rather than one route per player. That is what the reverted attempt did.
 
 ## Verification
 
 - Unit tests: `lib/play/lateral.test.ts` (chain walk, clamps, settling), `assignments.test.ts` and `call.test.ts` (every chain ending, no-run zones), `reducer.test.ts` (targeting, catch moves, re-clamping on a drag, flip, undo), `motion.test.ts` (tosses never forward, order, keep, unfinished, pre-snap), `geometry.test.ts` (carrier starts, throw path, arcs), and `storage.test.ts` (migration).
-- `e2e/journeys/lateral-chain.journey.ts` drives the chain, clamps, playback, migration and no-run flag on all four device projects. It leaves `test-results/lateral-chain-<device>-<test>.json` with screenshots, uploaded as `lateral-chain`.
+- `lib/play/share.test.ts` covers a moved catch going through a snapshot link and back. A link carrying a forward catch opens with it snapped back.
+- `e2e/journeys/lateral-chain.journey.ts` drives the chain, clamps, playback, migration and no-run flag on all four device projects. It also opens moved catches from a snapshot link on a cleared device, and a pitch beside a primary Dive stays that Dive's play. It leaves `test-results/lateral-chain-<device>-<test>.json` with screenshots, uploaded as `lateral-chain`.

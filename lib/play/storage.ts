@@ -115,30 +115,36 @@ interface Pitch {
 }
 
 /**
- * A play saved with a Pitch on player P, from before lateral chains (docs/adr/004-lateral-chains.md):
- * the quarterback now laterals to P. Where the pitch was an option (receivers out, and no runner marked
- * the read) P threw, so P throws; otherwise the play was a run, so P keeps it on a Stretch, the wide run
- * the pitch was. A pitch on the quarterback was a rollout: they throw from it or keep it. With two
- * pitches the first, left to right, takes the lateral and the other keeps running; with no
- * quarterback nobody tosses anything, so every pitch keeps running.
+ * A play saved with a Pitch, from before lateral chains (docs/adr/004-lateral-chains.md). The ball
+ * goes to whoever the play's words gave it to then (`runnerOf` before laterals), so nobody's play
+ * changes hands: a runner marked as the read; else, with receivers out, the first pitch runner left
+ * to right, who threw it (the call was an option); else the first runner left to right.
+ *
+ * - When that carrier is a pitch runner P, the quarterback now laterals to P, who throws if the play
+ *   was an option, or keeps it on a Stretch, the wide run the pitch was. A pitch on the quarterback
+ *   who carried it was a rollout: they throw from it, or keep it.
+ * - Every other pitch (the carrier was someone else, or there is no quarterback to toss it) keeps
+ *   running as a Stretch, a decoy, and the carrier keeps their own route and read.
  */
 function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
   const pitched = new Map(pitches.map((p) => [p.id, p]));
   const offense = players.filter((p) => p.team === "offense");
+  const byLine = (a: Player, b: Player): number => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const runs = (p: Player): boolean => pitched.has(p.id) || (p.route !== null && isRun(p.route.type));
   const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.label !== "QB" && !pitched.has(p.id));
-  const readRuns = offense.some((p) => pitched.get(p.id)?.primary === true || (p.route?.primary === true && isRun(p.route.type)));
-  const threw = receivers.length > 0 && !readRuns;
+  // the read, as the play's words found it: the first offensive player marked, a pitch included
+  const read = offense.find((p) => pitched.get(p.id)?.primary === true || p.route?.primary === true);
+  const runners = offense.filter(runs).sort(byLine);
+  const option = !(read && runs(read)) && receivers.length > 0;
+  const carrier = read && runs(read) ? read : option ? runners.find((p) => pitched.has(p.id)) : runners[0];
   const qb = quarterback(players);
-  const first = offense
-    .filter((p) => pitched.has(p.id) && p.id !== qb?.id)
-    .sort((a, b) => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : 1))[0];
+  const tossed = qb && carrier && pitched.has(carrier.id) ? carrier : undefined;
   const keep = (f: Pitch): Route => ({ type: "stretch", ...(f.mirror ? { mirror: true } : {}), ...(f.primary ? { primary: true } : {}) });
   return players.map((p) => {
-    if (qb && first && p.id === qb.id) return { ...p, route: { type: "lateral", target: first.id } };
+    if (tossed && p.id === qb?.id && tossed.id !== qb.id) return { ...p, route: { type: "lateral", target: tossed.id } };
     const f = pitched.get(p.id);
     if (!f) return p;
-    const tossed = qb && (p.id === first?.id || p.id === qb.id);
-    return { ...p, route: tossed && threw ? { type: "throw" } : keep(f) };
+    return { ...p, route: p.id === tossed?.id && option ? { type: "throw" } : keep(f) };
   });
 }
 

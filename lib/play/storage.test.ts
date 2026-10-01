@@ -257,6 +257,26 @@ describe("lateral chains in storage", () => {
     // the read went to the keep itself; a carrier is never the read
     expect(routeOf(read, "o5")).toEqual({ type: "stretch", mirror: true });
   });
+  test("a pitch beside a runner marked as the read: the read still gets the ball, and the pitch runs as a decoy (M7)", () => {
+    // before laterals the words and ▶ gave it to X, the primary Dive: no lateral may take it to Z
+    const ps = normalizePlayers(raw({ o3: { type: "dive", primary: true }, o5: { type: "pitch" }, o4: { type: "corner" } }));
+    expect(routeOf(ps, "o2")).toBeNull();
+    expect(routeOf(ps, "o3")).toEqual({ type: "dive", primary: true });
+    expect(routeOf(ps, "o5")).toEqual({ type: "stretch" });
+    expect(routeOf(ps, "o4")).toEqual({ type: "corner" });
+  });
+  test("with no read and nobody to throw to, the first runner left to right had it; the pitch is a lateral only if that was them (M8)", () => {
+    // X (on the left) dives, Z pitches: X carried it
+    const dive = normalizePlayers(raw({ o3: { type: "dive" }, o5: { type: "pitch" } }));
+    expect(routeOf(dive, "o2")).toBeNull();
+    expect(routeOf(dive, "o3")).toEqual({ type: "dive" });
+    expect(routeOf(dive, "o5")).toEqual({ type: "stretch" });
+    // X pitches, Z dives: X carried it, so X takes the lateral and keeps it
+    const pitch = normalizePlayers(raw({ o3: { type: "pitch" }, o5: { type: "dive" } }));
+    expect(routeOf(pitch, "o2")).toEqual({ type: "lateral", target: "o3" });
+    expect(routeOf(pitch, "o3")).toEqual({ type: "stretch" });
+    expect(routeOf(pitch, "o5")).toEqual({ type: "dive" });
+  });
   test("a pitch on the quarterback was a rollout: they throw from it, or keep it (M3)", () => {
     expect(routeOf(normalizePlayers(raw({ o2: { type: "pitch" }, o3: { type: "go", primary: true } })), "o2")).toEqual({ type: "throw" });
     expect(routeOf(normalizePlayers(raw({ o2: { type: "pitch" } })), "o2")).toEqual({ type: "stretch" });

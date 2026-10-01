@@ -44,3 +44,27 @@ describe("play side in links", () => {
     expect(decodeShare(legacy)?.side).toBe("defense");
   });
 });
+
+describe("lateral chains in links", () => {
+  const chain = (catches: { o2?: readonly [number, number]; o5?: readonly [number, number] }) => defaults().map((p) => {
+    if (p.id === "o2") return { ...p, route: { type: "lateral" as const, target: "o5", ...(catches.o2 ? { catch: catches.o2 } : {}) } };
+    if (p.id === "o5") return { ...p, route: { type: "lateral" as const, target: "o3", ...(catches.o5 ? { catch: catches.o5 } : {}) } };
+    if (p.id === "o3") return { ...p, route: { type: "throw" as const } };
+    return p;
+  });
+  test("a catch the coach moved travels with the link, so the recipient sees the same tosses", () => {
+    const players = chain({ o2: [20, 7], o5: [9, 7.4] });
+    expect(decodeShare(encodeShare({ name: "Trick", players }))?.players).toEqual(players);
+  });
+  test("a lateral with no catch of its own gets none on the way", () => {
+    const players = chain({});
+    const back = decodeShare(encodeShare({ name: "Trick", players }))?.players;
+    expect(back).toEqual(players);
+    expect(back?.find((p) => p.id === "o2")?.route).not.toHaveProperty("catch");
+  });
+  test("a link carrying a catch ahead of its release opens with it snapped back behind it", () => {
+    const players = chain({ o2: [20, 2] });
+    const tampered = Buffer.from(JSON.stringify({ name: "Trick", players })).toString("base64url");
+    expect(decodeShare(tampered)?.players.find((p) => p.id === "o2")?.route?.catch).toEqual([20, 5]);
+  });
+});

@@ -204,6 +204,18 @@ test("a catch never goes forward or past the line, and follows its release when 
   steps.push({ drag: "Z's catch past the line, the QB on it", note: LINE_NOTE, catch: await catchOf(page, "o2") });
   await page.screenshot({ path: `${out(info, "clamp")}-line.png` });
 
+  // a snapshot link carries each catch where the coach left it: opened afresh, the tosses land there
+  const moved = [await catchOf(page, "o2"), await catchOf(page, "o5")];
+  expect(moved).toEqual([[20, 0.9], [9, 6.5]]);
+  await d.clickTool("Copy share link");
+  await page.getByRole("dialog", { name: "Share snapshot" }).getByRole("button", { name: "Copy snapshot link" }).click();
+  const link = await page.evaluate(() => navigator.clipboard.readText());
+  const id = new URL(link).pathname.replace(/^\/p\//, "");
+  await page.evaluate(() => { localStorage.clear(); });
+  await d.goto(`?p=${id}`);
+  await expect.poll(async () => [await catchOf(page, "o2"), await catchOf(page, "o5")]).toEqual(moved);
+  steps.push({ link: "opened on a cleared device", catches: moved });
+
   writeFileSync(`${out(info, "clamp")}.json`, `${JSON.stringify({ project: info.project.name, steps }, null, 2)}\n`);
 });
 
@@ -256,8 +268,10 @@ test("a play saved with a Pitch opens as the QB's lateral to the runner, who thr
   };
   const OPTION = legacy("fx-old-option", "Otter Old Option", { o5: { type: "pitch" }, o4: { type: "corner" } });
   const SWEEP = legacy("fx-old-sweep", "Otter Old Sweep", { o5: { type: "pitch" } });
+  // X, the read on a Dive, had the ball: Z's pitch was a decoy, and stays one
+  const DECOY = legacy("fx-old-decoy", "Otter Old Decoy", { o3: { type: "dive", primary: true }, o5: { type: "pitch" }, o4: { type: "corner" } });
   const d = new Designer(page);
-  await seed(page, { plays: [OPTION, SWEEP], team: OTTERS });
+  await seed(page, { plays: [OPTION, SWEEP, DECOY], team: OTTERS });
 
   // the gallery draws the lateral on each thumbnail
   await page.goto("/playbooks");
@@ -265,6 +279,9 @@ test("a play saved with a Pitch opens as the QB's lateral to the runner, who thr
     const card = page.getByRole("link", { name: `Open ${p.name} in the designer` }).locator("xpath=..");
     await expect(card.getByRole("img").first().locator("[data-lateral]")).toHaveCount(1);
   }
+  const decoyCard = page.getByRole("link", { name: `Open ${DECOY.name} in the designer` }).locator("xpath=..");
+  await expect(decoyCard.getByRole("img").first()).toBeVisible();
+  await expect(decoyCard.getByRole("img").first().locator("[data-lateral]")).toHaveCount(0);
   await page.screenshot({ path: `${out(info, "migration")}-gallery.png` });
 
   const read: Record<string, unknown> = {};
@@ -279,6 +296,11 @@ test("a play saved with a Pitch opens as the QB's lateral to the runner, who thr
   await d.openSaved(SWEEP.name);
   await expect.poll(() => offense(page)).toMatchObject({ QB: { type: "lateral", target: "o5" }, Z: { type: "stretch" } });
   read[SWEEP.name] = await offense(page);
+
+  await d.openSaved(DECOY.name);
+  await expect.poll(() => offense(page)).toMatchObject({ QB: null, X: { type: "dive", primary: true }, Z: { type: "stretch" } });
+  await expect(d.field.locator("[data-lateral]")).toHaveCount(0);
+  read[DECOY.name] = await offense(page);
   writeFileSync(`${out(info, "migration")}.json`, `${JSON.stringify({ project: info.project.name, read }, null, 2)}\n`);
 });
 
