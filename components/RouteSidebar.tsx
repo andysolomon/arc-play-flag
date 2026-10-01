@@ -11,8 +11,14 @@ import { Sticker } from "./Sticker";
 
 interface Props {
   selected: Player | null;
-  /** who holds the ball, in order: the quarterback, then each lateral's target (lib/play/lateral.ts) */
+  /** who holds the ball, in order, the same player as often as they take it (lib/play/lateral.ts) */
   chain: readonly Player[];
+  /** the place in the chain the selected player is being edited at (0 is the quarterback at the snap); null off it */
+  visit: number | null;
+  /** the Lateral tile: ask who takes it, or, from a time the ball goes on, take that lateral and the rest off */
+  onLateral: () => void;
+  /** a step of the ball path tapped: edit that time its player has the ball */
+  onVisit: (index: number) => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
   cut: SidelineCut | null;
   hint: string | null;
@@ -40,21 +46,29 @@ function chainEnd(last: Player | undefined): string {
   return "?";
 }
 
-function RouteSidebarImpl({ selected: sel, chain, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone }: Props) {
+function RouteSidebarImpl({
+  selected: sel, chain, visit, onLateral, onVisit, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone,
+}: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
   const noRunNote = useId();
-  // where the selected player is in the chain: 0 the quarterback, more a lateral's target, -1 off it
-  const at = sel ? chain.findIndex((p) => p.id === sel.id) : -1;
+  // the time in the chain the selected player is being edited at: 0 the quarterback at the snap, more a
+  // lateral they take, -1 off the chain
+  const at = sel && visit !== null && chain[visit]?.id === sel.id ? visit : -1;
   const laterals = chain.length > 1;
   // took a lateral: they have the ball, so their choices are throw, lateral again or keep it
   const hasBall = at > 0;
+  // the ball goes on from them this time: their Lateral is on, and nothing else is their job yet
+  const goesOn = at >= 0 && at < chain.length - 1;
+  // they had it before this time: "has it again"
+  const again = hasBall && chain.slice(0, at).some((p) => p.id === sel?.id);
+  const isJob = (k: RouteType): boolean => !goesOn && sel?.route?.type === k;
   // offense splits into the passing tree and the run game; defense is one list. A carrier gets no pass route
   const keys: readonly RouteType[] = sel?.team === "offense" ? (hasBall ? [] : PASS_KEYS) : DEFENSE_KEYS;
   const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
   // the read is someone the final throw goes to, never a player the ball is lateraled through
-  const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && at >= 0));
+  const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
   const canMirror = mirrorable(sel);
   const primaryOn = !!sel?.route?.primary;
   const guidance = hint
@@ -101,17 +115,25 @@ function RouteSidebarImpl({ selected: sel, chain, cut, hint, onPick, onMotion, o
               style={{ background: teamFill(sel.team) }}
             />
             <h2 className="flex-1 text-title font-normal leading-tight">
-              {hasBall ? `${sel.label || "This player"} has the ball` : sel.team === "offense" ? "Pick a route" : "Pick a coverage"}
+              {hasBall
+                ? `${sel.label || "This player"} has ${again ? "it again" : "the ball"}`
+                : sel.team === "offense" ? "Pick a route" : "Pick a coverage"}
             </h2>
           </div>
-          {/* where the ball goes, carrier by carrier, and how it ends */}
-          {laterals && at >= 0 && (
+          {/* where the ball goes, carrier by carrier, and how it ends; a tap on a step edits that time they have it */}
+          {laterals && chain.some((p) => p.id === sel.id) && (
             <ol aria-label="Ball path" className="flex flex-none flex-wrap items-center gap-1 text-small text-ink-muted">
               <li className={eyebrow}>BALL</li>
-              {chain.map((p) => (
-                <li key={p.id} className="flex items-center gap-1">
+              {chain.map((p, i) => (
+                <li key={i} className="flex items-center gap-1">
                   <span aria-hidden="true" className="text-ink-faint">→</span>
-                  <span className={crumb} data-active={p.id === sel.id} aria-current={p.id === sel.id ? "step" : undefined}>{p.label || "·"}</span>
+                  <button
+                    type="button" className={`${crumb} min-h-11 min-w-11 cursor-pointer justify-center hover:bg-yellow-soft`} data-active={i === at}
+                    aria-current={i === at ? "step" : undefined} aria-label={`${p.label || "Player"}, step ${String(i + 1)} of the ball path`}
+                    onClick={() => { onVisit(i); }}
+                  >
+                    {p.label || "·"}
+                  </button>
                 </li>
               ))}
               <li className="flex items-center gap-1">
@@ -166,8 +188,8 @@ function RouteSidebarImpl({ selected: sel, chain, cut, hint, onPick, onMotion, o
                 Took a lateral behind the line, so everything is still legal: a forward throw, another lateral, or keep it.
               </span>
               <div className={tileGrid} role="group" aria-label="With the ball">
-                <IconTile icon="football" label="Throw" active={sel.route?.type === "throw"} onClick={() => { onPick("throw"); }} />
-                <IconTile icon="pitch" label="Lateral" active={sel.route?.type === "lateral"} onClick={() => { onPick("lateral"); }} />
+                <IconTile icon="football" label="Throw" active={isJob("throw")} onClick={() => { onPick("throw"); }} />
+                <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />
                 <IconTile icon="deselectOff" label="Done" onClick={onDone} />
               </div>
             </>
@@ -179,7 +201,7 @@ function RouteSidebarImpl({ selected: sel, chain, cut, hint, onPick, onMotion, o
                   key={k}
                   icon={k === "custom" ? `custom${suffix}` : k}
                   label={tableFor(sel.team)[k]?.label ?? k}
-                  active={sel.route?.type === k}
+                  active={isJob(k)}
                   onClick={() => { onPick(k); }}
                 />
               ))}
@@ -201,14 +223,14 @@ function RouteSidebarImpl({ selected: sel, chain, cut, hint, onPick, onMotion, o
                     key={k}
                     icon={k}
                     label={tableFor(sel.team)[k]?.label ?? k}
-                    active={sel.route?.type === k}
+                    active={isJob(k)}
                     hatched={noRunZone}
                     describedBy={noRunZone ? noRunNote : undefined}
                     onClick={() => { onPick(k); }}
                   />
                 ))}
                 {/* the quarterback starts a chain here, where Pitch was; later carriers lateral from WITH THE BALL */}
-                {at === 0 && <IconTile icon="pitch" label="Lateral" active={sel.route?.type === "lateral"} onClick={() => { onPick("lateral"); }} />}
+                {at === 0 && <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />}
                 {!hasBall && <IconTile icon={`deselect${suffix}`} label="Done" onClick={onDone} />}
               </div>
             </>

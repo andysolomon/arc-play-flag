@@ -33,16 +33,32 @@ interface Track {
   wait: number;
   /** man coverage: the offensive player being shadowed */
   target?: string;
-  /** a lateral's target: they stop `d` yards in, at the catch, until `until` seconds after the snap, then go on */
-  hold?: { d: number; until: number };
+  /**
+   * a lateral chain's carrier: in order, they stop `d` yards in (where they stand, or a catch) until
+   * `until` seconds after the snap, waiting for the ball or holding it until they toss it on, then go on
+   */
+  holds?: Hold[];
 }
 
-/** One lateral in playback: tossed from one carrier's hands at `at` and caught at the catch point at `land`. */
+interface Hold {
+  d: number;
+  until: number;
+}
+
+/**
+ * One lateral in playback: let go from `release` at `at`, and caught at the catch point at `land`. The
+ * ball flies between those two fixed points. Ways it could go wrong:
+ * - T1 the thrower moves on once it's gone (a quarterback drifting back to take it again) and drags the
+ *   ball in the air with them: it would bow off its line, and a level toss would dip deeper and back.
+ * - T2 the ball leaves from somewhere other than the thrower's hands: `release` is where they hold it, at
+ *   their spot or their catch, the same point the arc on the field is drawn from.
+ */
 export interface Toss {
   from: string;
   to: string;
   at: number;
   land: number;
+  release: Pt;
   catch: Pt;
 }
 
@@ -135,19 +151,42 @@ function at(t: Track, d: number): Pt {
   return t.pts[t.pts.length - 1] ?? first;
 }
 
-/** Where along a track a player is after `s` seconds, holding at the catch until the lateral is theirs. */
-function along(t: Track, s: number): Pt {
-  const d = (s - t.wait) * SPEED;
-  const h = t.hold;
-  if (!h || d <= h.d) return at(t, d);
-  const go = Math.max(t.wait + h.d / SPEED, h.until);
-  return at(t, s < go ? h.d : h.d + (s - go) * SPEED);
+/** How far along a track a player is after `s` seconds, stopping at each hold until it ends. */
+function distAt(t: Track, s: number): number {
+  let time = t.wait, d = 0;
+  for (const h of t.holds ?? []) {
+    const arrive = time + (h.d - d) / SPEED;
+    if (s < arrive) return d + (s - time) * SPEED;
+    time = Math.max(arrive, h.until);
+    d = h.d;
+    if (s < time) return d;
+  }
+  return d + (s - time) * SPEED;
 }
 
-/** Seconds after the snap a track is run to its end, any hold included. */
+/** Where along a track a player is after `s` seconds. */
+const along = (t: Track, s: number): Pt => at(t, distAt(t, s));
+
+/** Seconds after the snap a track's player reaches one of its holds, every hold before it kept. */
+function reach(t: Track, stop: Hold): number {
+  let time = t.wait, d = 0;
+  for (const h of t.holds ?? []) {
+    const arrive = time + (h.d - d) / SPEED;
+    if (h === stop) return arrive;
+    time = Math.max(arrive, h.until);
+    d = h.d;
+  }
+  return time + (stop.d - d) / SPEED;
+}
+
+/** Seconds after the snap a track is run to its end, every hold included. */
 function endOf(t: Track): number {
-  const h = t.hold;
-  return h ? Math.max(t.wait + h.d / SPEED, h.until) + (t.len - h.d) / SPEED : t.wait + t.len / SPEED;
+  let time = t.wait, d = 0;
+  for (const h of t.holds ?? []) {
+    time = Math.max(time + (h.d - d) / SPEED, h.until);
+    d = h.d;
+  }
+  return time + (t.len - d) / SPEED;
 }
 
 /** Seconds until a runner is closest to the quarterback, and how far away they still are. */
@@ -196,13 +235,7 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
   const zones = zoneLayout(players, top);
   const tracks: Record<string, Track> = {};
   const links = chainLinks(players);
-  for (const l of links) {
-    // a lateral's target drifts from their spot to the catch, holds there until it's theirs, then does
-    // their job from it (routeYards starts it there); the hold's end is set once the tosses are timed
-    const job = routeYards(l.to, players, top) ?? [];
-    const drift = Math.hypot(l.catch[0] - l.to.x, l.catch[1] - l.to.y);
-    tracks[l.to.id] = { ...track([[l.to.x, l.to.y], l.catch, ...job]), hold: { d: drift, until: 0 } };
-  }
+  const tosses = chainTracks(links, players, top, tracks);
   for (const p of players) {
     if (!p.route || tracks[p.id]) continue;
     const zone = zones[p.id];
@@ -243,7 +276,7 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
     passer: qb?.id ?? null, receiver: null, throwAt: Infinity, catchAt: Infinity,
   };
   if (!qb) return m;
-  if (links.length) return chainPlay(m, players, tracks, links, random, run);
+  if (links.length) return chainPlay(m, players, tracks, links, tosses, random, run);
 
   const offense = players.filter((p) => p.team === "offense" && p.route && tracks[p.id]);
   const runners = offense.filter((p) => p.route && isRun(p.route.type));
@@ -303,28 +336,77 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
   return m;
 }
 
+/** For each lateral in order: the hold where its thrower has it, and the hold at its catch. */
+interface TossHolds {
+  from: Hold;
+  to: Hold;
+}
+
 /**
- * A lateral chain after the snap. Each toss leaves the carrier a beat after they have it, timed so it
- * lands as the target gets to the catch (they drift there from the snap), and goes low and backward.
- * Then the last carrier throws (they set up behind the line and hit the read, never another carrier),
- * keeps it (a run, from the catch), or, with no job yet, just holds it. Everyone off the chain runs
- * their route from the snap.
+ * Every carrier's track on a lateral chain: from their spot to each catch that is theirs in turn, with a
+ * hold at each (and at the quarterback's spot, which they toss it from first), then, for the last carrier,
+ * their job from the last catch. The holds' ends are set once the tosses are timed (chainPlay).
+ */
+function chainTracks(links: readonly Link[], players: readonly Player[], top: number, tracks: Record<string, Track>): TossHolds[] {
+  const legs = new Map<string, { pts: Pair[]; len: number; holds: Hold[] }>();
+  const leg = (p: Player) => {
+    const known = legs.get(p.id);
+    if (known) return known;
+    const fresh = { pts: [[p.x, p.y] as Pair], len: 0, holds: [] as Hold[] };
+    legs.set(p.id, fresh);
+    return fresh;
+  };
+  // the hold where each carrier has it now
+  const now = new Map<string, Hold>();
+  const out: TossHolds[] = [];
+  for (const l of links) {
+    let from = now.get(l.from.id);
+    if (!from) {
+      from = { d: 0, until: 0 };
+      leg(l.from).holds.push(from);
+    }
+    const target = leg(l.to);
+    const prev = target.pts[target.pts.length - 1] ?? l.catch;
+    target.len += Math.hypot(l.catch[0] - prev[0], l.catch[1] - prev[1]);
+    target.pts.push(l.catch);
+    const to = { d: target.len, until: 0 };
+    target.holds.push(to);
+    now.set(l.to.id, to);
+    out.push({ from, to });
+  }
+  const last = links[links.length - 1]?.to;
+  if (last) leg(last).pts.push(...(routeYards(last, players, top) ?? []));
+  for (const [id, l] of legs) tracks[id] = { ...track(l.pts), holds: l.holds };
+  return out;
+}
+
+/**
+ * A lateral chain after the snap. Each toss leaves its carrier a beat after they have it, timed so it
+ * lands as the target gets to the catch (they drift there from the snap, or from where they last let it
+ * go when it comes back to them), and goes low and backward. Then the last carrier throws (they set up
+ * behind the line and hit the read, never a carrier), keeps it (a run, from the catch), or, with no job
+ * yet, just holds it. Everyone off the chain runs their route from the snap.
  */
 function chainPlay(
-  m: Motion, players: readonly Player[], tracks: Record<string, Track>, links: readonly Link[],
+  m: Motion, players: readonly Player[], tracks: Record<string, Track>, links: readonly Link[], holds: readonly TossHolds[],
   random: (() => number) | null, run: number,
 ): Motion {
   let held = m.snapAt;
-  for (const l of links) {
+  links.forEach((l, i) => {
+    const h = holds[i];
     const tr = tracks[l.to.id];
-    const drift = tr?.hold?.d ?? 0;
+    const arrive = tr && h ? reach(tr, h.to) : 0;
     const flight = cl(Math.hypot(l.catch[0] - l.release[0], l.catch[1] - l.release[1]) / 12, 0.3, 0.8);
-    const at = Math.max(held + BEAT, drift / SPEED - flight);
+    const at = Math.max(held + BEAT, arrive - flight);
     const land = at + flight;
-    if (tr?.hold) tr.hold.until = land;
-    m.laterals.push({ from: l.from.id, to: l.to.id, at, land, catch: { x: l.catch[0], y: l.catch[1] } });
+    // the thrower holds it until it leaves; the target waits at the catch until it's theirs
+    if (h) {
+      h.from.until = at;
+      h.to.until = land;
+    }
+    m.laterals.push({ from: l.from.id, to: l.to.id, at, land, release: { x: l.release[0], y: l.release[1] }, catch: { x: l.catch[0], y: l.catch[1] } });
     held = land;
-  }
+  });
   const last = links[links.length - 1]?.to;
   if (!last) return m;
   const carried = tracks[last.id];
@@ -420,11 +502,11 @@ export function ballAt(m: Motion, pos: Record<string, Pt>, t: number): Ball | nu
   const runner = m.runner ? pos[m.runner] : undefined;
   if (m.laterals.length) {
     for (const l of m.laterals) {
-      const from = pos[l.from] ?? qb;
-      if (t < l.at) return { ...from, lift: 0 };
+      if (t < l.at) return { ...(pos[l.from] ?? qb), lift: 0 };
       if (t < l.land) {
+        // from where it was let go (T1): the thrower may already be on their way to take it again
         const k = (t - l.at) / (l.land - l.at);
-        return { ...lerp(from, l.catch, k), lift: TOSS_LIFT * Math.sin(Math.PI * k) };
+        return { ...lerp(l.release, l.catch, k), lift: TOSS_LIFT * Math.sin(Math.PI * k) };
       }
     }
     const last = m.laterals[m.laterals.length - 1];

@@ -16,7 +16,8 @@
  * - L5 an offensive play with no routes: no call name, no call line.
  * - T6 two plays with one name: `headerLine` leads with the play's number.
  * - L6 a lateral chain (lib/play/lateral.ts) reads as who tosses it to whom and how it ends; a
- *   carrier left with the ball and no job is said to be one (`missing`), never "No route".
+ *   carrier left with the ball and no job is said to be one (`missing`), never "No route"; a player
+ *   who has it more than once is given every time, in order.
  * - L7 a read marked on a carrier in a chain is not the read: the final throw goes to someone else.
  *
  * Text is used as given; the caller cleans it first (T1–T5).
@@ -25,7 +26,7 @@
 import type { Numbered } from "@/lib/export/numbered";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
-import { carriers, chainOf } from "./lateral";
+import { carriers, chainOf, visits } from "./lateral";
 import { isRun, routeDef } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
@@ -89,10 +90,6 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
   const rt = p.route;
   if (!rt) return null;
   if (rt.type === "custom") return "Custom route";
-  if (rt.type === "lateral") {
-    const target = play.players.find((q) => q.id === rt.target);
-    return target ? `Lateral to ${who(target)}` : "Lateral";
-  }
   if (rt.type === "man") {
     const target = play.players.find((q) => q.id === rt.target);
     return target ? `Man on ${who(target)}` : "Man";
@@ -183,19 +180,27 @@ function qbJob(play: SavedPlay, who: Who): string | null {
 }
 
 /**
- * A carrier's job after the quarterback, who took a lateral (L6): toss it on, throw, keep it, or, with
- * nothing yet, say so. The quarterback's own throw is plain "Throw". Null off the chain.
+ * A carrier's job in a lateral chain (L6), said for every time they have it, in order: they toss it on
+ * ("Lateral to X"), or, the last time, throw, keep it or, with nothing yet, say so. A player who has it
+ * more than once gets each in turn: "Lateral to Z, then lateral to X". Null off the chain, and for a
+ * quarterback with no lateral, whose own route says their job, but for their rollout's "Throw".
  */
-function carrierJob(p: Player, index: number, play: SavedPlay, who: Who): string | null {
+function carrierJob(p: Player, chain: readonly Player[], play: SavedPlay, who: Who): { job: string; missing: boolean } | null {
+  const at = visits(chain, p.id);
   const rt = p.route;
-  if (index < 0) return null;
   const pr = primaryOf(play);
   const look = pr ? `, look to ${who(pr)} first` : "";
-  if (rt?.type === "throw") return index === 0 ? `Throw${look}` : `Take the lateral, throw${look}`;
-  if (index === 0) return null;
-  if (!rt) return "Takes the lateral · no job yet";
-  if (isRun(rt.type)) return `Take the lateral, keep it: ${routeJob(p, play, who) ?? ""}`;
-  return null;
+  const last = chain.length - 1;
+  if (!at.length) return null;
+  if (last === 0) return rt?.type === "throw" ? { job: `Throw${look}`, missing: false } : null;
+  const one = (i: number): string => {
+    if (i < last) return `Lateral to ${who(chain[i + 1] ?? null)}`;
+    if (rt?.type === "throw") return `Take the lateral, throw${look}`;
+    if (rt && isRun(rt.type)) return `Take the lateral, keep it: ${routeJob(p, play, who) ?? ""}`;
+    return "Takes the lateral · no job yet";
+  };
+  const job = at.map(one).map((t, k) => (k === 0 ? t : t.charAt(0).toLowerCase() + t.slice(1))).join(", then ");
+  return { job, missing: at.includes(last) && !rt };
 }
 
 /** Every player on the play's own side, left to right, with their job. */
@@ -205,10 +210,9 @@ export function assignments(play: SavedPlay): Assignment[] {
   const pr = primaryOf(play);
   return play.players.filter((p) => p.team === play.side).sort(byLine).map((p) => {
     const offense = p.team === "offense";
-    const index = offense ? chain.findIndex((q) => q.id === p.id) : -1;
-    const held = offense ? carrierJob(p, index, play, who) : null;
-    let job = held ?? routeJob(p, play, who);
-    const missing = index > 0 && !p.route;
+    const held = offense ? carrierJob(p, chain, play, who) : null;
+    let job = held?.job ?? routeJob(p, play, who);
+    const missing = held?.missing ?? false;
     let idle = false;
     if (job === null && offense && p.label === "QB") job = qbJob(play, who);
     if (job === null) {

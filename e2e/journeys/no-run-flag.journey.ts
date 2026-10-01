@@ -9,7 +9,7 @@ import { slidePlans } from "../../lib/export/slides";
 import { BAND_PRESETS, wristbandPages } from "../../lib/export/wristband";
 import type { SavedPlay, TeamSettings } from "../../lib/play/types";
 import { Designer } from "../support/designer";
-import { OTTERS, play, playbook, seed, storedDraft } from "../support/fixtures";
+import { OTTERS, lateraled, play, playbook, seed, storedDraft } from "../support/fixtures";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
@@ -202,7 +202,7 @@ test("a run picked with the ball on the 5 is flagged as it is drawn, and every w
 const GOAL_LINE_STRETCH: SavedPlay = { ...play("fx-goal-line-stretch", "Otter Goal Line Stretch", { o5: { type: "stretch" } }, "Z follows the C."), los: 35 };
 const GOAL_LINE_FAKE: SavedPlay = { ...play("fx-goal-line-fake", "Otter Goal Line Fake", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "corner" } }), los: 35 };
 const GOAL_LINE_DOUBLE: SavedPlay = {
-  ...play("fx-goal-line-double", "Otter Goal Line Double Pass", { o2: { type: "lateral", target: "o5" }, o5: { type: "throw" }, o4: { type: "corner" } }),
+  ...lateraled(play("fx-goal-line-double", "Otter Goal Line Double Pass", { o5: { type: "throw" }, o4: { type: "corner" } }), ["o5"]),
   los: 35,
 };
 const GOAL_LINE_D: SavedPlay = {

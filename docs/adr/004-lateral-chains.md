@@ -1,6 +1,6 @@
 # ADR 004: lateral chains
 
-Status: implemented. It replaces the Pitch route. An earlier attempt (#122, reverted in #124) kept a separate ball plan beside the routes. This one keeps the whole chain in the routes it is made of.
+Status: implemented, and superseded in part by [ADR 005](005-unlimited-laterals.md), which stores the chain on the quarterback and lets a player take it again, lifting rule 4 and the known limit below. It replaces the Pitch route. An earlier attempt (#122, reverted in #124) kept a separate ball plan beside the routes. This one keeps the whole chain in the routes it is made of.
 
 ## Rules
 

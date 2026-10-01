@@ -15,8 +15,8 @@ export type OffenseRouteType =
   | "go" | "out" | "in" | "slant" | "corner" | "post" | "curl" | "flat"
   | "cross" | "wheel" | "custom"
   | "handoff" | "dive" | "stretch" | "counter" | "reverse" | "delay"
-  /** a ball carrier's jobs: toss it back to another player, or set up and throw it forward */
-  | "lateral" | "throw";
+  /** the last ball carrier of a lateral chain sets up and throws it forward */
+  | "throw";
 export type DefenseRouteType =
   | "man" | "zoneDeep" | "zoneFlat" | "curlFlat" | "midRead" | "blitz" | "spy" | "custom";
 export type RouteType = OffenseRouteType | DefenseRouteType;
@@ -25,22 +25,10 @@ export interface Route {
   type: RouteType;
   /** custom routes: absolute yard waypoints after the player's spot */
   pts?: Pair[];
-  /** man coverage: id of the offensive player being covered; a lateral: who takes it */
+  /** man coverage: id of the offensive player being covered */
   target?: PlayerId;
-  /**
-   * a lateral: the absolute yard point where it is caught, level with or behind where it is let go
-   * and behind the line of scrimmage (see lib/play/lateral.ts). Left out, it is worked out from the target.
-   */
-  catch?: Pair;
   mirror?: boolean;
   primary?: boolean;
-}
-
-/** A carrier tosses the ball back to another offensive player, who catches it at `catch`. */
-export interface LateralRoute extends Route {
-  type: "lateral";
-  target: PlayerId;
-  catch?: Pair;
 }
 
 /** A carrier sets up at the pitch set depth and throws forward to the read. */
@@ -48,8 +36,17 @@ export interface ThrowRoute extends Route {
   type: "throw";
 }
 
-export const isLateral = (r: Route | null | undefined): r is LateralRoute => r?.type === "lateral" && typeof r.target === "string";
 export const isThrow = (r: Route | null | undefined): r is ThrowRoute => r?.type === "throw";
+
+/**
+ * One lateral in the quarterback's chain: who takes it, and where they catch it (absolute yards),
+ * level with or behind where it is let go and behind the line of scrimmage (see lib/play/lateral.ts).
+ * With no catch stored, one is worked out from where the target is.
+ */
+export interface Hop {
+  to: PlayerId;
+  catch?: Pair;
+}
 
 export interface Player {
   id: string;
@@ -60,6 +57,11 @@ export interface Player {
   route: Route | null;
   /** Absolute yard waypoints before the snap; independent of the post-snap route. */
   preSnap?: { pts: Pair[] };
+  /**
+   * The quarterback only: the ball's laterals after the snap, in order. Anyone may take it, again and
+   * again, but never from themself; the last to take it does their own route's job with it.
+   */
+  laterals?: Hop[];
 }
 
 /** How a route ends: an arrowhead, a zone bubble, or a ring where a carrier sets up to throw. */
@@ -74,8 +76,8 @@ export interface RouteDef {
   free?: boolean;
   /** the ball carrier's path on a run: laid out through the mesh point beside the QB */
   run?: boolean;
-  /** a job only the player holding the ball can take: toss it back, or set up and throw */
-  ball?: "lateral" | "throw";
+  /** a job only the player holding the ball can take: set up and throw */
+  ball?: "throw";
 }
 
 /** Measured size of the centre pane, minus its padding. */

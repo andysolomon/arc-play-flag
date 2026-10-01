@@ -192,8 +192,13 @@ describe("the call", () => {
 });
 
 describe("lateral chains", () => {
-  const chain = (r: Record<string, Route>): Player[] => defaults().map((p) => (r[p.id] ? { ...p, route: r[p.id] ?? null } : p));
-  const DOUBLE = { o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "throw" }, o4: { type: "go", primary: true }, o3: { type: "go" } } as const;
+  /** The default formation with routes, and the quarterback's laterals: each a target, or a target and its catch. */
+  const chain = (hops: readonly (string | readonly [string, readonly [number, number]])[], r: Record<string, Route>): Player[] =>
+    defaults().map((p) => {
+      const q = r[p.id] ? { ...p, route: r[p.id] ?? null } : p;
+      return p.id === "o2" ? { ...q, laterals: hops.map((h) => (typeof h === "string" ? { to: h } : { to: h[0], catch: h[1] })) } : q;
+    });
+  const DOUBLE = chain([["o5", [22, 6]]], { o5: { type: "throw" }, o4: { type: "go", primary: true }, o3: { type: "go" } });
   const ball = (m: ReturnType<typeof buildMotion>, ps: readonly Player[], t: number) => {
     const b = ballAt(m, positionsAt(m, ps, t), t);
     if (!b) throw new Error("no ball at " + String(t));
@@ -201,7 +206,7 @@ describe("lateral chains", () => {
   };
 
   test("a double pass: the ball goes back to the catch as the receiver gets there, then they set up and throw to the read", () => {
-    const ps = chain(DOUBLE);
+    const ps = DOUBLE;
     const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("pass");
     const [toss, ...more] = m.laterals;
@@ -240,7 +245,7 @@ describe("lateral chains", () => {
     }
   });
   test("two laterals go in order, the second from where the first was caught", () => {
-    const ps = chain({ o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "lateral", target: "o3", catch: [9, 6.8] }, o3: { type: "throw" }, o4: { type: "go", primary: true } });
+    const ps = chain([["o5", [22, 6]], ["o3", [9, 6.8]]], { o3: { type: "throw" }, o4: { type: "go", primary: true } });
     const m = buildMotion(ps, TOP);
     const [first, second] = m.laterals;
     expect(second).toMatchObject({ from: "o5", to: "o3" });
@@ -255,8 +260,54 @@ describe("lateral chains", () => {
     expect(m.receiver).toBe("o4");
     expect(m.throwAt).toBeGreaterThan(second.land);
   });
+  test("back to the QB and on: the QB holds their spot until they let it go, then drifts back to take it again (R11)", () => {
+    const ps = chain([["o5", [22, 6]], ["o2", [12, 7]], ["o3", [4, 7.4]]], { o3: { type: "throw" }, o4: { type: "go", primary: true } });
+    const m = buildMotion(ps, TOP);
+    expect(m.laterals.map((l) => [l.from, l.to])).toEqual([["o2", "o5"], ["o5", "o2"], ["o2", "o3"]]);
+    const [first, back, on] = m.laterals;
+    if (!first || !back || !on) return;
+    // the QB is still on their spot when the first toss leaves, and at their second catch when it comes back
+    expect(at(positionsAt(m, ps, first.at), "o2")).toEqual({ x: 15, y: 5 });
+    const caught = at(positionsAt(m, ps, back.land), "o2");
+    expect(caught.x).toBeCloseTo(12, 5);
+    expect(caught.y).toBeCloseTo(7, 5);
+    // each toss leaves after the one before it lands, and none goes forward
+    expect(back.at).toBeGreaterThan(first.land);
+    expect(on.at).toBeGreaterThan(back.land);
+    for (const [l, from] of [[first, 5], [back, 6], [on, 7]] as const) {
+      for (let t = l.at; t <= l.land; t += 0.01) expect(ball(m, ps, t).y).toBeGreaterThanOrEqual(from - 1e-9);
+    }
+    // between the tosses the QB has it, at their second catch
+    const between = (back.land + on.at) / 2;
+    expect(ball(m, ps, between)).toEqual({ ...at(positionsAt(m, ps, between), "o2"), lift: 0 });
+    expect(m.passer).toBe("o3");
+    expect(m.receiver).toBe("o4");
+  });
+  test("a toss flies from where it was let go, not with a thrower who moves on to take it again (T1)", () => {
+    // a level toss at the QB's depth, then back to the QB, who drifts to 7 yards deep while it's in the air
+    const ps = chain([["o5", [22, 5]], ["o2", [12, 7]]], { o2: { type: "throw" }, o4: { type: "go", primary: true } });
+    const m = buildMotion(ps, TOP);
+    const [first, back] = m.laterals;
+    if (!first || !back) throw new Error("two tosses");
+    expect(first.release).toEqual({ x: 15, y: 5 });
+    expect(back.release).toEqual({ x: 22, y: 5 });
+    // the QB is already on the move toward their next catch before the first toss lands
+    const qbMid = at(positionsAt(m, ps, (first.at + first.land) / 2), "o2");
+    expect(qbMid.y).toBeGreaterThan(5);
+    // each flight stays on the straight line from its release to its catch, and a level toss stays level
+    for (const l of [first, back]) {
+      for (let t = l.at; t <= l.land; t += 0.01) {
+        const b = ball(m, ps, t);
+        const cross = (l.catch.x - l.release.x) * (b.y - l.release.y) - (l.catch.y - l.release.y) * (b.x - l.release.x);
+        expect(Math.abs(cross)).toBeLessThan(1e-9);
+        expect(b.x).toBeGreaterThanOrEqual(Math.min(l.release.x, l.catch.x) - 1e-9);
+        expect(b.x).toBeLessThanOrEqual(Math.max(l.release.x, l.catch.x) + 1e-9);
+      }
+    }
+    for (let t = first.at; t <= first.land; t += 0.01) expect(ball(m, ps, t).y).toBeCloseTo(5, 9);
+  });
   test("a lateral run: the last carrier keeps it and runs from the catch", () => {
-    const ps = chain({ o2: { type: "lateral", target: "o5", catch: [22, 6] }, o5: { type: "reverse" }, o4: { type: "go" } });
+    const ps = chain([["o5", [22, 6]]], { o5: { type: "reverse" }, o4: { type: "go" } });
     const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("run");
     expect(m.runner).toBe("o5");
@@ -265,14 +316,14 @@ describe("lateral chains", () => {
     expect(ball(m, ps, m.dur)).toEqual({ ...at(late, "o5"), lift: 0 });
   });
   test("an unfinished chain ends with the ball in the last carrier's hands", () => {
-    const ps = chain({ o2: { type: "lateral", target: "o5" }, o4: { type: "go", primary: true } });
+    const ps = chain(["o5"], { o4: { type: "go", primary: true } });
     const m = buildMotion(ps, TOP);
     expect(m.kind).toBe("hold");
     expect(m.receiver).toBeNull();
     expect(ball(m, ps, m.dur)).toEqual({ ...at(positionsAt(m, ps, m.dur), "o5"), lift: 0 });
   });
   test("pre-snap motion holds the laterals back with the snap", () => {
-    const still = chain(DOUBLE);
+    const still = DOUBLE;
     const moving = still.map((p) => (p.id === "o3" ? { ...p, preSnap: { pts: [[8, 1]] as [number, number][] } } : p));
     const a = buildMotion(still, TOP), b = buildMotion(moving, TOP);
     const shift = b.preSnapFor ?? 0;

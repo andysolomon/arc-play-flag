@@ -6,15 +6,15 @@
   ],
   "files": {
     "app/globals.css": "adbe29ff46823bb9aba6b3180b4dc839919262cfd08908914532b1b393617bb7",
-    "components/App.tsx": "c164a4d5b91d37e65e4d58d11c7f5b44b12f0f0eb0d801b39edaafbff19e9beb",
+    "components/App.tsx": "24d92b82262a8c218f61d02584ab490a7c8c5adfa7c2402d13bfb9df83fb00ba",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "fdf4fd603eb8d0b3e0448e10c9ead084c70ed7fb335d934b3b4e5044983ea0d5",
+    "components/Field.tsx": "a7b7853a48edb698149178c411198a4e98c0ef85c5207f350f34519325d8eead",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "27ae56c5b4ae332ed52f4d97e484e2aa1f31e4fb55111982b76679dd2d495519",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "d8d6e11e2930790550cf0915ef14f172bb275f1c6f6d2578ff0014296c1aea92",
-    "components/LateralLayer.tsx": "d356a181f066c3f117d0eba4b950a4721405d26efa046623d15fef1593a4bfa2",
+    "components/LateralLayer.tsx": "0ce4a2aa47cb4c0052c735f4218a51827c718a9dc0c7e0a475b7e2b12c28f3cf",
     "components/ManTagLayer.tsx": "258c32c219b052ff21d75fa6e169e2e6abbc1b3f12036aee17a0c3a779615833",
     "components/OfflineStatus.tsx": "bf355de426d0eda57124b65468b8657713b243ff0b50fb7e1a639c4ed60aea2d",
     "components/PlaySidebar.tsx": "8f263155be4f3b5bb9e2ab788ae22149f12cfef443e72abb07cad239c30aed2c",
@@ -23,7 +23,7 @@
     "components/PlayerToken.tsx": "973e5390c1594caf47c2c981c105720693432b3207af76e0a91a868bbec1c9bc",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "b15606d5a702854e90beba918c764f584cdae739606ba5a1d754f8e1c6bb2735",
+    "components/RouteSidebar.tsx": "a26fdbc993f35c5fb0e6db6df4c9345368dc81f0faf66db521927078e7b25dce",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",
@@ -65,7 +65,7 @@
     "components/ui.ts": "708637dcfd235815bdbab737b526778a9b6f6289956c01dd966fb893a1c5aaee"
   },
   "restamped": {
-    "reason": "Lateral replaces Pitch only in the third row of the offense palette's RUN group, which no clip scrolls to (build-play stops at the pass tiles and custom-routes at the Counter/Reverse/Delay row, checked frame by frame); arcs, catch handles, the carrier palette and the flag-yellow note (which wraps rather than cuts off) draw only on plays with a lateral, which no chapter has; Man targeting's rings are unchanged. The game-day reader's read-only field passes no targeting as null, the type the field now takes; nothing draws differently",
+    "reason": "Lateral replaces Pitch only in the third row of the offense palette's RUN group, which no clip scrolls to (build-play stops at the pass tiles and custom-routes at the Counter/Reverse/Delay row, checked frame by frame); arcs, catch handles, the carrier palette and the flag-yellow note (which wraps rather than cuts off) draw only on plays with a lateral, which no chapter has; Man targeting's rings are unchanged. The game-day reader's read-only field passes no targeting as null, the type the field now takes; nothing draws differently. Laterals to anyone, as often as the play needs: the ball path becomes buttons and the field's catch handles are keyed by toss, both drawn only on plays with a lateral, which no chapter has; the RUN group every clip can show is unchanged (Pitch's row was never on screen, checked frame by frame)",
     "files": [
       "app/globals.css (changed)",
       "components/App.tsx (changed)",

@@ -202,15 +202,16 @@ describe("on-device backup", () => {
       draft: { id: "old-option", name: "Old draft", notes: "", side: "offense", players: OPTION.players },
       ...patch,
     });
-    const routes = (players: readonly { label: string; route: unknown }[]): Record<string, unknown> =>
-      Object.fromEntries(players.filter((p) => p.route).map((p) => [p.label, p.route]));
+    // each player's job: the quarterback's laterals when there are some, else their route
+    const routes = (players: readonly { label: string; route: unknown; laterals?: unknown }[]): Record<string, unknown> =>
+      Object.fromEntries(players.filter((p) => p.route || p.laterals).map((p) => [p.label, p.laterals ?? p.route]));
 
     test("restores every Pitch play and the draft as the lateral it reads as today (B1, B7)", () => {
       const read = readBackupFile(backup({}));
       if (!read.ok) throw new Error(read.error);
       const [option, sweep, decoy] = read.file.plays;
-      expect(routes(option?.players ?? [])).toEqual({ QB: { type: "lateral", target: "o5" }, Z: { type: "throw" }, Y: { type: "corner" } });
-      expect(routes(sweep?.players ?? [])).toEqual({ QB: { type: "lateral", target: "o5" }, Z: { type: "stretch", mirror: true } });
+      expect(routes(option?.players ?? [])).toEqual({ QB: [{ to: "o5" }], Z: { type: "throw" }, Y: { type: "corner" } });
+      expect(routes(sweep?.players ?? [])).toEqual({ QB: [{ to: "o5" }], Z: { type: "stretch", mirror: true } });
       expect(routes(decoy?.players ?? [])).toEqual({ X: { type: "dive", primary: true }, Z: { type: "stretch" }, Y: { type: "corner" } });
       expect(routes(read.file.draft?.players ?? [])).toEqual(routes(option?.players ?? []));
       expect(read.file.playbooks[0]?.plays).toEqual(["old-sweep", "old-option"]);
@@ -245,17 +246,76 @@ describe("on-device backup", () => {
       damaged("a Pitch on a defender", (p) => { player(p, "d1").route = { type: "pitch" }; });
       damaged("a Pitch beside a throw", (p) => { player(p, "o3").route = { type: "throw" }; });
       damaged("a Pitch beside a lateral", (p) => { player(p, "o2").route = { type: "lateral", target: "o3" }; });
+      damaged("a Pitch beside a list of laterals", (p) => { player(p, "o2").laterals = [{ to: "o3" }]; });
       damaged("a hostile id on a Pitch", (p) => { player(p, "o5").route = { type: "pitch", target: "__proto__" }; });
       const notes = { ...OPTION, notes: 42 };
       expect(readBackupFile(backup({ plays: [notes, SWEEP, DECOY] }))).toEqual({ ok: false, error: "invalidData" });
     });
 
+    describe("from ADR 004's version, one lateral per carrier (B8–B10)", () => {
+      // QB → Z → X, X throws to Y, as that version stored it: each carrier's lateral is their route
+      const CHAIN = old("old-chain", {
+        o2: { type: "lateral", target: "o5", catch: [22, 6] },
+        o5: { type: "lateral", target: "o3", catch: [9, 6.5] },
+        o3: { type: "throw" },
+        o4: { type: "go", primary: true },
+      });
+      const KEEP = old("old-keep", { o2: { type: "lateral", target: "o5" }, o5: { type: "reverse" } });
+      const draft = (p: RawPlay) => ({ id: null, name: "Draft", notes: "", side: "offense", players: p.players });
+      const chainBackup = (plays: RawPlay[], d: RawPlay | null = null) => backup({ plays, playbooks: [], draft: d && draft(d) });
+
+      test("restores it as the quarterback's laterals, in order, with the same catches (B8)", () => {
+        const read = readBackupFile(chainBackup([CHAIN, KEEP], CHAIN));
+        if (!read.ok) throw new Error(read.error);
+        const [chain, keep] = read.file.plays;
+        expect(routes(chain?.players ?? [])).toEqual({
+          QB: [{ to: "o5", catch: [22, 6] }, { to: "o3", catch: [9, 6.5] }], X: { type: "throw" }, Y: { type: "go", primary: true },
+        });
+        expect(routes(keep?.players ?? [])).toEqual({ QB: [{ to: "o5" }], Z: { type: "reverse" } });
+        expect(routes(read.file.draft?.players ?? [])).toEqual(routes(chain?.players ?? []));
+
+        const target = memory();
+        applyBackupRestore(planBackupRestore(read.file, readBackupState(target), "replace"), target);
+        expect(target.data.get(PLAYS_KEY)).not.toContain("\"lateral\"");
+        expect(readBackupFile(encodeBackupFile(target).json).ok).toBe(true);
+      });
+
+      test("still refuses one that version would never have stored, or one mixed with another version's (B9, B10)", () => {
+        const damaged = (label: string, change: (p: RawPlay) => void) => {
+          const play = structuredClone(CHAIN);
+          change(play);
+          expect(readBackupFile(chainBackup([play])), `play: ${label}`).toEqual({ ok: false, error: "invalidData" });
+          expect(readBackupFile(chainBackup([], play)), `draft: ${label}`).toEqual({ ok: false, error: "invalidData" });
+        };
+        const player = (p: RawPlay, id: string): RawPlayer => {
+          const q = p.players.find((v) => v.id === id);
+          if (!q) throw new Error(`missing ${id}`);
+          return q;
+        };
+        damaged("a catch in front of its release", (p) => { player(p, "o5").route = { type: "lateral", target: "o3", catch: [9, 3] }; });
+        damaged("a catch past the line", (p) => { player(p, "o2").route = { type: "lateral", target: "o5", catch: [22, 0.5] }; });
+        damaged("a lateral to a defender", (p) => { player(p, "o5").route = { type: "lateral", target: "d1" }; });
+        damaged("a lateral to nobody", (p) => { player(p, "o5").route = { type: "lateral", target: "zz" }; });
+        damaged("a hostile id on a lateral", (p) => { player(p, "o5").route = { type: "lateral", target: "__proto__" }; });
+        damaged("a lateral back into the chain", (p) => { player(p, "o3").route = { type: "lateral", target: "o2" }; });
+        damaged("a lateral on a player off the chain", (p) => { player(p, "o4").route = { type: "lateral", target: "o1" }; });
+        damaged("a read on a carrier's lateral", (p) => { player(p, "o5").route = { type: "lateral", target: "o3", catch: [9, 6.5], primary: true }; });
+        damaged("a read on the last carrier", (p) => { player(p, "o3").route = { type: "throw", primary: true }; });
+        damaged("a pass route on the last carrier", (p) => { player(p, "o3").route = { type: "go" }; });
+        damaged("a catch that isn't a point", (p) => { player(p, "o2").route = { type: "lateral", target: "o5", catch: "deep" }; });
+        damaged("beside a list of laterals", (p) => { player(p, "o2").laterals = [{ to: "o5" }]; });
+        damaged("beside a Pitch", (p) => { player(p, "o1").route = { type: "pitch" }; });
+      });
+    });
+
     test("checks a play in today's shape as strictly as before (B6)", () => {
+      const thrown = (id: string, c: [number, number]): RawPlay => {
+        const p = old(id, { o5: { type: "throw" } });
+        return { ...p, players: p.players.map((q) => (q.id === "o2" ? { ...q, laterals: [{ to: "o5", catch: c }] } : q)) };
+      };
       // a lateral caught in front of the QB's spot reads back snapped, so it isn't what was stored
-      const forward = old("forward", { o2: { type: "lateral", target: "o5", catch: [20, 2] }, o5: { type: "throw" } });
-      expect(readBackupFile(backup({ plays: [forward], playbooks: [], draft: null }))).toEqual({ ok: false, error: "invalidData" });
-      const legal = old("legal", { o2: { type: "lateral", target: "o5", catch: [20, 6] }, o5: { type: "throw" } });
-      expect(readBackupFile(backup({ plays: [legal], playbooks: [], draft: null })).ok).toBe(true);
+      expect(readBackupFile(backup({ plays: [thrown("forward", [20, 2])], playbooks: [], draft: null }))).toEqual({ ok: false, error: "invalidData" });
+      expect(readBackupFile(backup({ plays: [thrown("legal", [20, 6])], playbooks: [], draft: null })).ok).toBe(true);
     });
   });
 

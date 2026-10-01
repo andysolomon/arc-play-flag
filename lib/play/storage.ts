@@ -1,8 +1,8 @@
 import { readLos, withLos } from "./field";
-import { quarterback, settleChain } from "./lateral";
+import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
-import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
+import type { Hop, Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
 /** The prototype's library, keyed by play name. Read once and migrated into v2. */
@@ -98,8 +98,11 @@ function normalizeRoute(v: unknown, team: Team): Route | null {
   return cleanRoute(v, v.type as RouteType);
 }
 
-/** A route as some version stored it: today's, or an older one with a type that is gone (a Pitch, before lateral chains). */
-export type StoredRoute = Omit<Route, "type"> & { type: string };
+/**
+ * A route as some version stored it: today's, or an older one with a type that is gone (a Pitch,
+ * before lateral chains, or a carrier's `lateral` with its catch, before ADR 005).
+ */
+export type StoredRoute = Omit<Route, "type"> & { type: string; catch?: Pair };
 /** A player as some version stored them. */
 export type StoredPlayer = Omit<Player, "route"> & { route: StoredRoute | null };
 
@@ -108,13 +111,46 @@ function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit
   const r: Omit<Route, "type"> & { type: T } = { type };
   if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
-  if (type === "lateral" && v.catch !== undefined) {
-    const c = toPair(v.catch);
-    if (c) r.catch = c;
-  }
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;
+}
+
+/** One lateral as stored: who takes it, and the catch when the coach has moved it. Null for anything else. */
+function toHop(v: unknown): Hop | null {
+  if (!isRecord(v) || typeof v.to !== "string" || !v.to) return null;
+  const c = v.catch === undefined ? null : toPair(v.catch);
+  return c ? { to: v.to.slice(0, 40), catch: c } : { to: v.to.slice(0, 40) };
+}
+
+/** A stored list of laterals, cut at the first entry that isn't one (each depends on the one before) and at the cap. */
+function readHops(v: unknown): Hop[] {
+  if (!Array.isArray(v)) return [];
+  const out: Hop[] = [];
+  for (const entry of v.slice(0, MAX_LATERALS)) {
+    const hop = toHop(entry);
+    if (!hop) break;
+    out.push(hop);
+  }
+  return out;
+}
+
+/**
+ * A chain saved one lateral per carrier, before a player could take it again (ADR 004): each carrier's
+ * `{ type: "lateral", target, catch }` route, walked from the quarterback. It becomes the quarterback's
+ * laterals in the same order with the same catches; the last carrier's own route was already their job.
+ * The walk stops where that version's did: at a target already in it, or one that isn't there.
+ */
+function fromCarrierLaterals(players: Player[], old: ReadonlyMap<string, Hop>): Player[] {
+  const qb = quarterback(players);
+  if (!qb || qb.laterals?.length) return players;
+  const hops: Hop[] = [];
+  const seen = new Set([qb.id]);
+  for (let hop = old.get(qb.id); hop && !seen.has(hop.to) && players.some((p) => p.id === hop?.to); hop = old.get(hop.to)) {
+    hops.push(hop);
+    seen.add(hop.to);
+  }
+  return hops.length ? players.map((p) => (p.id === qb.id ? { ...p, laterals: hops } : p)) : players;
 }
 
 /** How a Pitch was stored before laterals: the runner took a toss from the quarterback. */
@@ -151,7 +187,7 @@ function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
   const tossed = qb && carrier && pitched.has(carrier.id) ? carrier : undefined;
   const keep = (f: Pitch): Route => ({ type: "stretch", ...(f.mirror ? { mirror: true } : {}), ...(f.primary ? { primary: true } : {}) });
   return players.map((p) => {
-    if (tossed && p.id === qb?.id && tossed.id !== qb.id) return { ...p, route: { type: "lateral", target: tossed.id } };
+    if (tossed && p.id === qb?.id && tossed.id !== qb.id) return { ...p, laterals: [{ to: tossed.id }] };
     const f = pitched.get(p.id);
     if (!f) return p;
     return { ...p, route: p.id === tossed?.id && option ? { type: "throw" } : keep(f) };
@@ -161,11 +197,12 @@ function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
 /**
  * Accepts the prototype's stored shape (and anything older that looks like it) and
  * returns players clamped back onto the field, exactly as the prototype's load does.
- * Ids are made unique, the roster is capped, and a man or lateral target that names
- * nobody on the offense drops the route rather than drawing nothing. A Pitch from before
- * lateral chains becomes one (see fromPitch), and the chain is settled: every catch
- * clamped behind its release and the line, and nothing a carrier can't have kept
- * (lib/play/lateral.ts). Every way a play is read in (the library, the draft, a share
+ * Ids are made unique, the roster is capped, and a man target that names nobody on the
+ * offense drops the route rather than drawing nothing. A Pitch from before lateral chains
+ * becomes one (see fromPitch), a chain saved one lateral per carrier becomes the
+ * quarterback's laterals (see fromCarrierLaterals), and the chain is settled: cut at the
+ * first lateral to nobody, every catch clamped behind its release and the line, and nothing
+ * a carrier can't have kept (lib/play/lateral.ts). Every way a play is read in (the library, the draft, a share
  * link, a play or playbook file, a backup) comes through here.
  */
 export function normalizePlayers(raw: unknown): Player[] {
@@ -173,13 +210,23 @@ export function normalizePlayers(raw: unknown): Player[] {
 }
 
 /**
- * The players as the earlier version that saved them would have stored them: for a play saved with a
- * Pitch before lateral chains, cleaned like any play but with the Pitch kept and only routes that
- * version had (no lateral or throw). It now reads back migrated, so a backup from that version is
- * checked against this instead (lib/export/backup.ts). Null for players in today's shape.
+ * The players as the earlier version that saved them would have stored them, cleaned like any play:
+ * - saved with a Pitch before lateral chains, the Pitch kept and only routes that version had (no
+ *   lateral, throw or list of laterals);
+ * - saved with one lateral per carrier (ADR 004), each carrier's lateral kept as their route and no
+ *   list of laterals, when the chain needs nothing settled, since that version settled it too.
+ * Such a play now reads back migrated, so a backup from that version is checked against this instead
+ * (lib/export/backup.ts). Null for players in today's shape, and for a chain that version never stored.
  */
 export function storedPlayers(raw: unknown): StoredPlayer[] | null {
   return readPlayers(raw).stored;
+}
+
+/** A player as a version before ADR 005 stored them: with no list of laterals. */
+function withoutLaterals(p: Player): StoredPlayer {
+  const q: StoredPlayer = { ...p };
+  delete q.laterals;
+  return q;
 }
 
 function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] | null } {
@@ -187,7 +234,9 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
   const out: Player[] = [];
   const ids = new Set<string>();
   const pitches: Pitch[] = [];
+  const carried = new Map<string, Hop>();
   const pitchRoutes = new Map<string, StoredRoute>();
+  const lateralRoutes = new Map<string, StoredRoute>();
   let hasMotion = false;
   raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
@@ -207,6 +256,18 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
       pitches.push({ id, mirror: v.route.mirror === true, primary: v.route.primary === true });
       pitchRoutes.set(id, cleanRoute(v.route, "pitch"));
     }
+    // a lateral stored as this carrier's route, before laterals moved to the quarterback (ADR 004)
+    const tossed = team === "offense" && isRecord(v.route) && v.route.type === "lateral"
+      ? toHop({ to: v.route.target, catch: v.route.catch })
+      : null;
+    if (tossed && isRecord(v.route)) {
+      carried.set(id, tossed);
+      // as ADR 004 stored it, where a carrier tossing it on was never the read
+      const route: StoredRoute = cleanRoute(v.route, "lateral");
+      delete route.primary;
+      lateralRoutes.set(id, tossed.catch ? { ...route, catch: tossed.catch } : route);
+    }
+    const laterals = team === "offense" ? readHops(v.laterals) : [];
     out.push({
       id,
       team,
@@ -214,20 +275,38 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
       x, y,
       route: pitch ? null : normalizeRoute(v.route, team),
       ...(preSnap.length ? { preSnap: { pts: preSnap } } : {}),
+      ...(laterals.length ? { laterals } : {}),
     });
   });
   const offense = new Set(out.filter((p) => p.team === "offense").map((p) => p.id));
   const aimed = out.map((p) => {
-    if (p.route?.type !== "man" && p.route?.type !== "lateral") return p;
+    if (p.route?.type !== "man") return p;
     return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
   });
-  if (!pitches.length) return { players: settleChain(aimed), stored: null };
-  // as that version stored it: its Pitch back, and no lateral or throw, which it never had
-  const stored = aimed.map((p): StoredPlayer => {
-    const r = pitchRoutes.get(p.id);
-    return r ? { ...p, route: r } : p.route && isBallJob(p.route.type) ? { ...p, route: null } : p;
-  });
-  return { players: settleChain(fromPitch(aimed, pitches)), stored };
+  const chained = carried.size ? fromCarrierLaterals(aimed, carried) : aimed;
+  const migrated = pitches.length ? fromPitch(chained, pitches) : chained;
+  const players = settleChain(migrated);
+  if (pitches.length) {
+    // before lateral chains: its Pitch back, and nothing that version never had (a throw, a lateral, a list of laterals)
+    return {
+      players,
+      stored: aimed.map((p): StoredPlayer => ({ ...withoutLaterals(p), route: pitchRoutes.get(p.id) ?? (p.route && isBallJob(p.route.type) ? null : p.route) })),
+    };
+  }
+  if (carried.size && players === migrated) {
+    // ADR 004's chain: each carrier's lateral back as their route, and no list of laterals, which it never had.
+    // A lateral that version settled away (off the chain, back into it, to nobody), or a chain it clamped or
+    // trimmed, reads back changed, as it did there, so it is no play that version stored.
+    const throwers = new Set(chainLinks(players).map((l) => l.from.id));
+    return {
+      players,
+      stored: aimed.map((p): StoredPlayer => {
+        const r = lateralRoutes.get(p.id);
+        return r && throwers.has(p.id) ? { ...withoutLaterals(p), route: r } : withoutLaterals(p);
+      }),
+    };
+  }
+  return { players, stored: null };
 }
 
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");

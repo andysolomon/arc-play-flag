@@ -33,7 +33,6 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   counter: { label: "Counter", pts: null, end: "arrow", run: true },
   reverse: { label: "Reverse", pts: null, end: "arrow", run: true },
   delay:   { label: "Delay",   pts: null, end: "arrow", run: true, dash: "7 6" },
-  lateral: { label: "Lateral", pts: null, end: "arrow", ball: "lateral" },
   throw:   { label: "Throw",   pts: null, end: "set",   ball: "throw" },
 };
 
@@ -71,7 +70,7 @@ export const PASS_KEYS = OFFENSE_KEYS.filter((k) => !ROUTES[k].run && !ROUTES[k]
 /** How far behind the line of scrimmage a carrier sets up to throw (it was the pitch runner's set point). */
 export const PITCH_SET = 2.6;
 
-/** True for a job only the player with the ball can take: a lateral or a throw. */
+/** True for a job only the player with the ball can take: the last carrier's throw. */
 export function isBallJob(type: RouteType): boolean {
   return ROUTES[type as OffenseRouteType]?.ball !== undefined;
 }
@@ -185,12 +184,10 @@ export function keepRead(prev: Route | null | undefined, next: Route): Route {
 
 /**
  * The route as it reads after the whole play is flipped (x → 30 - x), keeping every
- * flag, with a lateral's catch point flipped too. Handed presets need nothing: their side
- * is read from the player's new spot.
+ * flag. Handed presets need nothing: their side is read from the player's new spot.
  */
 export function flipRoute(route: Route): Route {
-  const out = route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
-  return out.catch ? { ...out, catch: [FIELD_W - out.catch[0], out.catch[1]] } : out;
+  return route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
 }
 const FIELD_W = 30;
 

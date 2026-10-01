@@ -11,12 +11,12 @@ interface Props {
   part: "arcs" | "handles";
   /** each player's name by id, for "Z catches" */
   names?: Readonly<Record<string, string>>;
-  /** the thrower whose handle is shaking off a clamp */
-  shake?: string | null;
+  /** the lateral (by hop) whose handle is shaking off a clamp */
+  shake?: number | null;
   /** the other team's chain, faded like its players */
   faded?: boolean;
-  onHandleDown?: (id: string, e: PointerEvent<SVGGElement>) => void;
-  onHandleKey?: (id: string, e: KeyboardEvent<SVGGElement>) => void;
+  onHandleDown?: (hop: number, e: PointerEvent<SVGGElement>) => void;
+  onHandleKey?: (hop: number, e: KeyboardEvent<SVGGElement>) => void;
 }
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
@@ -34,7 +34,7 @@ function LateralLayerImpl({ arcs, part, names = {}, shake = null, faded = false,
     return (
       <g aria-hidden="true" pointerEvents="none" className={faded ? "opacity-40" : undefined}>
         {arcs.map((a) => (
-          <g key={a.id} data-lateral={a.id} data-target={a.target}>
+          <g key={a.hop} data-lateral={a.hop} data-from={a.from} data-target={a.target}>
             <path d={a.d} fill="none" stroke={INK.route} style={ink} strokeWidth={4} strokeDasharray="5 7" />
             <image
               href="/icons/football.png" x={-11} y={-11} width={22} height={22}
@@ -49,27 +49,27 @@ function LateralLayerImpl({ arcs, part, names = {}, shake = null, faded = false,
     <g className={faded ? "opacity-40" : undefined}>
       {arcs.map((a) => {
         const who = names[a.target] ?? "";
-        const from = names[a.id] ?? "";
+        const from = names[a.from] ?? "";
         const anchor = a.handle.x < EDGE ? "start" : a.handle.x > VW - EDGE ? "end" : "middle";
         return (
           <g
-            key={a.id}
+            key={a.hop}
             transform={`translate(${a.handle.x.toFixed(1)},${a.handle.y.toFixed(1)})`}
             role="button"
             tabIndex={0}
             aria-label={`Where ${who} catches the lateral from ${from}. Arrow keys move it; it stays behind the line and never ahead of where ${from} lets it go.`}
             aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
-            data-catch={a.id}
-            onPointerDown={(e) => { onHandleDown?.(a.id, e); }}
+            data-catch={a.hop}
+            onPointerDown={(e) => { onHandleDown?.(a.hop, e); }}
             onClick={(e) => { e.stopPropagation(); }}
-            onKeyDown={(e) => { onHandleKey?.(a.id, e); }}
+            onKeyDown={(e) => { onHandleKey?.(a.hop, e); }}
             className="group cursor-grab touch-none outline-none"
             data-export="skip"
           >
             {/* a 44px target at the common phone field width, like a player's */}
             <circle r={22} fill="transparent" />
             <circle r={17} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={4} className="opacity-0 group-focus-visible:opacity-100" />
-            <g style={centred} className={shake === a.id ? "animate-shake motion-reduce:animate-none" : undefined}>
+            <g style={centred} className={shake === a.hop ? "animate-shake motion-reduce:animate-none" : undefined}>
               <rect
                 x={-8} y={-8} width={16} height={16} rx={3} transform="rotate(45)"
                 fill="#fffdf6" stroke={INK.route} style={{ fill: FIELD.waypoint, ...ink }} strokeWidth={3}
