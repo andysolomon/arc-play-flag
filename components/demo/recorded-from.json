@@ -47,14 +47,15 @@
     "components/fieldPaint.ts": "4b96f84aeb7050c7003e3adbfa8fb061bbc6e1736b51543f7a106ae95608ecee",
     "components/playbooks/AddPlays.tsx": "cd56b66ad16a72d30ef3f3c0017e9f0e5bd01ee99f89f90d14b1e4ed63980a9a",
     "components/playbooks/BookCard.tsx": "ecf90a7e3e3cbdbe017f901da644c7bfffdd3ea7d29d88f1c140f915799b1479",
-    "components/playbooks/BookEditor.tsx": "1cdead7773d4625171408ba9e8219c60c5eddab634c2a44a14bcb392d0deceea",
+    "components/playbooks/BookEditor.tsx": "245718a919adf54fd5d52ca87ad1e3adf3672a947cbdb244b1a5805f15c7bb05",
+    "components/playbooks/BookReader.tsx": "1197c664333d169b14afbe4e29c7e7e304513ab9e8a5a2ffcf954d9f37fa83d8",
     "components/playbooks/ExportPanel.tsx": "ff6ab9ae00f0cf4a2e46cc5a6b85465d9354feaaeb6255461033332ec3b2958b",
     "components/playbooks/Home.tsx": "8e1348c35cbf7ad076d9e842121b9bab3211204de6158c6558b5c909d5be1dc9",
     "components/playbooks/ImportLink.tsx": "e0dc65811b5ed2fffb85e8cf53e6e1ee8de388802a77e19e72df785104197d6f",
     "components/playbooks/ImportPreview.tsx": "3a1e7b7b7245664e070c2b9a41024e6a301b5ba74926a15a36b5f65cab1cade1",
     "components/playbooks/MoreMenu.tsx": "7ded2f798f9c06bdf08589aad943d5581f8e784e9c080083c047018131a4cc1c",
     "components/playbooks/PlayCard.tsx": "81dbcf049a620de45cbdd37db32dd82d465512770c9b1dad5278cf33f029763d",
-    "components/playbooks/PlaybooksScreen.tsx": "26dc200e309b66d4ccf43f9a411c19e29c37c57ad56cbe1dd78bae93157af74a",
+    "components/playbooks/PlaybooksScreen.tsx": "a26737f50bc31e10b6a62c4ba9b5286ab6bb93c843e6b42dc2ae2146d90feb8f",
     "components/playbooks/PreviewModal.tsx": "ee85b1f37797b0fb1601b7982006e7b80252a49a253e3308fb86df6b9a1743f3",
     "components/playbooks/Settings.tsx": "8631747d8affb78d106dae27327f1664c5736e5385da1d1b3917c15fb4c143b1",
     "components/playbooks/ShareBook.tsx": "8ffb1cf7a9480cf64faf2ecabfa913bc76b87dcc1ceec2da4dac9b50fce0e479",
@@ -64,12 +65,19 @@
     "components/ui.ts": "708637dcfd235815bdbab737b526778a9b6f6289956c01dd966fb893a1c5aaee"
   },
   "restamped": {
-    "reason": "Laterals to anyone, as often as the play needs: the ball path becomes buttons and the field's catch handles are keyed by toss, both drawn only on plays with a lateral, which no chapter has; the RUN group every clip can show is unchanged (Pitch's row was never on screen, checked frame by frame)",
+    "reason": "Lateral replaces Pitch only in the third row of the offense palette's RUN group, which no clip scrolls to (build-play stops at the pass tiles and custom-routes at the Counter/Reverse/Delay row, checked frame by frame); arcs, catch handles, the carrier palette and the flag-yellow note (which wraps rather than cuts off) draw only on plays with a lateral, which no chapter has; Man targeting's rings are unchanged. The game-day reader's read-only field passes no targeting as null, the type the field now takes; nothing draws differently. Laterals to anyone, as often as the play needs: the ball path becomes buttons and the field's catch handles are keyed by toss, both drawn only on plays with a lateral, which no chapter has; the RUN group every clip can show is unchanged (Pitch's row was never on screen, checked frame by frame)",
     "files": [
+      "app/globals.css (changed)",
       "components/App.tsx (changed)",
       "components/Field.tsx (changed)",
-      "components/LateralLayer.tsx (changed)",
-      "components/RouteSidebar.tsx (changed)"
+      "components/Hint.tsx (changed)",
+      "components/LateralLayer.tsx (added)",
+      "components/PlayerToken.tsx (changed)",
+      "components/RouteLayer.tsx (changed)",
+      "components/RouteSidebar.tsx (changed)",
+      "components/SharedPlay.tsx (changed)",
+      "components/playbooks/BookReader.tsx (changed)",
+      "components/ui.ts (changed)"
     ]
   }
 }

@@ -9,6 +9,7 @@ import {
   deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam,
   subscribe, swapPlaybookReferences, updatePlaybook,
 } from "@/lib/play/library";
+import { lastRead, readerHref } from "@/lib/play/reader";
 import { failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
@@ -74,6 +75,14 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
         />
       </div>
       <span className="text-caption leading-note text-ink-muted">Plays are numbered by their order here. Deleting a playbook keeps the plays.</span>
+      {items.length > 0 && (
+        <Link
+          href={readerHref(book.id, lastRead(book.id))}
+          className={`${pillDark} inline-flex min-h-11 items-center self-start px-4 text-small !text-cream no-underline`}
+        >
+          Game-day reader ›
+        </Link>
+      )}
 
       <ShareBook key={book.id} book={book} plays={plays} team={team} />
       <span className={divider} />
