@@ -1,6 +1,7 @@
 import { readLos, withLos } from "./field";
+import { quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
-import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
@@ -94,24 +95,99 @@ function toPair(v: unknown): Pair | null {
 /** A route this team can run, or null: an offensive type on a defender (or the reverse) is no route at all. */
 function normalizeRoute(v: unknown, team: Team): Route | null {
   if (!isRecord(v) || typeof v.type !== "string" || !routeDef(team, v.type as RouteType)) return null;
-  const r: Route = { type: v.type as RouteType };
+  return cleanRoute(v, v.type as RouteType);
+}
+
+/** A route as some version stored it: today's, or an older one with a type that is gone (a Pitch, before lateral chains). */
+export type StoredRoute = Omit<Route, "type"> & { type: string };
+/** A player as some version stored them. */
+export type StoredPlayer = Omit<Player, "route"> & { route: StoredRoute | null };
+
+/** A route's fields as stored, for a type already known to be one. */
+function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit<Route, "type"> & { type: T } {
+  const r: Omit<Route, "type"> & { type: T } = { type };
   if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
+  if (type === "lateral" && v.catch !== undefined) {
+    const c = toPair(v.catch);
+    if (c) r.catch = c;
+  }
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;
 }
 
+/** How a Pitch was stored before laterals: the runner took a toss from the quarterback. */
+interface Pitch {
+  id: string;
+  mirror: boolean;
+  primary: boolean;
+}
+
+/**
+ * A play saved with a Pitch, from before lateral chains (docs/adr/004-lateral-chains.md). The ball
+ * goes to whoever the play's words gave it to then (`runnerOf` before laterals), so nobody's play
+ * changes hands: a runner marked as the read; else, with receivers out, the first pitch runner left
+ * to right, who threw it (the call was an option); else the first runner left to right.
+ *
+ * - When that carrier is a pitch runner P, the quarterback now laterals to P, who throws if the play
+ *   was an option, or keeps it on a Stretch, the wide run the pitch was. A pitch on the quarterback
+ *   who carried it was a rollout: they throw from it, or keep it.
+ * - Every other pitch (the carrier was someone else, or there is no quarterback to toss it) keeps
+ *   running as a Stretch, a decoy, and the carrier keeps their own route and read.
+ */
+function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
+  const pitched = new Map(pitches.map((p) => [p.id, p]));
+  const offense = players.filter((p) => p.team === "offense");
+  const byLine = (a: Player, b: Player): number => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const runs = (p: Player): boolean => pitched.has(p.id) || (p.route !== null && isRun(p.route.type));
+  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.label !== "QB" && !pitched.has(p.id));
+  // the read, as the play's words found it: the first offensive player marked, a pitch included
+  const read = offense.find((p) => pitched.get(p.id)?.primary === true || p.route?.primary === true);
+  const runners = offense.filter(runs).sort(byLine);
+  const option = !(read && runs(read)) && receivers.length > 0;
+  const carrier = read && runs(read) ? read : option ? runners.find((p) => pitched.has(p.id)) : runners[0];
+  const qb = quarterback(players);
+  const tossed = qb && carrier && pitched.has(carrier.id) ? carrier : undefined;
+  const keep = (f: Pitch): Route => ({ type: "stretch", ...(f.mirror ? { mirror: true } : {}), ...(f.primary ? { primary: true } : {}) });
+  return players.map((p) => {
+    if (tossed && p.id === qb?.id && tossed.id !== qb.id) return { ...p, route: { type: "lateral", target: tossed.id } };
+    const f = pitched.get(p.id);
+    if (!f) return p;
+    return { ...p, route: p.id === tossed?.id && option ? { type: "throw" } : keep(f) };
+  });
+}
+
 /**
  * Accepts the prototype's stored shape (and anything older that looks like it) and
  * returns players clamped back onto the field, exactly as the prototype's load does.
- * Ids are made unique, the roster is capped, and a man target that names nobody on
- * the offense drops the route rather than drawing nothing.
+ * Ids are made unique, the roster is capped, and a man or lateral target that names
+ * nobody on the offense drops the route rather than drawing nothing. A Pitch from before
+ * lateral chains becomes one (see fromPitch), and the chain is settled: every catch
+ * clamped behind its release and the line, and nothing a carrier can't have kept
+ * (lib/play/lateral.ts). Every way a play is read in (the library, the draft, a share
+ * link, a play or playbook file, a backup) comes through here.
  */
 export function normalizePlayers(raw: unknown): Player[] {
-  if (!Array.isArray(raw)) return [];
+  return readPlayers(raw).players;
+}
+
+/**
+ * The players as the earlier version that saved them would have stored them: for a play saved with a
+ * Pitch before lateral chains, cleaned like any play but with the Pitch kept and only routes that
+ * version had (no lateral or throw). It now reads back migrated, so a backup from that version is
+ * checked against this instead (lib/export/backup.ts). Null for players in today's shape.
+ */
+export function storedPlayers(raw: unknown): StoredPlayer[] | null {
+  return readPlayers(raw).stored;
+}
+
+function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] | null } {
+  if (!Array.isArray(raw)) return { players: [], stored: null };
   const out: Player[] = [];
   const ids = new Set<string>();
+  const pitches: Pitch[] = [];
+  const pitchRoutes = new Map<string, StoredRoute>();
   let hasMotion = false;
   raw.slice(0, MAX_PLAYERS).forEach((v: unknown, i) => {
     if (!isRecord(v)) return;
@@ -126,20 +202,32 @@ export function normalizePlayers(raw: unknown): Player[] {
       ? v.preSnap.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null).map(motionPoint)
       : [];
     if (preSnap.length) hasMotion = true;
+    const pitch = team === "offense" && isRecord(v.route) && v.route.type === "pitch";
+    if (pitch && isRecord(v.route)) {
+      pitches.push({ id, mirror: v.route.mirror === true, primary: v.route.primary === true });
+      pitchRoutes.set(id, cleanRoute(v.route, "pitch"));
+    }
     out.push({
       id,
       team,
       label: typeof v.label === "string" ? v.label.slice(0, 3) : "",
       x, y,
-      route: normalizeRoute(v.route, team),
+      route: pitch ? null : normalizeRoute(v.route, team),
       ...(preSnap.length ? { preSnap: { pts: preSnap } } : {}),
     });
   });
   const offense = new Set(out.filter((p) => p.team === "offense").map((p) => p.id));
-  return out.map((p) => {
-    if (p.route?.type !== "man") return p;
+  const aimed = out.map((p) => {
+    if (p.route?.type !== "man" && p.route?.type !== "lateral") return p;
     return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
   });
+  if (!pitches.length) return { players: settleChain(aimed), stored: null };
+  // as that version stored it: its Pitch back, and no lateral or throw, which it never had
+  const stored = aimed.map((p): StoredPlayer => {
+    const r = pitchRoutes.get(p.id);
+    return r ? { ...p, route: r } : p.route && isBallJob(p.route.type) ? { ...p, route: null } : p;
+  });
+  return { players: settleChain(fromPitch(aimed, pitches)), stored };
 }
 
 export const cleanNotes = (v: unknown): string => (typeof v === "string" ? v.slice(0, MAX_NOTES) : "");

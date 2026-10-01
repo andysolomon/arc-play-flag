@@ -29,6 +29,8 @@ function compact(p: Player): Player {
     out.route = { type: p.route.type };
     if (p.route.pts) out.route.pts = p.route.pts;
     if (p.route.target) out.route.target = p.route.target;
+    // a lateral's catch where the coach put it; without it the recipient's toss lands at the default
+    if (p.route.catch) out.route.catch = p.route.catch;
     if (p.route.mirror) out.route.mirror = true;
     if (p.route.primary) out.route.primary = true;
   }

@@ -7,12 +7,12 @@ import { DIAGNOSTICS_KEY } from "../../lib/diagnostics";
 import { playSvg } from "../../lib/render/play-svg";
 import { armSabotage, canvasBudget, downloadBytes, sabotage } from "../support/designer";
 import {
-  COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, PITCH_OPTION, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
+  COVER_TWO_D, FAKE_DIVE, HOOK_LADDER, KEYS, OTTERS, DOUBLE_PASS, SLANT_LEFT, WALKTHROUGH, WALKTHROUGH_NOTES, WHEEL_RIGHT,
   corruptStoredText, playbook, seed,
 } from "../support/fixtures";
 import { PINNED, keepDeck, keepFile, packageProblems, pngSize, readDeck, readZip } from "../support/pptx";
 
-const PLAYS = [SLANT_LEFT, WHEEL_RIGHT, HOOK_LADDER, COVER_TWO_D, FAKE_DIVE, PITCH_OPTION, WALKTHROUGH];
+const PLAYS = [SLANT_LEFT, WHEEL_RIGHT, HOOK_LADDER, COVER_TWO_D, FAKE_DIVE, DOUBLE_PASS, WALKTHROUGH];
 const BOOK = playbook("fx-meeting", "Otter Meeting Book", PLAYS);
 const FAILED = "That export failed. Try again on a bigger screen.";
 
@@ -61,34 +61,34 @@ const TITLES = [
   '3 · Otter "Hook" & <Ladder>',
   "4 · Otter Cover Two D",
   "5 · Otter Fake Dive",
-  "6 · Otter Pitch Option",
+  "6 · Otter Double Pass",
   "7 · Otter Walkthrough",
 ];
 
 // Defender 4's man target names nobody, and loading a play drops such a route, so it reads "No assignment"
 const ALTS = [
   "Title slide: Otter Meeting Book, Riverside Otters. 7 plays · 6 offense, 1 defense.",
-  'Plays at a glance, 1–6 of 7: 1 Otter Slant Left; 2 Otter Wheel Right; 3 Otter "Hook" & <Ladder>; 4 Otter Cover Two D; 5 Otter Fake Dive; 6 Otter Pitch Option.',
+  'Plays at a glance, 1–6 of 7: 1 Otter Slant Left; 2 Otter Wheel Right; 3 Otter "Hook" & <Ladder>; 4 Otter Cover Two D; 5 Otter Fake Dive; 6 Otter Double Pass.',
   "Plays at a glance, 7 of 7: 7 Otter Walkthrough.",
   "Play 1: Otter Slant Left.\nPass.\nLeft to right: X: Slant; C: Snap; QB: Throw; Z: No route; Y: Out.\nCoaching points: X wins inside.",
   "Play 2: Otter Wheel Right.\nPass. Primary read: Z (Wheel).\nLeft to right: X: No route; C: Snap; QB: Throw, look to Z first; Z: Wheel (primary read); Y: Corner.",
   'Play 3: Otter "Hook" & <Ladder>.\nRun: Z takes it (Handoff).\nLeft to right: X: Go; C: Snap; QB: Hand off to Z; Z: Handoff (primary read); Y: Post.\nCoaching points: Z takes it & runs <behind> the C. Shout "hut" on two.',
   "Play 4: Otter Cover Two D.\nDefense, man coverage.\nLeft to right: Defender 1: Zone deep; Defender 2: Man on X; Defender 3: No assignment; Defender 4: No assignment; Defender 5: Zone deep.\nCoaching points: Deep halves. Nobody gets behind you.",
   "Play 5: Otter Fake Dive.\nPlay-action: fake to Z, then throw. Primary read: X (Post).\nLeft to right: X: Post (primary read); C: Snap; QB: Fake to Z, then throw, look to X first; Z: Dive; Y: Curl.",
-  "Play 6: Otter Pitch Option.\nOption: pitch to Z, who throws or keeps it.\nLeft to right: Player 1: Custom route; C: Snap; QB: Pitch to Z; Z: Pitch; Y: Corner.",
+  "Play 6: Otter Double Pass.\nDouble pass: QB laterals to Z, Z throws. Primary read: Y (Corner).\nBall: QB › Z › Y.\nLeft to right: Player 1: Custom route; C: Snap; QB: Lateral to Z; Z: Take the lateral, throw, look to Y first; Y: Corner (primary read).",
   `Play 7: Otter Walkthrough.\nNobody on this side yet.\nCoaching points: ${WALKTHROUGH_NOTES}`,
 ];
 
 const NOTES = [
-  'Otter Meeting Book · Riverside Otters\n7 plays, in book order:\n1 · Otter Slant Left · Pass\n2 · Otter Wheel Right · Pass\n3 · Otter "Hook" & <Ladder> · Run\n4 · Otter Cover Two D · Defense\n5 · Otter Fake Dive · Play-action\n6 · Otter Pitch Option · Option\n7 · Otter Walkthrough',
-  '1 · Otter Slant Left · Pass\n2 · Otter Wheel Right · Pass\n3 · Otter "Hook" & <Ladder> · Run\n4 · Otter Cover Two D · Defense\n5 · Otter Fake Dive · Play-action\n6 · Otter Pitch Option · Option',
+  'Otter Meeting Book · Riverside Otters\n7 plays, in book order:\n1 · Otter Slant Left · Pass\n2 · Otter Wheel Right · Pass\n3 · Otter "Hook" & <Ladder> · Run\n4 · Otter Cover Two D · Defense\n5 · Otter Fake Dive · Play-action\n6 · Otter Double Pass · Double pass\n7 · Otter Walkthrough',
+  '1 · Otter Slant Left · Pass\n2 · Otter Wheel Right · Pass\n3 · Otter "Hook" & <Ladder> · Run\n4 · Otter Cover Two D · Defense\n5 · Otter Fake Dive · Play-action\n6 · Otter Double Pass · Double pass',
   "7 · Otter Walkthrough",
   "1 · Otter Slant Left · Pass\n\nPass.\n\nX wins inside.\n\nLeft to right:\nX: Slant\nC: Snap\nQB: Throw\nZ: No route\nY: Out",
   "2 · Otter Wheel Right · Pass\n\nPass. Primary read: Z (Wheel).\n\nLeft to right:\nX: No route\nC: Snap\nQB: Throw, look to Z first\nZ: Wheel (primary read)\nY: Corner",
   '3 · Otter "Hook" & <Ladder> · Run\n\nRun: Z takes it (Handoff).\n\nZ takes it & runs <behind> the C.\n\nShout "hut" on two.\n\nLeft to right:\nX: Go\nC: Snap\nQB: Hand off to Z\nZ: Handoff (primary read)\nY: Post',
   "4 · Otter Cover Two D · Defense\n\nDefense, man coverage.\n\nDeep halves.\nNobody gets behind you.\n\nLeft to right:\nDefender 1: Zone deep\nDefender 2: Man on X\nDefender 3: No assignment\nDefender 4: No assignment\nDefender 5: Zone deep",
   "5 · Otter Fake Dive · Play-action\n\nPlay-action: fake to Z, then throw. Primary read: X (Post).\n\nLeft to right:\nX: Post (primary read)\nC: Snap\nQB: Fake to Z, then throw, look to X first\nZ: Dive\nY: Curl",
-  "6 · Otter Pitch Option · Option\n\nOption: pitch to Z, who throws or keeps it.\n\nLeft to right:\nPlayer 1: Custom route\nC: Snap\nQB: Pitch to Z\nZ: Pitch\nY: Corner",
+  "6 · Otter Double Pass · Double pass\n\nDouble pass: QB laterals to Z, Z throws. Primary read: Y (Corner).\n\nBall: QB › Z › Y.\n\nLeft to right:\nPlayer 1: Custom route\nC: Snap\nQB: Lateral to Z\nZ: Take the lateral, throw, look to Y first\nY: Corner (primary read)",
   `7 · Otter Walkthrough\n\n${WALKTHROUGH_NOTES}\n\nNobody on this side yet.`,
 ];
 

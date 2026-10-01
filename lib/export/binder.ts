@@ -1,4 +1,4 @@
-import { CALL_LABEL, callOf } from "@/lib/play/call";
+import { CALL_LABEL, callOf, unfinished } from "@/lib/play/call";
 import { LOS_YARD, losOf } from "@/lib/play/field";
 import { MIN_DEPTH } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
@@ -63,7 +63,7 @@ function detailedPage(item: Numbered, o: BinderOptions): SvgPage {
   if (call) {
     const label = CALL_LABEL[call];
     const pw = measure(label, 12) + 22;
-    out.push(pill(right - pw, MARGIN + r, 12, label, pw, "#ffe9a8"));
+    out.push(pill(right - pw, MARGIN + r, 12, label, pw, unfinished(call) ? "#f2b705" : "#ffe9a8"));
     right -= pw + 10;
   }
   out.push(badge(MARGIN + r, MARGIN + r, r, item.n));

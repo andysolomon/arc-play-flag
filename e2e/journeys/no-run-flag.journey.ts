@@ -38,11 +38,12 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 const STAMP = "RUN IN NO-RUN ZONE";
 const WORDS = "Run in a no-run zone";
 const NOTICE = "Flagged · run in a no-run zone";
-const PALETTE_NOTE = "The ball is in a no-run zone: a run from here is flagged. A handoff or pitch that ends in a throw is a pass.";
+const PALETTE_NOTE = "The ball is in a no-run zone: a run from here is flagged. A handoff or lateral that ends in a throw is a pass.";
 const DEFAULT_NOTE = "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20.";
 const NO_RUN_NOTE = "Saved with this play. The ball is in a no-run zone, so no runs from here.";
 const FLAGGED_NOTE = "Saved with this play. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball.";
-const RUNS = ["Handoff", "Dive", "Stretch", "Counter", "Reverse", "Delay", "Pitch"];
+// Z holds no ball here, so a Lateral is the quarterback's to start (see lateral-chain.journey.ts)
+const RUNS = ["Handoff", "Dive", "Stretch", "Counter", "Reverse", "Delay"];
 
 const flag = (l: Locator): Locator => l.locator("[data-no-run-flag]");
 const losSelect = (page: Page): Locator => page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" });
@@ -200,14 +201,17 @@ test("a run picked with the ball on the 5 is flagged as it is drawn, and every w
 // the book: one run on the 5 (flagged) beside every play the rule must leave alone
 const GOAL_LINE_STRETCH: SavedPlay = { ...play("fx-goal-line-stretch", "Otter Goal Line Stretch", { o5: { type: "stretch" } }, "Z follows the C."), los: 35 };
 const GOAL_LINE_FAKE: SavedPlay = { ...play("fx-goal-line-fake", "Otter Goal Line Fake", { o5: { type: "dive" }, o3: { type: "post", primary: true }, o4: { type: "corner" } }), los: 35 };
-const GOAL_LINE_OPTION: SavedPlay = { ...play("fx-goal-line-option", "Otter Goal Line Option", { o5: { type: "pitch" }, o4: { type: "corner" } }), los: 35 };
+const GOAL_LINE_DOUBLE: SavedPlay = {
+  ...play("fx-goal-line-double", "Otter Goal Line Double Pass", { o2: { type: "lateral", target: "o5" }, o5: { type: "throw" }, o4: { type: "corner" } }),
+  los: 35,
+};
 const GOAL_LINE_D: SavedPlay = {
   ...play("fx-goal-line-d", "Otter Goal Line D", { o5: { type: "handoff", primary: true }, d1: { type: "zoneDeep" }, d4: { type: "zoneDeep" } }, "", "defense"),
   los: 35,
   artShadow: true,
 };
 const MIDFIELD_STRETCH: SavedPlay = { ...play("fx-midfield-stretch", "Otter Midfield Stretch", { o5: { type: "stretch" } }), los: 20 };
-const PLAYS = [GOAL_LINE_STRETCH, GOAL_LINE_FAKE, GOAL_LINE_OPTION, GOAL_LINE_D, MIDFIELD_STRETCH];
+const PLAYS = [GOAL_LINE_STRETCH, GOAL_LINE_FAKE, GOAL_LINE_DOUBLE, GOAL_LINE_D, MIDFIELD_STRETCH];
 const BOOK = playbook("fx-goal-line-book", "Otter Goal Line Book", PLAYS);
 const FLAGGED = [true, false, false, false, false];
 

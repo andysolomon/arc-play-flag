@@ -34,8 +34,9 @@
  *   thunk `exportSlides` calls after `ensureFont()`.
  */
 
-import { assignmentLine, assignments, callLine, callName, headerLine, type Assignment } from "@/lib/play/assignments";
-import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
+import { assignmentLine, assignments, callLine, callName, chainLine, headerLine, type Assignment } from "@/lib/play/assignments";
+import { NO_RUN_FLAG, callOf, runInNoRunZone, unfinished } from "@/lib/play/call";
+import { INK as ROUTE_INK } from "@/lib/play/routes";
 import { losOf } from "@/lib/play/field";
 import { teamFill } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
@@ -218,7 +219,8 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   const call = callName(play);
   if (call) {
     const pw = Math.ceil(measure(call, 24)) + 44;
-    out.push(pill(924 - pw, 56, 24, call, pw, play.side === "defense" ? "#ffffff" : SOFT));
+    // a lateral with no job yet wears the highlighter's full gold
+    out.push(pill(924 - pw, 56, 24, call, pw, play.side === "defense" ? "#ffffff" : unfinished(callOf(play.players)) ? YELLOW : SOFT));
     right = 924 - pw - 20;
   }
   out.push(text(100, 70, 40, fit(play.name, right - 100, 40)));
@@ -247,7 +249,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   for (const row of rows) {
     const cy = y + 4 + r;
     out.push(token(X0 + r, cy, r, row.a.team, row.a.label));
-    const fill = row.a.primary ? RED : row.a.idle ? MUTED : INK;
+    const fill = row.a.primary ? RED : row.a.missing ? ROUTE_INK.blitz : row.a.idle ? MUTED : INK;
     row.lines.forEach((l, i) => { out.push(text(tx, cy + Math.round(s * 0.35) + i * lead, s, l, { fill })); });
     y += row.h;
   }
@@ -264,6 +266,9 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
   out.push(footer(teamName, bookTitle));
 
   const cl = callLine(play);
+  // a lateral chain's path, as the wristband says it: "QB › Z › X › Y"
+  const path = chainLine(play);
+  const ball = path ? `Ball: ${path}.` : null;
   // the face carries the flag in its picture; the alt text and notes say it in words
   const flagged = runInNoRunZone(play, hasNoRunZones(team)) ? `Flagged: ${NO_RUN_FLAG.toLowerCase()}.` : null;
   const lines = as.map(assignmentLine);
@@ -275,6 +280,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
     alt: [
       `Play ${String(item.n)}: ${play.name}.`,
       cl,
+      ball,
       flagged,
       play.artShadow ? `The ${play.side === "defense" ? "offense" : "defense"} is drawn faded.` : null,
       lines.length ? `Left to right: ${lines.join("; ")}.` : "Nobody on this side yet.",
@@ -283,6 +289,7 @@ function playSlide(item: Numbered, bookTitle: string, teamName: string, band: st
     notes: [
       headerLine(item),
       cl,
+      ball,
       flagged,
       notes || null,
       lines.length ? ["Left to right:", ...lines].join("\n") : "Nobody on this side yet.",

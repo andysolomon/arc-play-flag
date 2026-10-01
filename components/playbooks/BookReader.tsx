@@ -211,7 +211,7 @@ export function BookReader({ id, read }: { id: string; read: string }) {
           vis={play.artShadow ? "both" : play.side}
           side={play.side}
           selectedId={null}
-          targeting={false}
+          targeting={null}
           draft={null}
           dispatch={noop}
           onSelect={noop}

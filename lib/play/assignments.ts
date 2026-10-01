@@ -15,6 +15,9 @@
  * - L4 nobody on the play's own side: `assignments` is empty, and callers say so.
  * - L5 an offensive play with no routes: no call name, no call line.
  * - T6 two plays with one name: `headerLine` leads with the play's number.
+ * - L6 a lateral chain (lib/play/lateral.ts) reads as who tosses it to whom and how it ends; a
+ *   carrier left with the ball and no job is said to be one (`missing`), never "No route".
+ * - L7 a read marked on a carrier in a chain is not the read: the final throw goes to someone else.
  *
  * Text is used as given; the caller cleans it first (T1–T5).
  */
@@ -22,7 +25,8 @@
 import type { Numbered } from "@/lib/export/numbered";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
-import { isPitch, isRun, routeDef } from "./routes";
+import { carriers, chainOf } from "./lateral";
+import { isRun, routeDef } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
 export interface Assignment {
@@ -36,6 +40,8 @@ export interface Assignment {
   primary: boolean;
   /** nothing to do on this play: no route and no job from the call */
   idle: boolean;
+  /** has the ball from a lateral and nothing to do with it: the play isn't finished */
+  missing: boolean;
 }
 
 /** Left to right, then front to back, then by id so the order never depends on storage. */
@@ -53,17 +59,21 @@ export function names(play: { readonly players: readonly Player[] }): Map<string
   return out;
 }
 
-/** The ball carrier: the primary read on a run route, else the pitch man on an option, else the first runner. */
+/** The ball carrier: the last carrier of a lateral chain that keeps it, else the primary read on a run route, else the first runner. */
 export function runnerOf(play: SavedPlay): Player | null {
+  const chain = chainOf(play.players);
+  const last = chain[chain.length - 1];
+  if (chain.length > 1) return last?.route && isRun(last.route.type) ? last : null;
   const routed = play.players.filter((p) => p.team === "offense" && p.route).sort(byLine);
   const primary = primaryOf(play);
   if (primary?.route && isRun(primary.route.type)) return primary;
-  if (callOf(play.players) === "option") return routed.find((p) => p.route && isPitch(p.route.type)) ?? null;
   return routed.find((p) => p.route && isRun(p.route.type)) ?? null;
 }
 
+/** The primary read; never a carrier in a lateral chain (L7), whose throw goes to someone else. */
 function primaryOf(play: SavedPlay): Player | null {
-  return play.players.find((p) => p.team === "offense" && p.route?.primary) ?? null;
+  const held = carriers(play.players);
+  return play.players.find((p) => p.team === "offense" && p.route?.primary && !held.has(p.id)) ?? null;
 }
 
 /** A player's name for sentences; a missing runner reads "the runner". */
@@ -79,6 +89,10 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
   const rt = p.route;
   if (!rt) return null;
   if (rt.type === "custom") return "Custom route";
+  if (rt.type === "lateral") {
+    const target = play.players.find((q) => q.id === rt.target);
+    return target ? `Lateral to ${who(target)}` : "Lateral";
+  }
   if (rt.type === "man") {
     const target = play.players.find((q) => q.id === rt.target);
     return target ? `Man on ${who(target)}` : "Man";
@@ -86,7 +100,7 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
   return routeDef(p.team, rt.type)?.label ?? "Custom route";
 }
 
-/** "Pass", "Run", "Play-action", "Option", or "Defense" for a defensive call; null when nobody has a route. */
+/** "Pass", "Run", "Play-action", "Double pass", "Lateral pass", "Lateral run", "Lateral · unfinished", or "Defense" for a defensive call; null when nobody has a route. */
 export function callName(play: SavedPlay): string | null {
   if (play.side === "defense") return "Defense";
   const call = callOf(play.players);
@@ -104,15 +118,47 @@ export function callLine(play: SavedPlay): string | null {
   const who = namer(play);
   const r = runnerOf(play), pr = primaryOf(play);
   const read = pr ? ` Primary read: ${who(pr)} (${routeJob(pr, play, who) ?? ""}).` : "";
+  // a chain, toss by toss: "QB laterals to Z, Z laterals to X"
+  const chain = chainOf(play.players);
+  const last = chain[chain.length - 1] ?? null;
+  const hops = chain.slice(1).map((p, i) => `${who(chain[i] ?? null)} laterals to ${who(p)}`).join(", ");
   switch (call) {
     case "pass": return `Pass.${read}`;
     case "play-action": return `Play-action: fake to ${who(r)}, then throw.${read}`;
-    case "option": return `Option: pitch to ${who(r)}, who throws or keeps it.`;
     case "run": {
       const job = r ? routeJob(r, play, who) : null;
       return `Run: ${who(r)} takes it${job ? ` (${job})` : ""}.`;
     }
+    case "double-pass":
+    case "lateral-pass":
+      return `${CALL_LABEL[call]}: ${hops}, ${who(last)} throws.${read}`;
+    case "lateral-run": {
+      const job = last ? routeJob(last, play, who) : null;
+      return `Lateral run: ${hops}, ${who(last)} keeps it${job ? ` (${job})` : ""}.`;
+    }
+    case "lateral-unfinished":
+      return `Lateral: ${hops}. ${who(last)} still needs a job: throw, lateral again or keep it.`;
   }
+}
+
+/**
+ * Where the ball goes on a lateral chain, as a wristband or slide says it: "QB › Z › X › Y" (the last
+ * name is the read the final throw goes to, or "throw" with none marked), "QB › Z keeps", or
+ * "QB › Z › ?" while the last carrier has no job. Null for a play with no lateral.
+ */
+export function chainLine(play: SavedPlay): string | null {
+  if (play.side === "defense") return null;
+  const chain = chainOf(play.players);
+  const last = chain[chain.length - 1];
+  if (chain.length < 2 || !last) return null;
+  const who = namer(play);
+  const path = chain.map((p) => who(p)).join(" › ");
+  if (last.route?.type === "throw") {
+    const pr = primaryOf(play);
+    return `${path} › ${pr ? who(pr) : "throw"}`;
+  }
+  if (last.route && isRun(last.route.type)) return `${path} keeps`;
+  return `${path} › ?`;
 }
 
 /** The play's number, name and call: "3 · Otter Hook · Run". */
@@ -130,17 +176,39 @@ function qbJob(play: SavedPlay, who: Who): string | null {
   switch (call) {
     case "pass": return `Throw${look}`;
     case "play-action": return `Fake to ${who(r)}, then throw${look}`;
-    case "option": return `Pitch to ${who(r)}`;
-    case "run": return `${r?.route && isPitch(r.route.type) ? "Pitch" : "Hand off"} to ${who(r)}`;
+    case "run": return `Hand off to ${who(r)}`;
+    // in a chain the quarterback's job is their lateral
+    case "double-pass": case "lateral-pass": case "lateral-run": case "lateral-unfinished": return null;
   }
+}
+
+/**
+ * A carrier's job after the quarterback, who took a lateral (L6): toss it on, throw, keep it, or, with
+ * nothing yet, say so. The quarterback's own throw is plain "Throw". Null off the chain.
+ */
+function carrierJob(p: Player, index: number, play: SavedPlay, who: Who): string | null {
+  const rt = p.route;
+  if (index < 0) return null;
+  const pr = primaryOf(play);
+  const look = pr ? `, look to ${who(pr)} first` : "";
+  if (rt?.type === "throw") return index === 0 ? `Throw${look}` : `Take the lateral, throw${look}`;
+  if (index === 0) return null;
+  if (!rt) return "Takes the lateral · no job yet";
+  if (isRun(rt.type)) return `Take the lateral, keep it: ${routeJob(p, play, who) ?? ""}`;
+  return null;
 }
 
 /** Every player on the play's own side, left to right, with their job. */
 export function assignments(play: SavedPlay): Assignment[] {
   const who = namer(play);
+  const chain = chainOf(play.players);
+  const pr = primaryOf(play);
   return play.players.filter((p) => p.team === play.side).sort(byLine).map((p) => {
     const offense = p.team === "offense";
-    let job = routeJob(p, play, who);
+    const index = offense ? chain.findIndex((q) => q.id === p.id) : -1;
+    const held = offense ? carrierJob(p, index, play, who) : null;
+    let job = held ?? routeJob(p, play, who);
+    const missing = index > 0 && !p.route;
     let idle = false;
     if (job === null && offense && p.label === "QB") job = qbJob(play, who);
     if (job === null) {
@@ -154,7 +222,7 @@ export function assignments(play: SavedPlay): Assignment[] {
       job = idle ? "Pre-snap motion, then hold" : `Pre-snap motion, then ${job}`;
       idle = false;
     }
-    return { id: p.id, team: p.team, label: p.label, who: who(p), job, primary: offense && p.route?.primary === true, idle };
+    return { id: p.id, team: p.team, label: p.label, who: who(p), job, primary: offense && p.id === pr?.id, idle, missing };
   });
 }
 

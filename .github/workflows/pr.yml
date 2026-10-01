@@ -190,6 +190,14 @@ jobs:
           path: test-results/**/motion*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the lateral chains
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lateral-chain
+          path: test-results/lateral-chain-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the demo tour
         if: always()
         uses: actions/upload-artifact@v4

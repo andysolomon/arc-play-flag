@@ -8,6 +8,7 @@ import { download } from "@/lib/export/raster";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
+import { chainOf } from "@/lib/play/lateral";
 import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -74,7 +75,7 @@ export function App() {
   const [rightOpen, setRightOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const hydratedRef = useRef(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; flag: boolean } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [firstUse, setFirstUse] = useState(false);
@@ -85,8 +86,8 @@ export function App() {
   const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const restoredDraft = useRef(false);
   const toastTimer = useRef(0);
-  const say = useCallback((text: string, ms = 1600) => {
-    setToast(text);
+  const say = useCallback((text: string, ms = 1600, flag = false) => {
+    setToast({ text, flag });
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => { setToast(null); }, ms);
   }, []);
@@ -146,7 +147,7 @@ export function App() {
   }, [watchCut]);
   // on a phone/tablet the palette covers the field, so it folds away once a route is chosen
   const onPick = useCallback((key: RouteType) => {
-    if (s.selectedId && key !== "man" && key !== "custom") watchCut(s.selectedId);
+    if (s.selectedId && key !== "man" && key !== "custom" && key !== "lateral") watchCut(s.selectedId);
     dispatch({ type: "pick", key });
     if (compactRef.current) setRightOpen(false);
   }, [s.selectedId, watchCut]);
@@ -328,7 +329,11 @@ export function App() {
   useEffect(() => install(), []);
   const sel = selected(s);
   const selCut = useMemo(() => (sel ? sidelineCut(sel) : null), [sel]);
-  const hint = s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
+  // who holds the ball, in order: the palette shows a carrier their jobs with it and the path it takes
+  const chain = useMemo(() => chainOf(s.players), [s.players]);
+  // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
+  const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
+  const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
     ? "Pre-snap motion · tap waypoints behind the line · Finish when done"
     : "Tap waypoints on the field · double-tap to finish" : null;
 
@@ -390,6 +395,7 @@ export function App() {
           draft={s.draft}
           dispatch={fieldDispatch}
           onSelect={onSelect}
+          onCatchNote={onCatchNote}
           svgRef={svgRef}
           title={s.name || "Untitled play"}
           showTitle
@@ -400,6 +406,7 @@ export function App() {
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
           <RouteSidebar
             selected={sel}
+            chain={chain}
             cut={selCut}
             hint={hint}
             onPick={onPick}
@@ -413,7 +420,7 @@ export function App() {
           />
         </Sidebar>
       </div>
-      <Hint text={toast ?? hint} below={FIELD_TITLE_ID} />
+      <Hint text={toast?.text ?? hint} flag={toast?.flag} below={FIELD_TITLE_ID} />
       {shareOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-3" role="presentation">
           <section
