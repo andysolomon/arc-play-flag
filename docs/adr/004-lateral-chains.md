@@ -41,6 +41,8 @@ Every edit settles, because the reducer runs `settleChain` after each action tha
 
 A migrated play reads back identically the second time. `lib/play/storage.test.ts` covers each case, and `lateral-chain.journey.ts` opens a stored pitch in the gallery and the designer.
 
+A device backup is restored only if every play reads back exactly as stored, so a damaged file changes nothing. A play with a Pitch now reads back migrated, so `storedPlayers` gives its players as the version before laterals stored them: cleaned like any play, with the Pitch kept and no lateral or throw, which that version never had. `lib/export/backup.ts` checks such a play, or draft, against that, and restores it migrated. Everything else (ids, spots, motion, names, notes) is checked as strictly as before. A damaged Pitch, a defender's Pitch, a Pitch beside a lateral or throw, or a hostile id on a Pitch is still refused. `backup.test.ts` covers each case, and `lateral-chain.journey.ts` restores such a backup and refuses a mixed one.
+
 ## In the designer
 
 - **Lateral** replaces Pitch in the RUN group, with the pitch sticker for now. It shows only for players with the ball: in the RUN group for the quarterback, and under **WITH THE BALL** for later carriers. On anyone else it would make a lateral the chain can't reach, so the empty palette says "Tap the QB to start a lateral."

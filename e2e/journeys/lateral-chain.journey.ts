@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { S } from "../../lib/play/geometry";
 import type { Pair, Player, Route, SavedPlay } from "../../lib/play/types";
 import { Designer } from "../support/designer";
-import { OTTERS, play, seed, storedDraft } from "../support/fixtures";
+import { OTTERS, jsonUpload, play, seed, storageSnapshot, storedDraft, storedPlaybooks, storedPlays } from "../support/fixtures";
 
 /**
  * Lateral chains (docs/adr/004-lateral-chains.md): the quarterback laterals, each carrier laterals
@@ -260,12 +260,13 @@ test("▶ tosses the ball back to each catch in turn, then throws it forward to 
   expect(Math.min(...samples.map((s) => s.y))).toBeLessThan(-10);
 });
 
+/** A play stored by a version before laterals, as the JSON it was: a Pitch was a route like any other. */
+const legacy = (id: string, name: string, routes: Record<string, unknown>): SavedPlay => {
+  const p = play(id, name);
+  return { ...p, players: p.players.map((q) => ({ ...q, route: (routes[q.id] ?? null) as Route | null })) };
+};
+
 test("a play saved with a Pitch opens as the QB's lateral to the runner, who throws or keeps it", async ({ page }, info) => {
-  // stored by a version before laterals, as the JSON it was
-  const legacy = (id: string, name: string, routes: Record<string, unknown>): SavedPlay => {
-    const p = play(id, name);
-    return { ...p, players: p.players.map((q) => ({ ...q, route: (routes[q.id] ?? null) as Route | null })) };
-  };
   const OPTION = legacy("fx-old-option", "Otter Old Option", { o5: { type: "pitch" }, o4: { type: "corner" } });
   const SWEEP = legacy("fx-old-sweep", "Otter Old Sweep", { o5: { type: "pitch" } });
   // X, the read on a Dive, had the ball: Z's pitch was a decoy, and stays one
@@ -302,6 +303,62 @@ test("a play saved with a Pitch opens as the QB's lateral to the runner, who thr
   await expect(d.field.locator("[data-lateral]")).toHaveCount(0);
   read[DECOY.name] = await offense(page);
   writeFileSync(`${out(info, "migration")}.json`, `${JSON.stringify({ project: info.project.name, read }, null, 2)}\n`);
+});
+
+test("a device backup made before laterals restores each Pitch as the lateral it reads as today, and a damaged one changes nothing", async ({ page }, info) => {
+  const OPTION = legacy("fx-old-option", "Otter Old Option", { o5: { type: "pitch" }, o4: { type: "corner" } });
+  // Z's Pitch was the read: Z keeps it on a Stretch, and the keep says so instead
+  const SWEEP = legacy("fx-old-sweep", "Otter Old Sweep", { o5: { type: "pitch", mirror: true, primary: true } });
+  const backup = {
+    kind: "ffpd.backup", version: 1, exported: "2026-09-01T12:00:00.000Z",
+    plays: [OPTION, SWEEP],
+    playbooks: [{ id: "fx-old-book", name: "Otter Old Book", plays: [SWEEP.id, OPTION.id] }],
+    team: OTTERS,
+    draft: { id: OPTION.id, name: OPTION.name, notes: "", side: "offense", players: OPTION.players },
+  };
+  await seed(page, { plays: [play("fx-local", "Otter Local")], team: OTTERS });
+  await page.goto("/playbooks");
+  const settings = page.getByRole("button", { name: /team, theme & backup settings/ });
+  const restore = page.getByLabel("Restore a device backup");
+  const preview = page.getByRole("region", { name: "Restore preview" });
+
+  // B4: a Pitch beside a throw is no version's play, so the whole backup is refused and nothing changes
+  await settings.click();
+  const before = await storageSnapshot(page);
+  const mixed = structuredClone(backup);
+  mixed.plays[1] = { ...SWEEP, players: SWEEP.players.map((q) => (q.id === "o3" ? { ...q, route: { type: "throw" } } : q)) };
+  await restore.setInputFiles(jsonUpload("old-mixed-backup.json", JSON.stringify(mixed)));
+  await expect(page.locator("div[role='status']")).toHaveText("That backup is incomplete or contains invalid data. Nothing was changed.");
+  await expect(preview).toHaveCount(0);
+  expect(await storageSnapshot(page)).toEqual(before);
+
+  // B1: the backup as that version wrote it is offered, and restores migrated
+  await restore.setInputFiles(jsonUpload("old-device-backup.json", JSON.stringify(backup)));
+  await expect(preview).toContainText("2 plays");
+  await preview.getByRole("button", { name: "Replace device data" }).click();
+  const stored = await storedPlays(page);
+  expect(Object.keys(stored)).toEqual([OPTION.id, SWEEP.id]);
+  expect(JSON.stringify(stored)).not.toContain("pitch");
+  const routes = (p: SavedPlay | undefined) => Object.fromEntries((p?.players ?? []).filter((q) => q.route).map((q) => [q.label, q.route]));
+  expect(routes(stored[OPTION.id])).toEqual({ QB: { type: "lateral", target: "o5" }, Z: { type: "throw" }, Y: { type: "corner" } });
+  expect(routes(stored[SWEEP.id])).toEqual({ QB: { type: "lateral", target: "o5" }, Z: { type: "stretch", mirror: true } });
+  expect((await storedPlaybooks(page))["fx-old-book"]?.plays).toEqual([SWEEP.id, OPTION.id]);
+
+  await page.goto("/playbooks");
+  for (const p of [OPTION, SWEEP]) {
+    const card = page.getByRole("link", { name: `Open ${p.name} in the designer` }).locator("xpath=..");
+    await expect(card.getByRole("img").first().locator("[data-lateral]")).toHaveCount(1);
+  }
+  await page.screenshot({ path: `${out(info, "backup")}-gallery.png` });
+  const d = new Designer(page);
+  await d.openSaved(OPTION.name);
+  await d.select("Z");
+  await expect(page.getByRole("heading", { name: "Z has the ball" })).toBeVisible();
+  await expect(group(page, "With the ball").getByRole("button", { name: "Throw" })).toHaveAttribute("aria-pressed", "true");
+  writeFileSync(`${out(info, "backup")}.json`, `${JSON.stringify({
+    project: info.project.name, mixedRefused: true,
+    restored: { [OPTION.name]: routes(stored[OPTION.id]), [SWEEP.name]: routes(stored[SWEEP.id]) },
+  }, null, 2)}\n`);
 });
 
 test("from their 5 a chain that ends in a throw is a pass, never flagged, and one that ends in a keep is flagged", async ({ page }, info) => {
