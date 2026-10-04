@@ -21,7 +21,7 @@ const typing = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
 
 /** What the play is, in a word or two: the call for an offensive play, the coverage for a defensive one. */
-function kindOf(play: SavedPlay): string | null {
+export function kindOf(play: SavedPlay): string | null {
   if (play.side === "defense") {
     const cover = coverageOf(play.players);
     return cover ? `${COVERAGE_WORDS[cover].charAt(0).toUpperCase()}${COVERAGE_WORDS[cover].slice(1)} coverage` : null;

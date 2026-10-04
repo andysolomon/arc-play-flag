@@ -15,6 +15,7 @@ import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
 import { card, divider, eyebrow, flagChip, input, pill, pillDark, pillSm } from "../ui";
 import { AddPlaysModal } from "./AddPlays";
+import { BookPlayModal } from "./BookPlayModal";
 import { ShareBook } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
@@ -28,6 +29,9 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
   const book = books.find((b) => b.id === id) ?? null;
   const items = useMemo(() => (book ? numbered(book, plays) : []), [book, plays]);
   const [adding, setAdding] = useState(false);
+  // the play shown big, by id so a reorder behind it keeps it open on the same play
+  const [viewing, setViewing] = useState<string | null>(null);
+  const viewingAt = viewing === null ? -1 : items.findIndex((it) => it.play.id === viewing);
 
   if (!book) {
     return (
@@ -97,29 +101,46 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
           {plays.length === 0 ? "Empty. Save a play in the designer, then add it here." : "Empty. Tap + Add plays to pick from your saved plays."}
         </div>
       ) : (
-        <ol className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-3">
+        <ol className="grid grid-cols-[repeat(auto-fill,minmax(min(260px,100%),1fr))] gap-3">
           {items.map((it, i) => (
-            <li key={it.play.id} className={`${card} flex items-center gap-3`}>
-              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-label={`Play ${String(it.n)}`}>
-                {it.n}
-              </span>
-              <div className="w-[84px] flex-none"><PlayThumb players={it.play.players} name={it.play.name} side={it.play.side} artShadow={it.play.artShadow} los={it.play.los} /></div>
-              <div className="min-w-0 flex-1">
-                <span className="block truncate text-base" title={it.play.name}>{it.play.name}</span>
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <SideBadge side={it.play.side} />
-                  {runInNoRunZone(it.play, hasNoRunZones(team)) && <span className={flagChip}>{NO_RUN_FLAG}</span>}
-                  <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
+            <li key={it.play.id} className={`${card} flex flex-col gap-2.5`}>
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-label={`Play ${String(it.n)}`}>
+                  {it.n}
                 </span>
+                <span className="min-w-0 flex-1 truncate text-title leading-tight" title={it.play.name}>{it.play.name}</span>
+                <button type="button" onClick={() => { setPlays(book.plays.filter((playId) => playId !== it.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} h-9 w-9 flex-none p-0 text-small`}>✕</button>
               </div>
-              <div className="flex flex-none flex-col gap-1">
-                <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} px-2 py-0 text-small`}>↑</button>
-                <button type="button" onClick={() => { move(i, 1); }} disabled={i === items.length - 1} aria-label="Move down" className={`${pill} px-2 py-0 text-small`}>↓</button>
+              <button
+                type="button"
+                onClick={() => { setViewing(it.play.id); }}
+                aria-label={`View ${it.play.name}`}
+                className="group block w-full cursor-pointer rounded-tile focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              >
+                <PlayThumb players={it.play.players} name={it.play.name} side={it.play.side} artShadow={it.play.artShadow} los={it.play.los} framed
+                  className="transition-transform duration-[120ms] group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+              </button>
+              <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1">
+                <SideBadge side={it.play.side} className="self-center" />
+                {runInNoRunZone(it.play, hasNoRunZones(team)) && <span className={flagChip}>{NO_RUN_FLAG}</span>}
+                <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
+                <span className="flex-1" />
+                <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} h-9 w-9 flex-none p-0 text-small`}>↑</button>
+                <button type="button" onClick={() => { move(i, 1); }} disabled={i === items.length - 1} aria-label="Move down" className={`${pill} h-9 w-9 flex-none p-0 text-small`}>↓</button>
               </div>
-              <button type="button" onClick={() => { setPlays(book.plays.filter((playId) => playId !== it.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} px-2 py-0 text-small`}>✕</button>
             </li>
           ))}
         </ol>
+      )}
+      {viewingAt >= 0 && (
+        <BookPlayModal
+          bookId={book.id}
+          items={items}
+          at={viewingAt}
+          noRunZones={hasNoRunZones(team)}
+          onGo={(k) => { const next = items[k]; if (next) setViewing(next.play.id); }}
+          onClose={() => { setViewing(null); }}
+        />
       )}
 
       <span className={divider} />

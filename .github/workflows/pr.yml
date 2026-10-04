@@ -182,6 +182,14 @@ jobs:
           path: test-results/game-day-reader-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the book play view
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-play-view
+          path: test-results/book-play-view-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload pre-snap motion evidence
         if: always()
         uses: actions/upload-artifact@v4
