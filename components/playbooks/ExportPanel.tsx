@@ -139,7 +139,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
           </div>
         </div>
       )}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-3">
       <div className={`${card} flex flex-col gap-2`}>
         <span className={eyebrow}>WRISTBANDS</span>
         <span className="text-caption leading-note text-ink-muted">{bands}</span>
@@ -159,7 +159,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
         <span className="text-caption text-ink-muted">
           {String(perCard)} plays per insert{items.length > perCard ? ` · ${String(inserts)} inserts per player` : ""}
         </span>
-        <button type="button" onClick={onWristbands} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download wristbands PDF</button>
+        <button type="button" onClick={onWristbands} disabled={busy || none} className={`${pill} min-h-11 self-start px-3 py-1 text-small`}>Download wristbands PDF</button>
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>
@@ -169,7 +169,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
           <option value="one">One play per page · detailed</option>
           <option value="four">Four per page · simple</option>
         </select>
-        <button type="button" onClick={onBinder} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download binder PDF</button>
+        <button type="button" onClick={onBinder} disabled={busy || none} className={`${pill} min-h-11 self-start px-3 py-1 text-small`}>Download binder PDF</button>
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>
@@ -178,7 +178,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
         <span className="text-caption text-ink-muted">
           {none ? "Opens in PowerPoint, Keynote and Google Slides." : `${String(slideCount(items.length))} slides · opens in PowerPoint, Keynote and Google Slides`}
         </span>
-        <button type="button" onClick={onSlides} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download slides</button>
+        <button type="button" onClick={onSlides} disabled={busy || none} className={`${pill} min-h-11 self-start px-3 py-1 text-small`}>Download slides</button>
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>
@@ -193,7 +193,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
           <option value="">Every play in this book</option>
           {items.map((it) => <option key={it.play.id} value={it.play.id}>{it.n} · {it.play.name}</option>)}
         </select>
-        <button type="button" onClick={onPostcards} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download postcards PDF</button>
+        <button type="button" onClick={onPostcards} disabled={busy || none} className={`${pill} min-h-11 self-start px-3 py-1 text-small`}>Download postcards PDF</button>
       </div>
 
       <div className={`${card} flex flex-col gap-2`}>
@@ -208,7 +208,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
                 aria-label={`Flyer slot ${String(i + 1)}`}
                 disabled={busy || none}
                 onChange={(e) => { setChosen(featured.map((v, k) => (k === i ? e.target.value : v))); }}
-                className={`${select} min-w-0 flex-1 px-2 text-small`}
+                className={`${select} min-w-0 flex-1 px-2`}
               >
                 <option value="">Empty</option>
                 {items.map((it) => <option key={it.play.id} value={it.play.id}>{it.n} · {it.play.name}</option>)}
@@ -220,7 +220,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
           type="button"
           onClick={onFlyer}
           disabled={busy || none || flyerPicks.every((i) => i === null)}
-          className={`${pill} self-start px-3 py-1 text-small`}
+          className={`${pill} min-h-11 self-start px-3 py-1 text-small`}
         >
           Download flyer PDF
         </button>
@@ -233,7 +233,7 @@ export function ExportPanel({ book, items, team, say }: Props) {
         </select>
         <span className="text-caption leading-note text-ink-muted">Every PDF keeps its words under the pictures: search it for a play, copy your notes out, or have it read aloud.</span>
         <span className="text-caption leading-note text-ink-muted">A playbook file carries the plays too. Send it to an assistant coach, or keep it as a backup.</span>
-        <button type="button" onClick={onFile} disabled={busy || none} className={`${pill} self-start px-3 py-1 text-small`}>Download playbook file</button>
+        <button type="button" onClick={onFile} disabled={busy || none} className={`${pill} min-h-11 self-start px-3 py-1 text-small`}>Download playbook file</button>
       </div>
       </div>
     </div>

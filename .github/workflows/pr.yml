@@ -220,6 +220,14 @@ jobs:
           path: test-results/primary-read-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload mobile usability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-usability
+          path: test-results/mobile-usability-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4

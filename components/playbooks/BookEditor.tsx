@@ -109,7 +109,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
                   {it.n}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-title leading-tight" title={it.play.name}>{it.play.name}</span>
-                <button type="button" onClick={() => { setPlays(book.plays.filter((playId) => playId !== it.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} h-9 w-9 flex-none p-0 text-small`}>✕</button>
+                <button type="button" onClick={() => { setPlays(book.plays.filter((playId) => playId !== it.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} h-11 w-11 flex-none p-0 text-small`}>✕</button>
               </div>
               <button
                 type="button"
@@ -125,8 +125,8 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
                 {runInNoRunZone(it.play, hasNoRunZones(team)) && <span className={flagChip}>{NO_RUN_FLAG}</span>}
                 <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
                 <span className="flex-1" />
-                <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} h-9 w-9 flex-none p-0 text-small`}>↑</button>
-                <button type="button" onClick={() => { move(i, 1); }} disabled={i === items.length - 1} aria-label="Move down" className={`${pill} h-9 w-9 flex-none p-0 text-small`}>↓</button>
+                <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} h-11 w-11 flex-none p-0 text-small`}>↑</button>
+                <button type="button" onClick={() => { move(i, 1); }} disabled={i === items.length - 1} aria-label="Move down" className={`${pill} h-11 w-11 flex-none p-0 text-small`}>↓</button>
               </div>
             </li>
           ))}

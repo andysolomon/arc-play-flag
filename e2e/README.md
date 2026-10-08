@@ -23,6 +23,8 @@ First time only: `bunx playwright install chromium`.
 
 ## Coverage
 
+`mobile-usability.journey.ts` checks editing and export layouts at 320px, 393px and 810px, including nested overflow, 44px remove/reorder/download controls, and 16px featured-play selectors. Long previews keep their title and close button visible while the body scrolls; keyboard actions, dismissal and focus restoration still work. Press feedback is checked before release, with and without reduced motion, and disabled controls stay still. It saves `mobile-usability-<device>-*.json` measurements and screenshots in `test-results/`, uploaded as `mobile-usability` in CI. Font-size checks establish the input-zoom safeguard; the phone projects emulate Chromium and do not prove real Safari zoom behavior.
+
 Pre-snap motion is covered by `pre-snap-motion.journey.ts`: draw and clamp the path, keep the route, undo/redo, save/reload, hold the ball and formation during motion, then snap and run, flip, snapshot sharing, redraw/cancel, transfer, removal, and play-file export/import on another device. Its per-test screenshots, manifest and exported JSON are uploaded as `pre-snap-motion`.
 
 | Journey | File |
