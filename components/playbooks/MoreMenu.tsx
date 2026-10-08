@@ -5,7 +5,7 @@ import { pill } from "../ui";
 
 /** Menu row style: full-width, thumb-sized, left-aligned. */
 export const menuItem =
-  "flex min-h-11 w-full cursor-pointer items-center rounded-note px-3 text-left text-small hover:bg-yellow-soft " +
+  "pressable flex min-h-11 w-full cursor-pointer items-center rounded-note px-3 text-left text-small hover:bg-yellow-soft " +
   "data-[active=true]:bg-rose-soft";
 /** A row that removes something: red so it reads as different before it's tapped. */
 export const menuItemDanger = `${menuItem} text-offense data-[active=true]:text-ink`;

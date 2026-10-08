@@ -507,6 +507,18 @@
   }
 }
 
+@layer components {
+  /* Feedback starts on pointer-down; disabled buttons and locked radio labels stay still. */
+  .pressable { touch-action: manipulation; user-select: none; }
+  .pressable:where(:not(:disabled):not(:has(:disabled))):active { opacity: 0.8; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pressable { transition: scale 120ms ease-out; }
+    /* Independent scale leaves a tile's existing hover translation intact. */
+    .pressable:where(:not(:disabled):not(:has(:disabled))):active { scale: 0.97; }
+  }
+}
+
 /*
  * Yellow is a highlighter in every theme, so whatever sits on it keeps the light theme's ink
  * and paper. Pair it with every yellow fill, including state ones (data-[active=true]:on-yellow).
