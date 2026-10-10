@@ -19,11 +19,14 @@
  *   carrier left with the ball and no job is said to be one (`missing`), never "No route"; a player
  *   who has it more than once is given every time, in order.
  * - L7 a read marked on a carrier in a chain is not the read: the final throw goes to someone else.
+ * - L8 a blitz aimed at a player reads "Blitz Z", at the backfield "Blitz the backfield", and at the
+ *   quarterback plain "Blitz", as every blitz did; one aimed at a player who is gone reads "Blitz" too.
  *
  * Text is used as given; the caller cleans it first (T1–T5).
  */
 
 import type { Numbered } from "@/lib/export/numbered";
+import { blitzAim, blitzTarget } from "./blitz";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
 import { carriers, chainOf, visits } from "./lateral";
@@ -93,6 +96,13 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
   if (rt.type === "man") {
     const target = play.players.find((q) => q.id === rt.target);
     return target ? `Man on ${who(target)}` : "Man";
+  }
+  if (rt.type === "blitz") {
+    // the quarterback's blitz reads as it always did; one aimed elsewhere says where (L8)
+    const aim = blitzAim(rt);
+    if (aim === "backfield") return "Blitz the backfield";
+    const target = aim === "player" ? blitzTarget(rt, play.players) : undefined;
+    return target ? `Blitz ${who(target)}` : "Blitz";
   }
   return routeDef(p.team, rt.type)?.label ?? "Custom route";
 }
