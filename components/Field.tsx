@@ -199,8 +199,8 @@ function FieldImpl({
   const share = (n: number): string => (n / vbh).toFixed(5);
 
   const zones = useMemo(() => zoneLayout(effective, top), [effective, top]);
-  // Man coverage always exposes its valid offense targets, even when the shadow is hidden.
-  // They disappear again as soon as targeting ends.
+  // Man coverage and a blitz's Pick a player always expose their valid offense targets, even when
+  // the shadow is hidden. They disappear again as soon as targeting ends.
   const visible = useMemo(
     () => effective.filter((p) => shown(p, vis) || (targeting !== null && p.team === "offense")),
     [effective, targeting, vis],
@@ -211,8 +211,8 @@ function FieldImpl({
     return new Set(players.filter((p) => p.team === "offense" && p.id !== lateralFrom).map((p) => p.id));
   }, [lateralFrom, players, targeting]);
   const targetOf = useCallback(
-    (p: Player): "man" | "lateral" | null =>
-      targeting === "man" && p.team === "offense" ? "man" : targeting === "lateral" && canTake.has(p.id) ? "lateral" : null,
+    (p: Player): "man" | "blitz" | "lateral" | null =>
+      (targeting === "man" || targeting === "blitz") && p.team === "offense" ? targeting : targeting === "lateral" && canTake.has(p.id) ? "lateral" : null,
     [canTake, targeting],
   );
   // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
@@ -666,6 +666,8 @@ function FieldImpl({
         <span className="sr-only" aria-live="polite">
           {targeting === "lateral" && targetOwnerName
             ? `Lateral from ${targetOwnerName}. Focus any other offense player, one who had it before included, and press Enter or Space. Escape cancels.`
+            : targeting === "blitz" && targetOwnerName
+            ? `Blitz from ${targetOwnerName}. Focus the offense player it comes for and press Enter or Space. Escape cancels.`
             : targeting && targetOwnerName
             ? `Targeting for ${targetOwnerName}. Focus an offense player and press Enter or Space. Escape cancels.`
             : selectedPoint
