@@ -1,7 +1,7 @@
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
 import { chainLinks, quarterback, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
-import { DEF, INK, PITCH_SET, ROUTES, inkFor, routeDef, runLegs } from "./routes";
+import { DEF, INK, PITCH_SET, ROUTES, inkFor, jetLegs, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -115,6 +115,13 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     // who took a lateral keeps it from the catch, carrying on the way the ball was going.
     const qb0 = quarterback(players);
     const qb = qb0 ? atSnap(qb0) : undefined;
+    if (rt.type === "jet") {
+      // across the formation past the quarterback, the handoff on the way (docs/adr/006-jet-sweep.md)
+      const q = qb && qb.id !== p.id ? qb : { x: 15, y: 5 };
+      const across = p.x < q.x - 0.01 ? 1 : -1;
+      const legs = jetLegs(p.x, q.x, q.y, across);
+      return [[p.x, p.y], ...legs.map((l) => [Math.max(0.8, Math.min(29.2, l[0])), Math.max(top + 0.6, l[1])] as const)];
+    }
     // the last toss, when it is this player who keeps it
     const links = chainLinks(players);
     const into = links.length && links[links.length - 1]?.to.id === p.id ? links[links.length - 1] : undefined;
