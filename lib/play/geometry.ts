@@ -1,3 +1,4 @@
+import { blitzTarget } from "./blitz";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
 import { chainLinks, quarterback, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
@@ -95,10 +96,10 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     return [[p.x, p.y], set];
   }
   if (rt.type === "blitz") {
-    // drive past the line of scrimmage, angled at the quarterback
-    const qb0 = quarterback(players);
-    const qb = qb0 ? atSnap(qb0) : undefined;
-    const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
+    // drive past the line of scrimmage, angled at whoever it comes for: the quarterback unless it is
+    // aimed at the backfield or at a player (lib/play/blitz.ts)
+    const t = blitzTarget(rt, players);
+    const tx = t ? t.x : 15, ty = t ? t.y : 5;
     const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
     const reach = Math.max(1.5, L - 1.8);
     return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];

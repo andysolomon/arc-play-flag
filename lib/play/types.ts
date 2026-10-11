@@ -27,8 +27,14 @@ export interface Route {
   type: RouteType;
   /** custom routes: absolute yard waypoints after the player's spot */
   pts?: Pair[];
-  /** man coverage: id of the offensive player being covered */
+  /** man coverage: id of the offensive player being covered; a blitz: who it comes for, when not the quarterback */
   target?: PlayerId;
+  /**
+   * A blitz aimed at the backfield: it comes for the nearest back lined up near the ball, and for the
+   * quarterback when nobody is (lib/play/blitz.ts). Stored only when set; a blitz with neither this nor
+   * a target comes for the quarterback, as every blitz did.
+   */
+  aim?: "backfield";
   mirror?: boolean;
   primary?: boolean;
 }

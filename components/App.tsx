@@ -5,6 +5,8 @@ import { install, record } from "@/lib/diagnostics";
 import { editedVisit, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
+import { names } from "@/lib/play/assignments";
+import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
@@ -157,6 +159,12 @@ export function App() {
     if (compactRef.current) setRightOpen(false);
   }, []);
   const onVisit = useCallback((index: number) => { dispatch({ type: "selectVisit", index }); }, []);
+  // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
+  const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  const onBlitzTarget = useCallback(() => {
+    dispatch({ type: "blitzTarget" });
+    if (compactRef.current) setRightOpen(false);
+  }, []);
   const onPrimary = useCallback(() => {
     dispatch({ type: "togglePrimary" });
     if (compactRef.current) setRightOpen(false);
@@ -342,7 +350,16 @@ export function App() {
   const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
-  const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
+  // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
+  const blitz = useMemo(() => {
+    if (sel?.team !== "defense" || sel.route?.type !== "blitz") return null;
+    const who = names({ players: s.players });
+    const t = blitzTarget(sel.route, s.players);
+    const back = nearestBack(s.players);
+    return { aim: blitzAim(sel.route), who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null };
+  }, [sel, s.players]);
+  const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
+    : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
     ? "Pre-snap motion · tap waypoints behind the line · Finish when done"
     : "Tap waypoints on the field · double-tap to finish" : null;
 
@@ -420,6 +437,9 @@ export function App() {
             visit={visit}
             onLateral={onLateral}
             onVisit={onVisit}
+            blitz={blitz}
+            onBlitzAim={onBlitzAim}
+            onBlitzTarget={onBlitzTarget}
             cut={selCut}
             jet={jetAble}
             hint={hint}
