@@ -2,7 +2,7 @@ import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { carriers, chainLinks, chainOf, clampCatch, quarterback, settleChain, visits } from "./lateral";
+import { canJet, carriers, chainLinks, chainOf, clampCatch, quarterback, settleChain, visits } from "./lateral";
 import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
@@ -289,6 +289,8 @@ function reduce(s: PlayState, a: Action): PlayState {
         return { ...c, players: cut.map((q) => (q.id === p.id ? legalSpot({ ...q, route: { type: a.key } }) : q)), visit: at };
       }
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
+      // a jet sweep is a handoff at the snap: not for the quarterback, the centre or a lateral carrier (J8)
+      if (a.key === "jet" && !canJet(p, s.players)) return s;
       if (a.key === "man") return { ...s, targeting: "man", draft: null };
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: null };
       // a preset picked over the current route keeps the read; picking the same one again takes the route away, read and all

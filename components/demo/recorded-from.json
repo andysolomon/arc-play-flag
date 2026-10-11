@@ -6,9 +6,9 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "c0de7b4d92b8273e0d386c2377297e80d9376c6786c0dd8ef5b708141fbecf05",
+    "components/App.tsx": "3c7e3a812da45879700e99eb0b7a3cce6b90a5e6359d6d5bd6c9d5ae51cf3f59",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "8a2e005592df4a4bbc9c8ae663608741730b2bb163b1640a79ae2ed7496b9b21",
+    "components/Field.tsx": "eb46073cac6facc727cdb20cab936264c048a4254a2ae2290753dfb3d65cdb53",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "27ae56c5b4ae332ed52f4d97e484e2aa1f31e4fb55111982b76679dd2d495519",
@@ -23,7 +23,7 @@
     "components/PlayerToken.tsx": "27c551311d79b8a43ead0a82b4732301b37c5508e7347edaa5c96e564abb5ba5",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "bf0c5555d5aef65090e14b6bd3791b731e8b532bf44fcadd3c35260ac3b71760",
+    "components/RouteSidebar.tsx": "5dceac8612f3b2dbdc0e836d516c153482843b1a9ecb431b49057cdfcbb64153",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",
@@ -64,14 +64,5 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "a4feffa6d24b7783b399ac8b05c83486eacbbf73883a18cf0d945b25d2ac1b68"
-  },
-  "restamped": {
-    "reason": "blitz targeting: the BLITZ pills show only while a blitzer is selected with the palette open, and the build-defense chapter records at 960px, where the palette folds on the pick and the script closes the panels; the field, token and hint changes read only while a blitz's Pick a player is waiting, which no chapter does",
-    "files": [
-      "components/App.tsx (changed)",
-      "components/Field.tsx (changed)",
-      "components/PlayerToken.tsx (changed)",
-      "components/RouteSidebar.tsx (changed)"
-    ]
   }
 }

@@ -718,6 +718,7 @@ function FieldImpl({
             {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
             {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
+            {visible.some((p) => p.route?.type === "jet") ? " A jet sweep is already crossing behind the line when the ball is snapped and takes the handoff from the quarterback as it passes." : ""}
             {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.from] ?? ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
             {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>

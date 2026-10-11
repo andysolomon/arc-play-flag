@@ -10,7 +10,7 @@ import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
-import { chainOf } from "@/lib/play/lateral";
+import { canJet, chainOf } from "@/lib/play/lateral";
 import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -346,6 +346,8 @@ export function App() {
   // who holds the ball, in order: the palette shows a carrier their jobs with it and the path it takes
   const chain = useMemo(() => chainOf(s.players), [s.players]);
   const visit = editedVisit(s, chain);
+  // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
+  const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
   // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
@@ -439,6 +441,7 @@ export function App() {
             onBlitzAim={onBlitzAim}
             onBlitzTarget={onBlitzTarget}
             cut={selCut}
+            jet={jetAble}
             hint={hint}
             onPick={onPick}
             onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}

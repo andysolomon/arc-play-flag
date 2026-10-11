@@ -15,6 +15,8 @@ export type OffenseRouteType =
   | "go" | "out" | "in" | "slant" | "corner" | "post" | "curl" | "flat"
   | "cross" | "wheel" | "custom"
   | "handoff" | "dive" | "stretch" | "counter" | "reverse" | "delay"
+  /** a run whose runner is already crossing the formation at the snap and takes the handoff in stride (ADR 006) */
+  | "jet"
   /** the last ball carrier of a lateral chain sets up and throws it forward */
   | "throw";
 export type DefenseRouteType =

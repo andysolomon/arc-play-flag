@@ -33,6 +33,7 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   counter: { label: "Counter", pts: null, end: "arrow", run: true },
   reverse: { label: "Reverse", pts: null, end: "arrow", run: true },
   delay:   { label: "Delay",   pts: null, end: "arrow", run: true, dash: "7 6" },
+  jet:     { label: "Jet sweep", pts: null, end: "arrow", run: true },
   throw:   { label: "Throw",   pts: null, end: "set",   ball: "throw" },
 };
 
@@ -48,6 +49,31 @@ export function runLegs(type: RouteType, qx: number, qy: number, side: number): 
     case "reverse": return [[qx + side * 0.4, qy + 1], [qx - side * 9, qy - 0.5], [qx - side * 12, -5]];
     default:        return [[qx + side * 1, qy - 0.3], [qx + side * 1.6, -5]];
   }
+}
+
+/** How far in front of (or behind) the quarterback the jet-sweep runner crosses, in yards. */
+export const JET_GAP = 1.2;
+
+/**
+ * The lane a jet sweep crosses on (docs/adr/006-jet-sweep.md, rule 3): in front of a shotgun
+ * quarterback, or behind one under centre when the lane in front would sit on the line. Either way
+ * it is at least half a yard behind the closest anyone may stand to the line (J5).
+ */
+export function jetLane(qy: number): number {
+  const ahead = qy - JET_GAP;
+  return ahead >= LOS_GAP + 0.5 ? ahead : qy + JET_GAP;
+}
+
+/**
+ * The jet sweep's legs after the runner's own spot (x = px): into the lane on the near side of the
+ * quarterback (qx, qy), or at their own x when they already stand within 3 yards (J6), across the lane
+ * past the quarterback, who hands it off as they go by, on toward the far sideline and up past the line
+ * 5 yards, like every run. `across` is +1 when the sweep goes to the quarterback's right.
+ */
+export function jetLegs(px: number, qx: number, qy: number, across: number): Pair[] {
+  const ly = jetLane(qy);
+  const entry = across > 0 ? Math.max(px, qx - 3) : Math.min(px, qx + 3);
+  return [[entry, ly], [qx + across * 1, ly], [qx + across * 8, ly - 1.5], [qx + across * 11, -5]];
 }
 
 export const DROUTES: Record<DefenseRouteType, RouteDef> = {
@@ -200,7 +226,8 @@ export function mirrorable(p: Player | null): boolean {
   const t = p.route.type;
   if (t === "custom") return (p.route.pts ?? []).length > 0;
   const def = routeDef(p.team, t);
-  if (def?.run) return true;
+  // a jet sweep always crosses toward the far side; to sweep the other way, line the runner up on the other side
+  if (def?.run) return t !== "jet";
   if (!def?.pts || def.end === "zone") return false;
   return def.pts.some((q) => Math.abs(q[0]) > 0.01);
 }

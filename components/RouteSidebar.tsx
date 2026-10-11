@@ -28,6 +28,11 @@ interface Props {
   onBlitzTarget: () => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
   cut: SidelineCut | null;
+  /**
+   * the selected player can take a jet sweep (docs/adr/006-jet-sweep.md): an offensive player who is not the
+   * quarterback or the centre and does not carry the ball in a lateral chain. Nobody else is offered the tile.
+   */
+  jet: boolean;
   hint: string | null;
   onPick: (key: RouteType) => void;
   onMotion: () => void;
@@ -73,7 +78,7 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, blitz, onBlitzAim, onBlitzTarget, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone,
+  selected: sel, chain, visit, onLateral, onVisit, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
@@ -91,7 +96,8 @@ function RouteSidebarImpl({
   const isJob = (k: RouteType): boolean => !goesOn && sel?.route?.type === k;
   // offense splits into the passing tree and the run game; defense is one list. A carrier gets no pass route
   const keys: readonly RouteType[] = sel?.team === "offense" ? (hasBall ? [] : PASS_KEYS) : DEFENSE_KEYS;
-  const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS : [];
+  // the jet sweep is a handoff at the snap: only for a player who can take one, never a keep after a lateral
+  const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS.filter((k) => k !== "jet" || (jet && !hasBall)) : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
   // the read is someone the final throw goes to, never a player the ball is lateraled through
   const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
@@ -289,6 +295,12 @@ function RouteSidebarImpl({
                 {at === 0 && <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />}
                 {!hasBall && <IconTile icon={`deselect${suffix}`} label="Done" onClick={onDone} />}
               </div>
+              {isJob("jet") && (
+                <span data-jet-note className="flex-none text-caption leading-note text-ink-muted">
+                  {sel.label || "This player"} is already crossing behind the line when the ball is snapped, and the QB hands it off as they pass.
+                  A forward pass to a player behind the line isn&apos;t allowed, so a jet sweep is always a handoff.
+                </span>
+              )}
             </>
           )}
         </>

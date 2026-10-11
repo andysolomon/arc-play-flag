@@ -1,5 +1,5 @@
 import { quarterback, routeYards } from "./geometry";
-import { chainLinks, type Link } from "./lateral";
+import { centre, chainLinks, type Link } from "./lateral";
 import { isBallJob, isRun } from "./routes";
 import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";
@@ -23,6 +23,8 @@ const SET_UP = 0.2;
 const BEAT = 0.15;
 /** A lateral is a low toss: the top of its arc, as a share of a thrown ball's. */
 const TOSS_LIFT = 0.3;
+/** How long after the snap reaches the quarterback a jet-sweep runner passes them and takes the handoff. */
+const JET_BEAT = 0.1;
 
 interface Track {
   pts: Pt[];
@@ -65,9 +67,14 @@ export interface Toss {
 export type PlayKind = "run" | "pass" | "hold";
 
 export interface Motion {
-  /** Seconds before the snap begins, and the independent pre-snap paths. */
+  /** Seconds before the snap begins: the pre-snap motion's time plus any jet-sweep lead. The motion's independent paths. */
   preSnapFor?: number;
   preSnapTracks?: Record<string, Track>;
+  /**
+   * the last of `preSnapFor`: how long a jet-sweep runner is already crossing before the snap begins, so
+   * the ball reaches the quarterback as they pass (docs/adr/006-jet-sweep.md). Their track's wait is minus this.
+   */
+  jetLead: number;
   /** total playback length in seconds, hold included */
   dur: number;
   /** the card's top edge the play was laid out against: the end line once the ball is near their goal */
@@ -221,16 +228,31 @@ export function buildMotion(
     const pts = motionPoints(p);
     if (pts.length) preSnapTracks[p.id] = track([[p.x, p.y], ...pts]);
   }
-  const preSnapFor = Object.values(preSnapTracks).reduce((n, tr) => Math.max(n, tr.len / SPEED), 0);
+  const motionFor = Object.values(preSnapTracks).reduce((n, tr) => Math.max(n, tr.len / SPEED), 0);
   const m = buildAfterSnap(players.map(atSnap), top, mode);
-  if (!preSnapFor) return m;
-  return { ...m, preSnapFor, preSnapTracks, dur: m.dur + preSnapFor,
-    snapAt: m.snapAt + preSnapFor, handAt: m.handAt + preSnapFor,
-    throwAt: m.throwAt + preSnapFor, catchAt: m.catchAt + preSnapFor,
-    laterals: m.laterals.map((l) => ({ ...l, at: l.at + preSnapFor, land: l.land + preSnapFor })) };
+  if (!motionFor) return m;
+  // the motion runs first, everyone else holding; a jet-sweep runner's lead (already in m) follows it (J4)
+  return { ...delayed(m, motionFor), preSnapTracks };
 }
 
+/** The plan with `by` more seconds before the snap begins: every moment after the snap moves, the tracks (timed from the snap) don't. */
+function delayed(m: Motion, by: number): Motion {
+  return { ...m, preSnapFor: (m.preSnapFor ?? 0) + by, dur: m.dur + by,
+    snapAt: m.snapAt + by, handAt: m.handAt + by, throwAt: m.throwAt + by, catchAt: m.catchAt + by,
+    laterals: m.laterals.map((l) => ({ ...l, at: l.at + by, land: l.land + by })) };
+}
+
+/**
+ * The play from the snap, with a jet-sweep runner's lead in front of it: they are already crossing when
+ * the snap begins, so the snap's frame runs from minus the lead (positionsAt), and everything after it
+ * is that much later.
+ */
 function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackMode): Motion {
+  const m = planAfterSnap(players, top, mode);
+  return m.jetLead ? delayed(m, m.jetLead) : m;
+}
+
+function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMode): Motion {
   const random = mode.kind === "simulation" ? mode.random : null;
   const zones = zoneLayout(players, top);
   const tracks: Record<string, Track> = {};
@@ -255,22 +277,35 @@ function buildAfterSnap(players: readonly Player[], top: number, mode: PlaybackM
     const pts = routeYards(p, players, top);
     if (pts) tracks[p.id] = track(pts, p.route.type === "delay" ? DELAY : 0);
   }
-  const run = cl(Object.values(tracks).reduce((m, t) => Math.max(m, t.wait + t.len / SPEED), 0), 1, 5);
 
   const qb = quarterback(players);
-  const center =
-    players.find((p) => p.team === "offense" && p.label === "C") ??
-    players.find((p) => p.id === "o1" && p.team === "offense");
+  const center = centre(players);
   const snapGap = qb && center && center.id !== qb.id ? dist(qb, center) : 0;
+  const snapAt = cl(snapGap / 10, 0.12, 0.45);
+
+  // a jet-sweep runner is already crossing when the snap begins (docs/adr/006-jet-sweep.md): they start
+  // early enough that the ball, snapped as they come, reaches the quarterback a beat before they pass. Their
+  // track waits a negative time, so in the snap's frame they are yards along at zero. One already within
+  // reach starts with the snap, like any run, so the handoff is never before the snap arrives (J1).
+  let jetLead = 0;
+  for (const p of players) {
+    const tr = tracks[p.id];
+    if (!tr || tr.holds || p.route?.type !== "jet" || !qb || qb.id === p.id) continue;
+    const lead = Math.max(0, meshPoint(tr, qb).at - snapAt - JET_BEAT);
+    tr.wait = -lead;
+    jetLead = Math.max(jetLead, lead);
+  }
+  const run = cl(Object.values(tracks).reduce((m, t) => Math.max(m, t.wait + t.len / SPEED), 0), 1, 5);
 
   const m: Motion = {
+    jetLead,
     dur: run + HOLD,
     top,
     tracks,
     kind: "hold",
     center: center && center.id !== qb?.id ? center.id : null,
     qb: qb?.id ?? null,
-    snapAt: cl(snapGap / 10, 0.12, 0.45),
+    snapAt,
     shotgun: snapGap > 2,
     runner: null, handAt: Infinity, handFor: 0, laterals: [],
     passer: qb?.id ?? null, receiver: null, throwAt: Infinity, catchAt: Infinity,
@@ -451,14 +486,17 @@ function chainPlay(
 export function positionsAt(m: Motion, players: readonly Player[], t: number): Record<string, Pt> {
   const pos: Record<string, Pt> = {};
   const preSnapFor = m.preSnapFor ?? 0;
-  if (t < preSnapFor) {
+  // the motion runs first; then a jet-sweep runner's lead, in which the snap's tracks run from a negative
+  // time: everyone with a wait of zero stays at their spot, holds and man coverage included (J2)
+  const motionFor = preSnapFor - m.jetLead;
+  if (t < motionFor) {
     for (const p of players) {
       const tr = m.preSnapTracks?.[p.id];
       pos[p.id] = tr ? along(tr, Math.max(0, t)) : { x: p.x, y: p.y };
     }
     return pos;
   }
-  const s = Math.max(0, t - preSnapFor);
+  const s = Math.max(motionFor, t) - preSnapFor;
   players = players.map(atSnap);
   // offense first: man defenders shadow where their receiver is right now
   for (const p of players) {
