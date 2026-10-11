@@ -1,6 +1,6 @@
 import { blitzTarget } from "./blitz";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
-import { chainLinks, quarterback, startOf } from "./lateral";
+import { chainLinks, quarterback, runsBefore, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
 import { DEF, INK, PITCH_SET, ROUTES, inkFor, jetLegs, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
@@ -299,7 +299,14 @@ export interface LateralArc {
   ball: { x: number; y: number; angle: number };
   /** the catch point in SVG units, where its handle sits */
   handle: { x: number; y: number };
+  /**
+   * the run before a pitch on the run (ADR 007): the carrier's straight path with the ball from where
+   * they have it to the release, as a route is drawn, and the release point where its handle sits;
+   * null for a lateral let go from where they stand
+   */
+  run: { d: string; handle: { x: number; y: number } } | null;
   /** in yards */
+  start: Pair;
   release: Pair;
   catch: Pair;
 }
@@ -317,6 +324,15 @@ export function lateralArcs(players: readonly Player[], top: number): LateralArc
     const chord = Math.hypot(cx - ax, cy - ay);
     const bow = Math.min(2 * S, Math.max(0.5 * S, chord * 0.3));
     const qx = (ax + cx) / 2, qy = Math.min((ay + cy) / 2 + bow, Math.max(back, ay, cy));
+    let run: LateralArc["run"] = null;
+    if (runsBefore(l)) {
+      // the run with the ball, drawn as a route is: from the thrower's token (held clear of it, as a
+      // route from a spot is; a run from a catch has no token there) straight to the release
+      const sx = px(l.start[0]), sy = py(l.start[1], top);
+      const L = Math.hypot(ax - sx, ay - sy) || 1;
+      const off = l.index === 0 ? Math.min(27, L * 0.42) : 0;
+      run = { d: `M${f1(sx + ((ax - sx) / L) * off)} ${f1(sy + ((ay - sy) / L) * off)}L${f1(ax)} ${f1(ay)}`, handle: { x: ax, y: ay } };
+    }
     return {
       hop: l.index,
       from: l.from.id,
@@ -324,6 +340,8 @@ export function lateralArcs(players: readonly Player[], top: number): LateralArc
       d: `M${f1(ax)} ${f1(ay)}Q${f1(qx)} ${f1(qy)} ${f1(cx)} ${f1(cy)}`,
       ball: { x: 0.25 * ax + 0.5 * qx + 0.25 * cx, y: 0.25 * ay + 0.5 * qy + 0.25 * cy, angle: (Math.atan2(cy - ay, cx - ax) * 180) / Math.PI },
       handle: { x: cx, y: cy },
+      run,
+      start: l.start,
       release: l.release,
       catch: l.catch,
     };

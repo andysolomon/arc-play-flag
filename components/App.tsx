@@ -10,7 +10,7 @@ import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
-import { canJet, chainOf } from "@/lib/play/lateral";
+import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -159,6 +159,11 @@ export function App() {
     if (compactRef.current) setRightOpen(false);
   }, []);
   const onVisit = useCallback((index: number) => { dispatch({ type: "selectVisit", index }); }, []);
+  // a pitch on the run puts a handle on the field to drag, so on a phone the palette folds away for it
+  const onRunBefore = useCallback(() => {
+    dispatch({ type: "runBefore" });
+    if (compactRef.current) setRightOpen(false);
+  }, []);
   // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
   const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
   const onBlitzTarget = useCallback(() => {
@@ -346,6 +351,11 @@ export function App() {
   // who holds the ball, in order: the palette shows a carrier their jobs with it and the path it takes
   const chain = useMemo(() => chainOf(s.players), [s.players]);
   const visit = editedVisit(s, chain);
+  // whether the toss that leaves the edited time with the ball is a pitch on the run (ADR 007)
+  const onTheRun = useMemo(() => {
+    const link = visit === null ? undefined : chainLinks(s.players)[visit];
+    return link ? runsBefore(link) : false;
+  }, [s.players, visit]);
   // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
   const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
@@ -437,6 +447,8 @@ export function App() {
             visit={visit}
             onLateral={onLateral}
             onVisit={onVisit}
+            onTheRun={onTheRun}
+            onRunBefore={onRunBefore}
             blitz={blitz}
             onBlitzAim={onBlitzAim}
             onBlitzTarget={onBlitzTarget}

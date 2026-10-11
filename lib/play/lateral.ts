@@ -15,6 +15,10 @@ import type { Hop, Pair, Player, Route } from "./types";
  * behind the line of scrimmage. In yards +y is toward the offense's backfield, so that is
  * `catch.y >= max(LOS_GAP, release.y)`.
  *
+ * A carrier can also run with it first and pitch on the run, the option (docs/adr/007-pitch-on-the-run.md):
+ * a hop with a `release` stored is let go there, and the carrier runs straight to it from where they
+ * have the ball. The release stays behind the line, so every rule above holds against it unchanged.
+ *
  * Ways it could go wrong, written down before the code:
  * - C1 no quarterback on the field: there is no chain, not an error.
  * - C6 the quarterback is the player labelled QB, else the default QB slot, as everywhere else.
@@ -41,6 +45,18 @@ import type { Hop, Pair, Player, Route } from "./types";
  * - S3 a throw left on a player the chain doesn't reach: taken off.
  * - S4 settling a settled play hands back the very same array, so nothing reads as an edit.
  * - S5 a quarterback with no lateral keeps whatever route, and read, they had.
+ * - P1 a release past the line of scrimmage: snapped back behind it, so no lateral is ever let go past it.
+ * - P2 a release off the field: pulled back inside the sidelines and the backfield.
+ * - P3 a release where the carrier already has the ball: no run, the toss leaves from there as with none.
+ * - P4 the catch is clamped against the release, never the start: a pitch from up at the line can be
+ *   caught anywhere behind the line, deeper than where the run began included.
+ * - P5 a release moved behind its catch: the catch is pushed back level with it (K1 against the
+ *   release) and, as ever, never pulled forward again (K5).
+ * - P6 a release on a hop that is cut (to nobody, to the carrier, past the cap) goes with the hop.
+ * - P7 a run before a pitch flips with the field, like every catch (reducer "flip").
+ * - P8 a carrier who takes it back after running: their next catch is reached from the release, not
+ *   from their spot, so the playback track never jumps.
+ * - P9 pre-snap motion: the quarterback's run starts where they stand at the snap.
  */
 
 /** As many laterals as a play keeps: a bound on what storage reads, far past any play. */
@@ -67,14 +83,23 @@ export function canJet(p: Player, players: readonly Player[]): boolean {
   return !carriers(players).has(p.id);
 }
 
-/** One lateral in a chain: which hop it is, who lets it go and where, and who catches it and where (clamped). */
+/**
+ * One lateral in a chain: which hop it is, who lets it go and where, and who catches it and where (clamped).
+ * `start` is where the thrower has the ball when it is theirs to toss: their spot, or their own catch.
+ * It differs from `release` only when they run with it first (see runsBefore).
+ */
 export interface Link {
   index: number;
   from: Player;
   to: Player;
+  start: Pair;
   release: Pair;
   catch: Pair;
 }
+
+/** True when the toss is let go on the run: its thrower carries the ball from `start` to `release` first. */
+export const runsBefore = (l: Pick<Link, "start" | "release">): boolean =>
+  Math.abs(l.start[0] - l.release[0]) > 0.01 || Math.abs(l.start[1] - l.release[1]) > 0.01;
 
 const spot = (p: Player): Pair => {
   const s = atSnap(p);
@@ -92,17 +117,20 @@ function walk(players: readonly Player[]): { qb: Player | undefined; chain: Play
   const links: Link[] = [];
   // where each player is when it comes to them: their last catch, else their spot (R10)
   const at = new Map<string, Pair>();
-  let release = spot(qb);
+  // where the thrower has it: the quarterback's spot at the snap (K7, P9), then each catch in turn
+  let start = spot(qb);
   for (const [index, hop] of storedHops(qb).entries()) {
     const from = chain[chain.length - 1];
     if (index >= MAX_LATERALS || !from) break;
     const to = players.find((q) => q.id === hop.to && q.team === "offense");
     if (!to || to.id === from.id) break;
+    // let go on the run from the stored release (P1, P2), else from where they have it
+    const release = hop.release ? clampRelease(hop.release) : start;
     const c = hop.catch ? clampCatch(hop.catch, release) : defaultCatch(release, at.get(to.id) ?? spot(to));
-    links.push({ index, from, to, release, catch: c });
+    links.push({ index, from, to, start, release, catch: c });
     at.set(to.id, c);
     chain.push(to);
-    release = c;
+    start = c;
   }
   return { qb, chain, links };
 }
@@ -134,6 +162,29 @@ export function visits(chain: readonly Player[], id: string): number[] {
  */
 export function clampCatch(c: Pair, release: Pair): Pair {
   return [Math.max(X_MIN, Math.min(X_MAX, c[0])), Math.min(Y_MAX, Math.max(LOS_GAP, release[1], c[1]))];
+}
+
+/**
+ * Where a carrier may let a lateral go on the run: on the field (P2) and behind the line (P1), so the
+ * catch rules, clamped against it, hold as ever.
+ */
+export function clampRelease(r: Pair): Pair {
+  return [Math.max(X_MIN, Math.min(X_MAX, r[0])), Math.min(Y_MAX, Math.max(LOS_GAP, r[1]))];
+}
+
+/** Which rule snapped a raw release back, for the note the coach is shown: the line, or nothing. */
+export function releaseClamp(r: Pair): "line" | null {
+  return r[1] < LOS_GAP ? "line" : null;
+}
+
+/**
+ * Where a carrier runs to before pitching when the coach first asks for it: 4 yards across toward
+ * whoever takes it and 3 yards up toward the line, so the toss reads as the option it is, the arc
+ * clears the token of a back lined up beside them, and the run never crosses the line.
+ */
+export function defaultRelease(start: Pair, toward: Pair): Pair {
+  const dir = toward[0] >= start[0] ? 1 : -1;
+  return clampRelease([start[0] + dir * 4, start[1] - 3]);
 }
 
 /**
@@ -179,8 +230,18 @@ function withoutPrimary(r: Route): Route {
   return out;
 }
 
+const samePoint = (a: Pair | undefined, b: Pair | undefined): boolean =>
+  (a === undefined) === (b === undefined) && a?.[0] === b?.[0] && a?.[1] === b?.[1];
 const sameHop = (a: Hop | undefined, b: Hop): boolean =>
-  a?.to === b.to && a.catch?.[0] === b.catch?.[0] && a.catch?.[1] === b.catch?.[1] && (a.catch === undefined) === (b.catch === undefined);
+  a?.to === b.to && samePoint(a.catch, b.catch) && samePoint(a.release, b.release);
+
+/** A hop as stored, its catch and release clamped and nothing else changed, the keys only when they are there. */
+function keptHop(stored: Hop | undefined, l: Link): Hop {
+  const out: Hop = { to: l.to.id };
+  if (stored?.catch) out.catch = l.catch;
+  if (stored?.release) out.release = l.release;
+  return out;
+}
 
 /** A player without their laterals, the key gone rather than left empty, so the record reads as before. */
 function withoutLaterals(p: Player): Player {
@@ -191,14 +252,14 @@ function withoutLaterals(p: Player): Player {
 
 /**
  * The play with its chain made legal: the quarterback's laterals cut at the first that isn't one (R1, R3,
- * R4) with every stored catch clamped in order (K4), laterals anywhere else taken off (R7), and every
+ * R4) with every stored release and catch clamped in order (K4, P1), laterals anywhere else taken off (R7), and every
  * route a carrier can't have taken off (R5, S1, S2, S3). A play with nothing to settle comes back as the
  * same array (S4).
  */
 export function settleChain<T extends readonly Player[]>(players: T): T {
   const { qb, chain, links } = walk(players);
   const stored = storedHops(qb);
-  const kept: Hop[] = links.map((l) => (stored[l.index]?.catch ? { to: l.to.id, catch: l.catch } : { to: l.to.id }));
+  const kept: Hop[] = links.map((l) => keptHop(stored[l.index], l));
   const hopsMoved = kept.length !== stored.length || kept.some((h, i) => !sameHop(stored[i], h));
   const inChain = new Set(chain.map((p) => p.id));
   const last = chain[chain.length - 1];
@@ -236,4 +297,9 @@ export function catchNote(rule: "line" | "forward", thrower: string): string {
   return rule === "line"
     ? "A lateral has to be caught behind the line. Snapped the catch back to it."
     : `A lateral can't go forward. Snapped the catch level with where ${thrower} lets it go.`;
+}
+
+/** What the coach is told when a dragged release is snapped back: a pitch is let go behind the line. */
+export function releaseNote(thrower: string): string {
+  return `${thrower} has to pitch from behind the line. Snapped the pitch back to it.`;
 }

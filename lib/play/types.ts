@@ -49,11 +49,15 @@ export const isThrow = (r: Route | null | undefined): r is ThrowRoute => r?.type
 /**
  * One lateral in the quarterback's chain: who takes it, and where they catch it (absolute yards),
  * level with or behind where it is let go and behind the line of scrimmage (see lib/play/lateral.ts).
- * With no catch stored, one is worked out from where the target is.
+ * With no catch stored, one is worked out from where the target is. With a `release` stored the
+ * carrier runs with the ball from where they have it (their spot, or their own catch) straight to
+ * that point, behind the line, and pitches from there: the option (docs/adr/007-pitch-on-the-run.md).
+ * Without one they let it go where they stand.
  */
 export interface Hop {
   to: PlayerId;
   catch?: Pair;
+  release?: Pair;
 }
 
 export interface Player {

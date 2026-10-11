@@ -206,6 +206,14 @@ jobs:
           path: test-results/lateral-chain-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the pitches on the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: option-pitch
+          path: test-results/option-pitch-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the jet sweep
         if: always()
         uses: actions/upload-artifact@v4

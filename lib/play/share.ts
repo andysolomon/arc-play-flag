@@ -34,8 +34,9 @@ function compact(p: Player): Player {
     if (p.route.primary) out.route.primary = true;
   }
   if (p.preSnap?.pts.length) out.preSnap = { pts: p.preSnap.pts };
-  // every lateral, with the catches the coach moved; without them the recipient's tosses land at the defaults
-  if (p.laterals?.length) out.laterals = p.laterals.map((h) => (h.catch ? { to: h.to, catch: h.catch } : { to: h.to }));
+  // every lateral, with the catches the coach moved and the runs before a pitch; without them the
+  // recipient's tosses land at the defaults, from where each carrier stands
+  if (p.laterals?.length) out.laterals = p.laterals.map((h) => ({ to: h.to, ...(h.catch ? { catch: h.catch } : {}), ...(h.release ? { release: h.release } : {}) }));
   return out;
 }
 

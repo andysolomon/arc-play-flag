@@ -20,6 +20,10 @@ interface Props {
   onLateral: () => void;
   /** a step of the ball path tapped: edit that time its player has the ball */
   onVisit: (index: number) => void;
+  /** the lateral that leaves the selected time with the ball is let go on the run (ADR 007) */
+  onTheRun: boolean;
+  /** the On the run tile: that lateral becomes a pitch on the run, or back to one from where they stand */
+  onRunBefore: () => void;
   /** the selected blitzer: how their blitz is aimed, who it comes for now, and the back a backfield blitz would come for (lib/play/blitz.ts) */
   blitz: BlitzInfo | null;
   /** the QB and Backfield pills */
@@ -78,7 +82,8 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion,
+  onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
@@ -103,6 +108,11 @@ function RouteSidebarImpl({
   const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
   const canMirror = mirrorable(sel);
   const primaryOn = !!sel?.route?.primary;
+  const runNote = goesOn
+    ? onTheRun
+      ? `${sel?.label || "This player"} runs with the ball to the round handle and pitches from there. Drag it to move the pitch; it stays behind the line.`
+      : "On the run: run with the ball first and pitch from where the run ends, the option."
+    : null;
   const guidance = hint
     ? hint.startsWith("Lateral to who?")
       ? "Lateral to who? Choose a red player · Esc cancels."
@@ -252,8 +262,10 @@ function RouteSidebarImpl({
               <div className={tileGrid} role="group" aria-label="With the ball">
                 <IconTile icon="football" label="Throw" active={isJob("throw")} onClick={() => { onPick("throw"); }} />
                 <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />
+                {goesOn && <IconTile icon="stretch" label="On the run" active={onTheRun} onClick={onRunBefore} />}
                 <IconTile icon="deselectOff" label="Done" onClick={onDone} />
               </div>
+              {runNote && <span className="flex-none text-caption leading-note text-ink-muted">{runNote}</span>}
             </>
           )}
           {keys.length > 0 && (
@@ -293,8 +305,11 @@ function RouteSidebarImpl({
                 ))}
                 {/* the quarterback starts a chain here, where Pitch was; later carriers lateral from WITH THE BALL */}
                 {at === 0 && <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />}
+                {/* and, once it goes on, can run with it first: the option */}
+                {at === 0 && goesOn && <IconTile icon="stretch" label="On the run" active={onTheRun} onClick={onRunBefore} />}
                 {!hasBall && <IconTile icon={`deselect${suffix}`} label="Done" onClick={onDone} />}
               </div>
+              {at === 0 && runNote && <span className="flex-none text-caption leading-note text-ink-muted">{runNote}</span>}
               {isJob("jet") && (
                 <span data-jet-note className="flex-none text-caption leading-note text-ink-muted">
                   {sel.label || "This player"} is already crossing behind the line when the ball is snapped, and the QB hands it off as they pass.

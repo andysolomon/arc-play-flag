@@ -2,7 +2,9 @@ import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { canJet, carriers, chainLinks, chainOf, clampCatch, quarterback, settleChain, visits } from "./lateral";
+import {
+  canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
+} from "./lateral";
 import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
@@ -47,6 +49,13 @@ export type Action =
   | { type: "selectVisit"; index: number }
   /** a lateral's catch point dragged or nudged: clamped behind its release and the line */
   | { type: "catchMove"; hop: number; pt: Pair }
+  /** a pitch's release point dragged or nudged: the carrier runs there with the ball first; clamped behind the line */
+  | { type: "releaseMove"; hop: number; pt: Pair }
+  /**
+   * the On the run tile, for a time the ball goes on from the selected carrier: that lateral is let go
+   * on the run (from a release a few yards along, to drag), or, when it already is, from where they stand
+   */
+  | { type: "runBefore" }
   | { type: "setRoute"; id: string; route: Route | null }
   | { type: "draftPoint"; pt: Pair }
   | { type: "draftPointRemove" }
@@ -351,7 +360,39 @@ function reduce(s: PlayState, a: Action): PlayState {
       const pt = clampCatch(a.pt, link.release);
       if (hop.catch?.[0] === pt[0] && hop.catch[1] === pt[1]) return s;
       const c = commit(s);
-      return { ...c, players: withHops(c.players, hops.map((h, i) => (i === a.hop ? { to: h.to, catch: pt } : h))) };
+      return { ...c, players: withHops(c.players, hops.map((h, i) => (i === a.hop ? { ...h, catch: pt } : h))) };
+    }
+    case "releaseMove": {
+      const link = chainLinks(s.players)[a.hop];
+      const hops = hopsUpTo(s.players, Infinity);
+      const hop = hops[a.hop];
+      if (!link || !hop) return s;
+      const pt = clampRelease(a.pt);
+      if (hop.release?.[0] === pt[0] && hop.release[1] === pt[1]) return s;
+      const c = commit(s);
+      return { ...c, players: withHops(c.players, hops.map((h, i) => (i === a.hop ? { ...h, release: pt } : h))) };
+    }
+    case "runBefore": {
+      const p = selected(s);
+      const chain = chainOf(s.players);
+      const at = editedVisit(s, chain);
+      // the lateral the ball goes on by from this time with it is hop `at`: tossed by chain[at]
+      const link = at === null ? undefined : chainLinks(s.players)[at];
+      const hops = hopsUpTo(s.players, Infinity);
+      const hop = at === null ? undefined : hops[at];
+      if (!p || p.team !== "offense" || at === null || !link || !hop || link.from.id !== p.id) return s;
+      const c = commit(s);
+      const next = hops.map((h, i): Hop => {
+        if (i !== at) return h;
+        // a release dragged onto the carrier's own spot is no run (P3): the tile reads off, and starts one again
+        if (runsBefore(link)) {
+          const still: Hop = { to: h.to };
+          if (h.catch) still.catch = h.catch;
+          return still;
+        }
+        return { ...h, release: defaultRelease(link.start, link.catch) };
+      });
+      return { ...c, visit: at, players: withHops(c.players, next) };
     }
     case "setRoute":
       return setRoute(s, a.id, a.route);
@@ -425,8 +466,12 @@ function reduce(s: PlayState, a: Action): PlayState {
         ...c,
         players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
           ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
-          // every lateral's catch flips with the field (R13)
-          ...(p.laterals ? { laterals: p.laterals.map((h) => (h.catch ? { to: h.to, catch: [30 - h.catch[0], h.catch[1]] as const } : h)) } : {}) })),
+          // every lateral's catch, and the run before a pitch, flip with the field (R13, P7)
+          ...(p.laterals ? { laterals: p.laterals.map((h): Hop => ({
+            ...h,
+            ...(h.catch ? { catch: [30 - h.catch[0], h.catch[1]] as const } : {}),
+            ...(h.release ? { release: [30 - h.release[0], h.release[1]] as const } : {}),
+          })) } : {}) })),
       };
     }
     case "clearRoutes": {

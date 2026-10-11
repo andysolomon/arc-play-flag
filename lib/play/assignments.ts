@@ -21,6 +21,8 @@
  * - L7 a read marked on a carrier in a chain is not the read: the final throw goes to someone else.
  * - L8 a blitz aimed at a player reads "Blitz Z", at the backfield "Blitz the backfield", and at the
  *   quarterback plain "Blitz", as every blitz did; one aimed at a player who is gone reads "Blitz" too.
+ * - L9 a lateral let go on the run (ADR 007) is a pitch: "QB runs and pitches to Z", and the job "Run
+ *   and pitch to Z", so the words say the carrier moves with the ball first.
  *
  * Text is used as given; the caller cleans it first (T1–T5).
  */
@@ -29,7 +31,7 @@ import type { Numbered } from "@/lib/export/numbered";
 import { blitzAim, blitzTarget } from "./blitz";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
-import { carriers, chainOf, visits } from "./lateral";
+import { carriers, chainLinks, chainOf, runsBefore, visits } from "./lateral";
 import { isRun, routeDef } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
@@ -125,10 +127,10 @@ export function callLine(play: SavedPlay): string | null {
   const who = namer(play);
   const r = runnerOf(play), pr = primaryOf(play);
   const read = pr ? ` Primary read: ${who(pr)} (${routeJob(pr, play, who) ?? ""}).` : "";
-  // a chain, toss by toss: "QB laterals to Z, Z laterals to X"
+  // a chain, toss by toss: "QB laterals to Z, Z laterals to X", or "QB runs and pitches to Z" on the run (L9)
   const chain = chainOf(play.players);
   const last = chain[chain.length - 1] ?? null;
-  const hops = chain.slice(1).map((p, i) => `${who(chain[i] ?? null)} laterals to ${who(p)}`).join(", ");
+  const hops = chainLinks(play.players).map((l) => `${who(l.from)} ${runsBefore(l) ? "runs and pitches" : "laterals"} to ${who(l.to)}`).join(", ");
   switch (call) {
     case "pass": return `Pass.${read}`;
     case "play-action": return `Play-action: fake to ${who(r)}, then throw.${read}`;
@@ -203,8 +205,11 @@ function carrierJob(p: Player, chain: readonly Player[], play: SavedPlay, who: W
   const last = chain.length - 1;
   if (!at.length) return null;
   if (last === 0) return rt?.type === "throw" ? { job: `Throw${look}`, missing: false } : null;
+  const links = chainLinks(play.players);
   const one = (i: number): string => {
-    if (i < last) return `Lateral to ${who(chain[i + 1] ?? null)}`;
+    // the toss that leaves them this time is hop i: on the run it is a pitch (L9)
+    const toss = links[i];
+    if (i < last) return `${toss && runsBefore(toss) ? "Run and pitch" : "Lateral"} to ${who(chain[i + 1] ?? null)}`;
     if (rt?.type === "throw") return `Take the lateral, throw${look}`;
     if (rt && isRun(rt.type)) return `Take the lateral, keep it: ${routeJob(p, play, who) ?? ""}`;
     return "Takes the lateral · no job yet";

@@ -118,11 +118,18 @@ function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit
   return r;
 }
 
-/** One lateral as stored: who takes it, and the catch when the coach has moved it. Null for anything else. */
+/**
+ * One lateral as stored: who takes it, the catch when the coach has moved it, and the release when
+ * they pitch it on the run (ADR 007). Null for anything else.
+ */
 function toHop(v: unknown): Hop | null {
   if (!isRecord(v) || typeof v.to !== "string" || !v.to) return null;
   const c = v.catch === undefined ? null : toPair(v.catch);
-  return c ? { to: v.to.slice(0, 40), catch: c } : { to: v.to.slice(0, 40) };
+  const r = v.release === undefined ? null : toPair(v.release);
+  const hop: Hop = { to: v.to.slice(0, 40) };
+  if (c) hop.catch = c;
+  if (r) hop.release = r;
+  return hop;
 }
 
 /** A stored list of laterals, cut at the first entry that isn't one (each depends on the one before) and at the cap. */
