@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useId, useRef, type ChangeEvent } from "react";
+import type { BlitzAim } from "@/lib/play/blitz";
 import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, isRun, mirrorable, tableFor } from "@/lib/play/routes";
 import { teamFill, type SidelineCut } from "@/lib/play/geometry";
 import type { Player, RouteType } from "@/lib/play/types";
@@ -19,12 +20,23 @@ interface Props {
   onLateral: () => void;
   /** a step of the ball path tapped: edit that time its player has the ball */
   onVisit: (index: number) => void;
-  /** the lateral that leaves the selected time with the ball is let go on the run (ADR 006) */
+  /** the lateral that leaves the selected time with the ball is let go on the run (ADR 007) */
   onTheRun: boolean;
   /** the On the run tile: that lateral becomes a pitch on the run, or back to one from where they stand */
   onRunBefore: () => void;
+  /** the selected blitzer: how their blitz is aimed, who it comes for now, and the back a backfield blitz would come for (lib/play/blitz.ts) */
+  blitz: BlitzInfo | null;
+  /** the QB and Backfield pills */
+  onBlitzAim: (aim: "qb" | "backfield") => void;
+  /** Pick a player: like Man, ask for a red player on the field */
+  onBlitzTarget: () => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
   cut: SidelineCut | null;
+  /**
+   * the selected player can take a jet sweep (docs/adr/006-jet-sweep.md): an offensive player who is not the
+   * quarterback or the centre and does not carry the ball in a lateral chain. Nobody else is offered the tile.
+   */
+  jet: boolean;
   hint: string | null;
   onPick: (key: RouteType) => void;
   onMotion: () => void;
@@ -40,6 +52,25 @@ interface Props {
   noRunZone: boolean;
 }
 
+export interface BlitzInfo {
+  aim: BlitzAim;
+  /** who the blitz comes for now, by name; null with no quarterback on the field */
+  who: string | null;
+  /** the back a backfield blitz comes for, by name; null with nobody lined up back there */
+  back: string | null;
+}
+
+/** What the blitz does, under the pills. */
+function blitzWords(b: BlitzInfo): string {
+  if (b.aim === "player") return `Comes for ${b.who ?? "that player"}, wherever they line up.`;
+  if (b.aim === "backfield") {
+    return b.back
+      ? `Comes for the nearest back lined up near the ball: ${b.back} now. With nobody back there, the quarterback.`
+      : "Comes for the nearest back lined up near the ball. Nobody is back there now, so it comes for the quarterback.";
+  }
+  return "Comes for the quarterback. Aim it at the backfield, or pick any red player.";
+}
+
 /** Yards as a coach reads them off the field, to the half yard. */
 const yards = (v: number): string => String(Math.round(v * 2) / 2);
 
@@ -51,8 +82,8 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename,
-  noRunZone,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion,
+  onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
@@ -70,7 +101,8 @@ function RouteSidebarImpl({
   const isJob = (k: RouteType): boolean => !goesOn && sel?.route?.type === k;
   // offense splits into the passing tree and the run game; defense is one list. A carrier gets no pass route
   const keys: readonly RouteType[] = sel?.team === "offense" ? (hasBall ? [] : PASS_KEYS) : DEFENSE_KEYS;
-  const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS : [];
+  // the jet sweep is a handoff at the snap: only for a player who can take one, never a keep after a lateral
+  const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS.filter((k) => k !== "jet" || (jet && !hasBall)) : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
   // the read is someone the final throw goes to, never a player the ball is lateraled through
   const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
@@ -84,7 +116,7 @@ function RouteSidebarImpl({
   const guidance = hint
     ? hint.startsWith("Lateral to who?")
       ? "Lateral to who? Choose a red player · Esc cancels."
-      : hint.startsWith("Cover who?")
+      : hint.startsWith("Cover who?") || hint.startsWith("Blitz who?")
       ? "Choose a red offense player · Tab then Enter or Space · Esc cancels."
       : "Tap waypoints on the field · double-tap to finish · Finish (Enter) or Cancel (Esc)."
     : sel?.route?.type === "custom"
@@ -179,6 +211,36 @@ function RouteSidebarImpl({
               text={`The sideline cuts this ${tableFor(sel.team)[sel.route.type]?.label ?? "route"}: ${yards(cut.room)} of its ${yards(cut.reach)} yards across fit. Move ${sel.label || "this player"} inside to run all of it.`}
             />
           )}
+          {/* who the blitz comes for: the quarterback unless aimed at the backfield or at a player the coach picks */}
+          {blitz && sel.team === "defense" && (
+            <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Blitz target">
+              <span className={eyebrow}>BLITZ</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button" onClick={() => { onBlitzAim("qb"); }} title="Blitz the quarterback"
+                  aria-pressed={blitz.aim === "qb"} data-active={blitz.aim === "qb"}
+                  className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                >
+                  QB
+                </button>
+                <button
+                  type="button" onClick={() => { onBlitzAim("backfield"); }} title="Blitz the nearest back in the backfield"
+                  aria-pressed={blitz.aim === "backfield"} data-active={blitz.aim === "backfield"}
+                  className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                >
+                  Backfield
+                </button>
+                <button
+                  type="button" onClick={onBlitzTarget} title="Blitz one player: tap them on the field"
+                  aria-pressed={blitz.aim === "player"} data-active={blitz.aim === "player"}
+                  className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                >
+                  {blitz.aim === "player" ? `On ${blitz.who ?? "?"}` : "Pick a player"}
+                </button>
+              </div>
+              <span className="text-caption leading-note text-ink-muted">{blitzWords(blitz)}</span>
+            </div>
+          )}
           {sel.team === "offense" && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Pre-snap motion">
               <span className={eyebrow}>PRE-SNAP</span>
@@ -248,6 +310,12 @@ function RouteSidebarImpl({
                 {!hasBall && <IconTile icon={`deselect${suffix}`} label="Done" onClick={onDone} />}
               </div>
               {at === 0 && runNote && <span className="flex-none text-caption leading-note text-ink-muted">{runNote}</span>}
+              {isJob("jet") && (
+                <span data-jet-note className="flex-none text-caption leading-note text-ink-muted">
+                  {sel.label || "This player"} is already crossing behind the line when the ball is snapped, and the QB hands it off as they pass.
+                  A forward pass to a player behind the line isn&apos;t allowed, so a jet sweep is always a handoff.
+                </span>
+              )}
             </>
           )}
         </>

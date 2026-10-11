@@ -15,7 +15,7 @@ import type { Hop, Pair, Player, Route } from "./types";
  * behind the line of scrimmage. In yards +y is toward the offense's backfield, so that is
  * `catch.y >= max(LOS_GAP, release.y)`.
  *
- * A carrier can also run with it first and pitch on the run, the option (docs/adr/006-pitch-on-the-run.md):
+ * A carrier can also run with it first and pitch on the run, the option (docs/adr/007-pitch-on-the-run.md):
  * a hop with a `release` stored is let go there, and the carrier runs straight to it from where they
  * have the ball. The release stays behind the line, so every rule above holds against it unchanged.
  *
@@ -65,6 +65,22 @@ export const MAX_LATERALS = 60;
 /** The quarterback: the offensive player labelled QB, else the default QB slot. */
 export function quarterback(players: readonly Player[]): Player | undefined {
   return players.find((q) => q.team === "offense" && q.label === "QB") ?? players.find((q) => q.id === "o2");
+}
+
+/** The centre, who snaps the ball: the offensive player labelled C, else the default centre slot. */
+export function centre(players: readonly Player[]): Player | undefined {
+  return players.find((q) => q.team === "offense" && q.label === "C") ?? players.find((q) => q.id === "o1" && q.team === "offense");
+}
+
+/**
+ * Whether this player can be given a jet sweep (docs/adr/006-jet-sweep.md, rule 5): an offensive
+ * player who is not the quarterback, who hands it off, nor the centre, who snaps it, and who does not
+ * carry the ball in a lateral chain, since the ball comes to a carrier by lateral, never by handoff.
+ */
+export function canJet(p: Player, players: readonly Player[]): boolean {
+  if (p.team !== "offense") return false;
+  if (p.id === quarterback(players)?.id || p.id === centre(players)?.id) return false;
+  return !carriers(players).has(p.id);
 }
 
 /**
@@ -255,7 +271,9 @@ export function settleChain<T extends readonly Player[]>(players: T): T {
     const r = next.route;
     if (r && p.team === "offense") {
       let route: Route | null = r;
-      if (!inChain.has(p.id)) {
+      // J8: a jet sweep is a handoff at the snap, so neither the quarterback, the centre nor a carrier can take one
+      if (r.type === "jet" && (p.id === qb?.id || p.id === centre(players)?.id || (links.length && inChain.has(p.id)))) route = null;
+      else if (!inChain.has(p.id)) {
         // S3: a throw only a carrier has, on someone who doesn't carry
         if (isBallJob(r.type)) route = null;
       } else if (p.id !== last?.id) {

@@ -1,4 +1,4 @@
-// Draws the run-route stickers (dive, stretch, counter, reverse, delay, pitch) in the style of
+// Draws the run-route stickers (dive, stretch, counter, reverse, delay, pitch, jet) in the style of
 // the design's route icons: ink on paper into design/assets/icons, and the dark board's version
 // (chalk outlines, yellow route) into design/assets/icons-dark. Then run `bun run icons`.
 // Run with `node scripts/run-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
@@ -50,6 +50,11 @@ const draw = (P: Palette): Record<string, string> => {
     counter: svg(token(400, 410) + line("M330 380 Q250 360 220 300 Q290 270 310 190 Q330 120 320 96") + head(318, 60, -0.1, -1) + ball(400, 300, -40)),
     // all the way around the far end
     reverse: svg(token(410, 400) + line("M340 420 Q200 470 130 400 Q80 340 100 96") + head(100, 60, 0, -1) + ball(410, 290, -40)),
+    // already running across behind the line when the ball is snapped, the handoff on the way, then around the far end
+    jet: svg(
+      token(96, 410) + line("M180 400 Q250 416 310 392", "1 62") +
+      line("M310 392 Q400 350 428 280 Q450 200 424 96") + head(422, 60, -0.1, -1) + ball(330, 300, -20),
+    ),
     // a pause on the spot, then go
     delay: svg(token(256, 400) + line("M256 320 L256 240", "1 62") + line("M256 200 Q252 150 256 96") + head(256, 60, 0, -1) + ball(150, 420)),
     // the toss comes in from the quarterback's side; the runner sets up wide, then runs or throws

@@ -19,7 +19,7 @@ interface Props {
   faded?: boolean;
   onHandleDown?: (hop: number, e: PointerEvent<SVGGElement>) => void;
   onHandleKey?: (hop: number, e: KeyboardEvent<SVGGElement>) => void;
-  /** the release handle of a pitch on the run (ADR 006), dragged or nudged */
+  /** the release handle of a pitch on the run (ADR 007), dragged or nudged */
   onReleaseDown?: (hop: number, e: PointerEvent<SVGGElement>) => void;
   onReleaseKey?: (hop: number, e: KeyboardEvent<SVGGElement>) => void;
 }
@@ -32,7 +32,7 @@ const EDGE = 64;
  * Laterals on the live field (see lib/play/lateral.ts). Each is a dashed arc from where the ball is
  * let go to where it is caught, bowing back, with the football sticker at the curve's midpoint; the
  * catch point is a diamond the coach drags, clamped as it moves behind the release and the line. A
- * pitch on the run (ADR 006) first draws the carrier's run with the ball as a solid line to the
+ * pitch on the run (ADR 007) first draws the carrier's run with the ball as a solid line to the
  * release, a round handle the coach drags, kept behind the line.
  */
 function LateralLayerImpl({

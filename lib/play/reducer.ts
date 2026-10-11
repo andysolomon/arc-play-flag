@@ -1,12 +1,15 @@
+import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
-import { carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits } from "./lateral";
+import {
+  canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
+} from "./lateral";
 import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
-/** What a tap on a red player is waiting to answer: who a man defender covers, or who takes a lateral. */
-export type Targeting = "man" | "lateral";
+/** What a tap on a red player is waiting to answer: who a man defender covers, who a blitz comes for, or who takes a lateral. */
+export type Targeting = "man" | "blitz" | "lateral";
 
 export interface PlayState extends Doc, History {
   artShadow: boolean;
@@ -33,6 +36,10 @@ export type Action =
   | { type: "drawMotion" }
   | { type: "removeMotion" }
   | { type: "target"; id: string }
+  /** the selected blitzer comes for the quarterback or the backfield (lib/play/blitz.ts) */
+  | { type: "blitzAim"; aim: "qb" | "backfield" }
+  /** the selected blitzer's Pick a player: like Man, ask who they come for */
+  | { type: "blitzTarget" }
   /**
    * the Lateral tile: the selected carrier's last time with it asks who takes it, like Man; a time they
    * toss it on takes off that lateral and every one after
@@ -291,6 +298,8 @@ function reduce(s: PlayState, a: Action): PlayState {
         return { ...c, players: cut.map((q) => (q.id === p.id ? legalSpot({ ...q, route: { type: a.key } }) : q)), visit: at };
       }
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
+      // a jet sweep is a handoff at the snap: not for the quarterback, the centre or a lateral carrier (J8)
+      if (a.key === "jet" && !canJet(p, s.players)) return s;
       if (a.key === "man") return { ...s, targeting: "man", draft: null };
       if (a.key === "custom") return { ...s, draft: { id: p.id, pts: [] }, targeting: null };
       // a preset picked over the current route keeps the read; picking the same one again takes the route away, read and all
@@ -325,8 +334,23 @@ function reduce(s: PlayState, a: Action): PlayState {
         });
         return { ...c, targeting: null, selectedId: t.id, visit: at + 1, players };
       }
+      if (s.targeting === "blitz") {
+        // the blitzer comes for this player; picking the quarterback is the default again (B8)
+        if (def?.team !== "defense" || def.route?.type !== "blitz") return { ...s, targeting: null };
+        return { ...setRoute(s, def.id, blitzAt(t, s.players)), targeting: null };
+      }
       const next = def ? setRoute(s, def.id, { type: "man", target: t.id }) : s;
       return { ...next, targeting: null };
+    }
+    case "blitzAim": {
+      const p = selected(s);
+      if (p?.team !== "defense" || p.route?.type !== "blitz" || blitzAim(p.route) === a.aim) return s;
+      return { ...setRoute(s, p.id, aimedBlitz(a.aim)), targeting: null };
+    }
+    case "blitzTarget": {
+      const p = selected(s);
+      if (p?.team !== "defense" || p.route?.type !== "blitz") return s;
+      return { ...s, targeting: "blitz", draft: null };
     }
     case "catchMove": {
       const link = chainLinks(s.players)[a.hop];

@@ -214,6 +214,14 @@ jobs:
           path: test-results/option-pitch-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the jet sweep
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jet-sweep
+          path: test-results/jet-sweep-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the demo tour
         if: always()
         uses: actions/upload-artifact@v4
@@ -226,6 +234,14 @@ jobs:
         with:
           name: primary-read
           path: test-results/primary-read-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the blitz targets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blitz-target
+          path: test-results/blitz-target-*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload mobile usability evidence

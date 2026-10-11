@@ -15,6 +15,8 @@ export type OffenseRouteType =
   | "go" | "out" | "in" | "slant" | "corner" | "post" | "curl" | "flat"
   | "cross" | "wheel" | "custom"
   | "handoff" | "dive" | "stretch" | "counter" | "reverse" | "delay"
+  /** a run whose runner is already crossing the formation at the snap and takes the handoff in stride (ADR 006) */
+  | "jet"
   /** the last ball carrier of a lateral chain sets up and throws it forward */
   | "throw";
 export type DefenseRouteType =
@@ -25,8 +27,14 @@ export interface Route {
   type: RouteType;
   /** custom routes: absolute yard waypoints after the player's spot */
   pts?: Pair[];
-  /** man coverage: id of the offensive player being covered */
+  /** man coverage: id of the offensive player being covered; a blitz: who it comes for, when not the quarterback */
   target?: PlayerId;
+  /**
+   * A blitz aimed at the backfield: it comes for the nearest back lined up near the ball, and for the
+   * quarterback when nobody is (lib/play/blitz.ts). Stored only when set; a blitz with neither this nor
+   * a target comes for the quarterback, as every blitz did.
+   */
+  aim?: "backfield";
   mirror?: boolean;
   primary?: boolean;
 }
@@ -43,7 +51,7 @@ export const isThrow = (r: Route | null | undefined): r is ThrowRoute => r?.type
  * level with or behind where it is let go and behind the line of scrimmage (see lib/play/lateral.ts).
  * With no catch stored, one is worked out from where the target is. With a `release` stored the
  * carrier runs with the ball from where they have it (their spot, or their own catch) straight to
- * that point, behind the line, and pitches from there: the option (docs/adr/006-pitch-on-the-run.md).
+ * that point, behind the line, and pitches from there: the option (docs/adr/007-pitch-on-the-run.md).
  * Without one they let it go where they stand.
  */
 export interface Hop {

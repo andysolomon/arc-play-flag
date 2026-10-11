@@ -43,7 +43,7 @@ const DEFAULT_NOTE = "Saved with this play. Yards count down to their goal line:
 const NO_RUN_NOTE = "Saved with this play. The ball is in a no-run zone, so no runs from here.";
 const FLAGGED_NOTE = "Saved with this play. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball.";
 // Z holds no ball here, so a Lateral is the quarterback's to start (see lateral-chain.journey.ts)
-const RUNS = ["Handoff", "Dive", "Stretch", "Counter", "Reverse", "Delay"];
+const RUNS = ["Handoff", "Dive", "Stretch", "Counter", "Reverse", "Delay", "Jet sweep"];
 
 const flag = (l: Locator): Locator => l.locator("[data-no-run-flag]");
 const losSelect = (page: Page): Locator => page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" });

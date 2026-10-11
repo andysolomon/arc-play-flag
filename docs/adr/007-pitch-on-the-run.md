@@ -1,6 +1,6 @@
-# ADR 006: a pitch on the run
+# ADR 007: a pitch on the run
 
-Status: implemented. It extends [ADR 005](005-unlimited-laterals.md), whose rules, data model, migration, sidebar, arcs, handles, words and playback all still hold. Nothing in ADR 004 or ADR 005 is superseded.
+Status: implemented. It extends [ADR 005](005-unlimited-laterals.md), whose rules, data model, migration, sidebar, arcs, handles, words and playback all still hold. Nothing in ADR 004, ADR 005 or [ADR 006](006-jet-sweep.md) is superseded. A carrier in a lateral chain still can't take a jet sweep (ADR 006, rule 5), whether or not a toss in the chain is let go on the run.
 
 ## Why
 

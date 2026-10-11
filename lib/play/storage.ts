@@ -111,6 +111,8 @@ function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit
   const r: Omit<Route, "type"> & { type: T } = { type };
   if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
+  // a blitz aimed at the backfield; one aimed at a player keeps only the player
+  else if (v.aim === "backfield") r.aim = "backfield";
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;
@@ -118,7 +120,7 @@ function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit
 
 /**
  * One lateral as stored: who takes it, the catch when the coach has moved it, and the release when
- * they pitch it on the run (ADR 006). Null for anything else.
+ * they pitch it on the run (ADR 007). Null for anything else.
  */
 function toHop(v: unknown): Hop | null {
   if (!isRecord(v) || typeof v.to !== "string" || !v.to) return null;
@@ -204,8 +206,9 @@ function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
 /**
  * Accepts the prototype's stored shape (and anything older that looks like it) and
  * returns players clamped back onto the field, exactly as the prototype's load does.
- * Ids are made unique, the roster is capped, and a man target that names nobody on the
- * offense drops the route rather than drawing nothing. A Pitch from before lateral chains
+ * Ids are made unique, the roster is capped, a man target that names nobody on the
+ * offense drops the route rather than drawing nothing, and a blitz aimed at nobody comes for
+ * the quarterback. A Pitch from before lateral chains
  * becomes one (see fromPitch), a chain saved one lateral per carrier becomes the
  * quarterback's laterals (see fromCarrierLaterals), and the chain is settled: cut at the
  * first lateral to nobody, every catch clamped behind its release and the line, and nothing
@@ -287,6 +290,13 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
   });
   const offense = new Set(out.filter((p) => p.team === "offense").map((p) => p.id));
   const aimed = out.map((p) => {
+    if (p.route?.type === "blitz") {
+      // a blitz aimed at a player who is gone comes for the quarterback (lib/play/blitz.ts, B2)
+      if (!p.route.target || offense.has(p.route.target)) return p;
+      const route = { ...p.route };
+      delete route.target;
+      return { ...p, route };
+    }
     if (p.route?.type !== "man") return p;
     return p.route.target && offense.has(p.route.target) ? p : { ...p, route: null };
   });

@@ -1,7 +1,8 @@
+import { blitzTarget } from "./blitz";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
 import { chainLinks, quarterback, runsBefore, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
-import { DEF, INK, PITCH_SET, ROUTES, inkFor, routeDef, runLegs } from "./routes";
+import { DEF, INK, PITCH_SET, ROUTES, inkFor, jetLegs, routeDef, runLegs } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -95,10 +96,10 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     return [[p.x, p.y], set];
   }
   if (rt.type === "blitz") {
-    // drive past the line of scrimmage, angled at the quarterback
-    const qb0 = quarterback(players);
-    const qb = qb0 ? atSnap(qb0) : undefined;
-    const tx = qb ? qb.x : 15, ty = qb ? qb.y : 5;
+    // drive past the line of scrimmage, angled at whoever it comes for: the quarterback unless it is
+    // aimed at the backfield or at a player (lib/play/blitz.ts)
+    const t = blitzTarget(rt, players);
+    const tx = t ? t.x : 15, ty = t ? t.y : 5;
     const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
     const reach = Math.max(1.5, L - 1.8);
     return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
@@ -115,6 +116,13 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     // who took a lateral keeps it from the catch, carrying on the way the ball was going.
     const qb0 = quarterback(players);
     const qb = qb0 ? atSnap(qb0) : undefined;
+    if (rt.type === "jet") {
+      // across the formation past the quarterback, the handoff on the way (docs/adr/006-jet-sweep.md)
+      const q = qb && qb.id !== p.id ? qb : { x: 15, y: 5 };
+      const across = p.x < q.x - 0.01 ? 1 : -1;
+      const legs = jetLegs(p.x, q.x, q.y, across);
+      return [[p.x, p.y], ...legs.map((l) => [Math.max(0.8, Math.min(29.2, l[0])), Math.max(top + 0.6, l[1])] as const)];
+    }
     // the last toss, when it is this player who keeps it
     const links = chainLinks(players);
     const into = links.length && links[links.length - 1]?.to.id === p.id ? links[links.length - 1] : undefined;
@@ -292,7 +300,7 @@ export interface LateralArc {
   /** the catch point in SVG units, where its handle sits */
   handle: { x: number; y: number };
   /**
-   * the run before a pitch on the run (ADR 006): the carrier's straight path with the ball from where
+   * the run before a pitch on the run (ADR 007): the carrier's straight path with the ball from where
    * they have it to the release, as a route is drawn, and the release point where its handle sits;
    * null for a lateral let go from where they stand
    */

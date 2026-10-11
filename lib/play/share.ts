@@ -29,6 +29,7 @@ function compact(p: Player): Player {
     out.route = { type: p.route.type };
     if (p.route.pts) out.route.pts = p.route.pts;
     if (p.route.target) out.route.target = p.route.target;
+    if (p.route.aim) out.route.aim = p.route.aim;
     if (p.route.mirror) out.route.mirror = true;
     if (p.route.primary) out.route.primary = true;
   }

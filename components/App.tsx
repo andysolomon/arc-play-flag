@@ -5,10 +5,12 @@ import { install, record } from "@/lib/diagnostics";
 import { editedVisit, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
+import { names } from "@/lib/play/assignments";
+import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
-import { chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
+import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -160,6 +162,12 @@ export function App() {
   // a pitch on the run puts a handle on the field to drag, so on a phone the palette folds away for it
   const onRunBefore = useCallback(() => {
     dispatch({ type: "runBefore" });
+    if (compactRef.current) setRightOpen(false);
+  }, []);
+  // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
+  const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  const onBlitzTarget = useCallback(() => {
+    dispatch({ type: "blitzTarget" });
     if (compactRef.current) setRightOpen(false);
   }, []);
   const onPrimary = useCallback(() => {
@@ -343,14 +351,25 @@ export function App() {
   // who holds the ball, in order: the palette shows a carrier their jobs with it and the path it takes
   const chain = useMemo(() => chainOf(s.players), [s.players]);
   const visit = editedVisit(s, chain);
-  // whether the toss that leaves the edited time with the ball is a pitch on the run (ADR 006)
+  // whether the toss that leaves the edited time with the ball is a pitch on the run (ADR 007)
   const onTheRun = useMemo(() => {
     const link = visit === null ? undefined : chainLinks(s.players)[visit];
     return link ? runsBefore(link) : false;
   }, [s.players, visit]);
+  // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
+  const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
-  const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
+  // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
+  const blitz = useMemo(() => {
+    if (sel?.team !== "defense" || sel.route?.type !== "blitz") return null;
+    const who = names({ players: s.players });
+    const t = blitzTarget(sel.route, s.players);
+    const back = nearestBack(s.players);
+    return { aim: blitzAim(sel.route), who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null };
+  }, [sel, s.players]);
+  const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
+    : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
     ? "Pre-snap motion · tap waypoints behind the line · Finish when done"
     : "Tap waypoints on the field · double-tap to finish" : null;
 
@@ -430,7 +449,11 @@ export function App() {
             onVisit={onVisit}
             onTheRun={onTheRun}
             onRunBefore={onRunBefore}
+            blitz={blitz}
+            onBlitzAim={onBlitzAim}
+            onBlitzTarget={onBlitzTarget}
             cut={selCut}
+            jet={jetAble}
             hint={hint}
             onPick={onPick}
             onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}

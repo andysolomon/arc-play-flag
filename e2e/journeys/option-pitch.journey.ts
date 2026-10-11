@@ -6,7 +6,7 @@ import { Designer } from "../support/designer";
 import { OTTERS, lateraled, play, seed, storedDraft } from "../support/fixtures";
 
 /**
- * A pitch on the run, the option (docs/adr/006-pitch-on-the-run.md): a carrier runs with the ball to
+ * A pitch on the run, the option (docs/adr/007-pitch-on-the-run.md): a carrier runs with the ball to
  * a release point and pitches from there, instead of tossing it from where they stand. Each test
  * leaves what it saw as `test-results/option-pitch-<device>-<test>.json` with pictures beside it,
  * uploaded as `option-pitch`.
