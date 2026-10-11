@@ -9,7 +9,7 @@ import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZ
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
 import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, snap } from "@/lib/play/geometry";
-import { catchClamp, catchNote, clampCatch, releasePoint } from "@/lib/play/lateral";
+import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
 import type { Action, Targeting } from "@/lib/play/reducer";
@@ -42,7 +42,7 @@ interface Props {
   draft: Draft | null;
   dispatch: (a: Action) => void;
   onSelect: (id: string) => void;
-  /** a lateral's catch was dragged or nudged somewhere illegal and snapped back: say why */
+  /** a lateral's catch, or a pitch's release, was dragged or nudged somewhere illegal and snapped back: say why */
   onCatchNote?: (text: string) => void;
   /** while Lateral asks who takes it: the carrier tossing it, who can't take it from themself */
   lateralFrom?: string | null;
@@ -91,6 +91,15 @@ interface CatchDrag {
   clamp: "line" | "forward" | null;
 }
 
+interface ReleaseDrag {
+  /** which of the quarterback's laterals is pitched on the run from this release */
+  hop: number;
+  moved: boolean;
+  last: { x: number; y: number } | null;
+  /** whether the live spot is being held behind the line, so the note and shake come once as it starts */
+  clamped: boolean;
+}
+
 interface WaypointDrag {
   id: string;
   index: number;
@@ -126,9 +135,13 @@ function FieldImpl({
   const [selectedWaypoint, setSelectedWaypoint] = useState<{ id: string; index: number } | null>(null);
   const [boingId, setBoingId] = useState<string | null>(null);
   const [liveCatch, setLiveCatch] = useState<{ hop: number; pt: Pair } | null>(null);
+  const [liveRelease, setLiveRelease] = useState<{ hop: number; pt: Pair } | null>(null);
   const [shakeHop, setShakeHop] = useState<number | null>(null);
+  const [shakeRelease, setShakeRelease] = useState<number | null>(null);
   const shakeTimer = useRef(0);
+  const shakeReleaseTimer = useRef(0);
   const catchDragRef = useRef<CatchDrag | null>(null);
+  const releaseDragRef = useRef<ReleaseDrag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const waypointDragRef = useRef<WaypointDrag | null>(null);
   const waypointRefs = useRef(new Map<number, SVGGElement>());
@@ -167,9 +180,12 @@ function FieldImpl({
   // the dragged player's live spot overrides its committed spot until pointer-up
   const effective = useMemo(() => players.map((p) => {
     const moved = live?.id === p.id ? { ...p, x: live.x, y: live.y } : p;
-    // a catch being dragged moves its lateral's arc and every one after it, live
+    // a catch being dragged moves its lateral's arc and every one after it, live; so does a pitch's release
     if (liveCatch && moved.laterals?.[liveCatch.hop]) {
-      return { ...moved, laterals: moved.laterals.map((h, i) => (i === liveCatch.hop ? { to: h.to, catch: liveCatch.pt } : h)) };
+      return { ...moved, laterals: moved.laterals.map((h, i) => (i === liveCatch.hop ? { ...h, catch: liveCatch.pt } : h)) };
+    }
+    if (liveRelease && moved.laterals?.[liveRelease.hop]) {
+      return { ...moved, laterals: moved.laterals.map((h, i) => (i === liveRelease.hop ? { ...h, release: liveRelease.pt } : h)) };
     }
     if (liveWaypoint?.id !== p.id || moved.route?.type !== "custom" || !moved.route.pts) return moved;
     return {
@@ -179,7 +195,7 @@ function FieldImpl({
         pts: moved.route.pts.map((q, i) => (i === liveWaypoint.index ? [liveWaypoint.x, liveWaypoint.y] as const : q)),
       },
     };
-  }), [players, live, liveWaypoint, liveCatch]);
+  }), [players, live, liveWaypoint, liveCatch, liveRelease]);
   // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
   // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
   // pre-snap motion stays in the backfield, so drawing it leaves the card as it is
@@ -344,7 +360,59 @@ function FieldImpl({
     const from = arcs.find((a) => a.hop === hop)?.from;
     onCatchNote?.(catchNote(rule, from ? names[from] ?? "" : ""));
   }, [arcs, names, onCatchNote]);
-  useEffect(() => () => { window.clearTimeout(shakeTimer.current); }, []);
+  useEffect(() => () => { window.clearTimeout(shakeTimer.current); window.clearTimeout(shakeReleaseTimer.current); }, []);
+  // a release dragged past the line shakes and says so, once as it starts
+  const snapBackRelease = useCallback((hop: number) => {
+    setShakeRelease(hop);
+    window.clearTimeout(shakeReleaseTimer.current);
+    shakeReleaseTimer.current = window.setTimeout(() => { setShakeRelease(null); }, 400);
+    const from = arcs.find((a) => a.hop === hop)?.from;
+    onCatchNote?.(releaseNote(from ? names[from] ?? "" : ""));
+  }, [arcs, names, onCatchNote]);
+
+  /** The release a pointer is over, in yards: snapped like a waypoint, then kept behind the line and on the field. */
+  const releaseAt = useCallback((cx: number, cy: number) => {
+    const pt = toYards(cx, cy);
+    const raw: Pair = [snap(pt.x, snapMode), snap(pt.y, snapMode)];
+    return { pt: clampRelease(raw), clamped: releaseClamp(raw) !== null };
+  }, [snapMode, toYards]);
+
+  const applyReleaseDrag = useCallback(() => {
+    const dr = releaseDragRef.current;
+    if (!dr?.last) return;
+    dr.moved = true;
+    const r = releaseAt(dr.last.x, dr.last.y);
+    if (r.clamped && !dr.clamped) snapBackRelease(dr.hop);
+    dr.clamped = r.clamped;
+    setLiveRelease({ hop: dr.hop, pt: r.pt });
+  }, [releaseAt, snapBackRelease]);
+
+  const endReleaseDrag = useCallback(() => {
+    const dr = releaseDragRef.current;
+    if (!dr) return;
+    releaseDragRef.current = null;
+    if (dr.moved && dr.last) dispatch({ type: "releaseMove", hop: dr.hop, pt: releaseAt(dr.last.x, dr.last.y).pt });
+    setLiveRelease(null);
+  }, [dispatch, releaseAt]);
+
+  const onReleaseDown = useCallback((hop: number, e: PointerEvent<SVGGElement>) => {
+    if (e.button !== 0 || playRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    releaseDragRef.current = { hop, moved: false, last: null, clamped: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+  }, []);
+
+  const onReleaseKey = useCallback((hop: number, e: KeyboardEvent<SVGGElement>) => {
+    const step = STEP[e.key];
+    const arc = arcs.find((a) => a.hop === hop);
+    if (!step || !arc?.run || playRef.current) return;
+    e.preventDefault();
+    const distance = e.shiftKey ? 1 : 0.5;
+    const raw: Pair = [arc.release[0] + step[0] * distance, arc.release[1] + step[1] * distance];
+    if (releaseClamp(raw)) snapBackRelease(hop);
+    dispatch({ type: "releaseMove", hop, pt: raw });
+  }, [arcs, dispatch, snapBackRelease]);
 
   /** The catch a pointer is over, in yards: snapped like a waypoint, then clamped behind its release and the line. */
   const catchAt = useCallback((hop: number, cx: number, cy: number) => {
@@ -397,7 +465,8 @@ function FieldImpl({
       const dr = dragRef.current;
       const waypoint = waypointDragRef.current;
       const toss = catchDragRef.current;
-      if (!dr && !waypoint && !toss) return;
+      const pitch = releaseDragRef.current;
+      if (!dr && !waypoint && !toss && !pitch) return;
       e.preventDefault();
       if (dr) {
         dr.last = { x: e.clientX, y: e.clientY };
@@ -411,8 +480,12 @@ function FieldImpl({
         toss.last = { x: e.clientX, y: e.clientY };
         applyCatchDrag();
       }
+      if (pitch) {
+        pitch.last = { x: e.clientX, y: e.clientY };
+        applyReleaseDrag();
+      }
     };
-    const up = () => { endDrag(); endWaypointDrag(); endCatchDrag(); };
+    const up = () => { endDrag(); endWaypointDrag(); endCatchDrag(); endReleaseDrag(); };
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
@@ -421,7 +494,7 @@ function FieldImpl({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [applyDrag, applyCatchDrag, applyWaypointDrag, endCatchDrag, endDrag, endWaypointDrag]);
+  }, [applyDrag, applyCatchDrag, applyReleaseDrag, applyWaypointDrag, endCatchDrag, endDrag, endReleaseDrag, endWaypointDrag]);
 
   const onDown = useCallback((id: string, e: PointerEvent<SVGGElement>) => {
     if (e.button !== 0 || playRef.current) return;
@@ -716,7 +789,7 @@ function FieldImpl({
             {readOnly ? "Flag football play diagram." : "Interactive flag football play diagram. Tab to players and custom waypoints."}
             {tagWords}
             {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
-            {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.from] ?? ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
+            {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.from] ?? ""}${a.run ? " runs with it and pitches" : ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
             {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
           <defs>
@@ -834,7 +907,10 @@ function FieldImpl({
           {!playing && <ManTagLayer tags={tags} />}
           {/* each catch point's handle, over the players so one never hides it; not while running, drawing or on the share page */}
           {!playing && !readOnly && draft === null && arcs.length > 0 && (
-            <LateralLayer arcs={arcs} part="handles" names={names} shake={shakeHop} faded={arcsFaded} onHandleDown={onCatchDown} onHandleKey={onCatchKey} />
+            <LateralLayer
+              arcs={arcs} part="handles" names={names} shake={shakeHop} shakeRelease={shakeRelease} faded={arcsFaded}
+              onHandleDown={onCatchDown} onHandleKey={onCatchKey} onReleaseDown={onReleaseDown} onReleaseKey={onReleaseKey}
+            />
           )}
           {ball && <Football x={px(ball.x)} y={py(ball.y, top)} lift={ball.lift} />}
         </svg>

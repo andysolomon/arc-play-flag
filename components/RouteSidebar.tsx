@@ -19,6 +19,10 @@ interface Props {
   onLateral: () => void;
   /** a step of the ball path tapped: edit that time its player has the ball */
   onVisit: (index: number) => void;
+  /** the lateral that leaves the selected time with the ball is let go on the run (ADR 006) */
+  onTheRun: boolean;
+  /** the On the run tile: that lateral becomes a pitch on the run, or back to one from where they stand */
+  onRunBefore: () => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
   cut: SidelineCut | null;
   hint: string | null;
@@ -47,7 +51,8 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename, noRunZone,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, cut, hint, onPick, onMotion, onRemoveMotion, onDone, onPrimary, onMirror, onRename,
+  noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
   const renaming = useRef<string | null>(null);
@@ -71,6 +76,11 @@ function RouteSidebarImpl({
   const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
   const canMirror = mirrorable(sel);
   const primaryOn = !!sel?.route?.primary;
+  const runNote = goesOn
+    ? onTheRun
+      ? `${sel?.label || "This player"} runs with the ball to the round handle and pitches from there. Drag it to move the pitch; it stays behind the line.`
+      : "On the run: run with the ball first and pitch from where the run ends, the option."
+    : null;
   const guidance = hint
     ? hint.startsWith("Lateral to who?")
       ? "Lateral to who? Choose a red player · Esc cancels."
@@ -190,8 +200,10 @@ function RouteSidebarImpl({
               <div className={tileGrid} role="group" aria-label="With the ball">
                 <IconTile icon="football" label="Throw" active={isJob("throw")} onClick={() => { onPick("throw"); }} />
                 <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />
+                {goesOn && <IconTile icon="stretch" label="On the run" active={onTheRun} onClick={onRunBefore} />}
                 <IconTile icon="deselectOff" label="Done" onClick={onDone} />
               </div>
+              {runNote && <span className="flex-none text-caption leading-note text-ink-muted">{runNote}</span>}
             </>
           )}
           {keys.length > 0 && (
@@ -231,8 +243,11 @@ function RouteSidebarImpl({
                 ))}
                 {/* the quarterback starts a chain here, where Pitch was; later carriers lateral from WITH THE BALL */}
                 {at === 0 && <IconTile icon="pitch" label="Lateral" active={goesOn} onClick={onLateral} />}
+                {/* and, once it goes on, can run with it first: the option */}
+                {at === 0 && goesOn && <IconTile icon="stretch" label="On the run" active={onTheRun} onClick={onRunBefore} />}
                 {!hasBall && <IconTile icon={`deselect${suffix}`} label="Done" onClick={onDone} />}
               </div>
+              {at === 0 && runNote && <span className="flex-none text-caption leading-note text-ink-muted">{runNote}</span>}
             </>
           )}
         </>

@@ -8,7 +8,7 @@ import { download } from "@/lib/export/raster";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
-import { chainOf } from "@/lib/play/lateral";
+import { chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
@@ -157,6 +157,11 @@ export function App() {
     if (compactRef.current) setRightOpen(false);
   }, []);
   const onVisit = useCallback((index: number) => { dispatch({ type: "selectVisit", index }); }, []);
+  // a pitch on the run puts a handle on the field to drag, so on a phone the palette folds away for it
+  const onRunBefore = useCallback(() => {
+    dispatch({ type: "runBefore" });
+    if (compactRef.current) setRightOpen(false);
+  }, []);
   const onPrimary = useCallback(() => {
     dispatch({ type: "togglePrimary" });
     if (compactRef.current) setRightOpen(false);
@@ -338,6 +343,11 @@ export function App() {
   // who holds the ball, in order: the palette shows a carrier their jobs with it and the path it takes
   const chain = useMemo(() => chainOf(s.players), [s.players]);
   const visit = editedVisit(s, chain);
+  // whether the toss that leaves the edited time with the ball is a pitch on the run (ADR 006)
+  const onTheRun = useMemo(() => {
+    const link = visit === null ? undefined : chainLinks(s.players)[visit];
+    return link ? runsBefore(link) : false;
+  }, [s.players, visit]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
   const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
@@ -418,6 +428,8 @@ export function App() {
             visit={visit}
             onLateral={onLateral}
             onVisit={onVisit}
+            onTheRun={onTheRun}
+            onRunBefore={onRunBefore}
             cut={selCut}
             hint={hint}
             onPick={onPick}

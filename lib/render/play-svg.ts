@@ -174,13 +174,15 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
     out.push("</g>");
   }
 
-  // each lateral, as the field draws it: a dashed arc back from its release to its catch, with a
-  // football at its midpoint. Ink, not the sticker, so it prints and reads on a mono printer
+  // each lateral, as the field draws it: the run with the ball before a pitch on the run, then a dashed
+  // arc back from its release to its catch, with a football at its midpoint. Ink, not the sticker, so
+  // it prints and reads on a mono printer
   for (const a of lateralArcs(players, top)) {
     const p = shown.find((q) => q.id === a.from);
     if (!p) continue;
+    const run = a.run ? `<path data-run="${String(a.hop)}" d="${a.run.d}" fill="none" stroke="${ROUTE_INK.route}" stroke-width="5" stroke-linecap="round"/>` : "";
     out.push(
-      `<g data-lateral="${String(a.hop)}"${fade(opacity(p))}><path d="${a.d}" fill="none" stroke="${ROUTE_INK.route}" stroke-width="4" stroke-dasharray="5 7"/>` +
+      `<g data-lateral="${String(a.hop)}"${fade(opacity(p))}>${run}<path d="${a.d}" fill="none" stroke="${ROUTE_INK.route}" stroke-width="4" stroke-dasharray="5 7"/>` +
       `<g transform="translate(${f1(a.ball.x)},${f1(a.ball.y)}) rotate(${f1(a.ball.angle)})"><ellipse rx="9" ry="5.5" fill="${ROUTE_INK.route}" stroke="${TURF}" stroke-width="1.5"/>` +
       `<line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="${TURF}" stroke-width="1.5"/></g></g>`,
     );
