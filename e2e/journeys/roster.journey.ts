@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import type { Lineups, Roster } from "../../lib/play/types";
 import { Designer, armSabotage, downloadText, sabotage } from "../support/designer";
-import { OTTERS, SLANT_LEFT, jsonUpload, seed, storedLineups } from "../support/fixtures";
+import { OTTERS, SLANT_LEFT, jsonUpload, play, seed, storedLineups } from "../support/fixtures";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
@@ -16,7 +16,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * stores nothing. Every name on the lineup has a page of its own: the positions they play and where they
  * sit at each. Lineups are versions of it all: the Starting Lineup is always there, any lineup branches
  * into a copy to change, the field follows the one picked, and a deleted lineup falls back to the one it
- * came from. Leaves `roster-<device>*.json` (what was stored at each step) and pictures of the panel and
+ * came from. A caption at a sideline is pulled in so the whole name stays on the field, and no caption is
+ * printed. Leaves `roster-<device>*.json` (what was stored at each step) and pictures of the panel and
  * the field in `test-results/`.
  */
 
@@ -303,4 +304,47 @@ test("lineups branch from the starting lineup or from each other, each with its 
   expect(after?.lineups.map((l) => [l.name, l.from ?? null])).toEqual([["Starting Lineup", null], ["Rainy day", null]]);
 
   writeFileSync(`test-results/roster-${device}-lineups.json`, `${JSON.stringify({ stored, after }, null, 2)}\n`);
+});
+
+test("a name at either sideline stays whole on the field, and no name goes to the printer", async ({ page }, info) => {
+  const device = info.project.name;
+  // the wide receivers as far out as they can be lined up, with an eleven-letter name that is never shortened
+  const wide = play("fx-wide-splits", "Otter Wide Splits", { o3: { type: "go" } });
+  wide.players = wide.players.map((p) => (p.id === "o3" ? { ...p, x: 1.2 } : p.id === "o4" ? { ...p, x: 28.8 } : p));
+  await seed(page, {
+    plays: [wide], team: OTTERS,
+    lineups: main([{ team: "offense", tag: "X", depth: ["Christopher"] }, { team: "offense", tag: "Y", depth: ["Christopher"] }]),
+  });
+  const d = new Designer(page);
+  await d.openSaved(wide.name);
+  await d.roster();
+  await d.closeSidebars();
+  const field = await d.field.boundingBox();
+  if (!field) throw new Error("the field has not laid out");
+  const boxes: Record<string, { left: number; right: number }> = {};
+  for (const tag of ["X", "Y"]) {
+    await expect(d.caption(tag)).toHaveText("Christopher");
+    const box = await d.caption(tag).boundingBox();
+    if (!box) throw new Error(`no caption under ${tag}`);
+    boxes[tag] = { left: box.x - field.x, right: field.x + field.width - (box.x + box.width) };
+    expect(boxes[tag].left, `${tag}'s caption starts inside the field`).toBeGreaterThanOrEqual(0);
+    expect(boxes[tag].right, `${tag}'s caption ends inside the field`).toBeGreaterThanOrEqual(0);
+  }
+  await d.field.screenshot({ path: `test-results/roster-${device}-sidelines.png` });
+
+  // the printer gets the play and never a name, in roster mode and on the play alike
+  await page.emulateMedia({ media: "print" });
+  await expect(d.caption("X")).toBeHidden();
+  await expect(d.player("X")).toBeVisible();
+  await page.emulateMedia({ media: "screen" });
+  await expect(d.caption("X")).toBeVisible();
+  await d.roster(false);
+  await d.closeSidebars();
+  await expect(d.caption("X")).toHaveText("Christopher");
+  await page.emulateMedia({ media: "print" });
+  await expect(d.caption("X")).toBeHidden();
+  await expect(d.routes).toHaveCount(1);
+  await page.emulateMedia({ media: "screen" });
+
+  writeFileSync(`test-results/roster-${device}-sidelines.json`, `${JSON.stringify({ field, boxes }, null, 2)}\n`);
 });
