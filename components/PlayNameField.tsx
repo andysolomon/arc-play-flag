@@ -23,7 +23,7 @@ interface Props {
 /**
  * The play name, with the current playbook's plays dropped down beside it: each numbered as the
  * book numbers it, the primary marked, the play on the board checked. Picking one opens it. A saved
- * play that isn't in the book can be added from here (docs/adr/008-playbook-switcher.md).
+ * play that isn't in the book can be added from here (docs/adr/009-playbook-switcher.md).
  */
 export function PlayNameField({ name, playId, onName, onOpenPlay, onAddToBook }: Props) {
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);

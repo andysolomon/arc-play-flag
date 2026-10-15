@@ -22,7 +22,7 @@ interface Props {
 /**
  * The Playbooks tile in Play tools, with every playbook on the device dropped down under it: the
  * current one checked, a tap on another switches to it, and the way on to the playbooks screen at
- * the end (docs/adr/008-playbook-switcher.md). The menu is a sibling of the tile in its grid, so it
+ * the end (docs/adr/009-playbook-switcher.md). The menu is a sibling of the tile in its grid, so it
  * takes no cell and is placed against `root`.
  */
 export function PlaybookTile({ onSwitchBook, root }: Props) {

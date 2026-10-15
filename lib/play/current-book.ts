@@ -1,5 +1,5 @@
 /**
- * The playbook the designer is working in on this device (docs/adr/008-playbook-switcher.md): the
+ * The playbook the designer is working in on this device (docs/adr/009-playbook-switcher.md): the
  * one the play name's list draws its plays from, and the one marked in the Playbooks tile's menu.
  * A convenience kept beside the library, like the game-day reader's place: never a reason to fail,
  * never in a backup or a file. Ways this could go wrong, written down before the code:

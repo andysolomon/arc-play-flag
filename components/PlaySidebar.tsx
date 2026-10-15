@@ -5,6 +5,7 @@ import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
 import { MAX_NOTES } from "@/lib/play/storage";
 import { EndZoneName, EndZonePicker } from "./endzone/EndZonePicker";
 import { Fold } from "./Fold";
+import type { Mode } from "./Header";
 import type { Team, TeamSettings, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { PlaybookTile } from "./PlaybookTile";
@@ -59,12 +60,15 @@ interface Props {
   onLos: (los: number) => void;
   /** the play is a run called with the ball in a no-run zone (see runInNoRunZone) */
   flagged: boolean;
+  /** drawing the play, or laying out the roster (docs/adr/008-roster-depth-chart.md) */
+  mode: Mode;
+  onMode: (mode: Mode) => void;
 }
 
 function PlaySidebarImpl({
   name, playId, notes, notesOpen, side, vis, onName, onOpenPlay, onAddToBook, onSwitchBook, onNotes, onToggleNotes, onNew, onSave,
   onDuplicate, unsaved, saved, onShare, savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones,
-  team, onTeam, los, onLos, flagged,
+  team, onTeam, los, onLos, flagged, mode, onMode,
 }: Props) {
   const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
@@ -197,6 +201,20 @@ function PlaySidebarImpl({
         {other === "offense" ? "Offense" : "Defense"} in play art
       </label>
       <span className="flex-none text-caption leading-note text-ink-muted">Draws the {other} faded on this play&apos;s thumbnail, snapshot and printouts. Save keeps it with the play.</span>
+      <span className={divider} />
+      <span className={eyebrow}>ROSTER</span>
+      <div className={tileGrid} role="group" aria-label="Roster">
+        <IconTile
+          icon="roster"
+          label="Roster"
+          title="Who plays each position, with depth"
+          active={mode === "roster"}
+          onClick={() => { onMode(mode === "roster" ? "play" : "roster"); }}
+        />
+      </div>
+      <span className="flex-none text-caption leading-note text-ink-muted">
+        Tap a position on the field and set who plays it, starter first. Names show under the tags here and nowhere else.
+      </span>
       <span className={divider} />
       <span className={eyebrow}>TEAM</span>
       <TeamFields team={team} onTeam={onTeam} />

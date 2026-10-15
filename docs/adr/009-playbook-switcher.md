@@ -1,4 +1,4 @@
-# ADR 008: a playbook switcher in the designer
+# ADR 009: a playbook switcher in the designer
 
 Status: implemented. It adds to the playbooks of [ADR 001](001-short-playbook-links.md) and [ADR 002](002-playbook-slides.md) without changing what a playbook is on paper: a named, ordered list of plays, numbered by that order on every export.
 
@@ -12,7 +12,7 @@ This change gives the designer a **current playbook**: the play name drops that 
 
 1. The designer has one **current playbook** on each device: the one last picked there, while it still exists, else the first playbook on the device, else none. It is a convenience kept beside the library (`ffpd.current-book.v1`), never in a backup or a file: a blocked storage costs it only its memory past the visit.
 2. Every playbook has a **primary play**: one of its plays, the one the designer opens on a switch to that book. **The first play added to a book is its primary** until the coach makes another one primary, in the book (**Make primary** on its card). A reorder leaves it. Taking the primary out of the book, or deleting that play, hands the choice to the first play left; an empty book has none.
-3. **Switching books** opens the new book's primary play, whole, as **Open** from the gallery does. A book with no primary (an empty one) **clears the board**: a fresh, unsaved play on the default formation, on the side the coach was drawing. A switch to the book whose primary is already on the board leaves the board as it is, undo history included, and picking the book already current changes nothing.
+3. **Switching books** opens the new book's primary play, whole, as **Open** from the gallery does. A book with no primary (an empty one) **clears the board**: a fresh, unsaved play on the default formation, on the side the coach was drawing. A switch to the book whose primary is already on the board leaves the board as it is, undo history included, and picking the book already current changes nothing. A play opened from the play name's list, or by a switch, is shown in play mode: roster mode ([ADR 008](008-roster-depth-chart.md)) hides the routes and titles the field "Roster", so the coach would otherwise not see the play they picked.
 4. **Opening a play from inside a book** (Open in designer, from a card or the play modal) makes that book the current one, so the list beside the play name shows its neighbours.
 5. The play name's list numbers the plays as the book does, marks the primary, and checks the play on the board. A saved play that isn't in the book can be added to it from there; an unsaved one is told to save first.
 

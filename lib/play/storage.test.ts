@@ -133,7 +133,7 @@ describe("storage", () => {
     store({ id: "a", name: "A", side: "offense", players: defaults(), notes: "" }, s);
     store({ id: "b", name: "B", side: "offense", players: defaults(), notes: "" }, s);
     storePlaybook({ id: "wk1", name: "Week 1", plays: ["a", "b", "a"] }, s);
-    // the first play added is the book's primary (docs/adr/008-playbook-switcher.md)
+    // the first play added is the book's primary (docs/adr/009-playbook-switcher.md)
     expect(readPlaybooks(s)).toEqual({ wk1: { id: "wk1", name: "Week 1", plays: ["a", "b"], primary: "a" } });
     const after = remove("a", s);
     expect(Object.keys(after.plays)).toEqual(["b"]);

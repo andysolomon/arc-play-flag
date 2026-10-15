@@ -5,9 +5,13 @@ import type { Team } from "@/lib/play/types";
 import { pillMd, pillSm } from "./ui";
 import { Sticker } from "./Sticker";
 
+export type Mode = "play" | "roster";
+
 interface Props {
   /** offensive play or defensive call */
   side: Team;
+  /** drawing the play, or laying out the roster (docs/adr/008-roster-depth-chart.md) */
+  mode: Mode;
   leftOpen: boolean;
   rightOpen: boolean;
   canUndo: boolean;
@@ -58,8 +62,9 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
+function HeaderImpl({ side, mode, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   const kind = SIDE[side];
+  const rostering = mode === "roster";
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5">
       <button
@@ -96,26 +101,26 @@ function HeaderImpl({ side, leftOpen, rightOpen, canUndo, canRedo, canClear, onT
         <button
           type="button"
           onClick={onClear}
-          disabled={!canClear}
+          disabled={!canClear || rostering}
           title="Clear routes (undoable)"
           aria-label="Clear routes"
           className={`${pillMd} ${round}`}
         >
-          <Sticker icon="clear" size={22} className={`${glyph} ${canClear ? "" : "opacity-40"}`} />
+          <Sticker icon="clear" size={22} className={`${glyph} ${canClear && !rostering ? "" : "opacity-40"}`} />
           <span className={name}>Clear</span>
         </button>
       </div>
       <button
         type="button"
         onClick={onToggleRight}
-        title="Route palette"
-        aria-label="Route palette"
+        title={rostering ? "Roster panel" : "Route palette"}
+        aria-label={rostering ? "Roster panel" : "Route palette"}
         aria-expanded={rightOpen}
         aria-controls="route-sidebar"
         data-active={rightOpen}
         className={`${pillSm} ${roundAfter} data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
       >
-        <span className={name}>Routes</span><Chevron dir={rightOpen ? "right" : "left"} />
+        <span className={name}>{rostering ? "Roster" : "Routes"}</span><Chevron dir={rightOpen ? "right" : "left"} />
       </button>
     </header>
   );

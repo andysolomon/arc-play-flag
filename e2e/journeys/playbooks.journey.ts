@@ -177,7 +177,7 @@ test("a playbook file downloaded on one device imports whole on another", async 
   await expect(toast(page2)).toHaveText("Imported “Otter Season Book” · 3 plays added");
   await expect(items(page2)).toHaveText([/Otter Cover Two/, /Otter Slant Left/, /Otter Wheel Right/]);
   expect(await storedPlays(page2)).toEqual(await storedPlays(page));
-  // the seeded book was never written, so it has no primary yet; written on the other device, its first play is (ADR 008)
+  // the seeded book was never written, so it has no primary yet; written on the other device, its first play is (ADR 009)
   expect(await storedPlaybooks(page2)).toEqual({ "fx-season": { ...season, primary: "fx-cover-two" } });
   await page2.getByRole("link", { name: "‹ All playbooks" }).click();
   await page2.getByRole("button", { name: /Riverside Otters · team, theme & backup settings/ }).click();

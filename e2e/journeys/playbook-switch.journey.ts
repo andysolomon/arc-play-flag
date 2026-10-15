@@ -6,13 +6,14 @@ import {
 } from "../support/fixtures";
 
 /**
- * The playbook switcher (docs/adr/008-playbook-switcher.md): the play name drops the current
+ * The playbook switcher (docs/adr/009-playbook-switcher.md): the play name drops the current
  * playbook's plays down, the Playbooks tile drops every playbook down, and a switch opens the new
  * book's primary play or clears the board. How this could break, and the test that catches each:
  *  - the play name's list shows another book's plays, or numbers them differently from the book → "the play name"
  *  - picking a play from it doesn't open that play, or opens it without its routes and read      → "the play name"
  *  - the list doesn't say which play is on the board, or which is the primary                   → "the play name"
  *  - the arrow keys and Enter can't pick, or Escape doesn't give focus back                      → "the play name"
+ *  - a play picked in roster mode opens hidden behind the roster, routes and name out of sight    → "the play name"
  *  - a switch opens the wrong play (the first instead of the primary), or leaves the old board   → "switching"
  *  - a switch to an empty book leaves the old play on the board instead of clearing it           → "switching"
  *  - a switch to the book already current clears the board, or the switch doesn't outlast reload → "switching"
@@ -108,6 +109,19 @@ test("the play name drops the playbook's plays down, numbered as the book is, an
   await expect(d.routes).toHaveCount(2);
   await expect(d.primaryRoutes).toHaveCount(0);
   steps.push(await read(d, "tapped Otter Slant Left"));
+
+  // roster mode hides the routes and titles the field "Roster" (ADR 008): a play picked there is shown in play mode
+  await d.roster();
+  await expect(page.getByRole("heading", { name: "Roster", level: 1 })).toBeVisible();
+  await expect(d.routes).toHaveCount(0);
+  await d.tools();
+  await playsButton(page).click();
+  await playsMenu(page).getByRole("menuitemradio", { name: "Otter Wheel Right" }).click();
+  await expect(d.toast).toHaveText("Opened “Otter Wheel Right”");
+  await expect(page.getByRole("heading", { name: "Otter Wheel Right", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Route palette" })).toBeVisible();
+  await expect(d.routes).toHaveCount(2);
+  steps.push(await read(d, "picked Otter Wheel Right from roster mode"));
   save(`${testInfo.project.name}-the-play-name`, steps);
 });
 
