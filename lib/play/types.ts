@@ -160,6 +160,8 @@ export interface Lineup {
   /** the lineup this one was branched from; the starting lineup has none, and one whose parent is gone loses it */
   from?: string;
   slots: Roster;
+  /** names added to the lineup by hand, kept whether or not they are down for a position; absent when there are none */
+  players?: string[];
 }
 
 /** Every lineup, and which one the field shows. */

@@ -16,7 +16,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * stores nothing. Every name on the lineup has a page of its own: the positions they play and where they
  * sit at each. Lineups are versions of it all: the Starting Lineup is always there, any lineup branches
  * into a copy to change, the field follows the one picked, and a deleted lineup falls back to the one it
- * came from. A caption at a sideline is pulled in so the whole name stays on the field, and no caption is
+ * came from. A player can be added to a lineup at any time, by name alone, and put at a position from
+ * their page. A caption at a sideline is pulled in so the whole name stays on the field, and no caption is
  * printed. Leaves `roster-<device>*.json` (what was stored at each step) and pictures of the panel and
  * the field in `test-results/`.
  */
@@ -99,7 +100,7 @@ test("positions are laid out, each takes a depth chart, the starter is named on 
   await lc.getByRole("button", { name: "+ Add a player" }).click();
   await lc.getByRole("textbox", { name: "2nd at LC" }).fill("devon");
   const players = panel(page).getByRole("group", { name: "Players" });
-  await expect(players.getByRole("button")).toHaveText([/^Aaliyah Brooks-Washington/, /^Devon/, /^Marcus Lee/, /^Priya/]);
+  await expect(players.locator("li").getByRole("button")).toHaveText([/^Aaliyah Brooks-Washington/, /^Devon/, /^Marcus Lee/, /^Priya/]);
   await players.getByRole("button", { name: "Devon", exact: true }).click();
   await expect(panel(page).getByRole("heading", { name: "Devon" })).toBeVisible();
   const positions = panel(page).getByRole("group", { name: "Devon's positions" });
@@ -304,6 +305,122 @@ test("lineups branch from the starting lineup or from each other, each with its 
   expect(after?.lineups.map((l) => [l.name, l.from ?? null])).toEqual([["Starting Lineup", null], ["Rainy day", null]]);
 
   writeFileSync(`test-results/roster-${device}-lineups.json`, `${JSON.stringify({ stored, after }, null, 2)}\n`);
+});
+
+test("a player is added any time, by name, with or without a position open, and put at positions from their page", async ({ page }, info) => {
+  const device = info.project.name;
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.rosterPanel();
+  const players = panel(page).getByRole("group", { name: "Players" });
+  const names = players.locator("li").getByRole("button");
+  const addButton = players.getByRole("button", { name: "+ Add a player to this lineup" });
+  const nameField = players.getByRole("textbox", { name: "Player name" });
+
+  // nothing tapped on the field and nobody on the lineup: the list is there, and a player can be added
+  await expect(players).toContainText("Nobody is on this lineup yet.");
+  await addButton.click();
+  await expect(nameField).toBeFocused();
+  await expect(players.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await nameField.fill("Josiah");
+  await nameField.press("Enter");
+  // a new name opens its page, with nowhere to play yet and every position on the field to put them at
+  await expect(panel(page).getByRole("heading", { name: "Josiah" })).toBeVisible();
+  await expect(panel(page).getByRole("group", { name: "Josiah's positions" })).toContainText("Josiah is not down for any position yet.");
+  const putJosiah = panel(page).getByRole("group", { name: "Put Josiah at a position" });
+  await expect(putJosiah.getByRole("button")).toHaveCount(10);
+  await expect.poll(() => storedLineups(page)).toEqual({ active: "main", lineups: [{ id: "main", name: "Starting Lineup", slots: [], players: ["Josiah"] }] });
+  const added = await storedLineups(page);
+  await panel(page).screenshot({ path: `test-results/roster-${device}-add-page.png` });
+  await panel(page).getByRole("button", { name: "‹ Back", exact: true }).click();
+  await expect(names).toHaveText([/^Josiah\s*No position yet$/]);
+
+  // a cancelled add, by Cancel or by Escape, adds nobody; the same name typed again is the same player
+  await addButton.click();
+  await nameField.fill("Zed");
+  await players.getByRole("button", { name: "Cancel" }).click();
+  await addButton.click();
+  await expect(nameField).toHaveValue("");
+  await nameField.fill("Zed");
+  await nameField.press("Escape");
+  await expect(addButton).toBeVisible();
+  await addButton.click();
+  await nameField.fill("  josiah ");
+  await players.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(panel(page).getByRole("heading", { name: "Josiah" })).toBeVisible();
+  await panel(page).getByRole("button", { name: "‹ Back", exact: true }).click();
+  await expect(names).toHaveText([/^Josiah/]);
+
+  // from his page, Josiah goes in at QB: the field names him, and the page and the list say where he sits
+  await names.first().click();
+  await putJosiah.getByRole("button", { name: "Put Josiah at QB" }).click();
+  await expect(d.caption("QB")).toHaveText("Josiah");
+  await expect(panel(page).getByRole("group", { name: "Josiah's positions" }).locator("li").getByRole("button")).toHaveText(["QB · Starter"]);
+  await expect(putJosiah.getByRole("button", { name: "Put Josiah at QB" })).toHaveCount(0);
+
+  // with a depth chart open, a player can still be added, and goes in behind whoever starts there
+  await d.select("X");
+  const chart = panel(page).getByRole("group", { name: "Depth chart at X" });
+  await chart.getByRole("button", { name: "+ Add a player" }).click();
+  await chart.getByRole("textbox", { name: "Starter at X" }).fill("Logan");
+  await addButton.click();
+  await nameField.fill("Noah");
+  await nameField.press("Enter");
+  await expect(panel(page).getByRole("heading", { name: "Noah" })).toBeVisible();
+  await panel(page).getByRole("group", { name: "Put Noah at a position" }).getByRole("button", { name: "Put Noah at X" }).click();
+  await expect(panel(page).getByRole("group", { name: "Noah's positions" }).locator("li").getByRole("button")).toHaveText(["X · 2nd"]);
+  await expect(d.caption("X")).toHaveText("Logan");
+  // the page is the way to the chart, where Noah is the next line
+  await panel(page).getByRole("group", { name: "Noah's positions" }).getByRole("button", { name: "X · 2nd" }).click();
+  await expect(chart.getByRole("textbox", { name: "2nd at X" })).toHaveValue("Noah");
+  await expect(names).toHaveText([/^Josiah\s*QB starter$/, /^Logan\s*X starter$/, /^Noah\s*X 2nd$/]);
+  // a name added by hand stays on the lineup when it comes off its last depth chart
+  await chart.getByRole("button", { name: "Remove Noah" }).click();
+  await expect(names).toHaveText([/^Josiah/, /^Logan/, /^Noah\s*No position yet$/]);
+  await panel(page).screenshot({ path: `test-results/roster-${device}-add-list.png` });
+
+  // a player with no position yet outlasts a reload, and goes into a device backup
+  await page.reload();
+  await expect(d.field).toBeVisible();
+  await d.roster();
+  await d.rosterPanel();
+  await expect(names).toHaveText([/^Josiah/, /^Logan/, /^Noah\s*No position yet$/]);
+  const kept = await storedLineups(page);
+  expect(kept?.lineups[0]?.players).toEqual(["Josiah", "Noah"]);
+
+  // a branch copies the names; removing one there asks once, takes them off its charts, and leaves the Starting Lineup alone
+  await panel(page).getByRole("button", { name: "Branch lineup" }).click();
+  await expect(names).toHaveText([/^Josiah/, /^Logan/, /^Noah/]);
+  await players.getByRole("button", { name: "Josiah", exact: true }).click();
+  await panel(page).getByRole("button", { name: "Remove from lineup" }).click();
+  await expect(panel(page)).toContainText("Remove Josiah from Lineup 2?");
+  await panel(page).getByRole("button", { name: "Keep" }).click();
+  await expect(panel(page).getByRole("heading", { name: "Josiah" })).toBeVisible();
+  await panel(page).getByRole("button", { name: "Remove from lineup" }).click();
+  await panel(page).getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(names).toHaveText([/^Logan/, /^Noah/]);
+  await expect(d.caption("QB")).toHaveText("Unassigned");
+  await picker(page).selectOption({ label: "Starting Lineup" });
+  await expect(names).toHaveText([/^Josiah/, /^Logan/, /^Noah/]);
+  await expect(d.caption("QB")).toHaveText("Josiah");
+  const after = await storedLineups(page);
+  expect(after?.lineups.map((l) => [l.name, l.players ?? [], l.slots])).toEqual([
+    ["Starting Lineup", ["Josiah", "Noah"], [{ team: "offense", tag: "QB", depth: ["Josiah"] }, { team: "offense", tag: "X", depth: ["Logan"] }]],
+    ["Lineup 2", ["Noah"], [{ team: "offense", tag: "X", depth: ["Logan"] }]],
+  ]);
+
+  await page.goto("/playbooks");
+  await openSettings(page);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download backup" }).click(),
+  ]);
+  const backup = JSON.parse(await downloadText(download)) as { lineups: Lineups };
+  expect(backup.lineups).toEqual(after);
+
+  writeFileSync(`test-results/roster-${device}-add.json`, `${JSON.stringify({ added, kept, after, backup: backup.lineups }, null, 2)}\n`);
 });
 
 test("a name at either sideline stays whole on the field, and no name goes to the printer", async ({ page }, info) => {

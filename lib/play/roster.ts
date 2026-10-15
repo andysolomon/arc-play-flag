@@ -16,6 +16,8 @@
  * - R6 a player with no tag has no slot: the panel asks for a tag first.
  * - R7 a name typed two ways ("devon", "Devon ") is one player: names are matched trimmed, without
  *   regard to case, and shown as first written.
+ * - R8 a player taken off the roster by name: off every depth chart they were on, matched as R7 matches,
+ *   and a chart left with no lines stores nothing (R3).
  */
 
 import type { Player, Roster, RosterSlot, Team } from "./types";
@@ -97,16 +99,36 @@ export function depthWord(index: number): string {
 /** A name as players are told apart (R7). */
 const key = (name: string): string => name.trim().toLocaleLowerCase();
 
-/** Everyone on the roster, each name once as first written, in alphabetical order; blank lines are nobody. */
-export function playerNames(roster: Roster): string[] {
+/** Whether two names are one player (R7). */
+export const sameName = (a: string, b: string): boolean => key(a) === key(b);
+
+/**
+ * Everyone on the roster, each name once as first written, in alphabetical order; blank lines are nobody.
+ * `also` are names on the lineup in their own right, down for a position or not, and come first, so a
+ * name added by hand is shown as the coach added it.
+ */
+export function playerNames(roster: Roster, also: readonly string[] = []): string[] {
   const seen = new Map<string, string>();
+  const take = (name: string) => {
+    const k = key(name);
+    if (k && !seen.has(k)) seen.set(k, name.trim());
+  };
+  for (const name of also) take(name);
   for (const slot of roster) {
-    for (const name of slot.depth) {
-      const k = key(name);
-      if (k && !seen.has(k)) seen.set(k, name.trim());
-    }
+    for (const name of slot.depth) take(name);
   }
   return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** The roster without a player: off every depth chart (R8), a chart left empty gone with them (R3). */
+export function withoutName(roster: Roster, name: string): Roster {
+  const k = key(name);
+  if (!k) return roster;
+  return roster.flatMap((slot) => {
+    const depth = slot.depth.filter((n) => key(n) !== k);
+    if (depth.length === slot.depth.length) return [slot];
+    return depth.length ? [{ ...slot, depth }] : [];
+  });
 }
 
 /** One place a player holds: a position and how deep they sit at it (0 is the starter). */

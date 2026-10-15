@@ -22,7 +22,7 @@
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlayerToken.tsx": "7fd9550c1091cdb8c3fe9254d22789f56cc17918e0562be1576f8cc3b447bd6e",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "f8a61abae096bb9ee72686c868c3d406a551dac07fe772373e509084680461eb",
+    "components/RosterSidebar.tsx": "ac8f2e3b23d1fd54bc38ea2d8225712532f33926da74734280a8f9458485907d",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
@@ -67,9 +67,9 @@
     "components/ui.ts": "a4feffa6d24b7783b399ac8b05c83486eacbbf73883a18cf0d945b25d2ac1b68"
   },
   "restamped": {
-    "reason": "the names under the tags only appear once a coach opens the roster; no clip opens it",
+    "reason": "adding a player by name, a player's PUT AT A POSITION list and Remove from lineup are all inside the roster panel; no clip opens the roster",
     "files": [
-      "components/PlayerToken.tsx (changed)"
+      "components/RosterSidebar.tsx (changed)"
     ]
   }
 }

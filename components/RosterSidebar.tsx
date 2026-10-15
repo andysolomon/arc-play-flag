@@ -4,9 +4,10 @@ import { memo, useEffect, useId, useRef, useState, type ChangeEvent } from "reac
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
 import {
-  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, activeLineup, branched, fromName, lineupName, renamed, withActive, without,
+  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, activeLineup, branched, fromName, lineupName, namesOn, playersFull, renamed, withActive,
+  withPlayer, without, withoutPlayer,
 } from "@/lib/play/lineup";
-import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, playerNames, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
 import { newId } from "@/lib/play/storage";
 import type { Lineups, Player, Roster, Team } from "@/lib/play/types";
 import { Sticker } from "./Sticker";
@@ -46,13 +47,15 @@ function says(roster: Roster, p: Player): string {
 
 /**
  * The right sidebar in roster mode (docs/adr/008-roster-depth-chart.md): the position tapped on the field
- * with its depth chart to fill in, starter first, and every position on the field to jump between. The
- * roster is the team's, kept on this device, so a change here lands at once and is never undone.
+ * with its depth chart to fill in, starter first, everyone on the lineup (a player can be added at any
+ * time, by name, and put at a position from their page), and every position on the field to jump
+ * between. The roster is the team's, kept on this device, so a change here lands at once and is never
+ * undone.
  */
 function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, onSelect, onRename, onDone }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
-  const pickId = useId(), nameId = useId();
+  const pickId = useId(), nameId = useId(), addNameId = useId();
   // a lineup just branched gets its name field, so the coach can say what it is for straight away
   const nameRef = useRef<HTMLInputElement>(null);
   const nameNext = useRef<string | null>(null);
@@ -79,16 +82,60 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   // a player's page: the name, and which selection it was opened over, so a tap on the field turns it back
   // to that position's chart with no effect to time it
   const [page, setPage] = useState<{ name: string; over: string | null } | null>(null);
-  const player = page && page.over === (sel?.id ?? null) ? page.name : null;
-  const names = playerNames(roster);
+  const names = namesOn(lineup);
+  // a page is left by a tap on the field, and closes on a lineup the name is not on (removed, or another picked)
+  const player = page && page.over === (sel?.id ?? null) && names.some((n) => sameName(n, page.name)) ? page.name : null;
+  // the play's own side first, each team left to right as the wristbands count them
+  const teams: Team[] = side === "defense" ? ["defense", "offense"] : ["offense", "defense"];
+  // a player added by name, any time: the form takes the place of the button, and the new name opens its page
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const addRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (adding) addRef.current?.focus(); }, [adding]);
+  const [removing, setRemoving] = useState(false);
+  const openPage = (name: string) => { setRemoving(false); setPage({ name, over: sel?.id ?? null }); };
+  const addPlayer = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const next = withPlayer(lineups, lineup.id, name);
+    if (next) onLineups(next);
+    setAdding(false);
+    setNewName("");
+    // the page for them, new or already there (V7), with the positions to put them at
+    openPage(names.find((n) => sameName(n, name)) ?? name);
+  };
+  const cancelAdd = () => { setAdding(false); setNewName(""); };
+  const removePlayer = () => {
+    if (player === null) return;
+    setRemoving(false);
+    setPage(null);
+    onLineups(withoutPlayer(lineups, lineup.id, player));
+  };
+  // a position on the field the player could be put at: each tag once per team, the play's own side first
+  const openings = (name: string) => {
+    const held = standings(roster, name);
+    const seen = new Set<string>();
+    return teams.flatMap((team) => players.filter((p) => p.team === team && p.label).sort(byLine).filter((p) => {
+      const k = `${p.team}-${p.label}`;
+      if (seen.has(k) || held.some((h) => h.team === p.team && h.tag === p.label)) return false;
+      seen.add(k);
+      return true;
+    }));
+  };
+  const putAt = (name: string, team: Team, tag: string) => {
+    const depth = depthOf(roster, team, tag);
+    if (depth.length >= MAX_DEPTH) return;
+    onRoster(withDepth(roster, team, tag, [...depth, name]));
+  };
   // the page's positions are a way to their depth charts: the first player wearing that tag on that team
   const goTo = (team: Team, tag: string) => {
     const p = players.filter((q) => q.team === team && q.label === tag).sort(byLine)[0];
     setPage(null);
     if (p) onSelect(p.id);
   };
-  // "X starter, LC 2nd": where a player sits, for the list
-  const sits = (name: string): string => standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ");
+  // "X starter, LC 2nd": where a player sits, for the list; "No position yet" for one added by name alone (V6)
+  const sits = (name: string): string =>
+    standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ") || "No position yet";
   // the line just added gets the focus as it mounts, so a name can be typed straight away
   const focusLine = useRef<number | null>(null);
 
@@ -111,9 +158,6 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     next[i] = a;
     set(next);
   };
-  // the play's own side first, each team left to right as the wristbands count them
-  const teams: Team[] = side === "defense" ? ["defense", "offense"] : ["offense", "defense"];
-
   return (
     <>
       <span className={eyebrow}>ROSTER</span>
@@ -160,30 +204,85 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
         </span>
       </div>
       {player !== null && (
-        <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`${player}'s positions`}>
-          <h2 className="text-title font-normal leading-tight">{player}</h2>
-          <span className={eyebrow}>POSITIONS</span>
-          <ul className="flex flex-none flex-col gap-1">
-            {standings(roster, player).map((st) => (
-              <li key={`${st.team}-${st.tag}`}>
-                <button
-                  type="button"
-                  onClick={() => { goTo(st.team, st.tag); }}
-                  className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
-                >
-                  <span aria-hidden="true" className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: teamFill(st.team) }} />
-                  <span className="min-w-0 flex-1 truncate">{st.tag} · {depthWord(st.depth)}</span>
+        <>
+          <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`${player}'s positions`}>
+            <h2 className="text-title font-normal leading-tight">{player}</h2>
+            <span className={eyebrow}>POSITIONS</span>
+            {standings(roster, player).length === 0 && (
+              <span className="flex-none text-small leading-note text-ink-muted">{player} is not down for any position yet.</span>
+            )}
+            {standings(roster, player).length > 0 && (
+              <ul className="flex flex-none flex-col gap-1">
+                {standings(roster, player).map((st) => (
+                  <li key={`${st.team}-${st.tag}`}>
+                    <button
+                      type="button"
+                      onClick={() => { goTo(st.team, st.tag); }}
+                      className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
+                    >
+                      <span aria-hidden="true" className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: teamFill(st.team) }} />
+                      <span className="min-w-0 flex-1 truncate">{st.tag} · {depthWord(st.depth)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <span className="flex-none text-caption leading-note text-ink-muted">
+              Where {player} sits on {lineupName(lineup)}. Tap a position to change its depth chart.
+            </span>
+          </div>
+          {openings(player).length > 0 && (
+            <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`Put ${player} at a position`}>
+              <span className={eyebrow}>PUT AT A POSITION</span>
+              <ul className="flex flex-none flex-col gap-1">
+                {openings(player).map((p) => {
+                  const line = says(roster, p);
+                  const full = depthOf(roster, p.team, p.label).length >= MAX_DEPTH;
+                  return (
+                    <li key={`${p.team}-${p.label}`}>
+                      <button
+                        type="button"
+                        onClick={() => { putAt(player, p.team, p.label); }}
+                        disabled={full}
+                        aria-label={`Put ${player} at ${p.label}`}
+                        title={full ? `${p.label} has ${String(MAX_DEPTH)} names already` : `Put ${player} on ${p.label}'s depth chart`}
+                        className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
+                      >
+                        <span aria-hidden="true" className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: teamFill(p.team) }} />
+                        <span className="w-7 flex-none">{p.label}</span>
+                        <span className={`min-w-0 flex-1 truncate ${line.startsWith("Unassigned") ? "text-ink-muted" : ""}`}>{line}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <span className="flex-none text-caption leading-note text-ink-muted">
+                Tap a position to put {player} on its depth chart: as the starter when nobody is down for it, else next up.
+              </span>
+            </div>
+          )}
+          <div className="flex flex-none flex-wrap gap-1.5">
+            {removing ? (
+              <>
+                <span className="flex min-h-11 items-center text-small">Remove {player} from {lineupName(lineup)}?</span>
+                <button type="button" onClick={removePlayer} className={`${pill} min-h-11 px-3 py-1 text-small bg-yellow on-yellow hover:bg-yellow`}>Remove</button>
+                <button type="button" onClick={() => { setRemoving(false); }} className={`${pill} min-h-11 px-3 py-1 text-small`}>Keep</button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => { setRemoving(false); setPage(null); }} className={`${pill} min-h-11 px-3 py-1 text-small`}>
+                  ‹ Back
                 </button>
-              </li>
-            ))}
-          </ul>
-          <span className="flex-none text-caption leading-note text-ink-muted">
-            Where {player} sits on {lineupName(lineup)}. Tap a position to change its depth chart.
-          </span>
-          <button type="button" onClick={() => { setPage(null); }} className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}>
-            ‹ Back
-          </button>
-        </div>
+                <button
+                  type="button" onClick={() => { setRemoving(true); }}
+                  title="Off this lineup and every depth chart on it" className={`${pill} min-h-11 px-3 py-1 text-small`}
+                >
+                  Remove from lineup
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
       {player === null && !sel && (
         <div className="flex flex-none flex-col items-center gap-[10px] rounded-tile border-2 border-dashed border-ink px-[10px] py-[18px]">
@@ -278,25 +377,61 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           )}
         </>
       )}
-      {player === null && names.length > 0 && (
+      {player === null && (
         <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Players">
           <span className={eyebrow}>PLAYERS</span>
-          <ul className="flex flex-none flex-col gap-1">
-            {names.map((name) => (
-              <li key={name}>
-                <button
-                  type="button"
-                  onClick={() => { setPage({ name, over: sel?.id ?? null }); }}
-                  aria-label={name}
-                  className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
-                >
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
-                  <span className="min-w-0 max-w-[55%] truncate text-caption text-ink-muted">{sits(name)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <span className="flex-none text-caption leading-note text-ink-muted">Everyone on this lineup. Tap a name for every position they play.</span>
+          {names.length > 0 && (
+            <ul className="flex flex-none flex-col gap-1">
+              {names.map((name) => (
+                <li key={name}>
+                  <button
+                    type="button"
+                    onClick={() => { openPage(name); }}
+                    aria-label={name}
+                    className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{name}</span>
+                    <span className="min-w-0 max-w-[55%] truncate text-caption text-ink-muted">{sits(name)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {adding ? (
+            <form className="flex flex-none items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); addPlayer(); }}>
+              <label htmlFor={addNameId} className="sr-only">Player name</label>
+              <input
+                id={addNameId}
+                ref={addRef}
+                value={newName}
+                maxLength={MAX_NAME}
+                placeholder="Name"
+                autoComplete="off"
+                autoCapitalize="words"
+                onChange={(e: ChangeEvent<HTMLInputElement>) => { setNewName(e.target.value); }}
+                onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); cancelAdd(); } }}
+                className={`${input} min-w-0 flex-1 px-3`}
+              />
+              <button type="submit" disabled={!newName.trim()} className={`${pill} min-h-11 flex-none px-3 py-1 text-small`}>Add</button>
+              <button type="button" onClick={cancelAdd} className={`${pill} min-h-11 flex-none px-3 py-1 text-small`}>Cancel</button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setAdding(true); }}
+              disabled={playersFull(lineup)}
+              aria-label="+ Add a player to this lineup"
+              title="A player on this lineup, to put at a position from their page"
+              className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}
+            >
+              + Add a player
+            </button>
+          )}
+          <span className="flex-none text-caption leading-note text-ink-muted">
+            {names.length > 0
+              ? "Everyone on this lineup. Tap a name for every position they play."
+              : "Nobody is on this lineup yet. Add a player here, or tap a position on the field and name who plays it."}
+          </span>
         </div>
       )}
       {player === null && teams.map((team) => {

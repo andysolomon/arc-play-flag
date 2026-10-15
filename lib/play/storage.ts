@@ -1,8 +1,8 @@
 import { readLos, withLos } from "./field";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
-import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, defaultLineups } from "./lineup";
-import { MAX_DEPTH, MAX_SLOTS, cleanName as rosterName } from "./roster";
+import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_NAMES, defaultLineups } from "./lineup";
+import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
@@ -609,6 +609,19 @@ export function normalizeRoster(raw: unknown): Roster | null {
   return out;
 }
 
+/** The names a lineup holds by hand: strings only, trimmed and cut to fit, blanks out, each player once (R7), capped. */
+function normalizePlayerNames(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    const name = rosterName(v).trim().slice(0, MAX_NAME);
+    if (!name || out.some((n) => sameName(n, name))) continue;
+    out.push(name);
+    if (out.length >= MAX_NAMES) break;
+  }
+  return out;
+}
+
 /**
  * The lineups from any JSON-ish value: each an id, a name and its slots, with the lineup it was branched
  * from when that one is there too. The starting lineup is always there (put back empty at the front when
@@ -626,6 +639,8 @@ export function normalizeLineups(raw: unknown): Lineups | null {
       slots: normalizeRoster(v.slots) ?? [],
     };
     if (typeof v.from === "string" && v.from) lineup.from = v.from;
+    const players = normalizePlayerNames(v.players);
+    if (players.length) lineup.players = players;
     out.push(lineup);
     if (out.length >= MAX_LINEUPS) break;
   }
