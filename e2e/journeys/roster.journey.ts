@@ -225,41 +225,43 @@ test("a name the device will not keep is said once and stores nothing", async ({
   await expect.poll(() => storedLineups(page)).toEqual(main([{ team: "offense", tag: "Z", depth: ["Sam"] }]));
 });
 
-test("a player already on the lineup is picked for another position by name, only where they are not down yet, and never past a full chart", async ({ page }, info) => {
+test("a player already on the team is picked for another position by name, only where they are not down yet, and never past a full chart", async ({ page }, info) => {
   const device = info.project.name;
-  await seed(page, {
-    plays: [SLANT_LEFT], team: OTTERS,
-    lineups: main([
-      { team: "offense", tag: "X", depth: ["Devon", "Marcus Lee"] },
-      { team: "offense", tag: "QB", depth: ["Aaliyah"] },
-      { team: "defense", tag: "LC", depth: ["devon"] },
-    ]),
-  });
+  const slots: Roster = [
+    { team: "offense", tag: "X", depth: ["Devon", "Marcus Lee"] },
+    { team: "offense", tag: "QB", depth: ["Aaliyah"] },
+    { team: "defense", tag: "LC", depth: ["devon"] },
+  ];
+  // Priya is on the team but only on another lineup: still the team's, so still offered here
+  const rainy = { id: "rainy", name: "Rainy day", from: "main", slots: [{ team: "offense" as const, tag: "Z", depth: ["Priya"] }] };
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: { active: "main", lineups: [...main(slots).lineups, rainy] } });
   const d = new Designer(page);
   await d.openSaved(SLANT_LEFT.name);
   await d.roster();
   await d.select("Y");
   const chart = panel(page).getByRole("group", { name: "Depth chart at Y" });
-  const fromLineup = chart.getByRole("combobox", { name: "Add from the lineup" });
+  const fromTeam = chart.getByRole("combobox", { name: "Add from the team" });
   await expect(chart).toContainText("Nobody is down for Y yet.");
-  // everyone on the lineup, each once however it was typed, in alphabetical order
-  await expect(fromLineup.getByRole("option")).toHaveText(["Add from the lineup…", "Aaliyah", "Devon", "Marcus Lee"]);
+  // the lineup controls carry no help paragraph
+  await expect(panel(page).getByRole("group", { name: "Lineup" })).not.toContainText("A branch starts as a copy");
+  // everyone on the team, each once however it was typed, in alphabetical order
+  await expect(fromTeam.getByRole("option")).toHaveText(["Add from the team…", "Aaliyah", "Devon", "Marcus Lee", "Priya"]);
 
   // a pick goes on at the bottom, as first written, and leaves the list
-  await fromLineup.selectOption("Devon");
+  await fromTeam.selectOption("Devon");
   await expect(chart.getByRole("textbox", { name: "Starter at Y" })).toHaveValue("Devon");
   await expect(d.caption("Y")).toHaveText("Devon");
-  await expect(fromLineup).toHaveValue("");
-  await expect(fromLineup.getByRole("option")).toHaveText(["Add from the lineup…", "Aaliyah", "Marcus Lee"]);
-  await fromLineup.selectOption("Marcus Lee");
+  await expect(fromTeam).toHaveValue("");
+  await expect(fromTeam.getByRole("option")).toHaveText(["Add from the team…", "Aaliyah", "Marcus Lee", "Priya"]);
+  await fromTeam.selectOption("Marcus Lee");
   await expect(chart.getByRole("textbox", { name: "2nd at Y" })).toHaveValue("Marcus Lee");
   // a picked line is an ordinary line: it moves up like any other
   await chart.getByRole("button", { name: "Move Marcus Lee up" }).click();
   await expect(d.caption("Y")).toHaveText("Marcus Lee");
   await expect(panel(page).getByRole("group", { name: "Offense positions" }).getByRole("button", { name: "Y: Marcus Lee, 2 deep" })).toBeVisible();
-  await panel(page).screenshot({ path: `test-results/roster-${device}-from-lineup.png` });
+  await panel(page).screenshot({ path: `test-results/roster-${device}-from-team.png` });
 
-  // the player's page counts the new position, and nobody was added twice to the lineup
+  // the player's page counts the new position; this lineup's players are only those down on it
   const players = panel(page).getByRole("group", { name: "Players" });
   await expect(players.getByRole("button")).toHaveText([/^Aaliyah/, /^Devon/, /^Marcus Lee/]);
   await players.getByRole("button", { name: "Devon", exact: true }).click();
@@ -270,17 +272,19 @@ test("a player already on the lineup is picked for another position by name, onl
   // "devon" at LC is Devon: across the ball, a name typed two ways is already down
   await d.select("LC", "Defense");
   const lc = panel(page).getByRole("group", { name: "Depth chart at LC" });
-  await expect(lc.getByRole("combobox", { name: "Add from the lineup" }).getByRole("option")).toHaveText(["Add from the lineup…", "Aaliyah", "Marcus Lee"]);
+  await expect(lc.getByRole("combobox", { name: "Add from the team" }).getByRole("option")).toHaveText(["Add from the team…", "Aaliyah", "Marcus Lee", "Priya"]);
 
-  // a new name is still a line to type
+  // Priya, from the other lineup, joins this one by a pick; a new name is still a line to type
   await d.select("QB");
   const qb = panel(page).getByRole("group", { name: "Depth chart at QB" });
-  const qbFrom = qb.getByRole("combobox", { name: "Add from the lineup" });
+  const qbFrom = qb.getByRole("combobox", { name: "Add from the team" });
   await qbFrom.selectOption("Devon");
-  await expect(qb.getByRole("textbox", { name: "2nd at QB" })).toHaveValue("Devon");
-  for (const [i, name] of ["Priya", "Jordan", "Sam", "Riley", "Kai", "Noor"].entries()) {
+  await qbFrom.selectOption("Priya");
+  await expect(qb.getByRole("textbox", { name: "3rd at QB" })).toHaveValue("Priya");
+  await expect(players.getByRole("button")).toHaveText([/^Aaliyah/, /^Devon/, /^Marcus Lee/, /^Priya/]);
+  for (const [i, name] of ["Jordan", "Sam", "Riley", "Kai", "Noor"].entries()) {
     await qb.getByRole("button", { name: "+ New player" }).click();
-    const line = qb.getByRole("textbox").nth(i + 2);
+    const line = qb.getByRole("textbox").nth(i + 3);
     await expect(line).toBeFocused();
     await line.fill(name);
   }
@@ -288,7 +292,7 @@ test("a player already on the lineup is picked for another position by name, onl
   await expect(qb.getByRole("textbox")).toHaveCount(8);
   await expect(qbFrom).toBeDisabled();
   await expect(qb.getByRole("button", { name: "+ New player" })).toBeDisabled();
-  // once everyone is down, there is nobody left to pick and the picker steps aside
+  // once everyone on the team is down, there is nobody left to pick and the picker steps aside
   await qb.getByRole("button", { name: "Remove Noor" }).click();
   await expect(qbFrom).toBeEnabled();
   await qbFrom.selectOption("Marcus Lee");
@@ -296,14 +300,21 @@ test("a player already on the lineup is picked for another position by name, onl
   await expect(qbFrom).toHaveCount(0);
   await expect(qb.getByRole("button", { name: "+ New player" })).toBeDisabled();
 
-  const expected = main([
-    { team: "offense", tag: "X", depth: ["Devon", "Marcus Lee"] },
-    { team: "offense", tag: "QB", depth: ["Aaliyah", "Devon", "Priya", "Jordan", "Sam", "Riley", "Kai", "Marcus Lee"] },
-    { team: "defense", tag: "LC", depth: ["devon"] },
-    { team: "offense", tag: "Y", depth: ["Marcus Lee", "Devon"] },
-  ]);
+  // only the active lineup changed; the other keeps its own
+  const expected: Lineups = {
+    active: "main",
+    lineups: [
+      ...main([
+        { team: "offense", tag: "X", depth: ["Devon", "Marcus Lee"] },
+        { team: "offense", tag: "QB", depth: ["Aaliyah", "Devon", "Priya", "Jordan", "Sam", "Riley", "Kai", "Marcus Lee"] },
+        { team: "defense", tag: "LC", depth: ["devon"] },
+        { team: "offense", tag: "Y", depth: ["Marcus Lee", "Devon"] },
+      ]).lineups,
+      rainy,
+    ],
+  };
   await expect.poll(() => storedLineups(page)).toEqual(expected);
-  writeFileSync(`test-results/roster-${device}-from-lineup.json`, `${JSON.stringify({ stored: await storedLineups(page) }, null, 2)}\n`);
+  writeFileSync(`test-results/roster-${device}-from-team.json`, `${JSON.stringify({ stored: await storedLineups(page) }, null, 2)}\n`);
 });
 
 test("lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked", async ({ page }, info) => {
