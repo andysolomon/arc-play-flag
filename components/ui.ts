@@ -40,6 +40,16 @@ export const swatch =
 export const crumb =
   "inline-flex items-center rounded-pill border-2 border-ink bg-white px-2 py-px text-caption leading-tight text-ink " +
   "data-[active=true]:bg-yellow data-[active=true]:on-yellow data-[end=true]:bg-yellow-soft";
+/** Menu row style: full-width, thumb-sized, left-aligned. */
+export const menuItem =
+  "pressable flex min-h-11 w-full cursor-pointer items-center rounded-note px-3 text-left text-small hover:bg-yellow-soft " +
+  "data-[active=true]:bg-rose-soft";
+/** A row that removes something: red so it reads as different before it's tapped. */
+export const menuItemDanger = `${menuItem} text-offense data-[active=true]:text-ink`;
+/** A row that is a choice among several (`menuitemradio`): the one in force is yellow, like a pressed tile. */
+export const menuChoice = `${menuItem} gap-2 aria-checked:bg-yellow aria-checked:on-yellow aria-checked:hover:bg-yellow`;
+/** The panel a menu drops down into. */
+export const menuPanel = "flex flex-col gap-0.5 rounded-tile border-2 border-ink bg-white p-1.5 shadow-toast";
 /** Small yellow sticker for a state word, e.g. "Shared". */
 export const chip = "inline-flex items-center rounded-pill border-2 border-ink bg-yellow-soft px-2 py-px text-caption leading-tight text-ink";
 /** The same sticker on a penalty flag's full yellow: something on the play a referee would flag. */

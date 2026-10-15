@@ -1,6 +1,8 @@
 import {
-  StorageError, artShadow, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
+  StorageError, artShadow, hasTeam, importAll, newId, primaryPlayId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store,
+  storePlaybook, writeTeam,
 } from "./storage";
+import { readCurrentBook, writeCurrentBook } from "./current-book";
 import { losOf, withLos } from "./field";
 import { callOf } from "./call";
 import { isBallJob, isRun } from "./routes";
@@ -73,10 +75,18 @@ const NO_BOOKS: readonly Playbook[] = [];
 let plays: readonly SavedPlay[] | null = null;
 let books: readonly Playbook[] | null = null;
 let team: TeamSettings | null = null;
+/** the current playbook's id, worked out from the pick on this device and the books; undefined until read */
+let currentId: string | null | undefined;
 const listeners = new Set<() => void>();
 
 function emit(): void {
   for (const cb of listeners) cb();
+}
+
+/** The books after a write: the current playbook is worked out again, since it may be gone or new (C1). */
+function setBooks(next: readonly Playbook[] | null): void {
+  books = next;
+  currentId = undefined;
 }
 
 /** Runs a write; a StorageError becomes a failed result, anything else is a bug and propagates. */
@@ -120,6 +130,47 @@ export function playbookById(id: string | null | undefined): Playbook | null {
   return id ? getPlaybooks().find((b) => b.id === id) ?? null : null;
 }
 
+/**
+ * The playbook the designer is working in on this device: the one picked here, while it exists,
+ * else the first playbook, else none (lib/play/current-book.ts, C1).
+ */
+export function getCurrentBookId(): string | null {
+  if (currentId === undefined) {
+    const picked = readCurrentBook();
+    currentId = picked && playbookById(picked) ? picked : getPlaybooks()[0]?.id ?? null;
+  }
+  return currentId;
+}
+export const getServerCurrentBookId = (): string | null => null;
+
+export function currentBook(): Playbook | null {
+  return playbookById(getCurrentBookId());
+}
+
+/** Makes a playbook the current one on this device. False when there is no such book. */
+export function setCurrentBook(id: string): boolean {
+  if (!playbookById(id)) return false;
+  writeCurrentBook(id);
+  currentId = id;
+  emit();
+  return true;
+}
+
+/**
+ * The play the designer opens on a switch to this book: its primary, when that play is still
+ * in the library, else the first play of the book that is (C5), else none (an empty book).
+ */
+export function primaryPlay(book: Playbook): SavedPlay | null {
+  return playById(primaryPlayId(book)) ?? book.plays.map((id) => playById(id)).find((p) => p !== null) ?? null;
+}
+
+/** Makes one of the book's plays its primary. A play off the book is refused as a write that can't land. */
+export function setPrimaryPlay(bookId: string, playId: string): Written {
+  const book = playbookById(bookId);
+  if (!book?.plays.includes(playId)) return { ok: false, error: new StorageError("write", "playbook primary") };
+  return updatePlaybook({ ...book, primary: playId });
+}
+
 /** Saves a play (new id when none is given) and returns the record as stored. */
 export function savePlay(play: Omit<SavedPlay, "id"> & { id?: string | null }): Written<SavedPlay> {
   // the ball spot goes last and only off the own goal line, as normalizeSavedPlay reads it back
@@ -142,24 +193,26 @@ export function deletePlay(id: string): Written {
   return attempt(() => {
     const next = remove(id);
     plays = Object.values(next.plays);
-    books = Object.values(next.playbooks);
+    setBooks(Object.values(next.playbooks));
     emit();
     return null;
   });
 }
 
+/** Makes a book and returns it as stored: with the first play given as its primary, when there is one. */
 export function createPlaybook(name: string, playIds: readonly string[] = []): Written<Playbook> {
   const book: Playbook = { id: newId(), name, plays: [...playIds] };
   return attempt(() => {
-    books = Object.values(storePlaybook(book));
+    const all = storePlaybook(book);
+    setBooks(Object.values(all));
     emit();
-    return book;
+    return all[book.id] ?? book;
   });
 }
 
 export function updatePlaybook(book: Playbook): Written {
   return attempt(() => {
-    books = Object.values(storePlaybook(book));
+    setBooks(Object.values(storePlaybook(book)));
     emit();
     return null;
   });
@@ -188,7 +241,7 @@ export function swapPlaybookReferences(book: Playbook, first: string, second: st
 
 export function deletePlaybook(id: string): Written {
   return attempt(() => {
-    books = Object.values(removePlaybook(id));
+    setBooks(Object.values(removePlaybook(id)));
     emit();
     return null;
   });
@@ -210,7 +263,7 @@ export function teamIsSet(): boolean {
 /** Drops every cached snapshot, for after a bulk write such as an import. */
 export function refresh(): void {
   plays = null;
-  books = null;
+  setBooks(null);
   team = null;
   emit();
 }

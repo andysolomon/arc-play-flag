@@ -70,7 +70,7 @@ export function BookPlayModal({ bookId, items, at, noRunZones, onGo, onClose }: 
           <Link href={readerHref(bookId, n)} className={`${pill} inline-flex min-h-11 items-center px-4 text-small !text-ink no-underline`}>
             Game-day reader at this play
           </Link>
-          <Link href={`/?open=${encodeURIComponent(play.id)}`} className={`${pillDark} inline-flex min-h-11 items-center px-4 text-small !text-cream no-underline`}>
+          <Link href={`/?open=${encodeURIComponent(play.id)}&book=${encodeURIComponent(bookId)}`} className={`${pillDark} inline-flex min-h-11 items-center px-4 text-small !text-cream no-underline`}>
             Open in designer ›
           </Link>
         </div>

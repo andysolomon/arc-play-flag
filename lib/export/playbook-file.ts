@@ -43,11 +43,14 @@ export function importMessage(e: ImportError): string {
 export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[], team: TeamSettings | null): string {
   const byId = new Map(library.map((p) => [p.id, p]));
   const plays = book.plays.flatMap((id) => { const p = byId.get(id); return p ? [p] : []; });
+  const playbook: Playbook = { id: book.id, name: book.name, plays: plays.map((p) => p.id) };
+  // the primary goes with the book, when it is one of the plays the file carries (C9)
+  if (book.primary !== undefined && playbook.plays.includes(book.primary)) playbook.primary = book.primary;
   const file: PlaybookFile = {
     kind: FILE_KIND,
     version: FILE_VERSION,
     exported: new Date().toISOString(),
-    playbook: { id: book.id, name: book.name, plays: plays.map((p) => p.id) },
+    playbook,
     plays,
     team: team && team.name ? team : null,
   };
@@ -79,6 +82,8 @@ export function readPlaybookFile(json: string): ImportRead {
   if (!book) return { ok: false, error: "notPlaybook" };
   const known = new Set(plays.map((p) => p.id));
   book.plays = book.plays.filter((id) => known.has(id));
+  // a primary whose play the file doesn't carry is no primary; the first play stands in (C4)
+  if (book.primary !== undefined && !book.plays.includes(book.primary)) delete book.primary;
   return {
     ok: true,
     file: {
@@ -136,14 +141,17 @@ export function planImport(file: PlaybookFile, library: readonly SavedPlay[], bo
     copied++;
   }
   const ids = file.playbook.plays.flatMap((id) => { const m = map.get(id); return m ? [m] : []; });
+  // the file's primary, as the play it names landed here: itself, the identical play already here, or its copy (C9)
+  const primary = file.playbook.primary === undefined ? undefined : map.get(file.playbook.primary);
+  const withPrimary = (b: Playbook): Playbook => (primary !== undefined && ids.includes(primary) ? { ...b, primary } : b);
   const existing = books.find((b) => b.id === file.playbook.id);
   const importedName = (file.playbook.name + " (imported)").slice(0, 80);
   const priorBook = books.find((b) => (b.name === file.playbook.name || b.name === importedName) && b.plays.join() === ids.join());
   let book: Playbook | null;
   if (priorBook) book = null;
-  else if (!existing) book = { id: file.playbook.id, name: file.playbook.name, plays: ids };
+  else if (!existing) book = withPrimary({ id: file.playbook.id, name: file.playbook.name, plays: ids });
   else if (existing.name === file.playbook.name && existing.plays.join() === ids.join()) book = null;
-  else book = { id: newId(), name: importedName, plays: ids };
+  else book = withPrimary({ id: newId(), name: importedName, plays: ids });
   return { plays, book, bookId: book?.id ?? priorBook?.id ?? null, reused, copied, added };
 }
 
