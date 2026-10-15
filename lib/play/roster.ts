@@ -16,6 +16,10 @@
  * - R6 a player with no tag has no slot: the panel asks for a tag first.
  * - R7 a name typed two ways ("devon", "Devon ") is one player: names are matched trimmed, without
  *   regard to case, and shown as first written.
+ * - R8 a player picked from the team for a position: the team is everyone down on any of its lineups, so
+ *   a player left off this lineup for a day is still offered; only those not already down for the
+ *   position are offered, a name typed two ways counting as there (R7); the pick goes on the chart as
+ *   first written (this lineup's spelling first), at the bottom, and never past the last line.
  */
 
 import type { Player, Roster, RosterSlot, Team } from "./types";
@@ -107,6 +111,24 @@ export function playerNames(roster: Roster): string[] {
     }
   }
   return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** Everyone on the team: each name once across all its lineups, the first lineup's spelling first (R8). */
+export function teamNames(rosters: readonly Roster[]): string[] {
+  return playerNames(rosters.flat());
+}
+
+/** Everyone on the team who is not down for a position yet, in alphabetical order (R8). */
+export function available(team: readonly string[], depth: readonly string[]): string[] {
+  const down = new Set(depth.map(key));
+  return team.filter((name) => !down.has(key(name)));
+}
+
+/** The depth chart with a player from the lineup added at the bottom (R8); unchanged when they are on it or it is full. */
+export function withPlayer(depth: readonly string[], name: string): readonly string[] {
+  const k = key(name);
+  if (!k || depth.length >= MAX_DEPTH || depth.some((n) => key(n) === k)) return depth;
+  return [...depth, name.trim()];
 }
 
 /** One place a player holds: a position and how deep they sit at it (0 is the starter). */
