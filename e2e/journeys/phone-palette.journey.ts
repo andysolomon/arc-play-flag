@@ -131,7 +131,7 @@ for (const size of SIZES) {
     const fieldOpen = await d.field.boundingBox();
     await page.screenshot({ path: shot("offense") });
     expectFits(offense, ["Pre-snap motion", "Routes", "Runs"]);
-    expect(rightColumn(offense, "Routes"), "the right-hand column ARC-183 clipped").toEqual(["In", "Post", "Cross"]);
+    expect(rightColumn(offense, "Routes"), "the right-hand column ARC-183 clipped").toEqual(["In", "Post", "Cross", "Custom"]);
     expect(fieldOpen, "the palette floats over the field instead of squeezing it").toEqual(fieldClosed);
 
     // Play tools and the palette take turns: opening one folds the other

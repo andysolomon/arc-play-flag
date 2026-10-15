@@ -14,6 +14,8 @@ export type PlayerId = string;
 export type OffenseRouteType =
   | "go" | "out" | "in" | "slant" | "corner" | "post" | "curl" | "flat"
   | "cross" | "wheel" | "custom"
+  /** a shallow crosser: 2 yards up, then across the formation just past the line */
+  | "drag"
   | "handoff" | "dive" | "stretch" | "counter" | "reverse" | "delay"
   /** a run whose runner is already crossing the formation at the snap and takes the handoff in stride (ADR 006) */
   | "jet"
