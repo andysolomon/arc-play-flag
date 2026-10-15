@@ -22,6 +22,8 @@ interface Props {
   drawing?: boolean;
   /** the opposite team, shown as faded context on the field */
   faded?: boolean;
+  /** tapped to pick, never dragged: roster mode's formation stands where it is */
+  fixed?: boolean;
   /**
    * who plays this position, under the token (docs/adr/008-roster-depth-chart.md): the starter's name, or,
    * in roster mode, that nobody is down for it yet. Above the token for a player lined up at the bottom edge.
@@ -43,7 +45,7 @@ function captionX(x: number, text: string): number {
 }
 
 function PlayerTokenImpl({
-  player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
+  player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, fixed = false, caption = null, onPointerDown, onKeyDown,
 }: Props) {
   const tokenRef = useRef<SVGGElement>(null);
   useEffect(() => {
@@ -60,13 +62,13 @@ function PlayerTokenImpl({
       aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id) + (target === "man" ? ", man coverage target" : target === "blitz" ? ", blitz target" : target === "lateral" ? ", can take the lateral" : "")}
       aria-description={caption && !caption.muted ? `Played by ${caption.text}` : undefined}
       aria-pressed={readOnly ? undefined : selected}
-      aria-keyshortcuts={readOnly ? undefined : "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"}
+      aria-keyshortcuts={readOnly ? undefined : fixed ? "Enter Space" : "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"}
       onPointerDown={readOnly ? undefined : (e) => { onPointerDown(p.id, e); }}
       onClick={readOnly ? undefined : (e) => { e.stopPropagation(); }}
       onKeyDown={readOnly ? undefined : (e) => { onKeyDown(p.id, e); }}
       className={[
         faded ? "opacity-40" : "",
-        readOnly ? "" : `group touch-none outline-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`,
+        readOnly ? "" : `group touch-none outline-none ${fixed ? "cursor-pointer" : dragging ? "cursor-grabbing" : "cursor-grab"}`,
       ].filter(Boolean).join(" ") || undefined}
     >
       <g style={{ ...centred, transform: selected ? "scale(1.1)" : "none" }}>
