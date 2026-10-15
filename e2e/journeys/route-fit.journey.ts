@@ -15,7 +15,7 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * coach is told when that cuts it short. How this could break, and the check that catches each:
  *  - the whole route still shrinks, so the stem and the depth come out short       → every bend and the arrow's tip at its designed depth
  *  - the route runs past the sideline, off the field                                → nothing drawn closer than 1.2 yards to either sideline
- *  - a route with room is cut or moved anyway                                       → Go, Slant, Post and In from X and Y, X's Cross, Z's Out and Wheel drawn in full
+ *  - a route with room is cut or moved anyway                                       → Go, Slant, Post, In and Drag from X and Y, X's Cross, Z's Out and Wheel drawn in full
  *  - Mirror toward the sideline makes a stub (a Cross turned outward)                → the mirrored Cross keeps its 4-yard stem and 7-yard depth
  *  - a player moved to the sideline shrinks the route, or it vanishes there        → Z dragged wide keeps its Out's stem; on the sideline the Out is its stem, drawn
  *  - the cut is drawn without a word                                                → a toast on the pick, the mirror and the move that cut it, and a note in the palette saying by how much
@@ -153,7 +153,7 @@ async function keep(testInfo: TestInfo, name: string, data: unknown): Promise<vo
 }
 
 /** Routes that break away from the near sideline, or run straight up it: room to spare from any split. */
-const HAS_ROOM: readonly OffenseRouteType[] = ["go", "slant", "post", "in"];
+const HAS_ROOM: readonly OffenseRouteType[] = ["go", "slant", "post", "in", "drag"];
 /** Routes that break toward the near sideline: from 3 yards off it, each needs more room than there is. */
 const TO_THE_SIDELINE: readonly OffenseRouteType[] = ["out", "corner", "wheel", "flat"];
 
