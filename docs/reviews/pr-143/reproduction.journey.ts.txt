@@ -1,0 +1,29 @@
+import { test, expect } from '@playwright/test';
+import { Designer } from '../support/designer';
+import { seed, play, moved, storedLineups, OTTERS } from '../support/fixtures';
+import { writeFileSync } from 'node:fs';
+
+const out = '/workspace/scratch/cf8295e059ef/pr143-evidence';
+const slots = [{ team: 'defense' as const, tag: 'FS', depth: ['Jordan', 'Casey'] }];
+test('existing custom position chart remains stored but cannot be edited from roster', async ({ page }, info) => {
+  const p = moved(play('review-fs', 'Otters Cover One', {}, '', 'defense'), {d5: {label: 'FS'}});
+  await seed(page, {team: OTTERS, plays: [p], lineups: { active:'main', lineups:[{id:'main',name:'Starting Lineup',slots}], players:['Jordan','Casey'] }});
+  const d = new Designer(page);
+  await d.openSaved(p.name);
+  await expect(d.caption('FS','Defense')).toHaveText('Jordan');
+  await d.select('FS','Defense');
+  await d.roster();
+  await d.rosterPanel();
+  const panel = page.locator('#route-sidebar');
+  const standardOnly = await panel.getByRole('group',{name:'Defense positions'}).getByRole('button').allTextContents();
+  await expect(panel.getByRole('heading',{name:'Who plays FS'})).toHaveCount(0);
+  await expect(d.player('FS','Defense')).toHaveCount(0);
+  await panel.getByRole('button',{name:'Jordan',exact:false}).first().click();
+  await expect(panel.getByRole('button',{name:'FS · Starter', exact:true})).toBeVisible();
+  await page.screenshot({path:`${out}/custom-fs-player-${info.project.name}.png`});
+  await panel.getByRole('button',{name:'FS · Starter',exact:true}).click();
+  await expect(panel.getByRole('group',{name:'Depth chart at FS',exact:true})).toHaveCount(0);
+  await page.screenshot({path:`${out}/custom-fs-dead-end-${info.project.name}.png`});
+  expect((await storedLineups(page))?.lineups[0]?.slots).toEqual(slots);
+  writeFileSync(`${out}/custom-fs-${info.project.name}.json`,JSON.stringify({ standardOnly, stored:await storedLineups(page), chartCount:await panel.getByRole('group',{name:'Depth chart at FS',exact:true}).count() },null,2));
+});

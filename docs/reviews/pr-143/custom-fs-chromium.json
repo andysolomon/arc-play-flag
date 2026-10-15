@@ -1,0 +1,33 @@
+{
+  "standardOnly": [
+    "LCUnassigned",
+    "LBUnassigned",
+    "SUnassigned",
+    "RUnassigned",
+    "RCUnassigned"
+  ],
+  "stored": {
+    "active": "main",
+    "lineups": [
+      {
+        "id": "main",
+        "name": "Starting Lineup",
+        "slots": [
+          {
+            "team": "defense",
+            "tag": "FS",
+            "depth": [
+              "Jordan",
+              "Casey"
+            ]
+          }
+        ]
+      }
+    ],
+    "players": [
+      "Jordan",
+      "Casey"
+    ]
+  },
+  "chartCount": 0
+}
