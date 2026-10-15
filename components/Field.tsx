@@ -924,7 +924,8 @@ function FieldImpl({
               dragging={dragging}
               readOnly={readOnly || draft !== null}
               drawing={draft !== null}
-              faded={isContext(p, side)}
+              // the roster is both sides of one team, so neither side is a shadow of the other there
+              faded={!roster && isContext(p, side)}
               caption={captionFor(p, starters, roster)}
               onPointerDown={onDown}
               onKeyDown={onKey}

@@ -7,10 +7,15 @@ import {
   MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, activeLineup, branched, fromName, lineupName, renamed, withActive, without,
 } from "@/lib/play/lineup";
 import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, playerNames, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { shown } from "@/lib/play/reducer";
 import { newId } from "@/lib/play/storage";
-import type { Lineups, Player, Roster, Team } from "@/lib/play/types";
+import type { Lineups, Player, Roster, Team, Vis } from "@/lib/play/types";
+import { VIEW } from "./Header";
 import { Sticker } from "./Sticker";
-import { crumb, eyebrow, input, pill, select } from "./ui";
+import { crumb, eyebrow, input, pill, segment, segmentInput, segmented, select } from "./ui";
+
+/** The views in the order the header's badge goes through them. */
+const VIEWS: readonly Vis[] = ["offense", "defense", "both"];
 
 interface Props {
   /** every lineup and which one the field shows */
@@ -23,14 +28,15 @@ interface Props {
   selected: Player | null;
   /** everyone on the field, both teams, for the list of positions */
   players: readonly Player[];
-  /** the play's own side: its positions are listed first */
+  /** the play's own side: its positions are listed first when both are on view */
   side: Team;
+  /** which side of the roster is on the field, or both; the header's badge and the SHOW pills set it */
+  view: Vis;
+  onView: (next: Vis) => void;
   /** a position in the list tapped: select that player on the field */
   onSelect: (id: string) => void;
   /** the tag field, the same one the route palette has */
   onRename: (id: string, label: string, commit: boolean) => void;
-  /** back to drawing the play */
-  onDone: () => void;
 }
 
 const SIDE_WORD: Record<Team, string> = { offense: "OFFENSE", defense: "DEFENSE" };
@@ -49,10 +55,10 @@ function says(roster: Roster, p: Player): string {
  * with its depth chart to fill in, starter first, and every position on the field to jump between. The
  * roster is the team's, kept on this device, so a change here lands at once and is never undone.
  */
-function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, onSelect, onRename, onDone }: Props) {
+function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, view, onView, onSelect, onRename }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
-  const pickId = useId(), nameId = useId();
+  const pickId = useId(), nameId = useId(), viewName = useId();
   // a lineup just branched gets its name field, so the coach can say what it is for straight away
   const nameRef = useRef<HTMLInputElement>(null);
   const nameNext = useRef<string | null>(null);
@@ -81,11 +87,14 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   const [page, setPage] = useState<{ name: string; over: string | null } | null>(null);
   const player = page && page.over === (sel?.id ?? null) ? page.name : null;
   const names = playerNames(roster);
-  // the page's positions are a way to their depth charts: the first player wearing that tag on that team
+  // the page's positions are a way to their depth charts: the first player wearing that tag on that team,
+  // brought onto the field first when their side is not on view
   const goTo = (team: Team, tag: string) => {
     const p = players.filter((q) => q.team === team && q.label === tag).sort(byLine)[0];
     setPage(null);
-    if (p) onSelect(p.id);
+    if (!p) return;
+    if (!shown(p, view)) onView(team);
+    onSelect(p.id);
   };
   // "X starter, LC 2nd": where a player sits, for the list
   const sits = (name: string): string => standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ");
@@ -111,8 +120,8 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     next[i] = a;
     set(next);
   };
-  // the play's own side first, each team left to right as the wristbands count them
-  const teams: Team[] = side === "defense" ? ["defense", "offense"] : ["offense", "defense"];
+  // the side on view, or both with the play's own side first; each team left to right as the wristbands count them
+  const teams: Team[] = view === "both" ? (side === "defense" ? ["defense", "offense"] : ["offense", "defense"]) : [view];
 
   return (
     <>
@@ -299,6 +308,22 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           <span className="flex-none text-caption leading-note text-ink-muted">Everyone on this lineup. Tap a name for every position they play.</span>
         </div>
       )}
+      {player === null && (
+        <div className="flex flex-none flex-col gap-1.5">
+          <span className={eyebrow}>SHOW</span>
+          <div role="radiogroup" aria-label="Show" className={segmented}>
+            {VIEWS.map((v) => (
+              <label key={v} title={VIEW[v].title} className={segment}>
+                <input type="radio" name={viewName} value={v} checked={view === v} onChange={() => { onView(v); }} className={segmentInput} />
+                {VIEW[v].label}
+              </label>
+            ))}
+          </div>
+          <span className="flex-none text-caption leading-note text-ink-muted">
+            {view === "both" ? "Both sides of the roster on the field at once." : `The ${view} alone on the field; the roster has both sides.`}
+          </span>
+        </div>
+      )}
       {player === null && teams.map((team) => {
         const list = players.filter((p) => p.team === team).sort(byLine);
         if (!list.length) return null;
@@ -329,9 +354,6 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           </div>
         );
       })}
-      <button type="button" onClick={onDone} className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}>
-        ‹ Back to routes
-      </button>
     </>
   );
 }

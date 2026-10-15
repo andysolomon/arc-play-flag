@@ -13,6 +13,9 @@
  * - V3 a lineup deleted that others were branched from: they stay, and forget their parent.
  * - V4 a branch of a branch: it copies the slots of the lineup it was made from, not the main one.
  * - V5 a blank name: kept as typed while the coach writes it; the list shows "Untitled lineup".
+ * - V6 names turned on with no roster: there is nothing to show, so the switch waits for a roster (it is
+ *   disabled in Play tools until some lineup has a name), and a stored flag with no roster behind it is
+ *   dropped on read, so the last name taken off a lineup turns the names off with it.
  */
 
 import type { Lineup, Lineups, Roster } from "./types";
@@ -63,7 +66,7 @@ export function branched(ls: Lineups, fromId: string, id: string): Lineups | nul
   const from = lineupOf(ls, fromId);
   if (!from || ls.lineups.length >= MAX_LINEUPS || lineupOf(ls, id)) return null;
   const lineup: Lineup = { id, name: `Lineup ${String(ls.lineups.length + 1)}`, from: from.id, slots: from.slots.map((s) => ({ ...s, depth: [...s.depth] })) };
-  return { active: id, lineups: [...ls.lineups, lineup] };
+  return { ...ls, active: id, lineups: [...ls.lineups, lineup] };
 }
 
 /** The lineups without one; never the starting lineup (V1). Its branches forget it (V3); the field falls back (V2). */
@@ -77,7 +80,23 @@ export function without(ls: Lineups, id: string): Lineups {
     return rest;
   });
   const active = ls.active === id ? (gone.from && lineups.some((l) => l.id === gone.from) ? gone.from : MAIN_LINEUP) : ls.active;
-  return { active, lineups };
+  return { ...ls, active, lineups };
+}
+
+/** Whether any lineup has a name on it: a roster to show on a play (V6). */
+export function hasNames(ls: Lineups): boolean {
+  return ls.lineups.some((l) => l.slots.some((s) => s.depth.some((n) => n.trim() !== "")));
+}
+
+/** Whether a play shows its starters' names: turned on, with a roster behind it (V6). */
+export function showsNames(ls: Lineups): boolean {
+  return ls.names === true && hasNames(ls);
+}
+
+/** The lineups with the names shown on plays or not; on only with a roster to show (V6). */
+export function withNames(ls: Lineups, on: boolean): Lineups {
+  const rest: Lineups = { active: ls.active, lineups: ls.lineups };
+  return on && hasNames(ls) ? { ...rest, names: true } : rest;
 }
 
 /** What a lineup was branched from, by name, or null for the starting lineup and an orphan. */
