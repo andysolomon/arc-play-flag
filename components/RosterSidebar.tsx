@@ -7,7 +7,7 @@ import {
   MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, activeLineup, branched, fromName, lineupName, onTeam, renamed, renamedPlayer, teamFull,
   teamNames, withActive, withPlayer, withSlots, without, withoutPlayer,
 } from "@/lib/play/lineup";
-import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, isOffField, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
 import { newId } from "@/lib/play/storage";
 import type { Lineups, Player, Roster, Team } from "@/lib/play/types";
 import { Sticker } from "./Sticker";
@@ -22,7 +22,7 @@ interface Props {
   onRoster: (next: Roster) => void;
   /** the position tapped on the field, whose depth chart is being set */
   selected: Player | null;
-  /** the team's standard formation, both sides, for the list of positions */
+  /** the team's standard formation, both sides, then the tags it has no token for, for the list of positions */
   players: readonly Player[];
   /** a position in the list tapped: select that player on the field */
   onSelect: (id: string) => void;
@@ -351,6 +351,11 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
             </span>
             <h2 className="flex-1 text-title font-normal leading-tight">Who plays {sel.label}</h2>
           </div>
+          {isOffField(sel) && (
+            <span className={note}>
+              {sel.label} has no spot in the standard formation, so it is not on the field. Its starter is named under whoever wears {sel.label} on a play.
+            </span>
+          )}
           {sel.label && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`Depth chart at ${sel.label}`}>
               <span className={eyebrow}>DEPTH CHART</span>

@@ -12,7 +12,7 @@ import { LOS_YARD, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import { activeLineup, withSlots } from "@/lib/play/lineup";
-import { starters } from "@/lib/play/roster";
+import { offFieldId, offFieldPositions, starters } from "@/lib/play/roster";
 import type { Lineups, Player, Roster, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import {
@@ -90,6 +90,14 @@ export function App() {
   // standard tags, and a selection of its own. The play open in the designer is left exactly as it was.
   const formation = useMemo(() => defaults(), []);
   const [rosterPick, setRosterPick] = useState<string | null>(null);
+  // a depth chart kept for a tag the formation has no token for (FS, H) stays in reach from the panel: every
+  // tag a lineup keeps a chart for, the open play wears or a saved play wears (lib/play/roster.ts, R9)
+  const positions = useMemo(() => {
+    if (!rostering) return formation;
+    const tagged = [...s.players, ...getPlays().flatMap((p) => p.players)].filter((p) => p.label).map((p) => ({ team: p.team, tag: p.label }));
+    const kept = lineups.lineups.flatMap((l) => l.slots.map((slot) => ({ team: slot.team, tag: slot.tag })));
+    return [...formation, ...offFieldPositions(formation, [...kept, ...tagged])];
+  }, [rostering, formation, lineups, s.players]);
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -420,7 +428,7 @@ export function App() {
       dispatch({ type: "draftCancel" });
       dispatch({ type: "cancelTargeting" });
       const was = selected(s);
-      setRosterPick(was ? formation.find((p) => p.team === was.team && p.label === was.label)?.id ?? null : null);
+      setRosterPick(!was?.label ? null : formation.find((p) => p.team === was.team && p.label === was.label)?.id ?? offFieldId(was.team, was.label));
       openRight(true);
     }
   }, [formation, openRight, s]);
@@ -554,8 +562,8 @@ export function App() {
               onLineups={onLineups}
               roster={lineup.slots}
               onRoster={onRoster}
-              selected={formation.find((p) => p.id === rosterPick) ?? null}
-              players={formation}
+              selected={positions.find((p) => p.id === rosterPick) ?? null}
+              players={positions}
               onSelect={onRosterSelect}
               onDone={() => { onMode("play"); }}
             />

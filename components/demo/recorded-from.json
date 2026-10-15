@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "49d6a047acf91fe1207fa899be29e1ca83634e92b5dbb878b9f5db3cd8e0d3c2",
+    "components/App.tsx": "ce99ae373ff6ab262b1ec8f8c8c0e51428492a29ffb291b3f858b4896e7e96e3",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "e0ae979e224329d3b127c830e55d9bcdcbe30622f22602b1d1542652db5ca93f",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
@@ -25,7 +25,7 @@
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
     "components/PlayerToken.tsx": "027c2353b964d5f5734437a7523073e5b5feb0c9b499824424f7570ce141b3cc",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "7d83ca1d4045dc1c50bb50ab1fff2dbadd2156a8e6a31f0b6d8b1e56746315f1",
+    "components/RosterSidebar.tsx": "e45a7f636b7be182563f32094d9e9d1c4110b5e68edb14068feca7c3960be2ba",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
@@ -70,12 +70,9 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "roster mode now lays out the standard formation instead of the open play, and Play tools hides the play's sections there; every change is gated on roster mode and no chapter opens it (the recorder never enters roster mode)",
+    "reason": "roster mode lists tags the standard formation lacks in its panel; the change is gated on roster mode and no chapter opens it (the recorder never enters roster mode)",
     "files": [
       "components/App.tsx (changed)",
-      "components/Field.tsx (changed)",
-      "components/PlaySidebar.tsx (changed)",
-      "components/PlayerToken.tsx (changed)",
       "components/RosterSidebar.tsx (changed)"
     ]
   }
