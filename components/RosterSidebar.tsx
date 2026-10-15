@@ -7,7 +7,7 @@ import {
   MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, activeLineup, branched, fromName, lineupName, onTeam, renamed, renamedPlayer, teamFull,
   teamNames, withActive, withPlayer, withSlots, without, withoutPlayer,
 } from "@/lib/play/lineup";
-import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, isOffField, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
 import { shown } from "@/lib/play/reducer";
 import { newId } from "@/lib/play/storage";
 import type { Lineups, Player, Roster, Team, Vis } from "@/lib/play/types";
@@ -27,17 +27,13 @@ interface Props {
   onRoster: (next: Roster) => void;
   /** the position tapped on the field, whose depth chart is being set */
   selected: Player | null;
-  /** everyone on the field, both teams, for the list of positions */
+  /** the team's standard formation, both sides, then the tags it has no token for, for the list of positions */
   players: readonly Player[];
-  /** the play's own side: its positions are listed first when both are on view */
-  side: Team;
   /** which side of the roster is on the field, or both; the header's badge and the SHOW pills set it */
   view: Vis;
   onView: (next: Vis) => void;
   /** a position in the list tapped: select that player on the field */
   onSelect: (id: string) => void;
-  /** the tag field, the same one the route palette has */
-  onRename: (id: string, label: string, commit: boolean) => void;
 }
 
 const SIDE_WORD: Record<Team, string> = { offense: "OFFENSE", defense: "DEFENSE" };
@@ -66,7 +62,7 @@ const Dot = ({ team }: { team: Team }) => (
  * position on the field is listed to jump between. The roster is the team's, kept on this device, so a
  * change here lands at once and is never undone.
  */
-function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, view, onView, onSelect, onRename }: Props) {
+function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
   const pickId = useId(), nameId = useId(), joinId = useId(), freshId = useId(), viewName = useId();
@@ -91,14 +87,12 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   };
   const pick = (id: string) => { setDeleting(false); onLineups(withActive(lineups, id)); };
   const removeLineup = () => { setDeleting(false); onLineups(without(lineups, lineup.id)); };
-  // one history entry per rename session, not per keystroke, as the palette's tag field does
-  const renaming = useRef<string | null>(null);
 
   // the team: everyone, the same on every lineup
   const names = teamNames(lineups);
   const full = teamFull(lineups);
-  // both sides, the play's own side first, each team left to right as the wristbands count them
-  const sides: Team[] = side === "defense" ? ["defense", "offense"] : ["offense", "defense"];
+  // offense then defense, each left to right as the wristbands count them; no play is open to put a side first
+  const sides: Team[] = ["offense", "defense"];
   // the positions listed: the side on view, or both
   const teams: Team[] = view === "both" ? sides : [view];
   // "X starter, LC 2nd": where a player sits on this lineup, for the lists
@@ -143,7 +137,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     onSelect(p.id);
   };
   // the positions a player is not down for yet, on both sides whatever is on view (a tap only writes the chart):
-  // each tag once per team, the play's own side first
+  // each tag once per team, offense first
   const openings = (name: string): Player[] => {
     const held = standings(roster, name);
     const seen = new Set<string>();
@@ -352,8 +346,6 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           <Sticker icon="roster" size={56} className="opacity-75" />
           <span className="text-center text-base leading-body text-ink-muted">
             Tap a position on the field to set who plays it.
-            <br />
-            Drag to line them up.
           </span>
         </div>
       )}
@@ -361,26 +353,21 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
       {player === null && sel && (
         <>
           <div className="flex flex-none items-center gap-[10px]">
-            {/* the coloured token is the tag field, as in the route palette: the tag is the position */}
-            <input
-              value={sel.label}
-              maxLength={3}
-              placeholder="Tag"
-              aria-label="Player tag"
-              title="Position tag (up to 3 letters)"
-              onFocus={() => { renaming.current = null; }}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                const commit = renaming.current !== sel.id;
-                renaming.current = sel.id;
-                onRename(sel.id, e.target.value, commit);
-              }}
-              className="h-[42px] w-[42px] flex-none rounded-full border-[2.5px] border-ink p-0 text-center text-base text-ink placeholder:text-ink/60"
+            {/* the coloured token wears the position's tag, as on the field; tags are a play's to rename, not the roster's */}
+            <span
+              aria-hidden="true"
+              className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full border-[2.5px] border-ink text-base text-ink"
               style={{ background: teamFill(sel.team) }}
-            />
-            <h2 className="flex-1 text-title font-normal leading-tight">
-              {sel.label ? `Who plays ${sel.label}` : "Tag this position first"}
-            </h2>
+            >
+              {sel.label}
+            </span>
+            <h2 className="flex-1 text-title font-normal leading-tight">Who plays {sel.label}</h2>
           </div>
+          {isOffField(sel) && (
+            <span className={note}>
+              {sel.label} has no spot in the standard formation, so it is not on the field. Its starter is named under whoever wears {sel.label} on a play.
+            </span>
+          )}
           {sel.label && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`Depth chart at ${sel.label}`}>
               <span className={eyebrow}>DEPTH CHART</span>
