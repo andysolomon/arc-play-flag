@@ -25,7 +25,7 @@
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
     "components/PlayerToken.tsx": "7fd9550c1091cdb8c3fe9254d22789f56cc17918e0562be1576f8cc3b447bd6e",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "ba083fecf251c7af363f85b14d27c15c5db3f6c5829067e77ff6bec184caa651",
+    "components/RosterSidebar.tsx": "e803c7d72d78089ea37d40b79b156cb50e909780b7423c75021e63167f99fa42",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
