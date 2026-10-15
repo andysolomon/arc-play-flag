@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Starting Lineup",
+    "title": null,
+    "width": 150,
+    "contentWidth": 150,
+    "overflow": "ellipsis"
+  },
+  {
+    "name": "Saturday vs Falcons - Rotation A",
+    "title": null,
+    "width": 150,
+    "contentWidth": 180,
+    "overflow": "ellipsis"
+  },
+  {
+    "name": "Saturday vs Falcons - Rotation B",
+    "title": null,
+    "width": 150,
+    "contentWidth": 179,
+    "overflow": "ellipsis"
+  }
+]

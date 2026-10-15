@@ -1,0 +1,19 @@
+[WebServer] (node:19) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 2 workers
+
+(node:40) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:39) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  2 [chromium] › e2e/journeys/pr144-review.journey.ts:6:1 › review: distinguish lineup names that differ at the end (1.2s)
+  ✓  1 [pixel-7] › e2e/journeys/pr144-review.journey.ts:6:1 › review: distinguish lineup names that differ at the end (1.4s)
+(node:186) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:195) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 [iphone-15] › e2e/journeys/pr144-review.journey.ts:6:1 › review: distinguish lineup names that differ at the end (1.4s)
+  ✓  4 [ipad-gen-7] › e2e/journeys/pr144-review.journey.ts:6:1 › review: distinguish lineup names that differ at the end (1.3s)
+
+  4 passed (4.5s)
