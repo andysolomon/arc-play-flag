@@ -6,7 +6,7 @@ import { teamFill } from "@/lib/play/geometry";
 import {
   MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, activeLineup, branched, fromName, lineupName, renamed, withActive, without,
 } from "@/lib/play/lineup";
-import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, playerNames, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { MAX_DEPTH, MAX_NAME, available, depthOf, depthWord, playerNames, standings, starterOf, withDepth, withPlayer } from "@/lib/play/roster";
 import { newId } from "@/lib/play/storage";
 import type { Lineups, Player, Roster, Team } from "@/lib/play/types";
 import { Sticker } from "./Sticker";
@@ -52,7 +52,7 @@ function says(roster: Roster, p: Player): string {
 function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, onSelect, onRename, onDone }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
-  const pickId = useId(), nameId = useId();
+  const pickId = useId(), nameId = useId(), fromId = useId();
   // a lineup just branched gets its name field, so the coach can say what it is for straight away
   const nameRef = useRef<HTMLInputElement>(null);
   const nameNext = useRef<string | null>(null);
@@ -102,6 +102,9 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     focusLine.current = depth.length;
     set([...depth, ""]);
   };
+  // a player already on the lineup goes on this chart by name, no typing: everyone not down for it yet (R8)
+  const open = sel?.label ? available(roster, sel.team, sel.label) : [];
+  const addFrom = (name: string) => { set(withPlayer(depth, name)); };
   const remove = (i: number) => { set(depth.filter((_, k) => k !== i)); };
   const up = (i: number) => {
     if (i <= 0) return;
@@ -263,16 +266,35 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                   ))}
                 </ol>
               )}
-              <button
-                type="button"
-                onClick={add}
-                disabled={depth.length >= MAX_DEPTH}
-                className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}
-              >
-                + Add a player
-              </button>
+              <div className="flex flex-none flex-wrap items-center gap-1.5">
+                {open.length > 0 && (
+                  <>
+                    <label htmlFor={fromId} className="sr-only">Add from the lineup</label>
+                    <select
+                      id={fromId}
+                      value=""
+                      disabled={depth.length >= MAX_DEPTH}
+                      title="Put a player already on the lineup down for this position"
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) => { addFrom(e.target.value); }}
+                      className={`${select} min-w-0 max-w-full flex-none`}
+                    >
+                      <option value="">Add from the lineup…</option>
+                      {open.map((name) => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={add}
+                  disabled={depth.length >= MAX_DEPTH}
+                  title="A line for a name not on the lineup yet"
+                  className={`${pill} min-h-11 flex-none px-3 py-1 text-small`}
+                >
+                  + New player
+                </button>
+              </div>
               <span className="flex-none text-caption leading-note text-ink-muted">
-                Starter first; ▲ moves a player up. The starter&apos;s name shows under {sel.label} on every play. Kept on this device, never in links or printouts.
+                Starter first; ▲ moves a player up. {open.length > 0 ? "Pick someone already on the lineup, or add a new player. " : ""}The starter&apos;s name shows under {sel.label} on every play. Kept on this device, never in links or printouts.
               </span>
             </div>
           )}
