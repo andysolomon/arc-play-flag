@@ -1,9 +1,10 @@
+import { defaultLineups } from "@/lib/play/lineup";
 import {
-  DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, kebab, normalizeDraft, normalizePlaybook, normalizeSavedPlay, normalizeTeam,
-  readAll, readDraft, readPlaybooks, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks, type StorageLike,
-  type StoredPlayer,
+  DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, kebab, normalizeDraft, normalizeLineups, normalizePlaybook, normalizeSavedPlay,
+  normalizeTeam, readAll, readDraft, readLineups, readPlaybooks, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks,
+  type StorageLike, type StoredPlayer,
 } from "@/lib/play/storage";
-import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
+import type { Lineups, Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 
 export const BACKUP_KIND = "ffpd.backup";
 export const BACKUP_VERSION = 1;
@@ -18,6 +19,8 @@ export interface BackupFile {
   plays: SavedPlay[];
   playbooks: Playbook[];
   team: TeamSettings;
+  /** the lineups, who plays each position; a backup from before them has none, and restores the empty starting lineup */
+  lineups: Lineups;
   draft: DraftRecord | null;
 }
 
@@ -25,6 +28,7 @@ export interface BackupState {
   plays: Library;
   playbooks: Playbooks;
   team: TeamSettings;
+  lineups: Lineups;
   draft: DraftRecord | null;
 }
 
@@ -125,6 +129,7 @@ export function readBackupState(storage?: StorageLike | null): BackupState {
     plays: readAll(storage),
     playbooks: readPlaybooks(storage),
     team: readTeam(storage),
+    lineups: readLineups(storage),
     draft: readDraft(storage),
   };
 }
@@ -139,6 +144,7 @@ export function createBackup(storage?: StorageLike | null): BackupFile {
     plays: Object.values(state.plays),
     playbooks: Object.values(state.playbooks),
     team: state.team,
+    lineups: state.lineups,
     draft: state.draft,
   };
 }
@@ -168,8 +174,10 @@ export function readBackupFile(json: string): BackupRead {
   const plays = raw.plays.map(canonicalPlay);
   const playbooks = raw.playbooks.map(canonicalBook);
   const team = normalizeTeam(raw.team);
+  // the lineups came after version 1's first backups, so a file without them is still whole
+  const lineups = raw.lineups === undefined ? defaultLineups() : normalizeLineups(raw.lineups);
   const draft = raw.draft === null ? null : normalizeDraft(raw.draft);
-  if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team)) {
+  if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team) || !lineups) {
     return { ok: false, error: "invalidData" };
   }
   if (raw.draft !== null && (!draft || !isRecord(raw.draft) || !asStored(raw.draft, draft))) return { ok: false, error: "invalidData" };
@@ -186,7 +194,7 @@ export function readBackupFile(json: string): BackupRead {
   if (typeof raw.exported !== "string" || Number.isNaN(Date.parse(raw.exported))) return { ok: false, error: "invalidData" };
   return {
     ok: true,
-    file: { kind: BACKUP_KIND, version: BACKUP_VERSION, exported: raw.exported, plays: validPlays, playbooks: validBooks, team, draft },
+    file: { kind: BACKUP_KIND, version: BACKUP_VERSION, exported: raw.exported, plays: validPlays, playbooks: validBooks, team, lineups, draft },
   };
 }
 
@@ -201,6 +209,7 @@ export function planBackupRestore(file: BackupFile, current: BackupState, mode: 
       plays: mode === "merge" ? { ...current.plays, ...incomingPlays } : incomingPlays,
       playbooks: mode === "merge" ? { ...current.playbooks, ...incomingBooks } : incomingBooks,
       team: file.team,
+      lineups: file.lineups,
       draft: file.draft,
     },
     incomingPlays: file.plays.length,
@@ -212,12 +221,13 @@ export function planBackupRestore(file: BackupFile, current: BackupState, mode: 
   };
 }
 
-/** Commits all four storage keys together; writeMany restores their prior values on failure. */
+/** Commits all five storage keys together; writeMany restores their prior values on failure. */
 export function applyBackupRestore(plan: RestorePlan, storage?: StorageLike | null): void {
   writeMany([
     [PLAYS_KEY, plan.state.plays],
     [PLAYBOOKS_KEY, plan.state.playbooks],
     [TEAM_KEY, plan.state.team],
+    [LINEUPS_KEY, plan.state.lineups],
     [DRAFT_KEY, plan.state.draft],
   ], storage);
 }

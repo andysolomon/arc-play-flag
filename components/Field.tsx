@@ -61,6 +61,13 @@ interface Props {
   showTitle?: boolean;
   /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
   status?: string;
+  /** who starts at each position, by player id, from the roster (docs/adr/008-roster-depth-chart.md) */
+  starters?: Readonly<Record<string, string>>;
+  /**
+   * Roster mode: the formation alone, nothing drawn on it and nothing to run, every position captioned
+   * with its starter or as unassigned, so the field reads as the team's depth chart.
+   */
+  roster?: boolean;
 }
 
 interface Drag {
@@ -124,9 +131,20 @@ const PLAY_BUTTON = { inset: 12, size: 48 };
 /** The field's border, in CSS pixels: the diagram's units start inside it. */
 const FIELD_BORDER = 3;
 
+/**
+ * What goes under a token: the starter's name when the roster has one, and in roster mode "Unassigned"
+ * for a position nobody is down for yet. A player lined up against the bottom edge wears it above.
+ */
+function captionFor(p: Player, starters: Readonly<Record<string, string>> | undefined, roster: boolean): { text: string; muted?: boolean; above?: boolean } | null {
+  const above = p.team === "offense" && p.y > 6;
+  const name = starters?.[p.id];
+  if (name) return { text: name, above };
+  return roster ? { text: p.label ? "Unassigned" : "No tag", muted: true, above } : null;
+}
+
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onCatchNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -233,10 +251,10 @@ function FieldImpl({
   );
   // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
   const onField = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
-  const tags = useMemo(() => manTags(visible, effective, top, layout.vh, zones), [visible, effective, top, layout.vh, zones]);
+  const tags = useMemo(() => (roster ? [] : manTags(visible, effective, top, layout.vh, zones)), [roster, visible, effective, top, layout.vh, zones]);
   // a run called from a no-run zone is flagged in the backfield corner every picture of it uses,
   // kept clear of the ▶ button on screen; a screen reader hears it with the diagram
-  const flagged = runInNoRunZone({ side, players, los }, noRunZones);
+  const flagged = !roster && runInNoRunZone({ side, players, los }, noRunZones);
   const flag = useMemo(() => {
     if (!flagged) return null;
     const k = VW / Math.max(1, (width ?? 430) - 2 * FIELD_BORDER);
@@ -253,11 +271,12 @@ function FieldImpl({
     return tags.length ? ` Man coverage: ${tags.map((t) => `${who(t.id)} ${t.text}`).join("; ")}.` : "";
   }, [tags, effective]);
   // each lateral as an arc from its release to its catch, drawn with its thrower
-  const arcs = useMemo(() => lateralArcs(effective, top).filter((a) => onField.has(a.from)), [effective, top, onField]);
+  const arcs = useMemo(() => (roster ? [] : lateralArcs(effective, top).filter((a) => onField.has(a.from))), [roster, effective, top, onField]);
   const arcsFaded = arcs.length > 0 && side === "defense";
   const names = useMemo(() => Object.fromEntries(effective.map((p) => [p.id, p.label || p.id])), [effective]);
   const routes = useMemo(
     () => {
+      if (roster) return [];
       const list = visible.flatMap((p) => {
         if (tagged(p, onField)) return [];
         const g = geom(p, effective, top, zones);
@@ -266,7 +285,7 @@ function FieldImpl({
       // faded context sits under the play's own side
       return list.sort((a, b) => Number(b.faded) - Number(a.faded));
     },
-    [visible, onField, effective, top, zones, side],
+    [roster, visible, onField, effective, top, zones, side],
   );
   const draftD = useMemo(() => {
     if (!draft) return "";
@@ -274,9 +293,10 @@ function FieldImpl({
     return p ? draftPath(draft.kind === "motion" ? p : atSnap(p), draft.pts, top) : "";
   }, [draft, effective, top]);
   const editableCustom = useMemo(() => {
+    if (roster) return null;
     const p = effective.find((q) => q.id === selectedId);
     return p?.route?.type === "custom" ? p : null;
-  }, [effective, selectedId]);
+  }, [roster, effective, selectedId]);
   const customPoints = editableCustom?.route?.pts ?? [];
 
   useEffect(() => {
@@ -632,6 +652,9 @@ function FieldImpl({
   // Live playback is a simulation: the primary read gets the ball most of the time, so a
   // coach who presses ▶ again can see the other reads too. Exports pin the primary.
   const playing = run !== null;
+  // roster mode is the formation standing still: a play running when it opens ends on its next frame
+  const rosterRef = useRef(roster);
+  useLayoutEffect(() => { rosterRef.current = roster; }, [roster]);
   const played = run ? positionsAt(run.motion, players, run.t) : null;
   const ball = run && played ? ballAt(run.motion, played, run.t) : null;
   const stop = useCallback(() => {
@@ -656,7 +679,7 @@ function FieldImpl({
         const { touchdowns, unlocked } = recordTouchdown();
         setParty({ seed: touchdowns, unlocked });
       }
-      if (t >= motion.dur) { playRef.current = 0; setRun(null); return; }
+      if (t >= motion.dur || rosterRef.current) { playRef.current = 0; setRun(null); return; }
       setRun({ motion, t });
       playRef.current = requestAnimationFrame(tick);
     };
@@ -854,7 +877,7 @@ function FieldImpl({
               </text>
             </g>
           )}
-          {visible.map(p => {
+          {!roster && visible.map(p => {
             const g = motionGeom(p, top);
             return g ? <g key={p.id} data-pre-snap={p.id}><RouteLayer routes={[{ ...g, id: p.id, faded: isContext(p, side) }]} draftD="" /></g> : null;
           })}
@@ -902,6 +925,7 @@ function FieldImpl({
               readOnly={readOnly || draft !== null}
               drawing={draft !== null}
               faded={isContext(p, side)}
+              caption={captionFor(p, starters, roster)}
               onPointerDown={onDown}
               onKeyDown={onKey}
             />
@@ -930,7 +954,7 @@ function FieldImpl({
         <span className="sr-only" aria-live="polite">
           {party ? `Touchdown!${party.unlocked ? ` The ${party.unlocked.name} end zone is open.` : ""}` : ""}
         </span>
-        <PlayButton playing={playing} onClick={playing ? stop : play} />
+        {!roster && <PlayButton playing={playing} onClick={playing ? stop : play} />}
         </div>
       </div>
     </main>

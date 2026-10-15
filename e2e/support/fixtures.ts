@@ -1,8 +1,8 @@
 import type { Page } from "@playwright/test";
 import { FILE_KIND, FILE_VERSION } from "../../lib/export/playbook-file";
 import { defaults } from "../../lib/play/routes";
-import { DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
-import type { Hop, Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
+import { DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
+import type { Hop, Lineups, Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
 
 /**
  * Fictional fixtures for the Riverside Otters, a team that does not exist. Every test
@@ -95,6 +95,7 @@ export interface Seed {
   plays?: readonly SavedPlay[];
   playbooks?: readonly Playbook[];
   team?: TeamSettings;
+  lineups?: Lineups;
   draft?: DraftRecord;
 }
 
@@ -114,9 +115,10 @@ export async function seed(page: Page, data: Seed): Promise<void> {
       if (plays) localStorage.setItem(keys.plays, JSON.stringify(plays));
       if (books) localStorage.setItem(keys.books, JSON.stringify(books));
       if (d.team) localStorage.setItem(keys.team, JSON.stringify(d.team));
+      if (d.lineups) localStorage.setItem(keys.lineups, JSON.stringify(d.lineups));
       if (d.draft) localStorage.setItem(keys.draft, JSON.stringify(d.draft));
     },
-    [{ plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, draft: DRAFT_KEY }, data] as const,
+    [{ plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, lineups: LINEUPS_KEY, draft: DRAFT_KEY }, data] as const,
   );
 }
 
@@ -154,8 +156,13 @@ export async function storedDraft(page: Page): Promise<DraftRecord | null> {
 export async function storageSnapshot(page: Page): Promise<Record<string, string | null>> {
   return page.evaluate(
     (keys) => Object.fromEntries(keys.map((k) => [k, localStorage.getItem(k)])),
-    [PLAYS_KEY, PLAYBOOKS_KEY, TEAM_KEY, DRAFT_KEY],
+    [PLAYS_KEY, PLAYBOOKS_KEY, TEAM_KEY, LINEUPS_KEY, DRAFT_KEY],
   );
+}
+
+/** The lineups as the app stored them (docs/adr/008-roster-depth-chart.md). */
+export async function storedLineups(page: Page): Promise<Lineups | null> {
+  return page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as Lineups | null, LINEUPS_KEY);
 }
 
 /** A playbook file exactly as the app writes one (see lib/export/playbook-file.ts). */
@@ -169,4 +176,4 @@ export function jsonUpload(name: string, text: string): { name: string; mimeType
 }
 
 /** Local storage keys the app uses, for tests that break a write on purpose. */
-export const KEYS = { plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, draft: DRAFT_KEY } as const;
+export const KEYS = { plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, lineups: LINEUPS_KEY, draft: DRAFT_KEY } as const;

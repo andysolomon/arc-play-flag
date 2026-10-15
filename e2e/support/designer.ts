@@ -42,7 +42,7 @@ export class Designer {
   }
 
   /** Opens a sidebar from its header toggle unless it is already open. */
-  private async open(name: "Play tools" | "Route palette", id: string): Promise<void> {
+  private async open(name: "Play tools" | "Route palette" | "Roster panel" | RegExp, id: string): Promise<void> {
     const toggle = this.page.getByRole("button", { name });
     // the first tap after a navigation can land before React has hydrated; tap again if it did
     await expect(async () => {
@@ -53,9 +53,12 @@ export class Designer {
     await this.settle();
   }
 
+  /** The header toggle of the right sidebar: the route palette, or the roster panel in roster mode. */
+  static readonly RIGHT = /^(Route palette|Roster panel)$/;
+
   /** Folds both sidebars away so the field sits still where a tap will land. */
   async closeSidebars(): Promise<void> {
-    for (const name of ["Play tools", "Route palette"] as const) {
+    for (const name of ["Play tools", Designer.RIGHT] as const) {
       const toggle = this.page.getByRole("button", { name });
       if ((await toggle.getAttribute("aria-expanded")) === "true") await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -84,6 +87,23 @@ export class Designer {
   }
   async palette(): Promise<void> {
     await this.open("Route palette", "route-sidebar");
+  }
+  /** The right sidebar in roster mode (docs/adr/008-roster-depth-chart.md). */
+  async rosterPanel(): Promise<void> {
+    await this.open("Roster panel", "route-sidebar");
+  }
+  /** Whichever the right sidebar is now: the palette, or the roster panel in roster mode. */
+  async rightPanel(): Promise<void> {
+    await this.open(Designer.RIGHT, "route-sidebar");
+  }
+  /**
+   * Into roster mode from Play tools, or back out of it; the header's right toggle says which it is. On a
+   * phone or tablet entering it opens the roster drawer over Play tools, so the tile is not read back.
+   */
+  async roster(on = true): Promise<void> {
+    const toggle = this.page.getByRole("button", { name: on ? "Roster panel" : "Route palette" });
+    if ((await toggle.count()) === 0) await (await this.tool("Roster")).click();
+    await expect(toggle).toBeVisible();
   }
 
   /** A tile or pill in the Play tools sidebar, by its visible label. */
@@ -127,7 +147,11 @@ export class Designer {
       await this.player(label, team).click();
       await expect(this.player(label, team)).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
     }).toPass();
-    await this.palette();
+    await this.rightPanel();
+  }
+  /** The starter's name drawn under a token (the roster's), or none. */
+  caption(label: string, team: "Offense" | "Defense" = "Offense"): Locator {
+    return this.player(label, team).locator("[data-caption]");
   }
 
   /** Picks a route or coverage tile for the selected player. */

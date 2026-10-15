@@ -1,10 +1,12 @@
 import {
-  StorageError, artShadow, hasTeam, importAll, newId, readAll, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook, writeTeam,
+  StorageError, artShadow, hasTeam, importAll, newId, readAll, readLineups, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook,
+  writeLineups, writeTeam,
 } from "./storage";
 import { losOf, withLos } from "./field";
 import { callOf } from "./call";
 import { isBallJob, isRun } from "./routes";
-import type { Playbook, SavedPlay, TeamSettings } from "./types";
+import { defaultLineups } from "./lineup";
+import type { Lineups, Playbook, SavedPlay, TeamSettings } from "./types";
 
 /**
  * The on-device library (plays, playbooks, team) as one external store, so components
@@ -70,9 +72,11 @@ export function formationTemplate(play: SavedPlay): SavedPlay {
 
 const NO_PLAYS: readonly SavedPlay[] = [];
 const NO_BOOKS: readonly Playbook[] = [];
+const NO_LINEUPS: Lineups = defaultLineups();
 let plays: readonly SavedPlay[] | null = null;
 let books: readonly Playbook[] | null = null;
 let team: TeamSettings | null = null;
+let lineups: Lineups | null = null;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -111,6 +115,13 @@ export function getTeam(): TeamSettings {
   return team;
 }
 export const getServerTeam = (): TeamSettings => readTeam(null);
+
+/** The lineups, who plays each position in versions (docs/adr/008-roster-depth-chart.md); kept with the team, on this device. */
+export function getLineups(): Lineups {
+  lineups ??= readLineups();
+  return lineups;
+}
+export const getServerLineups = (): Lineups => NO_LINEUPS;
 
 export function playById(id: string | null | undefined): SavedPlay | null {
   return id ? getPlays().find((p) => p.id === id) ?? null : null;
@@ -203,6 +214,15 @@ export function setTeam(next: TeamSettings): Written {
   });
 }
 
+export function setLineups(next: Lineups): Written {
+  return attempt(() => {
+    writeLineups(next);
+    lineups = readLineups();
+    emit();
+    return null;
+  });
+}
+
 export function teamIsSet(): boolean {
   return hasTeam();
 }
@@ -212,6 +232,7 @@ export function refresh(): void {
   plays = null;
   books = null;
   team = null;
+  lineups = null;
   emit();
 }
 

@@ -134,6 +134,40 @@ export interface Playbook {
   plays: string[];
 }
 
+/**
+ * One position on the roster: a tag as it reads on the field, and who plays it, the starter first.
+ * A blank line is a spot on the depth chart not filled in yet (docs/adr/008-roster-depth-chart.md).
+ */
+export interface RosterSlot {
+  team: Team;
+  /** the position tag, exactly as the player's label on the field: C, QB, X, Y, Z, LC, LB, R, RC, S or one the coach typed */
+  tag: string;
+  /** the depth chart, starter first */
+  depth: string[];
+}
+
+/** One lineup's roster: who plays each position, in the order the positions were first filled. */
+export type Roster = RosterSlot[];
+
+/**
+ * A lineup: a roster under a name. The starting lineup is always there; any other is a branch, a copy
+ * of the lineup it was made from (`from`, by id) changed for a day a player is away, a different
+ * opponent, or anything else. Kept on the device, like the team.
+ */
+export interface Lineup {
+  id: string;
+  name: string;
+  /** the lineup this one was branched from; the starting lineup has none, and one whose parent is gone loses it */
+  from?: string;
+  slots: Roster;
+}
+
+/** Every lineup, and which one the field shows. */
+export interface Lineups {
+  active: string;
+  lineups: Lineup[];
+}
+
 export interface TeamSettings {
   name: string;
   /** an accent colour for exports, as #rrggbb */
