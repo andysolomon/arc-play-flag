@@ -146,8 +146,27 @@ export interface RosterSlot {
   depth: string[];
 }
 
-/** The team's roster: who plays each position, in the order the positions were first filled. Kept on the device, like the team. */
+/** One lineup's roster: who plays each position, in the order the positions were first filled. */
 export type Roster = RosterSlot[];
+
+/**
+ * A lineup: a roster under a name. The starting lineup is always there; any other is a branch, a copy
+ * of the lineup it was made from (`from`, by id) changed for a day a player is away, a different
+ * opponent, or anything else. Kept on the device, like the team.
+ */
+export interface Lineup {
+  id: string;
+  name: string;
+  /** the lineup this one was branched from; the starting lineup has none, and one whose parent is gone loses it */
+  from?: string;
+  slots: Roster;
+}
+
+/** Every lineup, and which one the field shows. */
+export interface Lineups {
+  active: string;
+  lineups: Lineup[];
+}
 
 export interface TeamSettings {
   name: string;

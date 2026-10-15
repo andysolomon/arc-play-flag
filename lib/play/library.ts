@@ -1,11 +1,12 @@
 import {
-  StorageError, artShadow, hasTeam, importAll, newId, readAll, readPlaybooks, readRoster, readTeam, remove, removePlaybook, store, storePlaybook,
-  writeRoster, writeTeam,
+  StorageError, artShadow, hasTeam, importAll, newId, readAll, readLineups, readPlaybooks, readTeam, remove, removePlaybook, store, storePlaybook,
+  writeLineups, writeTeam,
 } from "./storage";
 import { losOf, withLos } from "./field";
 import { callOf } from "./call";
 import { isBallJob, isRun } from "./routes";
-import type { Playbook, Roster, SavedPlay, TeamSettings } from "./types";
+import { defaultLineups } from "./lineup";
+import type { Lineups, Playbook, SavedPlay, TeamSettings } from "./types";
 
 /**
  * The on-device library (plays, playbooks, team) as one external store, so components
@@ -71,11 +72,11 @@ export function formationTemplate(play: SavedPlay): SavedPlay {
 
 const NO_PLAYS: readonly SavedPlay[] = [];
 const NO_BOOKS: readonly Playbook[] = [];
-const NO_ROSTER: Roster = [];
+const NO_LINEUPS: Lineups = defaultLineups();
 let plays: readonly SavedPlay[] | null = null;
 let books: readonly Playbook[] | null = null;
 let team: TeamSettings | null = null;
-let roster: Roster | null = null;
+let lineups: Lineups | null = null;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -115,12 +116,12 @@ export function getTeam(): TeamSettings {
 }
 export const getServerTeam = (): TeamSettings => readTeam(null);
 
-/** Who plays each position (docs/adr/008-roster-depth-chart.md); kept with the team, on this device. */
-export function getRoster(): Roster {
-  roster ??= readRoster();
-  return roster;
+/** The lineups, who plays each position in versions (docs/adr/008-roster-depth-chart.md); kept with the team, on this device. */
+export function getLineups(): Lineups {
+  lineups ??= readLineups();
+  return lineups;
 }
-export const getServerRoster = (): Roster => NO_ROSTER;
+export const getServerLineups = (): Lineups => NO_LINEUPS;
 
 export function playById(id: string | null | undefined): SavedPlay | null {
   return id ? getPlays().find((p) => p.id === id) ?? null : null;
@@ -213,10 +214,10 @@ export function setTeam(next: TeamSettings): Written {
   });
 }
 
-export function setRoster(next: Roster): Written {
+export function setLineups(next: Lineups): Written {
   return attempt(() => {
-    writeRoster(next);
-    roster = readRoster();
+    writeLineups(next);
+    lineups = readLineups();
     emit();
     return null;
   });
@@ -231,7 +232,7 @@ export function refresh(): void {
   plays = null;
   books = null;
   team = null;
-  roster = null;
+  lineups = null;
   emit();
 }
 

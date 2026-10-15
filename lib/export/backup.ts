@@ -1,9 +1,10 @@
+import { defaultLineups } from "@/lib/play/lineup";
 import {
-  DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, ROSTER_KEY, TEAM_KEY, kebab, normalizeDraft, normalizePlaybook, normalizeRoster, normalizeSavedPlay,
-  normalizeTeam, readAll, readDraft, readPlaybooks, readRoster, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks,
+  DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, kebab, normalizeDraft, normalizeLineups, normalizePlaybook, normalizeSavedPlay,
+  normalizeTeam, readAll, readDraft, readLineups, readPlaybooks, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks,
   type StorageLike, type StoredPlayer,
 } from "@/lib/play/storage";
-import type { Playbook, Roster, SavedPlay, TeamSettings } from "@/lib/play/types";
+import type { Lineups, Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 
 export const BACKUP_KIND = "ffpd.backup";
 export const BACKUP_VERSION = 1;
@@ -18,8 +19,8 @@ export interface BackupFile {
   plays: SavedPlay[];
   playbooks: Playbook[];
   team: TeamSettings;
-  /** who plays each position; a backup from before the roster has none, and restores an empty one */
-  roster: Roster;
+  /** the lineups, who plays each position; a backup from before them has none, and restores the empty starting lineup */
+  lineups: Lineups;
   draft: DraftRecord | null;
 }
 
@@ -27,7 +28,7 @@ export interface BackupState {
   plays: Library;
   playbooks: Playbooks;
   team: TeamSettings;
-  roster: Roster;
+  lineups: Lineups;
   draft: DraftRecord | null;
 }
 
@@ -128,7 +129,7 @@ export function readBackupState(storage?: StorageLike | null): BackupState {
     plays: readAll(storage),
     playbooks: readPlaybooks(storage),
     team: readTeam(storage),
-    roster: readRoster(storage),
+    lineups: readLineups(storage),
     draft: readDraft(storage),
   };
 }
@@ -143,7 +144,7 @@ export function createBackup(storage?: StorageLike | null): BackupFile {
     plays: Object.values(state.plays),
     playbooks: Object.values(state.playbooks),
     team: state.team,
-    roster: state.roster,
+    lineups: state.lineups,
     draft: state.draft,
   };
 }
@@ -173,10 +174,10 @@ export function readBackupFile(json: string): BackupRead {
   const plays = raw.plays.map(canonicalPlay);
   const playbooks = raw.playbooks.map(canonicalBook);
   const team = normalizeTeam(raw.team);
-  // the roster came after version 1's first backups, so a file without one is still whole
-  const roster = raw.roster === undefined ? [] : normalizeRoster(raw.roster);
+  // the lineups came after version 1's first backups, so a file without them is still whole
+  const lineups = raw.lineups === undefined ? defaultLineups() : normalizeLineups(raw.lineups);
   const draft = raw.draft === null ? null : normalizeDraft(raw.draft);
-  if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team) || !roster) {
+  if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team) || !lineups) {
     return { ok: false, error: "invalidData" };
   }
   if (raw.draft !== null && (!draft || !isRecord(raw.draft) || !asStored(raw.draft, draft))) return { ok: false, error: "invalidData" };
@@ -193,7 +194,7 @@ export function readBackupFile(json: string): BackupRead {
   if (typeof raw.exported !== "string" || Number.isNaN(Date.parse(raw.exported))) return { ok: false, error: "invalidData" };
   return {
     ok: true,
-    file: { kind: BACKUP_KIND, version: BACKUP_VERSION, exported: raw.exported, plays: validPlays, playbooks: validBooks, team, roster, draft },
+    file: { kind: BACKUP_KIND, version: BACKUP_VERSION, exported: raw.exported, plays: validPlays, playbooks: validBooks, team, lineups, draft },
   };
 }
 
@@ -208,7 +209,7 @@ export function planBackupRestore(file: BackupFile, current: BackupState, mode: 
       plays: mode === "merge" ? { ...current.plays, ...incomingPlays } : incomingPlays,
       playbooks: mode === "merge" ? { ...current.playbooks, ...incomingBooks } : incomingBooks,
       team: file.team,
-      roster: file.roster,
+      lineups: file.lineups,
       draft: file.draft,
     },
     incomingPlays: file.plays.length,
@@ -226,7 +227,7 @@ export function applyBackupRestore(plan: RestorePlan, storage?: StorageLike | nu
     [PLAYS_KEY, plan.state.plays],
     [PLAYBOOKS_KEY, plan.state.playbooks],
     [TEAM_KEY, plan.state.team],
-    [ROSTER_KEY, plan.state.roster],
+    [LINEUPS_KEY, plan.state.lineups],
     [DRAFT_KEY, plan.state.draft],
   ], storage);
 }

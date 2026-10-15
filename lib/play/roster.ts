@@ -14,6 +14,8 @@
  *   first eleven letters and an ellipsis; the panel keeps the whole name.
  * - R5 two players wearing the same tag on one play share the slot and the starter's name.
  * - R6 a player with no tag has no slot: the panel asks for a tag first.
+ * - R7 a name typed two ways ("devon", "Devon ") is one player: names are matched trimmed, without
+ *   regard to case, and shown as first written.
  */
 
 import type { Player, Roster, RosterSlot, Team } from "./types";
@@ -90,4 +92,36 @@ export function depthWord(index: number): string {
   const n = index + 1;
   const tail = n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th";
   return `${String(n)}${tail}`;
+}
+
+/** A name as players are told apart (R7). */
+const key = (name: string): string => name.trim().toLocaleLowerCase();
+
+/** Everyone on the roster, each name once as first written, in alphabetical order; blank lines are nobody. */
+export function playerNames(roster: Roster): string[] {
+  const seen = new Map<string, string>();
+  for (const slot of roster) {
+    for (const name of slot.depth) {
+      const k = key(name);
+      if (k && !seen.has(k)) seen.set(k, name.trim());
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** One place a player holds: a position and how deep they sit at it (0 is the starter). */
+export interface Standing {
+  team: Team;
+  tag: string;
+  depth: number;
+}
+
+/** Every position a player is down for, in roster order, with where they sit at each (R7). */
+export function standings(roster: Roster, name: string): Standing[] {
+  const k = key(name);
+  if (!k) return [];
+  return roster.flatMap((slot) => {
+    const at = slot.depth.findIndex((n) => key(n) === k);
+    return at < 0 ? [] : [{ team: slot.team, tag: slot.tag, depth: at }];
+  });
 }

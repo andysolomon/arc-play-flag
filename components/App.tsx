@@ -11,10 +11,11 @@ import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
+import { activeLineup, withSlots } from "@/lib/play/lineup";
 import { starters } from "@/lib/play/roster";
-import type { Player, Roster, RouteType, Team, TeamSettings } from "@/lib/play/types";
+import type { Lineups, Player, Roster, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
-import { getPlays, getRoster, getServerRoster, getServerTeam, getTeam, playById, savePlay, setRoster, setTeam, subscribe } from "@/lib/play/library";
+import { getLineups, getPlays, getServerLineups, getServerTeam, getTeam, playById, savePlay, setLineups, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
@@ -74,8 +75,9 @@ export function App() {
   // a league rule, so it is the team's: the same field for every play, on screen and on paper
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const noRunZones = hasNoRunZones(team);
-  // who plays each position, the team's too (docs/adr/008-roster-depth-chart.md); roster mode lays it out on the field
-  const roster = useSyncExternalStore(subscribe, getRoster, getServerRoster);
+  // who plays each position, in lineups (docs/adr/008-roster-depth-chart.md); the field shows the active one
+  const lineups = useSyncExternalStore(subscribe, getLineups, getServerLineups);
+  const lineup = useMemo(() => activeLineup(lineups), [lineups]);
   const [mode, setMode] = useState<Mode>("play");
   const rostering = mode === "roster";
   // both sidebars start closed: the app opens on a clear field
@@ -333,13 +335,14 @@ export function App() {
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
   }, [say]);
   const onNoRunZones = useCallback((on: boolean) => { onTeam({ ...getTeam(), noRunZones: on }); }, [onTeam]);
-  // a line of a depth chart lands at once, like the team's name, and is never undone
-  const onRoster = useCallback((next: Roster) => {
-    const r = setRoster(next);
+  // a line of a depth chart, or a lineup made, named, picked or deleted, lands at once, like the team's name, and is never undone
+  const onLineups = useCallback((next: Lineups) => {
+    const r = setLineups(next);
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
   }, [say]);
-  // the starter at each position on the field, shortened to fit under the token
-  const starterNames = useMemo(() => starters(roster, s.players), [roster, s.players]);
+  const onRoster = useCallback((next: Roster) => { onLineups(withSlots(lineups, lineup.id, next)); }, [lineup.id, lineups, onLineups]);
+  // the starter at each position on the field, from the active lineup, shortened to fit under the token
+  const starterNames = useMemo(() => starters(lineup.slots, s.players), [lineup.slots, s.players]);
   // roster mode leaves whatever was being drawn and opens the panel on the positions; the selection stays,
   // so a player tapped in the palette is the position whose depth chart opens
   const onMode = useCallback((next: Mode) => {
@@ -463,7 +466,7 @@ export function App() {
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}
           showTitle
-          status={rostering ? team.name || "Who plays where" : persistenceLabel[persistence]}
+          status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
           los={s.los}
           starters={starterNames}
@@ -472,7 +475,9 @@ export function App() {
         <Sidebar id="route-sidebar" side="right" open={rightOpen} label={rostering ? "Roster panel" : "Route palette"} overlay={compact}>
           {rostering ? (
             <RosterSidebar
-              roster={roster}
+              lineups={lineups}
+              onLineups={onLineups}
+              roster={lineup.slots}
               onRoster={onRoster}
               selected={sel}
               players={s.players}

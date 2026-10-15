@@ -1,17 +1,18 @@
 import { readLos, withLos } from "./field";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
+import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, defaultLineups } from "./lineup";
 import { MAX_DEPTH, MAX_SLOTS, cleanName as rosterName } from "./roster";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
-import type { Hop, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
+import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
 /** The prototype's library, keyed by play name. Read once and migrated into v2. */
 export const LEGACY_PLAYS_KEY = "ffpd.plays.v1";
 export const PLAYBOOKS_KEY = "ffpd.playbooks.v1";
 export const TEAM_KEY = "ffpd.team.v1";
-/** Who plays each position, with depth (docs/adr/008-roster-depth-chart.md). */
-export const ROSTER_KEY = "ffpd.roster.v1";
+/** The lineups: who plays each position, with depth, in versions (docs/adr/008-roster-depth-chart.md). */
+export const LINEUPS_KEY = "ffpd.lineups.v1";
 export const DRAFT_KEY = "ffpd.draft.v1";
 
 export type Library = Record<string, SavedPlay>;
@@ -608,14 +609,45 @@ export function normalizeRoster(raw: unknown): Roster | null {
   return out;
 }
 
-/** The device's roster; empty when none has been set. */
-export function readRoster(storage: StorageLike | null = browserStorage()): Roster {
-  return normalizeRoster(parse(storage, ROSTER_KEY)) ?? [];
+/**
+ * The lineups from any JSON-ish value: each an id, a name and its slots, with the lineup it was branched
+ * from when that one is there too. The starting lineup is always there (put back empty at the front when
+ * it isn't), a second lineup with an id already seen is ignored, the active one must exist (else the
+ * starting lineup is), and the whole is capped. Null when it isn't a record with a list of lineups.
+ */
+export function normalizeLineups(raw: unknown): Lineups | null {
+  if (!isRecord(raw) || !Array.isArray(raw.lineups)) return null;
+  const out: Lineup[] = [];
+  for (const v of raw.lineups) {
+    if (!isRecord(v) || typeof v.id !== "string" || !v.id || v.id.length > 24 || out.some((l) => l.id === v.id)) continue;
+    const lineup: Lineup = {
+      id: v.id,
+      name: typeof v.name === "string" ? rosterName(v.name).slice(0, MAX_LINEUP_NAME) : "",
+      slots: normalizeRoster(v.slots) ?? [],
+    };
+    if (typeof v.from === "string" && v.from) lineup.from = v.from;
+    out.push(lineup);
+    if (out.length >= MAX_LINEUPS) break;
+  }
+  if (!out.some((l) => l.id === MAIN_LINEUP)) {
+    out.unshift({ id: MAIN_LINEUP, name: MAIN_NAME, slots: [] });
+    if (out.length > MAX_LINEUPS) out.pop();
+  }
+  for (const l of out) {
+    if (l.from !== undefined && (l.from === l.id || !out.some((p) => p.id === l.from))) delete l.from;
+  }
+  const active = typeof raw.active === "string" && out.some((l) => l.id === raw.active) ? raw.active : MAIN_LINEUP;
+  return { active, lineups: out };
+}
+
+/** The device's lineups; the starting lineup alone, empty, when none have been set. */
+export function readLineups(storage: StorageLike | null = browserStorage()): Lineups {
+  return normalizeLineups(parse(storage, LINEUPS_KEY)) ?? defaultLineups();
 }
 
 /** Throws a StorageError when the write doesn't land. */
-export function writeRoster(roster: Roster, storage: StorageLike | null = browserStorage()): void {
-  write(storage, ROSTER_KEY, normalizeRoster(roster) ?? []);
+export function writeLineups(lineups: Lineups, storage: StorageLike | null = browserStorage()): void {
+  write(storage, LINEUPS_KEY, normalizeLineups(lineups) ?? defaultLineups());
 }
 
 /** One draft from any JSON-ish value, or null when there are no players in it. */

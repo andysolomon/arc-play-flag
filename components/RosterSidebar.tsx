@@ -1,14 +1,22 @@
 "use client";
 
-import { memo, useRef, type ChangeEvent } from "react";
+import { memo, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
-import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, starterOf, withDepth } from "@/lib/play/roster";
-import type { Player, Roster, Team } from "@/lib/play/types";
+import {
+  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, activeLineup, branched, fromName, lineupName, renamed, withActive, without,
+} from "@/lib/play/lineup";
+import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, playerNames, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { newId } from "@/lib/play/storage";
+import type { Lineups, Player, Roster, Team } from "@/lib/play/types";
 import { Sticker } from "./Sticker";
-import { crumb, eyebrow, input, pill } from "./ui";
+import { crumb, eyebrow, input, pill, select } from "./ui";
 
 interface Props {
+  /** every lineup and which one the field shows */
+  lineups: Lineups;
+  onLineups: (next: Lineups) => void;
+  /** the active lineup's slots, the ones the depth chart edits */
   roster: Roster;
   onRoster: (next: Roster) => void;
   /** the position tapped on the field, whose depth chart is being set */
@@ -41,9 +49,46 @@ function says(roster: Roster, p: Player): string {
  * with its depth chart to fill in, starter first, and every position on the field to jump between. The
  * roster is the team's, kept on this device, so a change here lands at once and is never undone.
  */
-function RosterSidebarImpl({ roster, onRoster, selected: sel, players, side, onSelect, onRename, onDone }: Props) {
+function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, onSelect, onRename, onDone }: Props) {
+  const lineup = activeLineup(lineups);
+  const parent = fromName(lineups, lineup);
+  const pickId = useId(), nameId = useId();
+  // a lineup just branched gets its name field, so the coach can say what it is for straight away
+  const nameRef = useRef<HTMLInputElement>(null);
+  const nameNext = useRef<string | null>(null);
+  useEffect(() => {
+    if (nameNext.current !== lineup.id) return;
+    nameNext.current = null;
+    nameRef.current?.focus();
+    nameRef.current?.select();
+  }, [lineup.id]);
+  // Delete asks once, in place, since a lineup is not undoable: the pill becomes the question
+  const [deleting, setDeleting] = useState(false);
+  const branch = () => {
+    const id = newId();
+    const next = branched(lineups, lineup.id, id);
+    if (!next) return;
+    nameNext.current = id;
+    setDeleting(false);
+    onLineups(next);
+  };
+  const pick = (id: string) => { setDeleting(false); onLineups(withActive(lineups, id)); };
+  const removeLineup = () => { setDeleting(false); onLineups(without(lineups, lineup.id)); };
   // one history entry per rename session, not per keystroke, as the palette's tag field does
   const renaming = useRef<string | null>(null);
+  // a player's page: the name, and which selection it was opened over, so a tap on the field turns it back
+  // to that position's chart with no effect to time it
+  const [page, setPage] = useState<{ name: string; over: string | null } | null>(null);
+  const player = page && page.over === (sel?.id ?? null) ? page.name : null;
+  const names = playerNames(roster);
+  // the page's positions are a way to their depth charts: the first player wearing that tag on that team
+  const goTo = (team: Team, tag: string) => {
+    const p = players.filter((q) => q.team === team && q.label === tag).sort(byLine)[0];
+    setPage(null);
+    if (p) onSelect(p.id);
+  };
+  // "X starter, LC 2nd": where a player sits, for the list
+  const sits = (name: string): string => standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ");
   // the line just added gets the focus as it mounts, so a name can be typed straight away
   const focusLine = useRef<number | null>(null);
 
@@ -72,7 +117,75 @@ function RosterSidebarImpl({ roster, onRoster, selected: sel, players, side, onS
   return (
     <>
       <span className={eyebrow}>ROSTER</span>
-      {!sel && (
+      <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Lineup">
+        <label htmlFor={pickId} className="flex-none text-small">Lineup</label>
+        <select id={pickId} value={lineup.id} onChange={(e: ChangeEvent<HTMLSelectElement>) => { pick(e.target.value); }} className={`${select} w-full flex-none`}>
+          {lineups.lineups.map((l) => <option key={l.id} value={l.id}>{lineupName(l)}</option>)}
+        </select>
+        <label htmlFor={nameId} className="sr-only">Lineup name</label>
+        <input
+          id={nameId}
+          ref={nameRef}
+          value={lineup.name}
+          maxLength={MAX_LINEUP_NAME}
+          placeholder="Lineup name"
+          autoComplete="off"
+          onChange={(e: ChangeEvent<HTMLInputElement>) => { onLineups(renamed(lineups, lineup.id, e.target.value)); }}
+          className={`${input} flex-none`}
+        />
+        {parent && <span className="flex-none text-caption leading-note text-ink-muted">Branched from {parent}.</span>}
+        <div className="flex flex-none flex-wrap gap-1.5">
+          {deleting ? (
+            <>
+              <span className="flex min-h-11 items-center text-small">Delete {lineupName(lineup)}?</span>
+              <button type="button" onClick={removeLineup} className={`${pill} min-h-11 px-3 py-1 text-small bg-yellow on-yellow hover:bg-yellow`}>Delete</button>
+              <button type="button" onClick={() => { setDeleting(false); }} className={`${pill} min-h-11 px-3 py-1 text-small`}>Keep</button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button" onClick={branch} disabled={lineups.lineups.length >= MAX_LINEUPS}
+                title="A new lineup, a copy of this one to change" className={`${pill} min-h-11 px-3 py-1 text-small`}
+              >
+                Branch lineup
+              </button>
+              {lineup.id !== MAIN_LINEUP && (
+                <button type="button" onClick={() => { setDeleting(true); }} className={`${pill} min-h-11 px-3 py-1 text-small`}>Delete lineup</button>
+              )}
+            </>
+          )}
+        </div>
+        <span className="flex-none text-caption leading-note text-ink-muted">
+          A branch starts as a copy of this lineup, for a day a player is away or a different opponent. The field shows the lineup picked here.
+        </span>
+      </div>
+      {player !== null && (
+        <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`${player}'s positions`}>
+          <h2 className="text-title font-normal leading-tight">{player}</h2>
+          <span className={eyebrow}>POSITIONS</span>
+          <ul className="flex flex-none flex-col gap-1">
+            {standings(roster, player).map((st) => (
+              <li key={`${st.team}-${st.tag}`}>
+                <button
+                  type="button"
+                  onClick={() => { goTo(st.team, st.tag); }}
+                  className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
+                >
+                  <span aria-hidden="true" className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: teamFill(st.team) }} />
+                  <span className="min-w-0 flex-1 truncate">{st.tag} · {depthWord(st.depth)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <span className="flex-none text-caption leading-note text-ink-muted">
+            Where {player} sits on {lineupName(lineup)}. Tap a position to change its depth chart.
+          </span>
+          <button type="button" onClick={() => { setPage(null); }} className={`${pill} min-h-11 flex-none self-start px-3 py-1 text-small`}>
+            ‹ Back
+          </button>
+        </div>
+      )}
+      {player === null && !sel && (
         <div className="flex flex-none flex-col items-center gap-[10px] rounded-tile border-2 border-dashed border-ink px-[10px] py-[18px]">
           <Sticker icon="roster" size={56} className="opacity-75" />
           <span className="text-center text-base leading-body text-ink-muted">
@@ -82,7 +195,7 @@ function RosterSidebarImpl({ roster, onRoster, selected: sel, players, side, onS
           </span>
         </div>
       )}
-      {sel && (
+      {player === null && sel && (
         <>
           <div className="flex flex-none items-center gap-[10px]">
             {/* the coloured token is the tag field, as in the route palette: the tag is the position */}
@@ -165,7 +278,28 @@ function RosterSidebarImpl({ roster, onRoster, selected: sel, players, side, onS
           )}
         </>
       )}
-      {teams.map((team) => {
+      {player === null && names.length > 0 && (
+        <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Players">
+          <span className={eyebrow}>PLAYERS</span>
+          <ul className="flex flex-none flex-col gap-1">
+            {names.map((name) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  onClick={() => { setPage({ name, over: sel?.id ?? null }); }}
+                  aria-label={name}
+                  className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  <span className="min-w-0 max-w-[55%] truncate text-caption text-ink-muted">{sits(name)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <span className="flex-none text-caption leading-note text-ink-muted">Everyone on this lineup. Tap a name for every position they play.</span>
+        </div>
+      )}
+      {player === null && teams.map((team) => {
         const list = players.filter((p) => p.team === team).sort(byLine);
         if (!list.length) return null;
         return (
