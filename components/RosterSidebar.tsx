@@ -84,7 +84,8 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     nameRef.current?.focus();
     nameRef.current?.select();
   }, [lineup.id]);
-  // every lineup drops down from the name field, as the play name's list does, with Delete at the foot
+  // every lineup drops down from the name field, as the play name's list does, with Delete at the foot; a long
+  // name wraps rather than being cut off, so two that differ only at the end are told apart before a pick
   const [listing, setListing] = useState(false);
   const listRoot = useRef<HTMLDivElement>(null);
   const listButton = useRef<HTMLButtonElement>(null);
@@ -271,14 +272,14 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                     onClick={() => { pick(l.id); }}
                     className={menuChoice}
                   >
-                    <span className="min-w-0 flex-1 truncate">{lineupName(l)}</span>
+                    <span className="min-w-0 flex-1 break-words py-2 leading-tight">{lineupName(l)}</span>
                   </button>
                 ))}
                 {lineup.id !== MAIN_LINEUP && (
                   <>
                     <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
                     <button type="button" role="menuitem" onClick={askDelete} className={menuItemDanger}>
-                      <span className="min-w-0 truncate">Delete “{lineupName(lineup)}”</span>
+                      <span className="min-w-0 break-words py-2 leading-tight">Delete “{lineupName(lineup)}”</span>
                     </button>
                   </>
                 )}

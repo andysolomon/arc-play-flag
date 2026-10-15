@@ -458,6 +458,48 @@ test("lineups branch from the starting lineup or from each other, each with its 
   writeFileSync(`test-results/roster-${device}-lineups.json`, `${JSON.stringify({ stored, after }, null, 2)}\n`);
 });
 
+test("a long lineup name is shown whole in the lineups menu, so two that differ only at the end are told apart before either is picked", async ({ page }, info) => {
+  const device = info.project.name;
+  const rotA = "Saturday vs Falcons - Rotation A", rotB = "Saturday vs Falcons - Rotation B";
+  await seed(page, {
+    plays: [SLANT_LEFT], team: OTTERS,
+    lineups: {
+      active: "main", players: [],
+      lineups: [{ id: "main", name: "Starting Lineup", slots: [] }, { id: "rot-a", name: rotA, from: "main", slots: [] }, { id: "rot-b", name: rotB, from: "main", slots: [] }],
+    },
+  });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.rosterPanel();
+  /** The words in the open menu that are drawn cut off, and whether the menu itself scrolls sideways. */
+  const cutOff = () => lineupMenu(page).evaluate((menu) => ({
+    words: [...menu.querySelectorAll("[role^='menuitem'] span")].filter((s) => s.scrollWidth > s.clientWidth + 1).map((s) => s.textContent),
+    sideways: menu.scrollWidth > menu.clientWidth + 1,
+  }));
+
+  await lineupsButton(page).click();
+  const rows = lineupMenu(page).getByRole("menuitemradio");
+  await expect(rows).toHaveText(["Starting Lineup", rotA, rotB]);
+  expect(await cutOff()).toEqual({ words: [], sideways: false });
+  // a name too long for one line wraps, and its row grows past the 44px a row starts at
+  const one = await rows.first().boundingBox(), long = await rows.nth(2).boundingBox();
+  expect(one && long).toBeTruthy();
+  if (one && long) {
+    expect(one.height).toBeGreaterThanOrEqual(44);
+    expect(long.height).toBeGreaterThan(one.height);
+  }
+  await panel(page).screenshot({ path: `test-results/roster-${device}-long-lineup-names.png` });
+
+  // the one picked by its whole name is the one on the field, and its Delete names it whole too
+  await rows.nth(2).click();
+  await expect(lineupName(page)).toHaveValue(rotB);
+  await expect(page.locator("#field-title")).toContainText(rotB);
+  await lineupsButton(page).click();
+  await expect(lineupMenu(page).getByRole("menuitem")).toHaveText([`Delete “${rotB}”`]);
+  expect(await cutOff()).toEqual({ words: [], sideways: false });
+});
+
 test("players join the team any time, the same on every lineup, and depth charts are filled from the team", async ({ page }, info) => {
   const device = info.project.name;
   await seed(page, { plays: [SLANT_LEFT], team: OTTERS });
