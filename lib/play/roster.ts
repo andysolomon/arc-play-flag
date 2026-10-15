@@ -7,8 +7,8 @@
  *
  * - R1 a tag renamed on a play: the player wears a tag with no slot and reads as unassigned; the old slot
  *   keeps its names for whoever wears that tag next. Nothing is moved or lost.
- * - R2 a blank line on the depth chart: kept as typed while the coach fills it in, so a space typed in a
- *   name is never trimmed away under their fingers; a blank starter reads as unassigned on the field.
+ * - R2 a blank line on the depth chart (one typed on a chart before the team's list): nobody, dropped, so
+ *   the next name up starts; a name is stored trimmed.
  * - R3 a slot with no lines left is dropped from the roster, so an empty depth chart stores nothing.
  * - R4 a name that would not fit under a token is shortened for the field only: the first word, or the
  *   first eleven letters and an ellipsis; the panel keeps the whole name.
@@ -55,7 +55,7 @@ export function starterOf(roster: Roster, team: Team, tag: string): string | nul
  */
 export function withDepth(roster: Roster, team: Team, tag: string, depth: readonly string[]): Roster {
   if (!tag) return roster;
-  const lines = depth.slice(0, MAX_DEPTH).map(cleanName);
+  const lines = depth.map((n) => cleanName(n).trim()).filter(Boolean).slice(0, MAX_DEPTH);
   const rest = roster.filter((s) => !sameSlot(s, team, tag));
   if (!lines.length) return rest;
   const at = roster.findIndex((s) => sameSlot(s, team, tag));
@@ -64,7 +64,7 @@ export function withDepth(roster: Roster, team: Team, tag: string, depth: readon
   return roster.map((s) => (sameSlot(s, team, tag) ? slot : s));
 }
 
-/** A name as stored: control characters out, at most MAX_NAME letters, spaces kept as typed (R2). */
+/** A name as typed: control characters out, at most MAX_NAME letters. */
 export function cleanName(v: unknown): string {
   return typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, MAX_NAME) : "";
 }
@@ -118,6 +118,13 @@ export function playerNames(roster: Roster, also: readonly string[] = []): strin
     for (const name of slot.depth) take(name);
   }
   return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** The roster with a player's name changed on every depth chart they are on (R7). */
+export function renamedIn(roster: Roster, from: string, to: string): Roster {
+  const k = key(from);
+  if (!k) return roster;
+  return roster.map((slot) => (slot.depth.some((n) => key(n) === k) ? { ...slot, depth: slot.depth.map((n) => (key(n) === k ? to : n)) } : slot));
 }
 
 /** The roster without a player: off every depth chart (R8), a chart left empty gone with them (R3). */
