@@ -25,7 +25,7 @@
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
     "components/PlayerToken.tsx": "7fd9550c1091cdb8c3fe9254d22789f56cc17918e0562be1576f8cc3b447bd6e",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "f8a61abae096bb9ee72686c868c3d406a551dac07fe772373e509084680461eb",
+    "components/RosterSidebar.tsx": "86134e93db6b728ee197ab1033c0eb970af87b8981e3c2f747cbcba40abdbb8b",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
@@ -68,5 +68,11 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
+  },
+  "restamped": {
+    "reason": "only the roster panel changed (#140); no clip opens the roster panel",
+    "files": [
+      "components/RosterSidebar.tsx (changed)"
+    ]
   }
 }
