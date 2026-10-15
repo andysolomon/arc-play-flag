@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import type { Team } from "@/lib/play/types";
+import type { Team, Vis } from "@/lib/play/types";
 import { pillMd, pillSm } from "./ui";
 import { Sticker } from "./Sticker";
 
@@ -12,6 +12,10 @@ interface Props {
   side: Team;
   /** drawing the play, or laying out the roster (docs/adr/008-roster-depth-chart.md) */
   mode: Mode;
+  /** roster mode: which side of the roster is on the field, or both */
+  view: Vis;
+  /** the badge tapped in roster mode: the next view, offense, defense, both and round again */
+  onView: () => void;
   leftOpen: boolean;
   rightOpen: boolean;
   canUndo: boolean;
@@ -28,6 +32,13 @@ interface Props {
 const SIDE: Record<Team, { label: string; title: string }> = {
   offense: { label: "Offense", title: "This is an offensive play" },
   defense: { label: "Defense", title: "This is a defensive call" },
+};
+
+/** The roster view the badge shows and the one a tap goes to next: offense, defense, both and round again. */
+export const VIEW: Record<Vis, { label: string; icon: string; next: Vis; title: string }> = {
+  offense: { label: "Offense", icon: "offense", next: "defense", title: "Showing the offense. Tap for the defense." },
+  defense: { label: "Defense", icon: "defense", next: "both", title: "Showing the defense. Tap for both sides." },
+  both: { label: "Both", icon: "roster", next: "offense", title: "Showing both sides. Tap for the offense." },
 };
 
 /**
@@ -62,9 +73,10 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function HeaderImpl({ side, mode, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
+function HeaderImpl({ side, mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
   const kind = SIDE[side];
   const rostering = mode === "roster";
+  const showing = VIEW[view];
   return (
     <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5">
       <button
@@ -81,15 +93,29 @@ function HeaderImpl({ side, mode, leftOpen, rightOpen, canUndo, canRedo, canClea
       </button>
       <div className="min-w-0 flex-1" />
       <div className="flex gap-1.5">
-        <span
-          role="img"
-          aria-label={`${kind.label} play`}
-          title={kind.title}
-          className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
-        >
-          <Sticker icon={side} size={22} className={glyph} />
-          <span className={name}>{kind.label}</span>
-        </span>
+        {rostering ? (
+          // the roster has both sides: the badge is the way between them, and to both at once
+          <button
+            type="button"
+            onClick={onView}
+            title={showing.title}
+            aria-label={`Showing ${showing.label.toLowerCase()}`}
+            className={`${pillSm} ${round} bg-white`}
+          >
+            <Sticker icon={showing.icon} size={22} className={glyph} />
+            <span className={name}>{showing.label}</span>
+          </button>
+        ) : (
+          <span
+            role="img"
+            aria-label={`${kind.label} play`}
+            title={kind.title}
+            className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
+          >
+            <Sticker icon={side} size={22} className={glyph} />
+            <span className={name}>{kind.label}</span>
+          </span>
+        )}
         <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
           <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
           <span className={name}>Undo</span>

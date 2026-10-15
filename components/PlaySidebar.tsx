@@ -2,11 +2,12 @@
 
 import { memo, useId, useRef, useState, type ReactNode, type ChangeEvent } from "react";
 import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
+import { activeLineup, hasNames, lineupName, showsNames, withActive, withNames } from "@/lib/play/lineup";
 import { MAX_NOTES } from "@/lib/play/storage";
 import { EndZoneName, EndZonePicker } from "./endzone/EndZonePicker";
 import { Fold } from "./Fold";
 import type { Mode } from "./Header";
-import type { Team, TeamSettings, Vis } from "@/lib/play/types";
+import type { Lineups, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
 import { PlaybookTile } from "./PlaybookTile";
 import { PlayNameField } from "./PlayNameField";
@@ -63,18 +64,24 @@ interface Props {
   /** drawing the play, or laying out the roster (docs/adr/008-roster-depth-chart.md) */
   mode: Mode;
   onMode: (mode: Mode) => void;
+  /** the lineups: whether a play shows its starters' names, and from which lineup */
+  lineups: Lineups;
+  onLineups: (next: Lineups) => void;
 }
 
 function PlaySidebarImpl({
   name, playId, notes, notesOpen, side, vis, onName, onOpenPlay, onAddToBook, onSwitchBook, onNotes, onToggleNotes, onNew, onSave,
   onDuplicate, unsaved, saved, onShare, savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones,
-  team, onTeam, los, onLos, flagged, mode, onMode,
+  team, onTeam, los, onLos, flagged, mode, onMode, lineups, onLineups,
 }: Props) {
   const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
-  const losId = useId(), losNote = useId();
+  const losId = useId(), losNote = useId(), lineupId = useId(), namesNote = useId();
   // the Playbooks tile's menu drops down under the whole tile grid
   const tiles = useRef<HTMLDivElement>(null);
+  // names on a play need a roster first: the switch waits until some lineup has a name (lineup.ts, V6)
+  const rostered = hasNames(lineups);
+  const names = showsNames(lineups);
   const start = (next: Team) => {
     onNew(next);
     setChoosing(false);
@@ -219,7 +226,38 @@ function PlaySidebarImpl({
         />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">
-        Tap a position on the field and set who plays it, starter first. Names show under the tags here and nowhere else.
+        Tap a position on the field and set who plays it, starter first. Kept on this device, never in a play, a link or a printout.
+      </span>
+      <label className={`flex min-h-11 flex-none items-center gap-2 text-small ${rostered ? "cursor-pointer" : "text-ink-muted"}`}>
+        <input
+          type="checkbox"
+          checked={names}
+          disabled={!rostered}
+          aria-describedby={namesNote}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => { onLineups(withNames(lineups, e.target.checked)); }}
+          className="h-5 w-5 flex-none cursor-pointer accent-ink disabled:cursor-default"
+        />
+        Show player names
+      </label>
+      {names && (
+        <>
+          <label htmlFor={lineupId} className="flex-none text-small">Lineup</label>
+          <select
+            id={lineupId}
+            value={activeLineup(lineups).id}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => { onLineups(withActive(lineups, e.target.value)); }}
+            className={`${select} w-full flex-none`}
+          >
+            {lineups.lineups.map((l) => <option key={l.id} value={l.id}>{lineupName(l)}</option>)}
+          </select>
+        </>
+      )}
+      <span id={namesNote} aria-live="polite" className="flex-none text-caption leading-note text-ink-muted">
+        {!rostered
+          ? "Build a roster first: tap Roster and set who plays a position. Then the names can show on a play."
+          : names
+            ? `The starters on ${lineupName(activeLineup(lineups))} show under the tags on every play, on this screen only.`
+            : "Names stay off every play until you turn them on."}
       </span>
       <span className={divider} />
       <span className={eyebrow}>TEAM</span>
