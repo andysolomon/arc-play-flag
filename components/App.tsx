@@ -11,18 +11,20 @@ import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
-import type { Player, RouteType, Team, TeamSettings } from "@/lib/play/types";
+import { starters } from "@/lib/play/roster";
+import type { Player, Roster, RouteType, Team, TeamSettings } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
-import { getPlays, getServerTeam, getTeam, playById, savePlay, setTeam, subscribe } from "@/lib/play/library";
+import { getPlays, getRoster, getServerRoster, getServerTeam, getTeam, playById, savePlay, setRoster, setTeam, subscribe } from "@/lib/play/library";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
 import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
-import { Header } from "./Header";
+import { Header, type Mode } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
+import { RosterSidebar } from "./RosterSidebar";
 import { RouteSidebar } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
 import { Sidebar } from "./Sidebar";
@@ -72,6 +74,10 @@ export function App() {
   // a league rule, so it is the team's: the same field for every play, on screen and on paper
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const noRunZones = hasNoRunZones(team);
+  // who plays each position, the team's too (docs/adr/008-roster-depth-chart.md); roster mode lays it out on the field
+  const roster = useSyncExternalStore(subscribe, getRoster, getServerRoster);
+  const [mode, setMode] = useState<Mode>("play");
+  const rostering = mode === "roster";
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -327,6 +333,23 @@ export function App() {
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
   }, [say]);
   const onNoRunZones = useCallback((on: boolean) => { onTeam({ ...getTeam(), noRunZones: on }); }, [onTeam]);
+  // a line of a depth chart lands at once, like the team's name, and is never undone
+  const onRoster = useCallback((next: Roster) => {
+    const r = setRoster(next);
+    if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
+  }, [say]);
+  // the starter at each position on the field, shortened to fit under the token
+  const starterNames = useMemo(() => starters(roster, s.players), [roster, s.players]);
+  // roster mode leaves whatever was being drawn and opens the panel on the positions; the selection stays,
+  // so a player tapped in the palette is the position whose depth chart opens
+  const onMode = useCallback((next: Mode) => {
+    setMode(next);
+    if (next === "roster") {
+      dispatch({ type: "draftCancel" });
+      dispatch({ type: "cancelTargeting" });
+      openRight(true);
+    }
+  }, [openRight]);
   const copyShare = useCallback(() => {
     const url = shareUrl();
     setShareOpen(false);
@@ -368,7 +391,7 @@ export function App() {
     const back = nearestBack(s.players);
     return { aim: blitzAim(sel.route), who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null };
   }, [sel, s.players]);
-  const hint = s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
+  const hint = rostering ? null : s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
     : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
     ? "Pre-snap motion · tap waypoints behind the line · Finish when done"
     : "Tap waypoints on the field · double-tap to finish" : null;
@@ -377,6 +400,7 @@ export function App() {
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
         side={s.side}
+        mode={mode}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         canUndo={s.past.length > 0}
@@ -420,11 +444,14 @@ export function App() {
             los={s.los}
             onLos={onLos}
             flagged={flagged}
+            mode={mode}
+            onMode={onMode}
           />
         </Sidebar>
         <Field
           players={s.players}
-          vis={s.vis}
+          // the roster is both sides of the team, so roster mode shows both, the other faded, every position tappable
+          vis={rostering ? "both" : s.vis}
           side={s.side}
           selectedId={s.selectedId}
           targeting={s.targeting}
@@ -434,13 +461,27 @@ export function App() {
           onCatchNote={onCatchNote}
           lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
-          title={s.name || "Untitled play"}
+          title={rostering ? "Roster" : s.name || "Untitled play"}
           showTitle
-          status={persistenceLabel[persistence]}
+          status={rostering ? team.name || "Who plays where" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
           los={s.los}
+          starters={starterNames}
+          roster={rostering}
         />
-        <Sidebar id="route-sidebar" side="right" open={rightOpen} label="Route palette" overlay={compact}>
+        <Sidebar id="route-sidebar" side="right" open={rightOpen} label={rostering ? "Roster panel" : "Route palette"} overlay={compact}>
+          {rostering ? (
+            <RosterSidebar
+              roster={roster}
+              onRoster={onRoster}
+              selected={sel}
+              players={s.players}
+              side={s.side}
+              onSelect={onSelect}
+              onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
+              onDone={() => { onMode("play"); }}
+            />
+          ) : (
           <RouteSidebar
             selected={sel}
             chain={chain}
@@ -464,6 +505,7 @@ export function App() {
             onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
             noRunZone={s.side === "offense" && noRunZones && inNoRunZone(s.los)}
           />
+          )}
         </Sidebar>
       </div>
       <Hint text={toast?.text ?? hint} flag={toast?.flag} below={FIELD_TITLE_ID} />

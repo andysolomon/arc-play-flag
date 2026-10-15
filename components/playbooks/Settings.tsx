@@ -102,7 +102,7 @@ function SettingsPanel() {
       <span className={divider} />
       <span className={eyebrow}>ON-DEVICE BACKUP</span>
       <span className="text-caption leading-note text-ink-muted">
-        Plays, playbooks, team settings and your current draft are saved on this device. Download a backup before clearing site data or changing devices.
+        Plays, playbooks, team settings, the roster and your current draft are saved on this device. Download a backup before clearing site data or changing devices.
       </span>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={onBackup} className={`${pillDark} min-h-11 px-4 text-small`}>Download backup</button>
@@ -129,7 +129,7 @@ function SettingsPanel() {
               Merge keeps {plural(localOnlyPlays, "current-only play")} and {plural(localOnlyBooks, "current-only playbook")}; {plural(matchingPlays, "matching play")} and {plural(matchingBooks, "matching playbook")} use the backup version.
             </span>
             <span className="text-caption leading-note text-ink-muted">
-              Replace removes those current-only items. Either choice restores the backup&apos;s team settings and {backupPreview.draft ? "current draft" : "empty draft"}.
+              Replace removes those current-only items. Either choice restores the backup&apos;s team settings, roster and {backupPreview.draft ? "current draft" : "empty draft"}.
             </span>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => { restoreBackup("merge"); }} className={`${pill} min-h-11 px-3 text-small`}>Merge backup</button>

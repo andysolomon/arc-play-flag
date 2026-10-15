@@ -1,9 +1,9 @@
 import {
-  DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, kebab, normalizeDraft, normalizePlaybook, normalizeSavedPlay, normalizeTeam,
-  readAll, readDraft, readPlaybooks, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks, type StorageLike,
-  type StoredPlayer,
+  DRAFT_KEY, PLAYBOOKS_KEY, PLAYS_KEY, ROSTER_KEY, TEAM_KEY, kebab, normalizeDraft, normalizePlaybook, normalizeRoster, normalizeSavedPlay,
+  normalizeTeam, readAll, readDraft, readPlaybooks, readRoster, readTeam, storedPlayers, writeMany, type DraftRecord, type Library, type Playbooks,
+  type StorageLike, type StoredPlayer,
 } from "@/lib/play/storage";
-import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
+import type { Playbook, Roster, SavedPlay, TeamSettings } from "@/lib/play/types";
 
 export const BACKUP_KIND = "ffpd.backup";
 export const BACKUP_VERSION = 1;
@@ -18,6 +18,8 @@ export interface BackupFile {
   plays: SavedPlay[];
   playbooks: Playbook[];
   team: TeamSettings;
+  /** who plays each position; a backup from before the roster has none, and restores an empty one */
+  roster: Roster;
   draft: DraftRecord | null;
 }
 
@@ -25,6 +27,7 @@ export interface BackupState {
   plays: Library;
   playbooks: Playbooks;
   team: TeamSettings;
+  roster: Roster;
   draft: DraftRecord | null;
 }
 
@@ -125,6 +128,7 @@ export function readBackupState(storage?: StorageLike | null): BackupState {
     plays: readAll(storage),
     playbooks: readPlaybooks(storage),
     team: readTeam(storage),
+    roster: readRoster(storage),
     draft: readDraft(storage),
   };
 }
@@ -139,6 +143,7 @@ export function createBackup(storage?: StorageLike | null): BackupFile {
     plays: Object.values(state.plays),
     playbooks: Object.values(state.playbooks),
     team: state.team,
+    roster: state.roster,
     draft: state.draft,
   };
 }
@@ -168,8 +173,10 @@ export function readBackupFile(json: string): BackupRead {
   const plays = raw.plays.map(canonicalPlay);
   const playbooks = raw.playbooks.map(canonicalBook);
   const team = normalizeTeam(raw.team);
+  // the roster came after version 1's first backups, so a file without one is still whole
+  const roster = raw.roster === undefined ? [] : normalizeRoster(raw.roster);
   const draft = raw.draft === null ? null : normalizeDraft(raw.draft);
-  if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team)) {
+  if (plays.some((p) => p === null) || playbooks.some((b) => b === null) || !team || !sameData(raw.team, team) || !roster) {
     return { ok: false, error: "invalidData" };
   }
   if (raw.draft !== null && (!draft || !isRecord(raw.draft) || !asStored(raw.draft, draft))) return { ok: false, error: "invalidData" };
@@ -186,7 +193,7 @@ export function readBackupFile(json: string): BackupRead {
   if (typeof raw.exported !== "string" || Number.isNaN(Date.parse(raw.exported))) return { ok: false, error: "invalidData" };
   return {
     ok: true,
-    file: { kind: BACKUP_KIND, version: BACKUP_VERSION, exported: raw.exported, plays: validPlays, playbooks: validBooks, team, draft },
+    file: { kind: BACKUP_KIND, version: BACKUP_VERSION, exported: raw.exported, plays: validPlays, playbooks: validBooks, team, roster, draft },
   };
 }
 
@@ -201,6 +208,7 @@ export function planBackupRestore(file: BackupFile, current: BackupState, mode: 
       plays: mode === "merge" ? { ...current.plays, ...incomingPlays } : incomingPlays,
       playbooks: mode === "merge" ? { ...current.playbooks, ...incomingBooks } : incomingBooks,
       team: file.team,
+      roster: file.roster,
       draft: file.draft,
     },
     incomingPlays: file.plays.length,
@@ -212,12 +220,13 @@ export function planBackupRestore(file: BackupFile, current: BackupState, mode: 
   };
 }
 
-/** Commits all four storage keys together; writeMany restores their prior values on failure. */
+/** Commits all five storage keys together; writeMany restores their prior values on failure. */
 export function applyBackupRestore(plan: RestorePlan, storage?: StorageLike | null): void {
   writeMany([
     [PLAYS_KEY, plan.state.plays],
     [PLAYBOOKS_KEY, plan.state.playbooks],
     [TEAM_KEY, plan.state.team],
+    [ROSTER_KEY, plan.state.roster],
     [DRAFT_KEY, plan.state.draft],
   ], storage);
 }

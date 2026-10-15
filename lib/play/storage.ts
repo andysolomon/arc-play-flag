@@ -1,14 +1,17 @@
 import { readLos, withLos } from "./field";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
+import { MAX_DEPTH, MAX_SLOTS, cleanName as rosterName } from "./roster";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
-import type { Hop, Pair, Playbook, Player, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
+import type { Hop, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
 /** The prototype's library, keyed by play name. Read once and migrated into v2. */
 export const LEGACY_PLAYS_KEY = "ffpd.plays.v1";
 export const PLAYBOOKS_KEY = "ffpd.playbooks.v1";
 export const TEAM_KEY = "ffpd.team.v1";
+/** Who plays each position, with depth (docs/adr/008-roster-depth-chart.md). */
+export const ROSTER_KEY = "ffpd.roster.v1";
 export const DRAFT_KEY = "ffpd.draft.v1";
 
 export type Library = Record<string, SavedPlay>;
@@ -582,6 +585,37 @@ export function hasTeam(storage: StorageLike | null = browserStorage()): boolean
 /** Throws a StorageError when the write doesn't land. */
 export function writeTeam(team: TeamSettings, storage: StorageLike | null = browserStorage()): void {
   write(storage, TEAM_KEY, normalizeTeam(team) ?? DEFAULT_TEAM);
+}
+
+/**
+ * The roster from any JSON-ish value: a list of slots, each a team, a tag of up to three letters (as a
+ * player's label is stored) and its lines, starter first. A slot with no tag or no lines is dropped, a
+ * second slot for the same tag on the same team is ignored, and the whole is capped. Null when it isn't a list.
+ */
+export function normalizeRoster(raw: unknown): Roster | null {
+  if (!Array.isArray(raw)) return null;
+  const out: Roster = [];
+  for (const v of raw) {
+    if (!isRecord(v) || typeof v.tag !== "string" || !Array.isArray(v.depth)) continue;
+    const team: Team = v.team === "defense" ? "defense" : "offense";
+    const tag = v.tag.slice(0, 3);
+    const depth = v.depth.slice(0, MAX_DEPTH).map(rosterName);
+    if (!tag || !depth.length || out.some((s) => s.team === team && s.tag === tag)) continue;
+    const slot: RosterSlot = { team, tag, depth };
+    out.push(slot);
+    if (out.length >= MAX_SLOTS) break;
+  }
+  return out;
+}
+
+/** The device's roster; empty when none has been set. */
+export function readRoster(storage: StorageLike | null = browserStorage()): Roster {
+  return normalizeRoster(parse(storage, ROSTER_KEY)) ?? [];
+}
+
+/** Throws a StorageError when the write doesn't land. */
+export function writeRoster(roster: Roster, storage: StorageLike | null = browserStorage()): void {
+  write(storage, ROSTER_KEY, normalizeRoster(roster) ?? []);
 }
 
 /** One draft from any JSON-ish value, or null when there are no players in it. */

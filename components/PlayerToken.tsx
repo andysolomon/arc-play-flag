@@ -22,13 +22,20 @@ interface Props {
   drawing?: boolean;
   /** the opposite team, shown as faded context on the field */
   faded?: boolean;
+  /**
+   * who plays this position, under the token (docs/adr/008-roster-depth-chart.md): the starter's name, or,
+   * in roster mode, that nobody is down for it yet. Above the token for a player lined up at the bottom edge.
+   */
+  caption?: { text: string; muted?: boolean; above?: boolean } | null;
   onPointerDown: (id: string, e: PointerEvent<SVGGElement>) => void;
   onKeyDown: (id: string, e: KeyboardEvent<SVGGElement>) => void;
 }
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
 
-function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, onPointerDown, onKeyDown }: Props) {
+function PlayerTokenImpl({
+  player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
+}: Props) {
   const tokenRef = useRef<SVGGElement>(null);
   useEffect(() => {
     if (focusOnTarget) tokenRef.current?.focus();
@@ -42,6 +49,7 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
       tabIndex={readOnly ? undefined : 0}
       role={readOnly ? "img" : "button"}
       aria-label={(p.team === "offense" ? "Offense " : "Defense ") + (p.label || p.id) + (target === "man" ? ", man coverage target" : target === "blitz" ? ", blitz target" : target === "lateral" ? ", can take the lateral" : "")}
+      aria-description={caption && !caption.muted ? `Played by ${caption.text}` : undefined}
       aria-pressed={readOnly ? undefined : selected}
       aria-keyshortcuts={readOnly ? undefined : "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"}
       onPointerDown={readOnly ? undefined : (e) => { onPointerDown(p.id, e); }}
@@ -85,6 +93,27 @@ function PlayerTokenImpl({ player: p, x, y, selected, target, focusOnTarget, boi
           )}
         </g>
       </g>
+      {/* the name rides outside the selection scale, on a turf-coloured halo so it reads over a line; never in a picture */}
+      {caption && (
+        <text
+          data-caption
+          y={caption.above ? -44 : 46}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontFamily="var(--font-hand)"
+          fontSize={15}
+          fill="#1b1a17"
+          stroke="#c1f0c1"
+          strokeWidth={4}
+          strokeLinejoin="round"
+          paintOrder="stroke"
+          style={{ fill: FIELD.line, stroke: FIELD.turf }}
+          className={`pointer-events-none select-none ${caption.muted ? "opacity-55" : ""}`}
+          data-export="skip"
+        >
+          {caption.text}
+        </text>
+      )}
     </g>
   );
 }

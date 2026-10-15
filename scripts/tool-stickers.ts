@@ -1,7 +1,8 @@
-// Draws the new, notes, playbook, undo and redo tool stickers in the style of the design's icons, into
-// design/assets/icons. New, notes and playbook also get the dark board's version in design/assets/icons-dark
+// Draws the new, notes, playbook, roster, undo and redo tool stickers in the style of the design's icons, into
+// design/assets/icons. New, notes, playbook and roster also get the dark board's version in design/assets/icons-dark
 // (undo and redo came on the owner's dark sheet). Then run `bun run icons`.
-// Run with `node scripts/tool-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
+// Run with `node scripts/tool-stickers.ts [name...]` — sharp's SVG rasteriser stalls under Bun here; names
+// limit it to those stickers, so adding one leaves the others' files untouched.
 import path from "node:path";
 import sharp from "sharp";
 
@@ -52,6 +53,19 @@ const stickers: Record<string, string> = {
     `<polygon points="300,96 326,140 274,140" fill="${INK}" stroke="${INK}" stroke-width="14" stroke-linejoin="round"/>` +
     line(228, 340, 372, 340, 22) + line(228, 392, 330, 392, 22),
   ),
+  // a depth chart on a clipboard: the starter's red token at the top line, two more down the chart
+  roster: svg(
+    `<g transform="rotate(-3 256 256)">` +
+    `<rect x="96" y="92" width="320" height="356" rx="26" fill="${CREAM}" stroke="${INK}" stroke-width="26"/>` +
+    `<rect x="186" y="56" width="140" height="72" rx="22" fill="${YELLOW}" stroke="${INK}" stroke-width="22"/>` +
+    `<circle cx="168" cy="196" r="34" fill="${OFF}" stroke="${INK}" stroke-width="20"/>` +
+    line(228, 196, 362, 196, 24) +
+    `<circle cx="168" cy="290" r="34" fill="${CREAM}" stroke="${INK}" stroke-width="20"/>` +
+    line(228, 290, 338, 290, 24) +
+    `<circle cx="168" cy="384" r="34" fill="${CREAM}" stroke="${INK}" stroke-width="20"/>` +
+    line(228, 384, 310, 384, 24) +
+    `</g>`,
+  ),
   undo: svg(takeBack(INK)),
   redo: svg(`<g transform="translate(512 0) scale(-1 1)">${takeBack(DEF)}</g>`),
 };
@@ -69,8 +83,10 @@ const onDarkBoard = (sticker: string): string => {
   return `${open}${silhouette}${body}</svg>`;
 };
 
-const dark = ["new", "notes", "playbook"];
+const dark = ["new", "notes", "playbook", "roster"];
+const only = process.argv.slice(2);
 for (const [name, s] of Object.entries(stickers)) {
+  if (only.length && !only.includes(name)) continue;
   await sharp(Buffer.from(s)).png().toFile(path.resolve("design/assets/icons", `${name}.png`));
   console.log("wrote", name);
   if (!dark.includes(name)) continue;
