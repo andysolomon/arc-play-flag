@@ -1,5 +1,5 @@
 import { losOf } from "@/lib/play/field";
-import { kebab, newId, normalizePlaybook, normalizeSavedPlay, normalizeTeam } from "@/lib/play/storage";
+import { kebab, newId, normalizePlaybook, normalizeSavedPlay, normalizeTeam, primaryPlayId } from "@/lib/play/storage";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 
 /**
@@ -144,13 +144,17 @@ export function planImport(file: PlaybookFile, library: readonly SavedPlay[], bo
   // the file's primary, as the play it names landed here: itself, the identical play already here, or its copy (C9)
   const primary = file.playbook.primary === undefined ? undefined : map.get(file.playbook.primary);
   const withPrimary = (b: Playbook): Playbook => (primary !== undefined && ids.includes(primary) ? { ...b, primary } : b);
+  // a book here is the same book only with the same plays in the same order and the same primary, as each
+  // reads (the first play when none is stored), so a file that picks another primary is never dropped (C9)
+  const incoming = primaryPlayId(withPrimary({ id: "", name: "", plays: ids }));
+  const sameBook = (b: Playbook): boolean => b.plays.join() === ids.join() && primaryPlayId(b) === incoming;
   const existing = books.find((b) => b.id === file.playbook.id);
   const importedName = (file.playbook.name + " (imported)").slice(0, 80);
-  const priorBook = books.find((b) => (b.name === file.playbook.name || b.name === importedName) && b.plays.join() === ids.join());
+  const priorBook = books.find((b) => (b.name === file.playbook.name || b.name === importedName) && sameBook(b));
   let book: Playbook | null;
   if (priorBook) book = null;
   else if (!existing) book = withPrimary({ id: file.playbook.id, name: file.playbook.name, plays: ids });
-  else if (existing.name === file.playbook.name && existing.plays.join() === ids.join()) book = null;
+  else if (existing.name === file.playbook.name && sameBook(existing)) book = null;
   else book = withPrimary({ id: newId(), name: importedName, plays: ids });
   return { plays, book, bookId: book?.id ?? priorBook?.id ?? null, reused, copied, added };
 }

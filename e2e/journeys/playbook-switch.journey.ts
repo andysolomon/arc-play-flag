@@ -1,8 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Designer, downloadText } from "../support/designer";
+import { CURRENT_BOOK_KEY } from "../../lib/play/current-book";
 import {
-  COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook, seed, storedCurrentBook, storedPlaybooks, storedPlays,
+  COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook, playbookFile, seed, storedCurrentBook, storedPlaybooks, storedPlays,
 } from "../support/fixtures";
 
 /**
@@ -21,6 +22,9 @@ import {
  *  - the first play added isn't the primary, a reorder moves it, or a removal leaves none        → "primary"
  *  - the primary doesn't reach the playbook file, or another device after an import              → "primary"
  *  - a saved play can't be added to the current book from the play name; a bare device says nothing → "adding"
+ *  - an empty menu can't be closed with Escape, since nothing in it takes focus                  → "switching"
+ *  - a pick whose write the device refused is lost on the next write to the books (C3)           → "a refused pick"
+ *  - a file whose book differs here only in its primary is taken as already here, and dropped    → "a different primary"
  * Leaves `playbook-switch-<device>-<test>.json` (each step's rows, what was on the board and what the
  * device stored) and a picture of each menu in test-results/, uploaded as `playbook-switch`.
  */
@@ -174,7 +178,12 @@ test("switching playbooks opens the new book's primary play, clears the board fo
   await expect(playsMenu(page)).toContainText("Save the play on the board to add it to “Otter Scout Book”.");
   await expect(playsMenu(page).getByRole("menuitemradio")).toHaveCount(0);
   steps.push(await read(d, "switched to the empty Otter Scout Book", playsMenu(page)));
+  // nothing to pick, so the menu takes focus itself and Escape still closes it (review of #137)
+  await expect(playsMenu(page)).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(playsMenu(page)).toBeHidden();
+  await expect(playsButton(page)).toHaveAttribute("aria-expanded", "false");
+  await expect(playsButton(page)).toBeFocused();
 
   // the book already current is left as it is: a drawn route stays
   await d.select("X");
@@ -361,4 +370,93 @@ test("a saved play is added to the current playbook from the play name, and a de
   await expect(page2.getByText("No playbooks yet.")).toBeVisible();
   await bare.close();
   save(`${testInfo.project.name}-adding`, steps);
+});
+
+test("a refused pick holds for the visit: adding a play to that book keeps it current, and a reload falls back", async ({ page }, testInfo) => {
+  // the device refuses only the designer's pick (C3); every other write lands
+  await page.addInitScript((key) => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with .call below
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (this: Storage, k: string, v: string) {
+      if (k === key) throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      setItem.call(this, k, v);
+    };
+  }, CURRENT_BOOK_KEY);
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [GAME, ROAD], team: OTTERS });
+  const d = new Designer(page);
+  const steps: Step[] = [];
+  await d.goto();
+  await d.tools();
+  await booksTile(page).click();
+  await booksMenu(page).getByRole("menuitemradio", { name: "Otter Road Book" }).click();
+  await expect(d.toast).toHaveText("Switched to “Otter Road Book” · opened “Otter Cover Two”");
+  expect(await storedCurrentBook(page)).toBeNull();
+  steps.push(await read(d, "switched to Otter Road Book; the device refused the pick"));
+
+  // a new play, saved and added to the book: a write to the books must not drop the pick
+  await d.newPlay();
+  await d.setName("Otter Scratch");
+  await d.select("X");
+  await d.pick("Slant");
+  await d.save();
+  await expect(d.toast).toHaveText("Saved");
+  await d.tools();
+  await playsButton(page).click();
+  await expect(playsMenu(page)).toContainText("IN “Otter Road Book”");
+  await playsMenu(page).getByRole("menuitem", { name: "+ Add “Otter Scratch” to this playbook" }).click();
+  await expect(d.toast).toHaveText("Added to “Otter Road Book”");
+  await playsButton(page).click();
+  await expect(playsMenu(page)).toContainText("IN “Otter Road Book”");
+  expect((await rows(playsMenu(page))).map((r) => [r.name, r.checked])).toEqual([
+    ["Otter Wheel Right", "false"], ["Otter Cover Two", "false"], ["Otter Scratch", "true"],
+  ]);
+  steps.push({ ...(await read(d, "added Otter Scratch to Otter Road Book", playsMenu(page))), stored: (await storedPlaybooks(page))["fx-road"] });
+  await page.keyboard.press("Escape");
+  await booksTile(page).click();
+  expect((await rows(booksMenu(page))).map((r) => [r.name, r.checked])).toEqual([["Otter Game Plan", "false"], ["Otter Road Book", "true"]]);
+  await page.keyboard.press("Escape");
+
+  // the refused pick is gone past the visit: the first book stands in
+  await d.goto();
+  await d.tools();
+  await booksTile(page).click();
+  expect((await rows(booksMenu(page))).map((r) => [r.name, r.checked])).toEqual([["Otter Game Plan", "true"], ["Otter Road Book", "false"]]);
+  steps.push(await read(d, "reloaded", booksMenu(page)));
+  save(`${testInfo.project.name}-a-refused-pick`, steps);
+});
+
+test("a file whose book differs here only in its primary lands as a copy with the file's primary", async ({ page }, testInfo) => {
+  // here, the coach kept the first play as primary; the file's coach picked the second
+  const mine = playbook("fx-game", "Otter Game Plan", [SLANT_LEFT, WHEEL_RIGHT], SLANT_LEFT);
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT], playbooks: [mine], team: OTTERS });
+  const theirs = playbookFile(playbook("fx-game", "Otter Game Plan", [SLANT_LEFT, WHEEL_RIGHT], WHEEL_RIGHT), [SLANT_LEFT, WHEEL_RIGHT], OTTERS);
+  const steps: { step: string; url: string; stored: unknown }[] = [];
+  const importFile = async (): Promise<void> => {
+    await page.goto("/playbooks");
+    await page.getByLabel("Import a playbook file").setInputFiles(jsonUpload("otter-game-plan.playbook.json", theirs));
+    await page.getByRole("button", { name: "Import playbook", exact: true }).click();
+    await expect(page.locator("div[role='status']")).toHaveText("Imported “Otter Game Plan” · 2 plays already here");
+    await expect(page).toHaveURL(/book=/);
+  };
+
+  await importFile();
+  await expect(page).not.toHaveURL(/book=fx-game$/);
+  await expect(page.getByRole("textbox", { name: "Playbook name" })).toHaveValue("Otter Game Plan (imported)");
+  await expect(items(page)).toHaveText([/Otter Slant Left/, /Otter Wheel Right/]);
+  await expect(items(page).nth(1).getByText("Primary")).toBeVisible();
+  await expect(items(page).nth(0).getByRole("button", { name: "Make Otter Slant Left the primary play" })).toBeVisible();
+  let books = await storedPlaybooks(page);
+  // the coach's own book keeps its own primary; the copy carries the file's
+  expect(books["fx-game"]).toEqual({ id: "fx-game", name: "Otter Game Plan", plays: ["fx-slant-left", "fx-wheel-right"], primary: "fx-slant-left" });
+  const copy = Object.values(books).find((b) => b.id !== "fx-game");
+  expect(copy).toEqual({ id: copy?.id, name: "Otter Game Plan (imported)", plays: ["fx-slant-left", "fx-wheel-right"], primary: "fx-wheel-right" });
+  steps.push({ step: "imported a file with another primary", url: page.url(), stored: books });
+
+  // the same file again finds that copy, and makes no third book
+  await importFile();
+  await expect(page).toHaveURL(new RegExp(`book=${copy?.id ?? "missing"}$`));
+  books = await storedPlaybooks(page);
+  expect(Object.keys(books)).toHaveLength(2);
+  steps.push({ step: "imported the same file again", url: page.url(), stored: books });
+  writeFileSync(`test-results/playbook-switch-${testInfo.project.name}-a-different-primary.json`, `${JSON.stringify({ steps }, null, 2)}\n`);
 });

@@ -24,7 +24,8 @@ interface Playbook { id: string; name: string; plays: string[]; primary?: string
 
 - `primary` is one of `plays`, stored once the book has a play. Storage drops a primary that names a play off the book (on read and on write) and the first play stands in, so no book ever has an invalid one. A book written without a primary keeps the one it had or, for a book from before this change, takes the first play it had before the write: so the first play added stays primary through a reorder from then on.
 - A book from before this change reads with no primary and its first play stands in. **No primary is made up on read**, so a playbook file or a device backup from before this change imports or restores byte for byte as it was written, and a backup still reads back exactly as stored.
-- The primary travels in a playbook file and, when its play comes onto another device as a copy under a new id, follows the copy.
+- The primary travels in a playbook file and, when its play comes onto another device as a copy under a new id, follows the copy. It is part of a book's identity on import: a book here with the same plays in the same order but another primary (each as it reads, the first play when none is stored) is a different book, so the file lands as an "(imported)" copy wearing the file's primary and the coach's own book keeps theirs. Importing the same file again finds that copy.
+- The current playbook picked on a visit is kept in memory even when the device refuses to store it, and no later write to the books (a play added, a book renamed) drops it back to the stored pick. Past the visit the stored pick, or the first playbook, stands in.
 
 `lib/play/current-book.ts` writes down the ways this could fail before the code (C1–C10): a deleted current book, junk in storage, a blocked storage, a primary off the book or gone from the library, the primary taken out, books and files from before the change, and a switch to the book already open.
 

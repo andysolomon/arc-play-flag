@@ -80,6 +80,12 @@ let team: TeamSettings | null = null;
 let lineups: Lineups | null = null;
 /** the current playbook's id, worked out from the pick on this device and the books; undefined until read */
 let currentId: string | null | undefined;
+/**
+ * The playbook picked on this visit, kept in memory whether or not its write to storage landed, so a
+ * blocked or full storage costs the pick only its memory past the visit, never the visit itself (C3).
+ * Undefined until a pick is made here; until then the pick stored on the device stands.
+ */
+let pickedId: string | undefined;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -146,7 +152,7 @@ export function playbookById(id: string | null | undefined): Playbook | null {
  */
 export function getCurrentBookId(): string | null {
   if (currentId === undefined) {
-    const picked = readCurrentBook();
+    const picked = pickedId ?? readCurrentBook();
     currentId = picked && playbookById(picked) ? picked : getPlaybooks()[0]?.id ?? null;
   }
   return currentId;
@@ -161,6 +167,7 @@ export function currentBook(): Playbook | null {
 export function setCurrentBook(id: string): boolean {
   if (!playbookById(id)) return false;
   writeCurrentBook(id);
+  pickedId = id;
   currentId = id;
   emit();
   return true;

@@ -20,16 +20,18 @@ const ITEMS = "[role='menuitem'],[role='menuitemradio']";
 
 /**
  * A menu dropped down from a button in the sidebar (the Playbooks tile, the play name's list).
- * It opens with focus on the choice in force (or the first row), the arrow keys, Home and End
- * walk the rows, Escape and a tap outside close it, and focus goes back to the button that opened
- * it. Rows are the children: buttons or links with role menuitem or menuitemradio.
+ * It opens with focus on the choice in force (or the first row, or the menu itself when it has no
+ * rows to pick), the arrow keys, Home and End walk the rows, Escape and a tap outside close it, and
+ * focus goes back to the button that opened it. Rows are the children: buttons or links with role
+ * menuitem or menuitemradio.
  */
 export function Menu({ id, label, root, trigger, onClose, className = "", children }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const items = panel.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [];
     const checked = [...items].find((el) => el.getAttribute("aria-checked") === "true");
-    (checked ?? items[0])?.focus();
+    // a menu with nothing to pick (an empty book, an unsaved play) takes focus itself, so Escape still reaches it
+    (checked ?? items[0] ?? panel.current)?.focus();
     const onDown = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) onClose(); };
     document.addEventListener("pointerdown", onDown);
     return () => { document.removeEventListener("pointerdown", onDown); };
@@ -50,7 +52,7 @@ export function Menu({ id, label, root, trigger, onClose, className = "", childr
     items[to]?.focus();
   };
   return (
-    <div ref={panel} id={id} role="menu" aria-label={label} onKeyDown={onKey} className={`${menuPanel} ${className}`}>
+    <div ref={panel} id={id} role="menu" aria-label={label} tabIndex={-1} onKeyDown={onKey} className={`${menuPanel} outline-none ${className}`}>
       {children}
     </div>
   );

@@ -8,7 +8,8 @@
  *   on the device stands in (lib/play/library.ts, getCurrentBookId).
  * - C2 junk in storage (not a string, not JSON) reads as none.
  * - C3 storage is blocked (a private window, a full quota): the pick holds for the visit, in
- *   memory, and the write is never reported as a failure.
+ *   memory, and the write is never reported as a failure. A later write to the books (a play
+ *   added, a book renamed) must not drop it back to the stored pick (lib/play/library.ts, pickedId).
  * - C4 a primary that names a play off the book is dropped on write and on read; the first play
  *   stands in (lib/play/storage.ts, normalizePlaybook and settleBook).
  * - C5 a primary whose play is gone from the library while its id is still in the book: the first
@@ -20,7 +21,8 @@
  * - C8 a playbook file or device backup from before the choice imports or restores unchanged: no
  *   primary is made up on read, so a backup still reads back exactly as stored.
  * - C9 the primary travels in a playbook file and, when its play comes onto the other device as a
- *   copy under a new id, follows the copy (lib/export/playbook-file.ts, planImport).
+ *   copy under a new id, follows the copy (lib/export/playbook-file.ts, planImport). A file whose
+ *   book differs here only in its primary is not taken as already here and dropped: it lands as a copy.
  * - C10 a switch to the book whose primary is already open leaves the board as it is, its undo
  *   history included; a switch back to the book already current changes nothing.
  */
