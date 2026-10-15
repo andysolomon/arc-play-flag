@@ -134,6 +134,12 @@ export interface Playbook {
   id: string;
   name: string;
   plays: string[];
+  /**
+   * The play the designer opens when a coach switches to this playbook (docs/adr/009-playbook-switcher.md).
+   * One of `plays`: the first play added, until the coach picks another. Stored only once the book
+   * has a play, so a book from before the choice reads the same, and its first play stands in.
+   */
+  primary?: string;
 }
 
 /**

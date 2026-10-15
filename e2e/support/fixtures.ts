@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { FILE_KIND, FILE_VERSION } from "../../lib/export/playbook-file";
 import { defaults } from "../../lib/play/routes";
+import { CURRENT_BOOK_KEY } from "../../lib/play/current-book";
 import { DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
 import type { Hop, Lineups, Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
 
@@ -87,8 +88,9 @@ export const ZONE_D = play("fx-zone-d", "Otter Zone", {
   d1: { type: "zoneFlat" }, d4: { type: "zoneFlat" }, d2: { type: "curlFlat" }, d3: { type: "midRead" }, d5: { type: "zoneDeep" },
 }, "", "defense");
 
-export function playbook(id: string, name: string, plays: readonly SavedPlay[]): Playbook {
-  return { id, name, plays: plays.map((p) => p.id) };
+/** A book as stored before a primary play was chosen, or, given one, with that play as its primary. */
+export function playbook(id: string, name: string, plays: readonly SavedPlay[], primary?: SavedPlay): Playbook {
+  return { id, name, plays: plays.map((p) => p.id), ...(primary ? { primary: primary.id } : {}) };
 }
 
 export interface Seed {
@@ -150,6 +152,11 @@ export async function storedPlaybooks(page: Page): Promise<Record<string, Playbo
 
 export async function storedDraft(page: Page): Promise<DraftRecord | null> {
   return page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as DraftRecord | null, DRAFT_KEY);
+}
+
+/** The playbook picked on this device in the designer, as stored (lib/play/current-book.ts), or null. */
+export async function storedCurrentBook(page: Page): Promise<string | null> {
+  return page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as string | null, CURRENT_BOOK_KEY);
 }
 
 /** The raw text of every app key, to prove a refused import changed nothing. */

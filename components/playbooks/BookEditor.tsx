@@ -6,14 +6,14 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { numbered } from "@/lib/export/numbered";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import {
-  deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam,
+  deletePlaybook, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, primaryPlay, setPrimaryPlay,
   subscribe, swapPlaybookReferences, updatePlaybook,
 } from "@/lib/play/library";
 import { lastRead, readerHref } from "@/lib/play/reader";
 import { failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { PlayThumb } from "../PlayThumb";
 import { SideBadge } from "../SideBadge";
-import { card, divider, eyebrow, flagChip, input, pill, pillDark, pillSm } from "../ui";
+import { card, chip, divider, eyebrow, flagChip, input, pill, pillDark, pillSm } from "../ui";
 import { AddPlaysModal } from "./AddPlays";
 import { BookPlayModal } from "./BookPlayModal";
 import { ShareBook } from "./ShareBook";
@@ -28,6 +28,8 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
   const team = useSyncExternalStore(subscribe, getTeam, getServerTeam);
   const book = books.find((b) => b.id === id) ?? null;
   const items = useMemo(() => (book ? numbered(book, plays) : []), [book, plays]);
+  // the play the designer opens on a switch to this book: the first added, until the coach picks another
+  const primaryId = book ? primaryPlay(book)?.id ?? null : null;
   const [adding, setAdding] = useState(false);
   // the play shown big, by id so a reorder behind it keeps it open on the same play
   const [viewing, setViewing] = useState<string | null>(null);
@@ -78,7 +80,10 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
           }}
         />
       </div>
-      <span className="text-caption leading-note text-ink-muted">Plays are numbered by their order here. Deleting a playbook keeps the plays.</span>
+      <span className="text-caption leading-note text-ink-muted">
+        Plays are numbered by their order here. Deleting a playbook keeps the plays. The primary play is the one the designer opens when you
+        switch to this playbook: the first play added, until you make another one primary.
+      </span>
       {items.length > 0 && (
         <Link
           href={readerHref(book.id, lastRead(book.id))}
@@ -123,7 +128,20 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
               <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1">
                 <SideBadge side={it.play.side} className="self-center" />
                 {runInNoRunZone(it.play, hasNoRunZones(team)) && <span className={flagChip}>{NO_RUN_FLAG}</span>}
-                <Link href={`/?open=${it.play.id}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
+                {it.play.id === primaryId ? (
+                  <span className={chip} title="The designer opens this play when you switch to this playbook">Primary</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { const r = setPrimaryPlay(book.id, it.play.id); if (!r.ok) say(failureMessage(r.error), 3200); }}
+                    aria-label={`Make ${it.play.name} the primary play`}
+                    title="The designer opens the primary play when you switch to this playbook"
+                    className="min-h-11 cursor-pointer text-caption text-ink-muted underline"
+                  >
+                    Make primary
+                  </button>
+                )}
+                <Link href={`/?open=${encodeURIComponent(it.play.id)}&book=${encodeURIComponent(book.id)}`} className="text-caption !text-ink-muted underline">Open in designer</Link>
                 <span className="flex-1" />
                 <button type="button" onClick={() => { move(i, -1); }} disabled={i === 0} aria-label="Move up" className={`${pill} h-11 w-11 flex-none p-0 text-small`}>↑</button>
                 <button type="button" onClick={() => { move(i, 1); }} disabled={i === items.length - 1} aria-label="Move down" className={`${pill} h-11 w-11 flex-none p-0 text-small`}>↓</button>

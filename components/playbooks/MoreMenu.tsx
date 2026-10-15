@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { pill } from "../ui";
+import { menuPanel, pill } from "../ui";
 
-/** Menu row style: full-width, thumb-sized, left-aligned. */
-export const menuItem =
-  "pressable flex min-h-11 w-full cursor-pointer items-center rounded-note px-3 text-left text-small hover:bg-yellow-soft " +
-  "data-[active=true]:bg-rose-soft";
-/** A row that removes something: red so it reads as different before it's tapped. */
-export const menuItemDanger = `${menuItem} text-offense data-[active=true]:text-ink`;
+export { menuItem, menuItemDanger } from "../ui";
 
 /**
  * A "⋯" button that drops down the less-used actions of a card.
@@ -48,7 +43,7 @@ export function MoreMenu({ label, children }: { label: string; children: (close:
           id={menuId}
           role="group"
           aria-label={label}
-          className="absolute right-0 top-full z-10 mt-1.5 flex w-max min-w-[200px] flex-col gap-0.5 rounded-tile border-2 border-ink bg-white p-1.5 shadow-toast"
+          className={`${menuPanel} absolute right-0 top-full z-10 mt-1.5 w-max min-w-[200px]`}
         >
           {children(close)}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useId, useState, type ReactNode, type ChangeEvent } from "react";
+import { memo, useId, useRef, useState, type ReactNode, type ChangeEvent } from "react";
 import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
 import { MAX_NOTES } from "@/lib/play/storage";
 import { EndZoneName, EndZonePicker } from "./endzone/EndZonePicker";
@@ -8,18 +8,28 @@ import { Fold } from "./Fold";
 import type { Mode } from "./Header";
 import type { Team, TeamSettings, Vis } from "@/lib/play/types";
 import { IconTile, LinkTile } from "./IconTile";
+import { PlaybookTile } from "./PlaybookTile";
+import { PlayNameField } from "./PlayNameField";
 import { Support } from "./Support";
 import { TEAM_NOTE, TeamFields } from "./TeamFields";
 import { ThemeName, ThemePicker } from "./ThemePicker";
-import { divider, eyebrow, input, pill, select, tileGrid } from "./ui";
+import { divider, eyebrow, pill, select, tileGrid } from "./ui";
 
 interface Props {
   name: string;
+  /** the saved play on the board, when it is one */
+  playId: string | null;
   notes: string;
   notesOpen: boolean;
   side: Team;
   vis: Vis;
   onName: (name: string) => void;
+  /** opens a play of the current playbook from the play name's list */
+  onOpenPlay: (id: string) => void;
+  /** adds the saved play on the board to the current playbook */
+  onAddToBook: () => void;
+  /** switches to a playbook from the Playbooks tile: its primary play opens, or an empty book clears the board */
+  onSwitchBook: (id: string) => void;
   onNotes: (notes: string) => void;
   onToggleNotes: () => void;
   onNew: (side: Team) => void;
@@ -56,12 +66,15 @@ interface Props {
 }
 
 function PlaySidebarImpl({
-  name, notes, notesOpen, side, vis, onName, onNotes, onToggleNotes, onNew, onSave, onDuplicate, unsaved, saved, onShare,
-  savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones, team, onTeam, los, onLos, flagged, mode, onMode,
+  name, playId, notes, notesOpen, side, vis, onName, onOpenPlay, onAddToBook, onSwitchBook, onNotes, onToggleNotes, onNew, onSave,
+  onDuplicate, unsaved, saved, onShare, savePanel, onFlip, onClear, onReset, onShadow, artShadow, onArtShadow, noRunZones, onNoRunZones,
+  team, onTeam, los, onLos, flagged, mode, onMode,
 }: Props) {
   const other = side === "defense" ? "offense" : "defense";
   const [choosing, setChoosing] = useState(false);
   const losId = useId(), losNote = useId();
+  // the Playbooks tile's menu drops down under the whole tile grid
+  const tiles = useRef<HTMLDivElement>(null);
   const start = (next: Team) => {
     onNew(next);
     setChoosing(false);
@@ -69,13 +82,7 @@ function PlaySidebarImpl({
   return (
     <>
       <span className={eyebrow}>PLAY</span>
-      <input
-        value={name}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => { onName(e.target.value); }}
-        placeholder="Play name"
-        aria-label="Play name"
-        className={`flex-none ${input}`}
-      />
+      <PlayNameField name={name} playId={playId} onName={onName} onOpenPlay={onOpenPlay} onAddToBook={onAddToBook} />
       {choosing ? (
         <>
           <span className="flex-none text-small leading-note text-ink">Offense or defense?</span>
@@ -89,13 +96,15 @@ function PlaySidebarImpl({
           <span className="flex-none text-caption leading-note text-ink-muted">They are different plays. Pick one to start a fresh one.</span>
         </>
       ) : (
-        <div className={tileGrid}>
-          <IconTile icon="new" label="New play" title="Start a fresh play: offense or defense" onClick={() => { setChoosing(true); }} />
-          <IconTile icon="save" label="Save" title={unsaved ? "Save changes to this play" : "Save this play"} dot={unsaved} onClick={onSave} />
-          <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
-          <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
-          <LinkTile icon="playbook" label="Playbooks" href="/playbooks" title="Build playbooks and print them" />
-          <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
+        <div ref={tiles} className="relative flex-none">
+          <div className={tileGrid}>
+            <IconTile icon="new" label="New play" title="Start a fresh play: offense or defense" onClick={() => { setChoosing(true); }} />
+            <IconTile icon="save" label="Save" title={unsaved ? "Save changes to this play" : "Save this play"} dot={unsaved} onClick={onSave} />
+            <IconTile icon="duplicate" label="Duplicate" onClick={onDuplicate} />
+            <IconTile icon="notes" label="Notes" title="Coaching points for this play" active={notesOpen} dot={notes.trim().length > 0} onClick={onToggleNotes} />
+            <PlaybookTile onSwitchBook={onSwitchBook} root={tiles} />
+            <LinkTile icon="demo" label="Demo" href="/demo" title="Watch the complete feature tour" />
+          </div>
         </div>
       )}
       {savePanel}
