@@ -145,12 +145,15 @@ export interface Standing {
   depth: number;
 }
 
-/** Every position a player is down for, in roster order, with where they sit at each (R7). */
+/**
+ * Every position a player is down for, with where they sit at each (R7): the ones they start at first, then
+ * down the depth charts, positions at the same depth in roster order.
+ */
 export function standings(roster: Roster, name: string): Standing[] {
   const k = key(name);
   if (!k) return [];
   return roster.flatMap((slot) => {
     const at = slot.depth.findIndex((n) => key(n) === k);
     return at < 0 ? [] : [{ team: slot.team, tag: slot.tag, depth: at }];
-  });
+  }).sort((a, b) => a.depth - b.depth);
 }
