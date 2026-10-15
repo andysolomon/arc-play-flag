@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useId, useRef, useState, type ChangeEvent, type SyntheticEvent } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type SyntheticEvent } from "react";
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
 import {
@@ -12,8 +12,9 @@ import { shown } from "@/lib/play/reducer";
 import { newId } from "@/lib/play/storage";
 import type { Lineups, Player, Roster, Team, Vis } from "@/lib/play/types";
 import { VIEW } from "./Header";
+import { Chevron, Menu, MenuHeading } from "./Menu";
 import { Sticker } from "./Sticker";
-import { crumb, eyebrow, input, pill, segment, segmentInput, segmented, select } from "./ui";
+import { crumb, eyebrow, input, menuChoice, menuItemDanger, pill, segment, segmentInput, segmented } from "./ui";
 
 /** The views in the order the header's badge goes through them. */
 const VIEWS: readonly Vis[] = ["offense", "defense", "both"];
@@ -55,6 +56,16 @@ const Dot = ({ team }: { team: Team }) => (
   <span aria-hidden="true" className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: teamFill(team) }} />
 );
 
+/** A fork, for branching a lineup: one line splitting in two. */
+const Fork = () => (
+  <svg aria-hidden viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 flex-none fill-none stroke-current">
+    <circle cx="6" cy="5.5" r="2.5" />
+    <circle cx="18" cy="5.5" r="2.5" />
+    <circle cx="12" cy="18.5" r="2.5" />
+    <path d="M6 8v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 9.5V8M12 12v4" />
+  </svg>
+);
+
 /**
  * The right sidebar in roster mode (docs/adr/008-roster-depth-chart.md). The team's players come first in
  * the coach's mind: a player joins the team by name, any time, and is then put on depth charts, from the
@@ -65,7 +76,7 @@ const Dot = ({ team }: { team: Team }) => (
 function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
-  const pickId = useId(), nameId = useId(), joinId = useId(), freshId = useId(), viewName = useId();
+  const menuId = useId(), nameId = useId(), joinId = useId(), freshId = useId(), viewName = useId();
   // a lineup just branched gets its name field, so the coach can say what it is for straight away
   const nameRef = useRef<HTMLInputElement>(null);
   const nameNext = useRef<string | null>(null);
@@ -75,8 +86,16 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     nameRef.current?.focus();
     nameRef.current?.select();
   }, [lineup.id]);
-  // Delete asks once, in place, since a lineup is not undoable: the pill becomes the question
+  // every lineup drops down from the name field, as the play name's list does, with Delete at the foot; a long
+  // name wraps rather than being cut off, so two that differ only at the end are told apart before a pick
+  const [listing, setListing] = useState(false);
+  const listRoot = useRef<HTMLDivElement>(null);
+  const listButton = useRef<HTMLButtonElement>(null);
+  const closeList = useCallback(() => { setListing(false); }, []);
+  // Delete asks once, in place, since a lineup is not undoable: the question opens under the row, on Keep
   const [deleting, setDeleting] = useState(false);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (deleting) keepRef.current?.focus(); }, [deleting]);
   const branch = () => {
     const id = newId();
     const next = branched(lineups, lineup.id, id);
@@ -85,8 +104,10 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     setDeleting(false);
     onLineups(next);
   };
-  const pick = (id: string) => { setDeleting(false); onLineups(withActive(lineups, id)); };
-  const removeLineup = () => { setDeleting(false); onLineups(without(lineups, lineup.id)); };
+  const pick = (id: string) => { closeList(); listButton.current?.focus(); setDeleting(false); onLineups(withActive(lineups, id)); };
+  const askDelete = () => { closeList(); setDeleting(true); };
+  const keepLineup = () => { setDeleting(false); listButton.current?.focus(); };
+  const removeLineup = () => { setDeleting(false); listButton.current?.focus(); onLineups(without(lineups, lineup.id)); };
 
   // the team: everyone, the same on every lineup
   const names = teamNames(lineups);
@@ -217,43 +238,77 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     <>
       <span className={eyebrow}>ROSTER</span>
       <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Lineup">
-        <label htmlFor={pickId} className="flex-none text-small">Lineup</label>
-        <select id={pickId} value={lineup.id} onChange={(e: ChangeEvent<HTMLSelectElement>) => { pick(e.target.value); }} className={`${select} w-full flex-none`}>
-          {lineups.lineups.map((l) => <option key={l.id} value={l.id}>{lineupName(l)}</option>)}
-        </select>
-        <label htmlFor={nameId} className="sr-only">Lineup name</label>
-        <input
-          id={nameId}
-          ref={nameRef}
-          value={lineup.name}
-          maxLength={MAX_LINEUP_NAME}
-          placeholder="Lineup name"
-          autoComplete="off"
-          onChange={(e: ChangeEvent<HTMLInputElement>) => { onLineups(renamed(lineups, lineup.id, e.target.value)); }}
-          className={`${input} flex-none`}
-        />
-        {parent && <span className={note}>Branched from {parent}.</span>}
-        <div className="flex flex-none flex-wrap gap-1.5">
-          {deleting ? (
-            <>
-              <span className="flex min-h-11 items-center text-small">Delete {lineupName(lineup)}?</span>
-              <button type="button" onClick={removeLineup} className={`${small} bg-yellow on-yellow hover:bg-yellow`}>Delete</button>
-              <button type="button" onClick={() => { setDeleting(false); }} className={small}>Keep</button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button" onClick={branch} disabled={lineups.lineups.length >= MAX_LINEUPS}
-                title="A new lineup, a copy of this one to change" className={small}
-              >
-                Branch lineup
-              </button>
-              {lineup.id !== MAIN_LINEUP && (
-                <button type="button" onClick={() => { setDeleting(true); }} className={small}>Delete lineup</button>
-              )}
-            </>
-          )}
+        <div className="flex flex-none items-center gap-1.5">
+          <div ref={listRoot} className="relative min-w-0 flex-1">
+            <label htmlFor={nameId} className="sr-only">Lineup name</label>
+            <input
+              id={nameId}
+              ref={nameRef}
+              value={lineup.name}
+              maxLength={MAX_LINEUP_NAME}
+              placeholder="Lineup name"
+              autoComplete="off"
+              onChange={(e: ChangeEvent<HTMLInputElement>) => { onLineups(renamed(lineups, lineup.id, e.target.value)); }}
+              className={`${input} pr-12`}
+            />
+            <button
+              ref={listButton}
+              type="button"
+              aria-label="Lineups"
+              title="Switch lineup"
+              aria-haspopup="menu"
+              aria-expanded={listing}
+              aria-controls={listing ? menuId : undefined}
+              onClick={() => { setListing((o) => !o); }}
+              className="pressable absolute inset-y-0.5 right-0.5 flex w-11 cursor-pointer items-center justify-center rounded-pill text-ink hover:bg-yellow-soft data-[open=true]:bg-yellow-soft"
+              data-open={listing}
+            >
+              <Chevron open={listing} />
+            </button>
+            {listing && (
+              <Menu id={menuId} label="Lineups" root={listRoot} trigger={listButton} onClose={closeList}
+                className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[min(50vh,420px)] overflow-y-auto">
+                <MenuHeading>LINEUPS</MenuHeading>
+                {lineups.lineups.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={l.id === lineup.id}
+                    onClick={() => { pick(l.id); }}
+                    className={menuChoice}
+                  >
+                    <span className="min-w-0 flex-1 break-words py-2 leading-tight">{lineupName(l)}</span>
+                  </button>
+                ))}
+                {lineup.id !== MAIN_LINEUP && (
+                  <>
+                    <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
+                    <button type="button" role="menuitem" onClick={askDelete} className={menuItemDanger}>
+                      <span className="min-w-0 break-words py-2 leading-tight">Delete “{lineupName(lineup)}”</span>
+                    </button>
+                  </>
+                )}
+              </Menu>
+            )}
+          </div>
+          <button
+            type="button" onClick={branch} disabled={lineups.lineups.length >= MAX_LINEUPS}
+            aria-label="Branch lineup"
+            title={lineups.lineups.length >= MAX_LINEUPS ? `Up to ${String(MAX_LINEUPS)} lineups` : "Branch lineup: a new lineup, a copy of this one to change"}
+            className={`${pill} flex h-11 w-11 flex-none items-center justify-center`}
+          >
+            <Fork />
+          </button>
         </div>
+        {parent && <span className={note}>Branched from {parent}.</span>}
+        {deleting && (
+          <div className="flex flex-none flex-wrap gap-1.5">
+            <span className="flex min-h-11 items-center text-small">Delete {lineupName(lineup)}?</span>
+            <button type="button" onClick={removeLineup} className={`${small} bg-yellow on-yellow hover:bg-yellow`}>Delete</button>
+            <button ref={keepRef} type="button" onClick={keepLineup} className={small}>Keep</button>
+          </div>
+        )}
       </div>
 
       {player !== null && (
