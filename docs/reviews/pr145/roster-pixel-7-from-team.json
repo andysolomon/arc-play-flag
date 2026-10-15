@@ -1,0 +1,79 @@
+{
+  "marcusPage": [
+    "Y · Starter",
+    "X · 2nd"
+  ],
+  "stored": {
+    "active": "main",
+    "lineups": [
+      {
+        "id": "main",
+        "name": "Starting Lineup",
+        "slots": [
+          {
+            "team": "offense",
+            "tag": "X",
+            "depth": [
+              "Devon",
+              "Marcus Lee"
+            ]
+          },
+          {
+            "team": "offense",
+            "tag": "QB",
+            "depth": [
+              "Aaliyah",
+              "Devon",
+              "Priya",
+              "Jordan",
+              "Sam",
+              "Riley",
+              "Kai",
+              "Marcus Lee"
+            ]
+          },
+          {
+            "team": "defense",
+            "tag": "LC",
+            "depth": [
+              "devon"
+            ]
+          },
+          {
+            "team": "offense",
+            "tag": "Y",
+            "depth": [
+              "Marcus Lee",
+              "Devon"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "rainy",
+        "name": "Rainy day",
+        "slots": [
+          {
+            "team": "offense",
+            "tag": "Z",
+            "depth": [
+              "Priya"
+            ]
+          }
+        ],
+        "from": "main"
+      }
+    ],
+    "players": [
+      "Devon",
+      "Marcus Lee",
+      "Aaliyah",
+      "Priya",
+      "Jordan",
+      "Sam",
+      "Riley",
+      "Kai",
+      "Noor"
+    ]
+  }
+}

@@ -1,0 +1,868 @@
+{
+  "metadata": {
+    "actualWorkers": 2
+  },
+  "startTime": 1792080148069,
+  "duration": 113106.878,
+  "files": [
+    {
+      "fileId": "fc0bea75e4bd896a4711",
+      "fileName": "roster.journey.ts",
+      "tests": [
+        {
+          "testId": "fc0bea75e4bd896a4711-7f92ca1c9ec39683a79b",
+          "title": "positions are laid out, each takes a depth chart, the starter is named on the field, kept on the device and out of links",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 43,
+            "column": 1
+          },
+          "duration": 7882,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:30.444Z",
+              "workerIndex": 0
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-48e4b8cbb72aa2ac4e6b",
+          "title": "a defensive call lists the defenders first, a renamed tag is a fresh position, undo brings the old one back, and a backup carries the roster",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 167,
+            "column": 1
+          },
+          "duration": 4980,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:30.499Z",
+              "workerIndex": 1
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-c55798a2e8b1e4f9c7ca",
+          "title": "a name the device will not keep is said once and stores nothing",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 222,
+            "column": 1
+          },
+          "duration": 2977,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:35.903Z",
+              "workerIndex": 1
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-ecd62a1e4a6f1b16c858",
+          "title": "a player already on the team is picked for another position by name, only where they are not down yet, and never past a full chart",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 242,
+            "column": 1
+          },
+          "duration": 5382,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:38.762Z",
+              "workerIndex": 0
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-3e2d103ef5abe1e58576",
+          "title": "lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 342,
+            "column": 1
+          },
+          "duration": 4276,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:38.932Z",
+              "workerIndex": 1
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-11f36778f62d266c9e96",
+          "title": "players join the team any time, the same on every lineup, and depth charts are filled from the team",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 425,
+            "column": 1
+          },
+          "duration": 7950,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:43.221Z",
+              "workerIndex": 1
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-b6d1956c0e2c3b5f20b2",
+          "title": "a team holds fifteen players: the fifteenth fills it, a teammate can still go on a chart, and removing one opens it again",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 582,
+            "column": 1
+          },
+          "duration": 2967,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:44.169Z",
+              "workerIndex": 0
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-8f146c7ddaa7fad28aeb",
+          "title": "sixteen names typed on depth charts before the team's list all stay on the team, which is full until it is back under fifteen",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 639,
+            "column": 1
+          },
+          "duration": 2014,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:47.151Z",
+              "workerIndex": 0
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-60aa5bb2bdd1e6dca7e8",
+          "title": "a name at either sideline stays whole on the field, and no name goes to the printer",
+          "projectName": "chromium",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 673,
+            "column": 1
+          },
+          "duration": 2828,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:49.185Z",
+              "workerIndex": 0
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-6ee708f4ccbf0eae4155",
+          "title": "positions are laid out, each takes a depth chart, the starter is named on the field, kept on the device and out of links",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 43,
+            "column": 1
+          },
+          "duration": 16025,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:51.956Z",
+              "workerIndex": 2
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-98dae3ec5e6337c0a4d1",
+          "title": "a defensive call lists the defenders first, a renamed tag is a fresh position, undo brings the old one back, and a backup carries the roster",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 167,
+            "column": 1
+          },
+          "duration": 12172,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:02:53.377Z",
+              "workerIndex": 3
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-5c5c92a83fcd43d21023",
+          "title": "a name the device will not keep is said once and stores nothing",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 222,
+            "column": 1
+          },
+          "duration": 3024,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:05.820Z",
+              "workerIndex": 3
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-3b8156488e4fc93bf739",
+          "title": "a player already on the team is picked for another position by name, only where they are not down yet, and never past a full chart",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 242,
+            "column": 1
+          },
+          "duration": 6944,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:08.151Z",
+              "workerIndex": 2
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-d40a120c034f6efccb1a",
+          "title": "lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 342,
+            "column": 1
+          },
+          "duration": 4197,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:08.885Z",
+              "workerIndex": 3
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-1e14f9211b030f1ecc69",
+          "title": "players join the team any time, the same on every lineup, and depth charts are filled from the team",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 425,
+            "column": 1
+          },
+          "duration": 9487,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:13.110Z",
+              "workerIndex": 3
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-eec2b3eebdd49c4a38a7",
+          "title": "a team holds fifteen players: the fifteenth fills it, a teammate can still go on a chart, and removing one opens it again",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 582,
+            "column": 1
+          },
+          "duration": 3229,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:15.118Z",
+              "workerIndex": 2
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-ccb9e29b2961c04cee49",
+          "title": "sixteen names typed on depth charts before the team's list all stay on the team, which is full until it is back under fifteen",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 639,
+            "column": 1
+          },
+          "duration": 2205,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:18.364Z",
+              "workerIndex": 2
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-027d94df4bbbeb819fb0",
+          "title": "a name at either sideline stays whole on the field, and no name goes to the printer",
+          "projectName": "pixel-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 673,
+            "column": 1
+          },
+          "duration": 2735,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:20.581Z",
+              "workerIndex": 2
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-749a219f1847416d1eb3",
+          "title": "positions are laid out, each takes a depth chart, the starter is named on the field, kept on the device and out of links",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 43,
+            "column": 1
+          },
+          "duration": 14465,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:23.803Z",
+              "workerIndex": 4
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-8bf89dfa2bd44ccb790c",
+          "title": "a defensive call lists the defenders first, a renamed tag is a fresh position, undo brings the old one back, and a backup carries the roster",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 167,
+            "column": 1
+          },
+          "duration": 8739,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:25.547Z",
+              "workerIndex": 5
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-8cf53c530d38f3b4f0ab",
+          "title": "a name the device will not keep is said once and stores nothing",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 222,
+            "column": 1
+          },
+          "duration": 2949,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:34.580Z",
+              "workerIndex": 5
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-fe9913a770c1f6cb9971",
+          "title": "a player already on the team is picked for another position by name, only where they are not down yet, and never past a full chart",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 242,
+            "column": 1
+          },
+          "duration": 6736,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:37.569Z",
+              "workerIndex": 5
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-5d566817c8e3ac33db27",
+          "title": "lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 342,
+            "column": 1
+          },
+          "duration": 4496,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:38.508Z",
+              "workerIndex": 4
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-73520fc85e7cf3066d6d",
+          "title": "players join the team any time, the same on every lineup, and depth charts are filled from the team",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 425,
+            "column": 1
+          },
+          "duration": 8813,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:43.025Z",
+              "workerIndex": 4
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-3181119c862bc6706cc4",
+          "title": "a team holds fifteen players: the fifteenth fills it, a teammate can still go on a chart, and removing one opens it again",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 582,
+            "column": 1
+          },
+          "duration": 3341,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:44.327Z",
+              "workerIndex": 5
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-09fa0ebc26a2c2a061b7",
+          "title": "sixteen names typed on depth charts before the team's list all stay on the team, which is full until it is back under fifteen",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 639,
+            "column": 1
+          },
+          "duration": 1859,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:47.685Z",
+              "workerIndex": 5
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-eeb0f2614309ffacfb6d",
+          "title": "a name at either sideline stays whole on the field, and no name goes to the printer",
+          "projectName": "iphone-15",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 673,
+            "column": 1
+          },
+          "duration": 2928,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:49.567Z",
+              "workerIndex": 5
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-e124843c86f16b781c1d",
+          "title": "positions are laid out, each takes a depth chart, the starter is named on the field, kept on the device and out of links",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 43,
+            "column": 1
+          },
+          "duration": 9682,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:52.770Z",
+              "workerIndex": 6
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-7da264838fbefda64cc7",
+          "title": "a defensive call lists the defenders first, a renamed tag is a fresh position, undo brings the old one back, and a backup carries the roster",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 167,
+            "column": 1
+          },
+          "duration": 5493,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:53.306Z",
+              "workerIndex": 7
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-44d6a34f43b4f8f56d9c",
+          "title": "a name the device will not keep is said once and stores nothing",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 222,
+            "column": 1
+          },
+          "duration": 2538,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:03:58.970Z",
+              "workerIndex": 7
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-9f4edc404dfc9834f464",
+          "title": "a player already on the team is picked for another position by name, only where they are not down yet, and never past a full chart",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 242,
+            "column": 1
+          },
+          "duration": 6356,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:04:01.527Z",
+              "workerIndex": 7
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-65f4094c70f02b51ee9f",
+          "title": "lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 342,
+            "column": 1
+          },
+          "duration": 4396,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:04:02.668Z",
+              "workerIndex": 6
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-83a6cf6ad3612e407abe",
+          "title": "players join the team any time, the same on every lineup, and depth charts are filled from the team",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 425,
+            "column": 1
+          },
+          "duration": 12667,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:04:07.094Z",
+              "workerIndex": 6
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-2327b5a10c88dee29ce6",
+          "title": "a team holds fifteen players: the fifteenth fills it, a teammate can still go on a chart, and removing one opens it again",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 582,
+            "column": 1
+          },
+          "duration": 4950,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:04:07.903Z",
+              "workerIndex": 7
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-d3f2f74b56368ce3888e",
+          "title": "sixteen names typed on depth charts before the team's list all stay on the team, which is full until it is back under fifteen",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 639,
+            "column": 1
+          },
+          "duration": 3383,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:04:12.883Z",
+              "workerIndex": 7
+            }
+          ]
+        },
+        {
+          "testId": "fc0bea75e4bd896a4711-53f6e53e415ebbd42ab4",
+          "title": "a name at either sideline stays whole on the field, and no name goes to the printer",
+          "projectName": "ipad-gen-7",
+          "location": {
+            "file": "roster.journey.ts",
+            "line": 673,
+            "column": 1
+          },
+          "duration": 4777,
+          "annotations": [],
+          "tags": [],
+          "outcome": "expected",
+          "path": [],
+          "ok": true,
+          "results": [
+            {
+              "attachments": [],
+              "startTime": "2026-10-15T16:04:16.282Z",
+              "workerIndex": 7
+            }
+          ]
+        }
+      ],
+      "stats": {
+        "total": 36,
+        "expected": 36,
+        "unexpected": 0,
+        "flaky": 0,
+        "skipped": 0,
+        "ok": true
+      }
+    }
+  ],
+  "projectNames": [
+    "chromium",
+    "pixel-7",
+    "iphone-15",
+    "ipad-gen-7"
+  ],
+  "stats": {
+    "total": 36,
+    "expected": 36,
+    "unexpected": 0,
+    "flaky": 0,
+    "skipped": 0,
+    "ok": true
+  },
+  "errors": [],
+  "options": {},
+  "machines": []
+}
