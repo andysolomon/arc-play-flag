@@ -65,11 +65,5 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "a4feffa6d24b7783b399ac8b05c83486eacbbf73883a18cf0d945b25d2ac1b68"
-  },
-  "restamped": {
-    "reason": "the names under the tags only appear once a coach opens the roster; no clip opens it",
-    "files": [
-      "components/PlayerToken.tsx (changed)"
-    ]
   }
 }
