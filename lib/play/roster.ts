@@ -18,6 +18,11 @@
  *   regard to case, and shown as first written.
  * - R8 a player taken off the roster by name: off every depth chart they were on, matched as R7 matches,
  *   and a chart left with no lines stores nothing (R3).
+ * - R9 roster mode lays out the standard formation, not a play, so a position it has no token for (a tag a
+ *   coach gave on a play, FS, H) would leave its depth chart out of reach: every tag a chart is kept for,
+ *   on any lineup, or a play wears is listed beyond the formation, once per team, so it can still be opened,
+ *   reordered and filled. A tag the formation already has is not listed twice, an untagged player adds
+ *   nothing (R6), and one of these is never drawn on the field.
  */
 
 import type { Player, Roster, RosterSlot, Team } from "./types";
@@ -156,4 +161,24 @@ export function standings(roster: Roster, name: string): Standing[] {
     const at = slot.depth.findIndex((n) => key(n) === k);
     return at < 0 ? [] : [{ team: slot.team, tag: slot.tag, depth: at }];
   }).sort((a, b) => a.depth - b.depth);
+}
+
+/** The id roster mode gives a position it lists beyond the standard formation (R9). */
+export const offFieldId = (team: Team, tag: string): string => `off:${team}:${tag}`;
+export const isOffField = (p: Player): boolean => p.id.startsWith("off:");
+
+/**
+ * The positions roster mode lists beyond the formation (R9): each team's tags with no token in it, in tag
+ * order, after the formation's own (past its right edge, for `byLine`). Never drawn on the field.
+ */
+export function offFieldPositions(formation: readonly Player[], tags: Iterable<{ team: Team; tag: string }>): Player[] {
+  const seen = new Set(formation.filter((p) => p.label).map((p) => `${p.team}:${p.label}`));
+  const out: { team: Team; tag: string }[] = [];
+  for (const { team, tag } of tags) {
+    if (!tag || seen.has(`${team}:${tag}`)) continue;
+    seen.add(`${team}:${tag}`);
+    out.push({ team, tag });
+  }
+  out.sort((a, b) => a.tag.localeCompare(b.tag));
+  return out.map(({ team, tag }, i) => ({ id: offFieldId(team, tag), team, label: tag, x: 1000 + i, y: 0, route: null }));
 }
