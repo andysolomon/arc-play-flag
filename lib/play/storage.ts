@@ -490,7 +490,8 @@ export function remove(id: string, storage: StorageLike | null = browserStorage(
   let touched = false;
   for (const b of Object.values(books)) {
     if (!b.plays.includes(id)) continue;
-    b.plays = b.plays.filter((p) => p !== id);
+    // the primary gone with it, the first play left takes over (C6)
+    books[b.id] = settleBook({ ...b, plays: b.plays.filter((p) => p !== id) });
     touched = true;
   }
   if (touched) writePlaybooks(books, storage);
@@ -522,14 +523,42 @@ export function importAll(plays: readonly SavedPlay[], book: Playbook | null, st
   }
 }
 
+/**
+ * A book from any JSON-ish value. Its primary play is kept only when it is one of the book's plays;
+ * a book without one reads without one, so a file or backup from before the choice reads back as
+ * it was written (C7, C8 in lib/play/current-book.ts).
+ */
 export function normalizePlaybook(raw: unknown, fallbackId = newId()): Playbook | null {
   if (!isRecord(raw)) return null;
   const plays = Array.isArray(raw.plays) ? raw.plays.filter((p): p is string => typeof p === "string") : [];
-  return {
+  const book: Playbook = {
     id: typeof raw.id === "string" && raw.id ? raw.id.slice(0, 40) : fallbackId,
     name: cleanName(raw.name, "Playbook"),
     plays: [...new Set(plays)],
   };
+  if (typeof raw.primary === "string" && book.plays.includes(raw.primary)) book.primary = raw.primary;
+  return book;
+}
+
+/**
+ * The book's primary play: the one stored, when it is still one of the book's plays, else the
+ * first play in the book, else none (an empty book). This is the play the designer opens on a
+ * switch to the book; what it does with none is clear the board (ADR 009).
+ */
+export function primaryPlayId(book: Pick<Playbook, "plays" | "primary">): string | null {
+  return book.primary !== undefined && book.plays.includes(book.primary) ? book.primary : book.plays[0] ?? null;
+}
+
+/**
+ * A book as it is written: its primary one of its plays, the first by default. So the first play
+ * added to a book is its primary from then on, a reorder leaves it, and taking that play out of
+ * the book hands the choice to the first play left (C4, C6, C7).
+ */
+export function settleBook(book: Playbook): Playbook {
+  const out: Playbook = { id: book.id, name: book.name, plays: [...book.plays] };
+  const primary = primaryPlayId(book);
+  if (primary !== null) out.primary = primary;
+  return out;
 }
 
 export function readPlaybooks(storage: StorageLike | null = browserStorage()): Playbooks {
@@ -548,9 +577,16 @@ export function writePlaybooks(books: Playbooks, storage: StorageLike | null = b
   write(storage, PLAYBOOKS_KEY, books);
 }
 
+/**
+ * Upserts one book. A book written without a primary keeps the one it had, or, for a book from
+ * before the choice, takes the first play it had before this write (C7): so the first play a
+ * book had is its primary until the coach picks another, whatever the write reorders or adds.
+ */
 export function storePlaybook(book: Playbook, storage: StorageLike | null = browserStorage()): Playbooks {
   const all = readPlaybooks(storage);
-  all[book.id] = { ...book, plays: [...book.plays] };
+  const prior = all[book.id];
+  const primary = book.primary ?? prior?.primary ?? prior?.plays[0];
+  all[book.id] = settleBook(primary === undefined ? book : { ...book, primary });
   writePlaybooks(all, storage);
   return all;
 }
