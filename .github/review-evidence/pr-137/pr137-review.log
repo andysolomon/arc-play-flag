@@ -1,0 +1,41 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+[WebServer] $ next start --hostname "127.0.0.1" -p "3123"
+[WebServer] (node:35) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 16 tests using 2 workers
+
+(node:55) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/journeys/pr137-review.journey.ts:6:1 › review: importing a changed primary must preserve that choice (1.5s)
+  ✓   2 [chromium] › e2e/journeys/pr137-review.journey.ts:24:1 › review: Escape does not dismiss a play menu for an empty book (1.5s)
+  ✓   3 [chromium] › e2e/journeys/pr137-review.journey.ts:38:1 › review: long menus remain scrollable and keyboard reachable in dark mode (1.4s)
+(node:256) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   4 [chromium] › e2e/journeys/pr137-review.journey.ts:52:1 › review: a failed current-book write loses the in-memory choice after a book edit (2.5s)
+(node:333) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 [pixel-7] › e2e/journeys/pr137-review.journey.ts:6:1 › review: importing a changed primary must preserve that choice (1.7s)
+  ✓   6 [pixel-7] › e2e/journeys/pr137-review.journey.ts:24:1 › review: Escape does not dismiss a play menu for an empty book (2.0s)
+  ✓   7 [pixel-7] › e2e/journeys/pr137-review.journey.ts:38:1 › review: long menus remain scrollable and keyboard reachable in dark mode (1.9s)
+(node:450) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   8 [pixel-7] › e2e/journeys/pr137-review.journey.ts:52:1 › review: a failed current-book write loses the in-memory choice after a book edit (3.0s)
+  ✓   9 [iphone-15] › e2e/journeys/pr137-review.journey.ts:6:1 › review: importing a changed primary must preserve that choice (1.5s)
+(node:532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  10 [iphone-15] › e2e/journeys/pr137-review.journey.ts:38:1 › review: long menus remain scrollable and keyboard reachable in dark mode (1.8s)
+  ✓  11 [iphone-15] › e2e/journeys/pr137-review.journey.ts:24:1 › review: Escape does not dismiss a play menu for an empty book (1.9s)
+(node:647) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  12 [iphone-15] › e2e/journeys/pr137-review.journey.ts:52:1 › review: a failed current-book write loses the in-memory choice after a book edit (3.2s)
+  ✓  13 [ipad-gen-7] › e2e/journeys/pr137-review.journey.ts:6:1 › review: importing a changed primary must preserve that choice (2.2s)
+(node:727) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  14 [ipad-gen-7] › e2e/journeys/pr137-review.journey.ts:38:1 › review: long menus remain scrollable and keyboard reachable in dark mode (3.9s)
+  ✓  15 [ipad-gen-7] › e2e/journeys/pr137-review.journey.ts:24:1 › review: Escape does not dismiss a play menu for an empty book (3.9s)
+  ✓  16 [ipad-gen-7] › e2e/journeys/pr137-review.journey.ts:52:1 › review: a failed current-book write loses the in-memory choice after a book edit (3.6s)
+
+  16 passed (24.9s)

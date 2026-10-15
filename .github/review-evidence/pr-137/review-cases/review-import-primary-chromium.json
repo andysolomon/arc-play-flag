@@ -1,0 +1,22 @@
+{
+  "incoming": {
+    "id": "review-book",
+    "name": "Review Game Plan",
+    "plays": [
+      "fx-slant-left",
+      "fx-wheel-right"
+    ],
+    "primary": "fx-wheel-right"
+  },
+  "stored": {
+    "review-book": {
+      "id": "review-book",
+      "name": "Review Game Plan",
+      "plays": [
+        "fx-slant-left",
+        "fx-wheel-right"
+      ],
+      "primary": "fx-slant-left"
+    }
+  }
+}

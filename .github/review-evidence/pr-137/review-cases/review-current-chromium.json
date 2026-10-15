@@ -1,0 +1,22 @@
+{
+  "stored": {
+    "review-game": {
+      "id": "review-game",
+      "name": "Review Game Plan",
+      "plays": [
+        "fx-slant-left"
+      ],
+      "primary": "fx-slant-left"
+    },
+    "review-road": {
+      "id": "review-road",
+      "name": "Review Road Book",
+      "plays": [
+        "fx-wheel-right",
+        "gli0qm5w2o"
+      ],
+      "primary": "fx-wheel-right"
+    }
+  },
+  "menu": "IN “Review Game Plan”\n1.\nOtter Slant Left\nPrimary\n+ Add “Review New Play” to this playbook"
+}
