@@ -1,7 +1,7 @@
 import { readLos, withLos } from "./field";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
-import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, defaultLineups } from "./lineup";
+import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, defaultLineups, withNames } from "./lineup";
 import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
@@ -689,7 +689,8 @@ export function normalizeLineups(raw: unknown): Lineups | null {
     if (l.from !== undefined && (l.from === l.id || !out.some((p) => p.id === l.from))) delete l.from;
   }
   const active = typeof raw.active === "string" && out.some((l) => l.id === raw.active) ? raw.active : MAIN_LINEUP;
-  return { active, lineups: out, players: normalizeTeamPlayers(raw.players, out) };
+  // the names are shown on plays only when turned on and there is a roster to show (lineup.ts, V6)
+  return withNames({ active, lineups: out, players: normalizeTeamPlayers(raw.players, out) }, raw.names === true);
 }
 
 /** The device's lineups; the starting lineup alone, empty, when none have been set. */

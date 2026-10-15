@@ -13,6 +13,9 @@
  * - V3 a lineup deleted that others were branched from: they stay, and forget their parent.
  * - V4 a branch of a branch: it copies the slots of the lineup it was made from, not the main one.
  * - V5 a blank name: kept as typed while the coach writes it; the list shows "Untitled lineup".
+ * - V6 names turned on with no roster: there is nothing to show, so the switch waits for a roster (it is
+ *   disabled in Play tools until some depth chart has a name), and a stored flag with no roster behind it is
+ *   dropped on read, so the last name taken off a lineup turns the names off with it.
  *
  * The team's players are one list, the same on every lineup: a player joins the team by name, and a
  * depth chart is filled from it. Ways that could go wrong:
@@ -103,6 +106,23 @@ export function without(ls: Lineups, id: string): Lineups {
   });
   const active = ls.active === id ? (gone.from && lineups.some((l) => l.id === gone.from) ? gone.from : MAIN_LINEUP) : ls.active;
   return { ...ls, active, lineups };
+}
+
+/** Whether any depth chart on any lineup has a name on it: a starter to show on a play (V6). */
+export function hasNames(ls: Lineups): boolean {
+  return ls.lineups.some((l) => l.slots.some((s) => s.depth.some((n) => n.trim() !== "")));
+}
+
+/** Whether a play shows its starters' names: turned on, with a roster behind it (V6). */
+export function showsNames(ls: Lineups): boolean {
+  return ls.names === true && hasNames(ls);
+}
+
+/** The lineups with the names shown on plays or not; on only with a roster to show (V6). Everything else is kept. */
+export function withNames(ls: Lineups, on: boolean): Lineups {
+  const rest: Lineups = { ...ls };
+  delete rest.names;
+  return on && hasNames(ls) ? { ...rest, names: true } : rest;
 }
 
 /** What a lineup was branched from, by name, or null for the starting lineup and an orphan. */

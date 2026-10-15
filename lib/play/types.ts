@@ -170,12 +170,17 @@ export interface Lineup {
   slots: Roster;
 }
 
-/** The team's players, every lineup, and which one the field shows. */
+/** The team's players, every lineup, which one the field shows, and whether a play shows its starters' names. */
 export interface Lineups {
   active: string;
   lineups: Lineup[];
   /** everyone on the team, by name as first written: the same on every lineup, and who a depth chart is filled from */
   players: string[];
+  /**
+   * The starters' names are drawn under the tags while drawing a play. Off until the coach turns it on,
+   * and only once some depth chart has a name to show (stored only when true, and never without one).
+   */
+  names?: true;
 }
 
 export interface TeamSettings {

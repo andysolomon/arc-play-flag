@@ -106,6 +106,20 @@ export class Designer {
     await expect(toggle).toBeVisible();
   }
 
+  /** The starters' names on every play, or off them, from Play tools (docs/adr/008-roster-depth-chart.md). */
+  async showNames(on: boolean): Promise<void> {
+    await this.tools();
+    await this.namesSwitch.setChecked(on);
+  }
+  /** The "Show player names" switch in Play tools; off until a roster has a name. */
+  get namesSwitch(): Locator {
+    return this.page.locator("#play-sidebar").getByRole("checkbox", { name: "Show player names" });
+  }
+  /** The header's badge in roster mode: which side of the roster is on the field, and a tap to the next. */
+  get rosterView(): Locator {
+    return this.page.getByRole("banner").getByRole("button", { name: /^Showing / });
+  }
+
   /** A tile or pill in the Play tools sidebar, by its visible label. */
   async tool(label: string): Promise<Locator> {
     await this.tools();
