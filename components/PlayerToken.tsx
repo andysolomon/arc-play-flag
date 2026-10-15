@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
-import { teamFill } from "@/lib/play/geometry";
+import { VW, teamFill } from "@/lib/play/geometry";
 import type { Player } from "@/lib/play/types";
 import { FIELD, teamPaint } from "./fieldPaint";
 
@@ -32,6 +32,15 @@ interface Props {
 }
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
+
+/** About half the width of a caption in the field's units: Patrick Hand at 15 is about 7 a letter, plus the halo. */
+const captionHalf = (text: string): number => text.length * 3.6 + 4;
+
+/** Where a caption's centre goes, relative to its token: over it, or pulled in so a name at a sideline stays whole on the field. */
+function captionX(x: number, text: string): number {
+  const half = captionHalf(text);
+  return Math.min(Math.max(x, half), VW - half) - x;
+}
 
 function PlayerTokenImpl({
   player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
@@ -93,10 +102,11 @@ function PlayerTokenImpl({
           )}
         </g>
       </g>
-      {/* the name rides outside the selection scale, on a turf-coloured halo so it reads over a line; never in a picture */}
+      {/* the name rides outside the selection scale, on a turf-coloured halo so it reads over a line; never in a picture or on paper */}
       {caption && (
         <text
           data-caption
+          x={captionX(x, caption.text)}
           y={caption.above ? -44 : 46}
           textAnchor="middle"
           dominantBaseline="central"
@@ -108,7 +118,7 @@ function PlayerTokenImpl({
           strokeLinejoin="round"
           paintOrder="stroke"
           style={{ fill: FIELD.line, stroke: FIELD.turf }}
-          className={`pointer-events-none select-none ${caption.muted ? "opacity-55" : ""}`}
+          className={`pointer-events-none select-none print:hidden ${caption.muted ? "opacity-55" : ""}`}
           data-export="skip"
         >
           {caption.text}
