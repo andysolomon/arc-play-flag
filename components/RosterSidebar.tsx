@@ -8,10 +8,15 @@ import {
   teamNames, withActive, withPlayer, withSlots, without, withoutPlayer,
 } from "@/lib/play/lineup";
 import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, isOffField, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
+import { shown } from "@/lib/play/reducer";
 import { newId } from "@/lib/play/storage";
-import type { Lineups, Player, Roster, Team } from "@/lib/play/types";
+import type { Lineups, Player, Roster, Team, Vis } from "@/lib/play/types";
+import { VIEW } from "./Header";
 import { Sticker } from "./Sticker";
-import { crumb, eyebrow, input, pill, select } from "./ui";
+import { crumb, eyebrow, input, pill, segment, segmentInput, segmented, select } from "./ui";
+
+/** The views in the order the header's badge goes through them. */
+const VIEWS: readonly Vis[] = ["offense", "defense", "both"];
 
 interface Props {
   /** the team's players, every lineup and which one the field shows */
@@ -24,10 +29,11 @@ interface Props {
   selected: Player | null;
   /** the team's standard formation, both sides, then the tags it has no token for, for the list of positions */
   players: readonly Player[];
+  /** which side of the roster is on the field, or both; the header's badge and the SHOW pills set it */
+  view: Vis;
+  onView: (next: Vis) => void;
   /** a position in the list tapped: select that player on the field */
   onSelect: (id: string) => void;
-  /** back to drawing the play */
-  onDone: () => void;
 }
 
 const SIDE_WORD: Record<Team, string> = { offense: "OFFENSE", defense: "DEFENSE" };
@@ -56,10 +62,10 @@ const Dot = ({ team }: { team: Team }) => (
  * position on the field is listed to jump between. The roster is the team's, kept on this device, so a
  * change here lands at once and is never undone.
  */
-function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, onSelect, onDone }: Props) {
+function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
-  const pickId = useId(), nameId = useId(), joinId = useId(), freshId = useId();
+  const pickId = useId(), nameId = useId(), joinId = useId(), freshId = useId(), viewName = useId();
   // a lineup just branched gets its name field, so the coach can say what it is for straight away
   const nameRef = useRef<HTMLInputElement>(null);
   const nameNext = useRef<string | null>(null);
@@ -86,7 +92,9 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   const names = teamNames(lineups);
   const full = teamFull(lineups);
   // offense then defense, each left to right as the wristbands count them; no play is open to put a side first
-  const teams: Team[] = ["offense", "defense"];
+  const sides: Team[] = ["offense", "defense"];
+  // the positions listed: the side on view, or both
+  const teams: Team[] = view === "both" ? sides : [view];
   // "X starter, LC 2nd": where a player sits on this lineup, for the lists
   const sits = (name: string): string =>
     standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ") || "No position";
@@ -119,17 +127,21 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     setPage(null);
     onLineups(withoutPlayer(lineups, player));
   };
-  // the page's positions are a way to their depth charts: the first player wearing that tag on that team
+  // the page's positions are a way to their depth charts: the first player wearing that tag on that team,
+  // brought onto the field first when their side is not on view
   const goTo = (team: Team, tag: string) => {
     const p = players.filter((q) => q.team === team && q.label === tag).sort(byLine)[0];
     setPage(null);
-    if (p) onSelect(p.id);
+    if (!p) return;
+    if (!shown(p, view)) onView(team);
+    onSelect(p.id);
   };
-  // the positions on the field a player is not down for yet: each tag once per team, the play's own side first
+  // the positions a player is not down for yet, on both sides whatever is on view (a tap only writes the chart):
+  // each tag once per team, offense first
   const openings = (name: string): Player[] => {
     const held = standings(roster, name);
     const seen = new Set<string>();
-    return teams.flatMap((team) => players.filter((p) => p.team === team && p.label).sort(byLine).filter((p) => {
+    return sides.flatMap((team) => players.filter((p) => p.team === team && p.label).sort(byLine).filter((p) => {
       const k = `${p.team}-${p.label}`;
       if (seen.has(k) || held.some((h) => h.team === p.team && h.tag === p.label)) return false;
       seen.add(k);
@@ -521,7 +533,22 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           </span>
         </div>
       )}
-
+      {player === null && (
+        <div className="flex flex-none flex-col gap-1.5">
+          <span className={eyebrow}>SHOW</span>
+          <div role="radiogroup" aria-label="Show" className={segmented}>
+            {VIEWS.map((v) => (
+              <label key={v} title={VIEW[v].title} className={segment}>
+                <input type="radio" name={viewName} value={v} checked={view === v} onChange={() => { onView(v); }} className={segmentInput} />
+                {VIEW[v].label}
+              </label>
+            ))}
+          </div>
+          <span className="flex-none text-caption leading-note text-ink-muted">
+            {view === "both" ? "Both sides of the roster on the field at once." : `The ${view} alone on the field; the roster has both sides.`}
+          </span>
+        </div>
+      )}
       {player === null && teams.map((team) => {
         const list = players.filter((p) => p.team === team).sort(byLine);
         if (!list.length) return null;
@@ -552,9 +579,6 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           </div>
         );
       })}
-      <button type="button" onClick={onDone} className={`${small} flex-none self-start`}>
-        ‹ Back to the play
-      </button>
     </>
   );
 }
