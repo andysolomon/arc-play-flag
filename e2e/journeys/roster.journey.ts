@@ -37,7 +37,7 @@ async function addNew(chart: Locator, name: string): Promise<void> {
   await field.press("Enter");
 }
 /** The lineup picker and the name of the active lineup, in the roster panel. */
-const picker = (page: Page) => panel(page).getByRole("combobox", { name: "Lineup" });
+const picker = (page: Page) => panel(page).getByRole("combobox", { name: "Lineup", exact: true });
 const lineupName = (page: Page) => panel(page).getByRole("textbox", { name: "Lineup name" });
 
 test("positions are laid out, each takes a depth chart, the starter is named on the field, kept on the device and out of links", async ({ page }, info) => {
@@ -237,6 +237,99 @@ test("a name the device will not keep is said once and stores nothing", async ({
   await addNew(chart, "Sam");
   await expect(d.caption("Z")).toHaveText("Sam");
   await expect.poll(() => storedLineups(page)).toEqual(main([{ team: "offense", tag: "Z", depth: ["Sam"] }], ["Sam"]));
+});
+
+test("a player already on the team is picked for another position by name, only where they are not down yet, and never past a full chart", async ({ page }, info) => {
+  const device = info.project.name;
+  const slots: Roster = [
+    { team: "offense", tag: "X", depth: ["Devon", "Marcus Lee"] },
+    { team: "offense", tag: "QB", depth: ["Aaliyah"] },
+    { team: "defense", tag: "LC", depth: ["devon"] },
+  ];
+  // Priya is on the team but only on another lineup's chart: still the team's, so still offered here
+  const rainy = { id: "rainy", name: "Rainy day", from: "main", slots: [{ team: "offense" as const, tag: "Z", depth: ["Priya"] }] };
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: { active: "main", lineups: [...main(slots).lineups, rainy], players: [] } });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.select("Y");
+  const chart = panel(page).getByRole("group", { name: "Depth chart at Y" });
+  const chooser = chart.getByRole("group", { name: "Add a player at Y" });
+  const offered = chooser.locator("li").getByRole("button");
+  await expect(chart).toContainText("Nobody is down for Y yet.");
+  // the lineup controls carry no help paragraph
+  await expect(panel(page).getByRole("group", { name: "Lineup" })).not.toContainText("A branch starts as a copy");
+  // everyone on the team, each once however it was typed, in alphabetical order
+  await chart.getByRole("button", { name: "+ Add a player" }).click();
+  await expect(offered).toHaveText([/^Aaliyah/, /^Devon/, /^Marcus Lee/, /^Priya\s*No position$/]);
+
+  // a pick goes on at the bottom, as the team writes it, and leaves the list
+  await chooser.getByRole("button", { name: "Add Devon at Y" }).click();
+  await expect(lines(chart)).toHaveText(["Devon"]);
+  await expect(d.caption("Y")).toHaveText("Devon");
+  await chart.getByRole("button", { name: "+ Add a player" }).click();
+  await expect(offered).toHaveText([/^Aaliyah/, /^Marcus Lee/, /^Priya/]);
+  await chooser.getByRole("button", { name: "Add Marcus Lee at Y" }).click();
+  await expect(lines(chart)).toHaveText(["Devon", "Marcus Lee"]);
+  // a picked line is an ordinary line: it moves up like any other
+  await chart.getByRole("button", { name: "Move Marcus Lee up" }).click();
+  await expect(d.caption("Y")).toHaveText("Marcus Lee");
+  await expect(panel(page).getByRole("group", { name: "Offense positions" }).getByRole("button", { name: "Y: Marcus Lee, 2 deep" })).toBeVisible();
+  await panel(page).screenshot({ path: `test-results/roster-${device}-from-team.png` });
+
+  // the player's page counts the new position; the team is the same on every lineup, Priya with no position on this one
+  const players = panel(page).getByRole("group", { name: "Players" });
+  await expect(players.locator("li").getByRole("button")).toHaveText([/^Aaliyah/, /^Devon/, /^Marcus Lee/, /^Priya\s*No position$/]);
+  await players.getByRole("button", { name: "Devon", exact: true }).click();
+  await expect(panel(page).getByRole("group", { name: "Devon's positions" }).locator("li").getByRole("button"))
+    .toHaveText(["X · Starter", "LC · Starter", "Y · 2nd"]);
+  await panel(page).getByRole("button", { name: "‹ Back", exact: true }).click();
+
+  // "devon" at LC is Devon: across the ball, a name typed two ways is already down
+  await d.select("LC", "Defense");
+  const lc = panel(page).getByRole("group", { name: "Depth chart at LC" });
+  await lc.getByRole("button", { name: "+ Add a player" }).click();
+  await expect(lc.getByRole("group", { name: "Add a player at LC" }).locator("li").getByRole("button")).toHaveText([/^Aaliyah/, /^Marcus Lee/, /^Priya/]);
+  await lc.getByRole("button", { name: "Cancel" }).click();
+
+  // Priya, from the other lineup's chart, joins this one by a pick; a new name joins the team and the chart
+  await d.select("QB");
+  const qb = panel(page).getByRole("group", { name: "Depth chart at QB" });
+  const qbAdd = qb.getByRole("button", { name: "+ Add a player" });
+  await qbAdd.click();
+  await qb.getByRole("button", { name: "Add Devon at QB" }).click();
+  await qbAdd.click();
+  await qb.getByRole("button", { name: "Add Priya at QB" }).click();
+  await expect(lines(qb)).toHaveText(["Aaliyah", "Devon", "Priya"]);
+  for (const name of ["Jordan", "Sam", "Riley", "Kai", "Noor"]) await addNew(qb, name);
+  // eight lines: the chart is full, and neither way adds a ninth
+  await expect(lines(qb)).toHaveCount(8);
+  await expect(qbAdd).toBeDisabled();
+  // off the chart is still on the team, and offered again
+  await qb.getByRole("button", { name: "Remove Noor" }).click();
+  await expect(qbAdd).toBeEnabled();
+  await qbAdd.click();
+  await expect(qb.getByRole("group", { name: "Add a player at QB" }).locator("li").getByRole("button")).toHaveText([/^Marcus Lee/, /^Noor\s*No position$/]);
+  await qb.getByRole("button", { name: "Add Marcus Lee at QB" }).click();
+  await expect(lines(qb)).toHaveText(["Aaliyah", "Devon", "Priya", "Jordan", "Sam", "Riley", "Kai", "Marcus Lee"]);
+  await expect(qbAdd).toBeDisabled();
+
+  // only the active lineup's charts changed; the other keeps its own, and the team holds everyone
+  const expected: Lineups = {
+    active: "main",
+    lineups: [
+      ...main([
+        { team: "offense", tag: "X", depth: ["Devon", "Marcus Lee"] },
+        { team: "offense", tag: "QB", depth: ["Aaliyah", "Devon", "Priya", "Jordan", "Sam", "Riley", "Kai", "Marcus Lee"] },
+        { team: "defense", tag: "LC", depth: ["devon"] },
+        { team: "offense", tag: "Y", depth: ["Marcus Lee", "Devon"] },
+      ]).lineups,
+      rainy,
+    ],
+    players: ["Devon", "Marcus Lee", "Aaliyah", "Priya", "Jordan", "Sam", "Riley", "Kai", "Noor"],
+  };
+  await expect.poll(() => storedLineups(page)).toEqual(expected);
+  writeFileSync(`test-results/roster-${device}-from-team.json`, `${JSON.stringify({ stored: await storedLineups(page) }, null, 2)}\n`);
 });
 
 test("lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked", async ({ page }, info) => {

@@ -23,7 +23,10 @@
  * - T3 a blank name added, or a player renamed to blank: nobody; nothing changes.
  * - T4 a player removed from the team: off the list and off every depth chart on every lineup (R8). It
  *   is not undoable, so the panel asks once.
- * - T5 a player put at a position they already hold, or at one with eight names: nothing happens.
+ * - T5 a player put at a position, from their page or from the depth chart's chooser: only those not down
+ *   for it yet are offered, a name typed two ways counting as there (R7), and a player left off this
+ *   lineup for a day is still offered, being on the team; the pick goes at the bottom, never past eight
+ *   lines. One who holds the position already, or a full chart, changes nothing.
  * - T6 a name on a depth chart that is not on the team's list (typed on a chart before there was one):
  *   it joins the team when the lineups are read, so taking it off its chart keeps it on the team.
  * - T7 a player renamed to the name of another player on the team: refused, so two players never

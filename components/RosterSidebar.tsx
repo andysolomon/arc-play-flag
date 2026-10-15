@@ -248,9 +248,6 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
             </>
           )}
         </div>
-        <span className={note}>
-          A branch starts as a copy of this lineup, for a day a player is away or a different opponent. The field shows the lineup picked here.
-        </span>
       </div>
 
       {player !== null && (
