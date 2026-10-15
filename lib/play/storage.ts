@@ -1,8 +1,8 @@
 import { readLos, withLos } from "./field";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
-import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, defaultLineups } from "./lineup";
-import { MAX_DEPTH, MAX_SLOTS, cleanName as rosterName } from "./roster";
+import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, defaultLineups } from "./lineup";
+import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
 
@@ -636,12 +636,28 @@ export function normalizeRoster(raw: unknown): Roster | null {
     if (!isRecord(v) || typeof v.tag !== "string" || !Array.isArray(v.depth)) continue;
     const team: Team = v.team === "defense" ? "defense" : "offense";
     const tag = v.tag.slice(0, 3);
-    const depth = v.depth.slice(0, MAX_DEPTH).map(rosterName);
+    const depth = v.depth.map((n) => rosterName(n).trim()).filter(Boolean).slice(0, MAX_DEPTH);
     if (!tag || !depth.length || out.some((s) => s.team === team && s.tag === tag)) continue;
     const slot: RosterSlot = { team, tag, depth };
     out.push(slot);
     if (out.length >= MAX_SLOTS) break;
   }
+  return out;
+}
+
+/**
+ * The team's players: strings only, trimmed and cut to fit, blanks out, each player once (R7), the list
+ * capped at MAX_TEAM; then every name on a depth chart that is not on it yet joins it (T6), so a chart is
+ * always filled from the team. A name on a chart is never dropped to keep under the cap (T8).
+ */
+function normalizeTeamPlayers(raw: unknown, lineups: readonly Lineup[]): string[] {
+  const out: string[] = [];
+  const take = (v: unknown) => {
+    const name = rosterName(v).trim().slice(0, MAX_NAME);
+    if (name && !out.some((n) => sameName(n, name))) out.push(name);
+  };
+  if (Array.isArray(raw)) for (const v of raw.slice(0, MAX_TEAM)) take(v);
+  for (const l of lineups) for (const slot of l.slots) for (const name of slot.depth) take(name);
   return out;
 }
 
@@ -673,7 +689,7 @@ export function normalizeLineups(raw: unknown): Lineups | null {
     if (l.from !== undefined && (l.from === l.id || !out.some((p) => p.id === l.from))) delete l.from;
   }
   const active = typeof raw.active === "string" && out.some((l) => l.id === raw.active) ? raw.active : MAIN_LINEUP;
-  return { active, lineups: out };
+  return { active, lineups: out, players: normalizeTeamPlayers(raw.players, out) };
 }
 
 /** The device's lineups; the starting lineup alone, empty, when none have been set. */

@@ -13,8 +13,31 @@
  * - V3 a lineup deleted that others were branched from: they stay, and forget their parent.
  * - V4 a branch of a branch: it copies the slots of the lineup it was made from, not the main one.
  * - V5 a blank name: kept as typed while the coach writes it; the list shows "Untitled lineup".
+ *
+ * The team's players are one list, the same on every lineup: a player joins the team by name, and a
+ * depth chart is filled from it. Ways that could go wrong:
+ *
+ * - T1 a player added with nowhere to play yet: on the team by name, listed with no position.
+ * - T2 a name added twice, or typed two ways ("devon", "Devon "): one player (R7); the second add is
+ *   nothing, and the panel opens the page already there.
+ * - T3 a blank name added, or a player renamed to blank: nobody; nothing changes.
+ * - T4 a player removed from the team: off the list and off every depth chart on every lineup (R8). It
+ *   is not undoable, so the panel asks once.
+ * - T5 a player put at a position, from their page or from the depth chart's chooser: only those not down
+ *   for it yet are offered, a name typed two ways counting as there (R7), and a player left off this
+ *   lineup for a day is still offered, being on the team; the pick goes at the bottom, never past eight
+ *   lines. One who holds the position already, or a full chart, changes nothing.
+ * - T6 a name on a depth chart that is not on the team's list (typed on a chart before there was one):
+ *   it joins the team when the lineups are read, so taking it off its chart keeps it on the team.
+ * - T7 a player renamed to the name of another player on the team: refused, so two players never
+ *   merge; renamed to their own name in other letters ("devon" to "Devon"): allowed. A rename follows
+ *   them onto every depth chart on every lineup.
+ * - T8 the team full, fifteen players (MAX_TEAM): no more can join until one is removed. A device whose
+ *   depth charts already hold more names than that (typed before the team's list, T6) keeps every one of
+ *   them, and is full until it is back under.
  */
 
+import { MAX_NAME, cleanName, playerNames, renamedIn, sameName, withoutName } from "./roster";
 import type { Lineup, Lineups, Roster } from "./types";
 
 export const MAIN_LINEUP = "main";
@@ -22,9 +45,11 @@ export const MAIN_NAME = "Starting Lineup";
 /** Lineups a team may keep. */
 export const MAX_LINEUPS = 20;
 export const MAX_LINEUP_NAME = 40;
+/** Players a team may hold. */
+export const MAX_TEAM = 15;
 
 export function defaultLineups(): Lineups {
-  return { active: MAIN_LINEUP, lineups: [{ id: MAIN_LINEUP, name: MAIN_NAME, slots: [] }] };
+  return { active: MAIN_LINEUP, lineups: [{ id: MAIN_LINEUP, name: MAIN_NAME, slots: [] }], players: [] };
 }
 
 export function lineupOf(ls: Lineups, id: string | undefined): Lineup | null {
@@ -63,7 +88,7 @@ export function branched(ls: Lineups, fromId: string, id: string): Lineups | nul
   const from = lineupOf(ls, fromId);
   if (!from || ls.lineups.length >= MAX_LINEUPS || lineupOf(ls, id)) return null;
   const lineup: Lineup = { id, name: `Lineup ${String(ls.lineups.length + 1)}`, from: from.id, slots: from.slots.map((s) => ({ ...s, depth: [...s.depth] })) };
-  return { active: id, lineups: [...ls.lineups, lineup] };
+  return { ...ls, active: id, lineups: [...ls.lineups, lineup] };
 }
 
 /** The lineups without one; never the starting lineup (V1). Its branches forget it (V3); the field falls back (V2). */
@@ -77,11 +102,60 @@ export function without(ls: Lineups, id: string): Lineups {
     return rest;
   });
   const active = ls.active === id ? (gone.from && lineups.some((l) => l.id === gone.from) ? gone.from : MAIN_LINEUP) : ls.active;
-  return { active, lineups };
+  return { ...ls, active, lineups };
 }
 
 /** What a lineup was branched from, by name, or null for the starting lineup and an orphan. */
 export function fromName(ls: Lineups, l: Lineup): string | null {
   const parent = lineupOf(ls, l.from);
   return parent ? lineupName(parent) : null;
+}
+
+/** A name as it would join the team: control characters out, trimmed, cut to fit; "" when it is blank (T3). */
+const asJoined = (name: string): string => cleanName(name).trim().slice(0, MAX_NAME);
+
+/** Everyone on the team, each once (R7), in alphabetical order: the team's list and any name on a depth chart (T6). */
+export function teamNames(ls: Lineups): string[] {
+  return playerNames(ls.lineups.flatMap((l) => l.slots), ls.players);
+}
+
+/** The team's own spelling of a name, or null when nobody on the team goes by it (R7). */
+export function onTeam(ls: Lineups, name: string): string | null {
+  return teamNames(ls).find((n) => sameName(n, name)) ?? null;
+}
+
+/** Whether the team can take another player (T8). */
+export const teamFull = (ls: Lineups): boolean => teamNames(ls).length >= MAX_TEAM;
+
+/** The lineups with a player joining the team by name (T1). Null when the name is blank (T3), already on the team (T2), or the team is full (T8). */
+export function withPlayer(ls: Lineups, name: string): Lineups | null {
+  const clean = asJoined(name);
+  if (!clean || onTeam(ls, clean) !== null || teamFull(ls)) return null;
+  return { ...ls, players: [...ls.players, clean] };
+}
+
+/** The lineups with a player off the team: off its list and off every depth chart on every lineup (T4, R8). */
+export function withoutPlayer(ls: Lineups, name: string): Lineups {
+  return {
+    ...ls,
+    players: ls.players.filter((n) => !sameName(n, name)),
+    lineups: ls.lineups.map((l) => ({ ...l, slots: withoutName(l.slots, name) })),
+  };
+}
+
+/**
+ * The lineups with a player renamed, on the team's list and on every depth chart on every lineup (T7).
+ * Null when the new name is blank (T3) or belongs to another player on the team (T7).
+ */
+export function renamedPlayer(ls: Lineups, from: string, to: string): Lineups | null {
+  const clean = asJoined(to);
+  if (!clean) return null;
+  const other = onTeam(ls, clean);
+  if (other !== null && !sameName(other, from)) return null;
+  const listed = ls.players.some((n) => sameName(n, from));
+  return {
+    ...ls,
+    players: listed ? ls.players.map((n) => (sameName(n, from) ? clean : n)) : [...ls.players, clean],
+    lineups: ls.lineups.map((l) => ({ ...l, slots: renamedIn(l.slots, from, clean) })),
+  };
 }

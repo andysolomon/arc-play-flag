@@ -170,10 +170,12 @@ export interface Lineup {
   slots: Roster;
 }
 
-/** Every lineup, and which one the field shows. */
+/** The team's players, every lineup, and which one the field shows. */
 export interface Lineups {
   active: string;
   lineups: Lineup[];
+  /** everyone on the team, by name as first written: the same on every lineup, and who a depth chart is filled from */
+  players: string[];
 }
 
 export interface TeamSettings {

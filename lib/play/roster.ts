@@ -7,8 +7,8 @@
  *
  * - R1 a tag renamed on a play: the player wears a tag with no slot and reads as unassigned; the old slot
  *   keeps its names for whoever wears that tag next. Nothing is moved or lost.
- * - R2 a blank line on the depth chart: kept as typed while the coach fills it in, so a space typed in a
- *   name is never trimmed away under their fingers; a blank starter reads as unassigned on the field.
+ * - R2 a blank line on the depth chart (one typed on a chart before the team's list): nobody, dropped, so
+ *   the next name up starts; a name is stored trimmed.
  * - R3 a slot with no lines left is dropped from the roster, so an empty depth chart stores nothing.
  * - R4 a name that would not fit under a token is shortened for the field only: the first word, or the
  *   first eleven letters and an ellipsis; the panel keeps the whole name.
@@ -16,10 +16,8 @@
  * - R6 a player with no tag has no slot: the panel asks for a tag first.
  * - R7 a name typed two ways ("devon", "Devon ") is one player: names are matched trimmed, without
  *   regard to case, and shown as first written.
- * - R8 a player picked from the team for a position: the team is everyone down on any of its lineups, so
- *   a player left off this lineup for a day is still offered; only those not already down for the
- *   position are offered, a name typed two ways counting as there (R7); the pick goes on the chart as
- *   first written (this lineup's spelling first), at the bottom, and never past the last line.
+ * - R8 a player taken off the roster by name: off every depth chart they were on, matched as R7 matches,
+ *   and a chart left with no lines stores nothing (R3).
  */
 
 import type { Player, Roster, RosterSlot, Team } from "./types";
@@ -57,7 +55,7 @@ export function starterOf(roster: Roster, team: Team, tag: string): string | nul
  */
 export function withDepth(roster: Roster, team: Team, tag: string, depth: readonly string[]): Roster {
   if (!tag) return roster;
-  const lines = depth.slice(0, MAX_DEPTH).map(cleanName);
+  const lines = depth.map((n) => cleanName(n).trim()).filter(Boolean).slice(0, MAX_DEPTH);
   const rest = roster.filter((s) => !sameSlot(s, team, tag));
   if (!lines.length) return rest;
   const at = roster.findIndex((s) => sameSlot(s, team, tag));
@@ -66,7 +64,7 @@ export function withDepth(roster: Roster, team: Team, tag: string, depth: readon
   return roster.map((s) => (sameSlot(s, team, tag) ? slot : s));
 }
 
-/** A name as stored: control characters out, at most MAX_NAME letters, spaces kept as typed (R2). */
+/** A name as typed: control characters out, at most MAX_NAME letters. */
 export function cleanName(v: unknown): string {
   return typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, MAX_NAME) : "";
 }
@@ -101,34 +99,43 @@ export function depthWord(index: number): string {
 /** A name as players are told apart (R7). */
 const key = (name: string): string => name.trim().toLocaleLowerCase();
 
-/** Everyone on the roster, each name once as first written, in alphabetical order; blank lines are nobody. */
-export function playerNames(roster: Roster): string[] {
+/** Whether two names are one player (R7). */
+export const sameName = (a: string, b: string): boolean => key(a) === key(b);
+
+/**
+ * Everyone on the roster, each name once as first written, in alphabetical order; blank lines are nobody.
+ * `also` are names on the lineup in their own right, down for a position or not, and come first, so a
+ * name added by hand is shown as the coach added it.
+ */
+export function playerNames(roster: Roster, also: readonly string[] = []): string[] {
   const seen = new Map<string, string>();
+  const take = (name: string) => {
+    const k = key(name);
+    if (k && !seen.has(k)) seen.set(k, name.trim());
+  };
+  for (const name of also) take(name);
   for (const slot of roster) {
-    for (const name of slot.depth) {
-      const k = key(name);
-      if (k && !seen.has(k)) seen.set(k, name.trim());
-    }
+    for (const name of slot.depth) take(name);
   }
   return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-/** Everyone on the team: each name once across all its lineups, the first lineup's spelling first (R8). */
-export function teamNames(rosters: readonly Roster[]): string[] {
-  return playerNames(rosters.flat());
+/** The roster with a player's name changed on every depth chart they are on (R7). */
+export function renamedIn(roster: Roster, from: string, to: string): Roster {
+  const k = key(from);
+  if (!k) return roster;
+  return roster.map((slot) => (slot.depth.some((n) => key(n) === k) ? { ...slot, depth: slot.depth.map((n) => (key(n) === k ? to : n)) } : slot));
 }
 
-/** Everyone on the team who is not down for a position yet, in alphabetical order (R8). */
-export function available(team: readonly string[], depth: readonly string[]): string[] {
-  const down = new Set(depth.map(key));
-  return team.filter((name) => !down.has(key(name)));
-}
-
-/** The depth chart with a player from the lineup added at the bottom (R8); unchanged when they are on it or it is full. */
-export function withPlayer(depth: readonly string[], name: string): readonly string[] {
+/** The roster without a player: off every depth chart (R8), a chart left empty gone with them (R3). */
+export function withoutName(roster: Roster, name: string): Roster {
   const k = key(name);
-  if (!k || depth.length >= MAX_DEPTH || depth.some((n) => key(n) === k)) return depth;
-  return [...depth, name.trim()];
+  if (!k) return roster;
+  return roster.flatMap((slot) => {
+    const depth = slot.depth.filter((n) => key(n) !== k);
+    if (depth.length === slot.depth.length) return [slot];
+    return depth.length ? [{ ...slot, depth }] : [];
+  });
 }
 
 /** One place a player holds: a position and how deep they sit at it (0 is the starter). */
