@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { Lineups, Roster } from "../../lib/play/types";
+import type { Lineups, Roster, SavedPlay } from "../../lib/play/types";
 import { Designer, armSabotage, downloadText, sabotage } from "../support/designer";
 import { OTTERS, SLANT_LEFT, jsonUpload, play, seed, storedLineups } from "../support/fixtures";
 
@@ -11,8 +11,9 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * nothing drawn on them, lists every position on both sides, and, for the one tapped, takes a depth chart
  * of names, starter first, with a way to move a player up and to take one off. The starter's name is
  * drawn under the tag, in roster mode and while drawing the play, is the device's (it outlasts a reload,
- * goes into a device backup and comes back from one), and never reaches a share link. A tag renamed is a
- * fresh position; undo brings the old one back with its names. A write the device refuses is said, and
+ * goes into a device backup and comes back from one), and never reaches a share link. Roster mode is the
+ * team's standard formation, never the play that is open: none of its routes, tags, spots, side or tools,
+ * nothing to drag or undo, and the play is back as it was on the way out. A write the device refuses is said, and
  * stores nothing. Every name on the lineup has a page of its own: the positions they play and where they
  * sit at each. Lineups are versions of it all: the Starting Lineup is always there, any lineup branches
  * into a copy to change, the field follows the one picked, and a deleted lineup falls back to the one it
@@ -74,6 +75,14 @@ test("positions are laid out, each takes a depth chart, the starter is named on 
   await expect(page.getByRole("banner").getByRole("button", { name: "Clear routes" })).toBeDisabled();
   await expect(d.player("S", "Defense")).toBeVisible();
   await expect(d.caption("X")).toHaveText("Unassigned");
+  // no play is open in roster mode: Play tools keeps the roster and the team, not the play's own sections
+  await d.tools();
+  const tools = page.locator("#play-sidebar");
+  await expect(tools.getByRole("button", { name: "Roster", exact: true })).toBeVisible();
+  for (const tile of ["New play", "Save", "Duplicate", "Copy share link", "Flip play", "Reset spots"]) {
+    await expect(tools.getByRole("button", { name: tile, exact: true })).toHaveCount(0);
+  }
+  await expect(tools.getByRole("textbox", { name: "Play name" })).toHaveCount(0);
   await d.rosterPanel();
   const offense = panel(page).getByRole("group", { name: "Offense positions" });
   await expect(panel(page).getByRole("group", { name: /positions$/ }).first()).toHaveAttribute("aria-label", "Offense positions");
@@ -147,7 +156,7 @@ test("positions are laid out, each takes a depth chart, the starter is named on 
 
   // back to the play: the routes return, the names stay under the tags, and only where somebody is down
   await d.rosterPanel();
-  await panel(page).getByRole("button", { name: "‹ Back to routes" }).click();
+  await panel(page).getByRole("button", { name: "‹ Back to the play" }).click();
   await expect(page.getByRole("button", { name: "Route palette" })).toBeVisible();
   await expect(page.getByRole("heading", { name: SLANT_LEFT.name, level: 1 })).toBeVisible();
   await expect(d.routes).toHaveCount(2);
@@ -182,36 +191,78 @@ test("positions are laid out, each takes a depth chart, the starter is named on 
   writeFileSync(`test-results/roster-${device}.json`, `${JSON.stringify({ afterX, stored: await storedLineups(page), shareUrl: url }, null, 2)}\n`);
 });
 
-test("a defensive call lists the defenders first, a renamed tag is a fresh position, undo brings the old one back, and a backup carries the roster", async ({ page }, info) => {
+test("roster mode is the team's standard formation, never the open play: its tags, spots, side and history stay out, and a backup carries the roster", async ({ page }, info) => {
   const device = info.project.name;
   await seed(page, { team: OTTERS });
   const d = new Designer(page);
   await d.goto();
   await d.newPlay("Defense");
-  await d.roster();
-  await d.rosterPanel();
-  await expect(panel(page).getByRole("group", { name: /positions$/ }).first()).toHaveAttribute("aria-label", "Defense positions");
-  const defense = panel(page).getByRole("group", { name: "Defense positions" });
-  // left to right, as the wristbands count them
-  expect(await defense.getByRole("button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))))
-    .toEqual(["LC: Unassigned", "LB: Unassigned", "S: Unassigned", "R: Unassigned", "RC: Unassigned"]);
-
+  // the defensive call's own changes: S retagged FS, LC stepped two yards in
   await d.select("S", "Defense");
+  await panel(page).getByRole("textbox", { name: "Player tag" }).fill("FS");
+  await d.foldOverlays();
+  await d.player("LC", "Defense").press("ArrowRight");
+  await d.player("LC", "Defense").press("ArrowRight");
+  const lcInPlay = await d.playerX("LC", "Defense");
+  expect(lcInPlay).toBeGreaterThan(3.5);
+  await expect(d.undo).toBeEnabled();
+
+  // the roster lays out the standard ten at their home spots, both sides at full strength, offense first
+  await d.roster();
+  await expect(d.player("FS", "Defense")).toHaveCount(0);
+  await expect(d.caption("S", "Defense")).toHaveText("Unassigned");
+  expect(await d.playerX("LC", "Defense")).toBeCloseTo(3, 1);
+  for (const [tag, team] of [["C", "Offense"], ["X", "Offense"], ["LC", "Defense"], ["S", "Defense"]] as const) {
+    await expect(d.player(tag, team)).not.toHaveClass(/opacity-40/);
+  }
+  // nothing of the play's history is reachable from here
+  await expect(d.undo).toBeDisabled();
+  await expect(d.redo).toBeDisabled();
+  await d.rosterPanel();
+  await expect(panel(page).getByRole("group", { name: /positions$/ }).first()).toHaveAttribute("aria-label", "Offense positions");
+  const defense = panel(page).getByRole("group", { name: "Defense positions" });
+  // left to right, as the wristbands count them, then the call's own FS, which has no spot on the field
+  expect(await defense.getByRole("button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))))
+    .toEqual(["LC: Unassigned", "LB: Unassigned", "S: Unassigned", "R: Unassigned", "RC: Unassigned", "FS: Unassigned"]);
+
+  // a position is tapped, never dragged or stepped, and its tag is the standard one, not a field to rename
+  await d.foldOverlays();
+  const s = d.player("S", "Defense");
+  const sAt = await d.playerX("S", "Defense");
+  const box = await s.boundingBox();
+  if (!box) throw new Error("no S on the field");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 20, { steps: 8 });
+  await page.mouse.up();
+  await expect(s).toHaveAttribute("aria-pressed", "true");
+  expect(await d.playerX("S", "Defense")).toBeCloseTo(sAt, 1);
+  await s.press("ArrowLeft");
+  expect(await d.playerX("S", "Defense")).toBeCloseTo(sAt, 1);
+  await d.rosterPanel();
+  await expect(panel(page).getByRole("heading", { name: "Who plays S" })).toBeVisible();
+  await expect(panel(page).getByRole("textbox", { name: "Player tag" })).toHaveCount(0);
   const chart = panel(page).getByRole("group", { name: "Depth chart at S" });
   await addNew(chart, "Jordan");
   await expect(d.caption("S", "Defense")).toHaveText("Jordan");
-
-  // the tag is the position: a new tag starts with nobody, and S keeps Jordan for whoever wears S next
-  await panel(page).getByRole("textbox", { name: "Player tag" }).fill("FS");
-  await expect(panel(page).getByRole("heading", { name: "Who plays FS" })).toBeVisible();
-  await expect(d.caption("FS", "Defense")).toHaveText("Unassigned");
-  await expect(defense.getByRole("button", { name: "FS: Unassigned" })).toBeVisible();
+  await expect(defense.getByRole("button", { name: "S: Jordan" })).toBeVisible();
   await expect.poll(() => storedLineups(page)).toEqual(main([{ team: "defense", tag: "S", depth: ["Jordan"] }], ["Jordan"]));
-  // undo deselects, as it does while drawing; the list still says who starts at S
+  await d.foldOverlays();
+  await d.field.screenshot({ path: `test-results/roster-${device}-formation.png` });
+  // the keyboard's undo is the play's too, so it does nothing here
+  await page.keyboard.press("Control+z");
+  await expect(d.player("S", "Defense")).toBeVisible();
+
+  // out of roster mode the call is back as it was drawn, its history whole; FS is a position nobody is down for
+  await d.roster(false);
+  await expect(d.player("FS", "Defense")).toBeVisible();
+  await expect(d.caption("FS", "Defense")).toHaveCount(0);
+  expect(await d.playerX("LC", "Defense")).toBeCloseTo(lcInPlay, 1);
+  await expect(d.undo).toBeEnabled();
+  await d.undo.click();
+  await d.undo.click();
   await d.undo.click();
   await expect(d.caption("S", "Defense")).toHaveText("Jordan");
-  await d.rosterPanel();
-  await expect(defense.getByRole("button", { name: "S: Jordan" })).toBeVisible();
 
   // a device backup carries the roster, and restoring it on a wiped device brings the names back
   await page.goto("/playbooks");
@@ -235,6 +286,63 @@ test("a defensive call lists the defenders first, a renamed tag is a fresh posit
   await expect(d.caption("S", "Defense")).toHaveText("Jordan");
 
   writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups }, null, 2)}\n`);
+});
+
+/** A saved play with one player retagged, a position the standard formation has no token for. */
+const retagged = (p: SavedPlay, id: string, label: string): SavedPlay => ({ ...p, players: p.players.map((q) => (q.id === id ? { ...q, label } : q)) });
+
+test("a depth chart kept for a tag the standard formation lacks stays in reach: listed beyond the field, opened from a player's page, reordered and filled", async ({ page }, info) => {
+  const device = info.project.name;
+  const fsCall = retagged(play("fx-fs-call", "Otter FS Call", {}, "", "defense"), "d5", "FS");
+  const hSet = retagged(play("fx-h-set", "Otter H Set"), "o5", "H");
+  await seed(page, {
+    plays: [fsCall, hSet],
+    team: OTTERS,
+    lineups: main([{ team: "defense", tag: "FS", depth: ["Jordan", "Casey"] }], ["Jordan", "Casey"]),
+  });
+  const d = new Designer(page);
+  await d.openSaved(fsCall.name);
+  await expect(d.caption("FS", "Defense")).toHaveText("Jordan");
+
+  // the field is the standard ten; FS (kept on the lineup and worn by the call) and H (worn by a saved play) are listed after them
+  await d.roster();
+  await expect(d.player("FS", "Defense")).toHaveCount(0);
+  await expect(d.player("H")).toHaveCount(0);
+  await d.rosterPanel();
+  const labels = (team: "Offense" | "Defense") =>
+    panel(page).getByRole("group", { name: `${team} positions` }).getByRole("button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
+  expect(await labels("Offense")).toEqual(["X: Unassigned", "C: Unassigned", "QB: Unassigned", "Z: Unassigned", "Y: Unassigned", "H: Unassigned"]);
+  expect(await labels("Defense")).toEqual(["LC: Unassigned", "LB: Unassigned", "S: Unassigned", "R: Unassigned", "RC: Unassigned", "FS: Jordan, 2 deep"]);
+
+  // Jordan's page leads to FS's chart, which says it is off the field, and Casey moves up to start
+  await panel(page).getByRole("group", { name: "Players" }).getByRole("button", { name: "Jordan", exact: true }).click();
+  const positions = panel(page).getByRole("group", { name: "Jordan's positions" });
+  await expect(positions.locator("li").getByRole("button")).toHaveText(["FS · Starter"]);
+  await positions.getByRole("button", { name: "FS · Starter" }).click();
+  await expect(panel(page).getByRole("heading", { name: "Who plays FS" })).toBeVisible();
+  await expect(panel(page)).toContainText("FS has no spot in the standard formation");
+  const fs = panel(page).getByRole("group", { name: "Depth chart at FS" });
+  await fs.getByRole("button", { name: "Move Casey up" }).click();
+  await expect(lines(fs)).toHaveText(["Casey", "Jordan"]);
+  await panel(page).screenshot({ path: `test-results/roster-${device}-off-field.png` });
+
+  // H, worn only by a saved play, takes a chart of its own from the list
+  await panel(page).getByRole("group", { name: "Offense positions" }).getByRole("button", { name: "H: Unassigned" }).click();
+  const h = panel(page).getByRole("group", { name: "Depth chart at H" });
+  await addNew(h, "Riley");
+  await expect(lines(h)).toHaveText(["Riley"]);
+  const expected = main([
+    { team: "defense", tag: "FS", depth: ["Casey", "Jordan"] },
+    { team: "offense", tag: "H", depth: ["Riley"] },
+  ], ["Jordan", "Casey", "Riley"]);
+  await expect.poll(() => storedLineups(page)).toEqual(expected);
+
+  // back in the call, FS's new starter is named under the player wearing it
+  await d.roster(false);
+  await expect(page.getByRole("heading", { name: fsCall.name, level: 1 })).toBeVisible();
+  await expect(d.caption("FS", "Defense")).toHaveText("Casey");
+
+  writeFileSync(`test-results/roster-${device}-off-field.json`, `${JSON.stringify({ stored: await storedLineups(page) }, null, 2)}\n`);
 });
 
 test("a name the device will not keep is said once and stores nothing", async ({ page }) => {
