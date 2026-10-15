@@ -8,7 +8,7 @@ import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
-import { inNoRunZone, withLos } from "@/lib/play/field";
+import { LOS_YARD, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import { activeLineup, withSlots } from "@/lib/play/lineup";
@@ -21,7 +21,7 @@ import {
 } from "@/lib/play/library";
 import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { mirrorRoute, routeDef } from "@/lib/play/routes";
+import { defaults, mirrorRoute, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
@@ -84,6 +84,12 @@ export function App() {
   const lineup = useMemo(() => activeLineup(lineups), [lineups]);
   const [mode, setMode] = useState<Mode>("play");
   const rostering = mode === "roster";
+  const rosteringRef = useRef(rostering);
+  useEffect(() => { rosteringRef.current = rostering; }, [rostering]);
+  // roster mode is the team's, not a play's: the standard formation, both sides at their home spots with the
+  // standard tags, and a selection of its own. The play open in the designer is left exactly as it was.
+  const formation = useMemo(() => defaults(), []);
+  const [rosterPick, setRosterPick] = useState<string | null>(null);
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -139,6 +145,14 @@ export function App() {
     dispatch({ type: "select", id });
     openRight(true);
   }, [openRight]);
+  const onRosterSelect = useCallback((id: string) => {
+    setRosterPick(id);
+    openRight(true);
+  }, [openRight]);
+  // the field's only edit in roster mode is a tap: a position picked, or the turf tapped to let it go
+  const rosterDispatch = useCallback((a: Action) => {
+    if (a.type === "select") setRosterPick(a.id);
+  }, []);
   // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
   // short there, the toast says so once it is drawn, and the palette says by how much
   const playersRef = useRef(s.players);
@@ -200,8 +214,14 @@ export function App() {
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { dispatch({ type: "select", id: null }); return; }
+      if (e.key === "Escape") {
+        if (rosteringRef.current) setRosterPick(null);
+        else dispatch({ type: "select", id: null });
+        return;
+      }
       if (isEditable(e.target)) return;
+      // the play's history is the play's: nothing in roster mode is on it, so nothing there undoes it
+      if (rosteringRef.current) return;
       const k = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && k === "z") {
         e.preventDefault();
@@ -390,17 +410,20 @@ export function App() {
   }, [say]);
   const onRoster = useCallback((next: Roster) => { onLineups(withSlots(lineups, lineup.id, next)); }, [lineup.id, lineups, onLineups]);
   // the starter at each position on the field, from the active lineup, shortened to fit under the token
-  const starterNames = useMemo(() => starters(lineup.slots, s.players), [lineup.slots, s.players]);
-  // roster mode leaves whatever was being drawn and opens the panel on the positions; the selection stays,
-  // so a player tapped in the palette is the position whose depth chart opens
+  const fieldPlayers = rostering ? formation : s.players;
+  const starterNames = useMemo(() => starters(lineup.slots, fieldPlayers), [lineup.slots, fieldPlayers]);
+  // roster mode leaves whatever was being drawn and opens the panel on the positions; a player tapped in the
+  // palette opens the depth chart of the standard position wearing the same tag, when there is one
   const onMode = useCallback((next: Mode) => {
     setMode(next);
     if (next === "roster") {
       dispatch({ type: "draftCancel" });
       dispatch({ type: "cancelTargeting" });
+      const was = selected(s);
+      setRosterPick(was ? formation.find((p) => p.team === was.team && p.label === was.label)?.id ?? null : null);
       openRight(true);
     }
-  }, [openRight]);
+  }, [formation, openRight, s]);
   const copyShare = useCallback(() => {
     const url = shareUrl();
     setShareOpen(false);
@@ -454,8 +477,8 @@ export function App() {
         mode={mode}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
-        canUndo={s.past.length > 0}
-        canRedo={s.future.length > 0}
+        canUndo={!rostering && s.past.length > 0}
+        canRedo={!rostering && s.future.length > 0}
         canClear={s.players.some((p) => (p.route || p.preSnap) && p.team === s.side)}
         onClear={onClear}
         onToggleLeft={() => { openLeft(!leftOpen); }}
@@ -504,15 +527,15 @@ export function App() {
           />
         </Sidebar>
         <Field
-          players={s.players}
-          // the roster is both sides of the team, so roster mode shows both, the other faded, every position tappable
+          players={fieldPlayers}
+          // the roster is both sides of the team, so roster mode shows both, every position tappable
           vis={rostering ? "both" : s.vis}
           side={s.side}
-          selectedId={s.selectedId}
-          targeting={s.targeting}
-          draft={s.draft}
-          dispatch={fieldDispatch}
-          onSelect={onSelect}
+          selectedId={rostering ? rosterPick : s.selectedId}
+          targeting={rostering ? null : s.targeting}
+          draft={rostering ? null : s.draft}
+          dispatch={rostering ? rosterDispatch : fieldDispatch}
+          onSelect={rostering ? onRosterSelect : onSelect}
           onCatchNote={onCatchNote}
           lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
@@ -520,7 +543,7 @@ export function App() {
           showTitle
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
-          los={s.los}
+          los={rostering ? LOS_YARD : s.los}
           starters={starterNames}
           roster={rostering}
         />
@@ -531,11 +554,9 @@ export function App() {
               onLineups={onLineups}
               roster={lineup.slots}
               onRoster={onRoster}
-              selected={sel}
-              players={s.players}
-              side={s.side}
-              onSelect={onSelect}
-              onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
+              selected={formation.find((p) => p.id === rosterPick) ?? null}
+              players={formation}
+              onSelect={onRosterSelect}
               onDone={() => { onMode("play"); }}
             />
           ) : (

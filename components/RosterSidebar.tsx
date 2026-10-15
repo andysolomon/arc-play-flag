@@ -22,14 +22,10 @@ interface Props {
   onRoster: (next: Roster) => void;
   /** the position tapped on the field, whose depth chart is being set */
   selected: Player | null;
-  /** everyone on the field, both teams, for the list of positions */
+  /** the team's standard formation, both sides, for the list of positions */
   players: readonly Player[];
-  /** the play's own side: its positions are listed first */
-  side: Team;
   /** a position in the list tapped: select that player on the field */
   onSelect: (id: string) => void;
-  /** the tag field, the same one the route palette has */
-  onRename: (id: string, label: string, commit: boolean) => void;
   /** back to drawing the play */
   onDone: () => void;
 }
@@ -60,7 +56,7 @@ const Dot = ({ team }: { team: Team }) => (
  * position on the field is listed to jump between. The roster is the team's, kept on this device, so a
  * change here lands at once and is never undone.
  */
-function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, side, onSelect, onRename, onDone }: Props) {
+function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, onSelect, onDone }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
   const pickId = useId(), nameId = useId(), joinId = useId(), freshId = useId();
@@ -85,14 +81,12 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   };
   const pick = (id: string) => { setDeleting(false); onLineups(withActive(lineups, id)); };
   const removeLineup = () => { setDeleting(false); onLineups(without(lineups, lineup.id)); };
-  // one history entry per rename session, not per keystroke, as the palette's tag field does
-  const renaming = useRef<string | null>(null);
 
   // the team: everyone, the same on every lineup
   const names = teamNames(lineups);
   const full = teamFull(lineups);
-  // the play's own side first, each team left to right as the wristbands count them
-  const teams: Team[] = side === "defense" ? ["defense", "offense"] : ["offense", "defense"];
+  // offense then defense, each left to right as the wristbands count them; no play is open to put a side first
+  const teams: Team[] = ["offense", "defense"];
   // "X starter, LC 2nd": where a player sits on this lineup, for the lists
   const sits = (name: string): string =>
     standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ") || "No position";
@@ -340,8 +334,6 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           <Sticker icon="roster" size={56} className="opacity-75" />
           <span className="text-center text-base leading-body text-ink-muted">
             Tap a position on the field to set who plays it.
-            <br />
-            Drag to line them up.
           </span>
         </div>
       )}
@@ -349,25 +341,15 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
       {player === null && sel && (
         <>
           <div className="flex flex-none items-center gap-[10px]">
-            {/* the coloured token is the tag field, as in the route palette: the tag is the position */}
-            <input
-              value={sel.label}
-              maxLength={3}
-              placeholder="Tag"
-              aria-label="Player tag"
-              title="Position tag (up to 3 letters)"
-              onFocus={() => { renaming.current = null; }}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                const commit = renaming.current !== sel.id;
-                renaming.current = sel.id;
-                onRename(sel.id, e.target.value, commit);
-              }}
-              className="h-[42px] w-[42px] flex-none rounded-full border-[2.5px] border-ink p-0 text-center text-base text-ink placeholder:text-ink/60"
+            {/* the coloured token wears the position's tag, as on the field; tags are a play's to rename, not the roster's */}
+            <span
+              aria-hidden="true"
+              className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full border-[2.5px] border-ink text-base text-ink"
               style={{ background: teamFill(sel.team) }}
-            />
-            <h2 className="flex-1 text-title font-normal leading-tight">
-              {sel.label ? `Who plays ${sel.label}` : "Tag this position first"}
-            </h2>
+            >
+              {sel.label}
+            </span>
+            <h2 className="flex-1 text-title font-normal leading-tight">Who plays {sel.label}</h2>
           </div>
           {sel.label && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`Depth chart at ${sel.label}`}>
@@ -566,7 +548,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
         );
       })}
       <button type="button" onClick={onDone} className={`${small} flex-none self-start`}>
-        ‹ Back to routes
+        ‹ Back to the play
       </button>
     </>
   );

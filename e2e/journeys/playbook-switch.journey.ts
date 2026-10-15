@@ -114,18 +114,22 @@ test("the play name drops the playbook's plays down, numbered as the book is, an
   await expect(d.primaryRoutes).toHaveCount(0);
   steps.push(await read(d, "tapped Otter Slant Left"));
 
-  // roster mode hides the routes and titles the field "Roster" (ADR 008): a play picked there is shown in play mode
+  // roster mode is the team's, with no play open (ADR 008): no routes and no play to pick, until it is left
   await d.roster();
   await expect(page.getByRole("heading", { name: "Roster", level: 1 })).toBeVisible();
   await expect(d.routes).toHaveCount(0);
+  await d.tools();
+  await expect(playsButton(page)).toHaveCount(0);
+  await d.roster(false);
+  await expect(page.getByRole("heading", { name: "Otter Slant Left", level: 1 })).toBeVisible();
+  await expect(d.routes).toHaveCount(2);
   await d.tools();
   await playsButton(page).click();
   await playsMenu(page).getByRole("menuitemradio", { name: "Otter Wheel Right" }).click();
   await expect(d.toast).toHaveText("Opened “Otter Wheel Right”");
   await expect(page.getByRole("heading", { name: "Otter Wheel Right", level: 1 })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Route palette" })).toBeVisible();
   await expect(d.routes).toHaveCount(2);
-  steps.push(await read(d, "picked Otter Wheel Right from roster mode"));
+  steps.push(await read(d, "picked Otter Wheel Right after leaving roster mode"));
   save(`${testInfo.project.name}-the-play-name`, steps);
 });
 
