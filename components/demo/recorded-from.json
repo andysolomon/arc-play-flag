@@ -22,7 +22,7 @@
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlayerToken.tsx": "7fd9550c1091cdb8c3fe9254d22789f56cc17918e0562be1576f8cc3b447bd6e",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "6a3bc94b286318ab3a1614ddfa63d4e20aff051d9ecfec0f29282c0d6ec59f5f",
+    "components/RosterSidebar.tsx": "401d2b18b165ea2e4997f4db63cfaa1ede4f743298f0392a908084ee76ee23cc",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
@@ -67,7 +67,7 @@
     "components/ui.ts": "a4feffa6d24b7783b399ac8b05c83486eacbbf73883a18cf0d945b25d2ac1b68"
   },
   "restamped": {
-    "reason": "the team's players, the depth chart's chooser and a player's page are all inside the roster panel; no clip opens the roster",
+    "reason": "the team's players, the depth chart's chooser, a player's page and the full-team note are all inside the roster panel; no clip opens the roster",
     "files": [
       "components/RosterSidebar.tsx (changed)"
     ]

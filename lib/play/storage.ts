@@ -611,8 +611,8 @@ export function normalizeRoster(raw: unknown): Roster | null {
 
 /**
  * The team's players: strings only, trimmed and cut to fit, blanks out, each player once (R7), the list
- * capped; then every name on a depth chart that is not on it yet joins it (T6), so a chart is always filled
- * from the team.
+ * capped at MAX_TEAM; then every name on a depth chart that is not on it yet joins it (T6), so a chart is
+ * always filled from the team. A name on a chart is never dropped to keep under the cap (T8).
  */
 function normalizeTeamPlayers(raw: unknown, lineups: readonly Lineup[]): string[] {
   const out: string[] = [];

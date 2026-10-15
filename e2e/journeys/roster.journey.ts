@@ -476,6 +476,100 @@ test("players join the team any time, the same on every lineup, and depth charts
   writeFileSync(`test-results/roster-${device}-team.json`, `${JSON.stringify({ joined, kept, after, backup: backup.lineups }, null, 2)}\n`);
 });
 
+/** Sixteen fictional first names, for a team at and past its limit. */
+const SIXTEEN = ["Ari", "Bea", "Cal", "Dee", "Eli", "Fay", "Gus", "Hal", "Ivy", "Jay", "Kit", "Lou", "Max", "Ned", "Oz", "Pip"];
+
+test("a team holds fifteen players: the fifteenth fills it, a teammate can still go on a chart, and removing one opens it again", async ({ page }, info) => {
+  const device = info.project.name;
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: main([], SIXTEEN.slice(0, 14)) });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.rosterPanel();
+  const players = panel(page).getByRole("group", { name: "Players" });
+  const names = players.locator("li").getByRole("button");
+  const addButton = players.getByRole("button", { name: "+ Add to team" });
+  await expect(names).toHaveCount(14);
+  await expect(players).toContainText("(14 of 15)");
+  await expect(addButton).toBeEnabled();
+
+  // the fifteenth fills the team: adding to it is off, and the panel says why
+  await addButton.click();
+  await players.getByRole("textbox", { name: "Player name" }).fill("Oz");
+  await players.getByRole("textbox", { name: "Player name" }).press("Enter");
+  await expect(panel(page).getByRole("heading", { name: "Oz" })).toBeVisible();
+  await panel(page).getByRole("button", { name: "‹ Back", exact: true }).click();
+  await expect(names).toHaveCount(15);
+  await expect(players).toContainText("(15 of 15)");
+  await expect(addButton).toBeDisabled();
+  await expect(players).toContainText("The team is full at 15 players. Remove one from the team to add another.");
+
+  // a depth chart still takes a teammate, picked or typed, but not a new name
+  await d.select("X");
+  const chart = panel(page).getByRole("group", { name: "Depth chart at X" });
+  await chart.getByRole("button", { name: "+ Add a player" }).click();
+  const chooser = chart.getByRole("group", { name: "Add a player at X" });
+  await expect(chooser).toContainText("The team is full at 15 players: pick from it");
+  await expect(chooser.locator("li").getByRole("button")).toHaveCount(15);
+  const fresh = chooser.getByRole("textbox", { name: "New player at X" });
+  await fresh.fill("Pip");
+  await expect(chooser.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await fresh.fill("ari");
+  await expect(chooser.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
+  await fresh.press("Enter");
+  await expect(d.caption("X")).toHaveText("Ari");
+  await expect(lines(chart)).toHaveText(["Ari"]);
+  const full = await storedLineups(page);
+  expect(full?.players).toEqual(SIXTEEN.slice(0, 15));
+  await panel(page).screenshot({ path: `test-results/roster-${device}-team-full.png` });
+
+  // removing a player opens the team again
+  await players.getByRole("button", { name: "Oz", exact: true }).click();
+  await panel(page).getByRole("button", { name: "Remove from team" }).click();
+  await panel(page).getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(names).toHaveCount(14);
+  await expect(addButton).toBeEnabled();
+  await expect(players).not.toContainText("The team is full");
+  const reopened = await storedLineups(page);
+  expect(reopened?.players).toEqual(SIXTEEN.slice(0, 14));
+
+  writeFileSync(`test-results/roster-${device}-team-full.json`, `${JSON.stringify({ full, reopened }, null, 2)}\n`);
+});
+
+test("sixteen names typed on depth charts before the team's list all stay on the team, which is full until it is back under fifteen", async ({ page }, info) => {
+  const device = info.project.name;
+  // lineups as a device stored them before the team's list: names on depth charts, no `players`
+  const before = {
+    active: "main",
+    lineups: [{ id: "main", name: "Starting Lineup", slots: [
+      { team: "offense", tag: "X", depth: SIXTEEN.slice(0, 8) },
+      { team: "defense", tag: "LC", depth: SIXTEEN.slice(8, 16) },
+    ] }],
+  } as unknown as Lineups;
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: before });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await expect(d.caption("X")).toHaveText("Ari");
+  await d.roster();
+  await d.rosterPanel();
+  const players = panel(page).getByRole("group", { name: "Players" });
+  await expect(players.locator("li").getByRole("button")).toHaveCount(16);
+  await expect(players).toContainText("(16 of 15)");
+  await expect(players.getByRole("button", { name: "+ Add to team" })).toBeDisabled();
+  await expect(players).toContainText("The team is full at 15 players. Remove 2 from the team to add another.");
+  // the first write keeps every name on the team's list, and on its chart
+  await players.getByRole("button", { name: "Pip", exact: true }).click();
+  await panel(page).getByRole("button", { name: "Remove from team" }).click();
+  await panel(page).getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(players.locator("li").getByRole("button")).toHaveCount(15);
+  await expect(players).toContainText("Remove one from the team to add another.");
+  const after = await storedLineups(page);
+  expect(after?.players).toEqual(SIXTEEN.slice(0, 15));
+  expect(after?.lineups[0]?.slots.map((sl) => sl.depth)).toEqual([SIXTEEN.slice(0, 8), SIXTEEN.slice(8, 15)]);
+
+  writeFileSync(`test-results/roster-${device}-team-legacy.json`, `${JSON.stringify({ before, after }, null, 2)}\n`);
+});
+
 test("a name at either sideline stays whole on the field, and no name goes to the printer", async ({ page }, info) => {
   const device = info.project.name;
   // the wide receivers as far out as they can be lined up, with an eleven-letter name that is never shortened

@@ -4,7 +4,7 @@ import { memo, useEffect, useId, useRef, useState, type ChangeEvent, type Synthe
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
 import {
-  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, activeLineup, branched, fromName, lineupName, onTeam, renamed, renamedPlayer, teamFull,
+  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, activeLineup, branched, fromName, lineupName, onTeam, renamed, renamedPlayer, teamFull,
   teamNames, withActive, withPlayer, withSlots, without, withoutPlayer,
 } from "@/lib/play/lineup";
 import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
@@ -90,6 +90,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
 
   // the team: everyone, the same on every lineup
   const names = teamNames(lineups);
+  const full = teamFull(lineups);
   // the play's own side first, each team left to right as the wristbands count them
   const teams: Team[] = side === "defense" ? ["defense", "offense"] : ["offense", "defense"];
   // "X starter, LC 2nd": where a player sits on this lineup, for the lists
@@ -450,11 +451,15 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                       onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeChooser(); } }}
                       className={`${input} min-w-0 flex-1 px-3`}
                     />
-                    <button type="submit" disabled={!fresh.trim() || (onTeam(lineups, fresh) === null && teamFull(lineups))} className={`${small} flex-none`}>
+                    <button type="submit" disabled={!fresh.trim() || (onTeam(lineups, fresh) === null && full)} className={`${small} flex-none`}>
                       Add
                     </button>
                   </form>
-                  <span className={note}>Pick from the team, or type a new name: they join the team too.</span>
+                  <span className={note}>
+                    {full
+                      ? `The team is full at ${String(MAX_TEAM)} players: pick from it, or remove a player from the team to add someone new.`
+                      : "Pick from the team, or type a new name: they join the team too."}
+                  </span>
                   <button type="button" onClick={closeChooser} className={`${small} flex-none self-start`}>Cancel</button>
                 </div>
               ) : (
@@ -512,16 +517,22 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
             <button
               type="button"
               onClick={() => { setJoining(true); }}
-              disabled={teamFull(lineups)}
-              title="A player on the team, to put on the depth charts"
+              disabled={full}
+              title={full ? `The team is full at ${String(MAX_TEAM)} players` : "A player on the team, to put on the depth charts"}
               className={`${small} flex-none self-start`}
             >
               + Add to team
             </button>
           )}
+          {full && (
+            <span className="flex-none text-small leading-note">
+              The team is full at {String(MAX_TEAM)} players. Remove {names.length > MAX_TEAM ? String(names.length - MAX_TEAM + 1) : "one"} from
+              the team to add another.
+            </span>
+          )}
           <span className={note}>
             {names.length > 0
-              ? `Everyone on the team, on every lineup, with where they play on ${lineupName(lineup)}. Tap a name to put them at a position.`
+              ? `Everyone on the team (${String(names.length)} of ${String(MAX_TEAM)}), on every lineup, with where they play on ${lineupName(lineup)}. Tap a name to put them at a position.`
               : "Nobody is on the team yet. Add your players here, then put them on the depth charts."}
           </span>
         </div>

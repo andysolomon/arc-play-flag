@@ -29,7 +29,9 @@
  * - T7 a player renamed to the name of another player on the team: refused, so two players never
  *   merge; renamed to their own name in other letters ("devon" to "Devon"): allowed. A rename follows
  *   them onto every depth chart on every lineup.
- * - T8 the team full (MAX_TEAM): no more can be added.
+ * - T8 the team full, fifteen players (MAX_TEAM): no more can join until one is removed. A device whose
+ *   depth charts already hold more names than that (typed before the team's list, T6) keeps every one of
+ *   them, and is full until it is back under.
  */
 
 import { MAX_NAME, cleanName, playerNames, renamedIn, sameName, withoutName } from "./roster";
@@ -41,7 +43,7 @@ export const MAIN_NAME = "Starting Lineup";
 export const MAX_LINEUPS = 20;
 export const MAX_LINEUP_NAME = 40;
 /** Players a team may hold. */
-export const MAX_TEAM = 60;
+export const MAX_TEAM = 15;
 
 export function defaultLineups(): Lineups {
   return { active: MAIN_LINEUP, lineups: [{ id: MAIN_LINEUP, name: MAIN_NAME, slots: [] }], players: [] };
@@ -120,7 +122,7 @@ export function onTeam(ls: Lineups, name: string): string | null {
 }
 
 /** Whether the team can take another player (T8). */
-export const teamFull = (ls: Lineups): boolean => ls.players.length >= MAX_TEAM;
+export const teamFull = (ls: Lineups): boolean => teamNames(ls).length >= MAX_TEAM;
 
 /** The lineups with a player joining the team by name (T1). Null when the name is blank (T3), already on the team (T2), or the team is full (T8). */
 export function withPlayer(ls: Lineups, name: string): Lineups | null {
