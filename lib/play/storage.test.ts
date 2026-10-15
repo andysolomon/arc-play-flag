@@ -133,11 +133,12 @@ describe("storage", () => {
     store({ id: "a", name: "A", side: "offense", players: defaults(), notes: "" }, s);
     store({ id: "b", name: "B", side: "offense", players: defaults(), notes: "" }, s);
     storePlaybook({ id: "wk1", name: "Week 1", plays: ["a", "b", "a"] }, s);
-    expect(readPlaybooks(s)).toEqual({ wk1: { id: "wk1", name: "Week 1", plays: ["a", "b"] } });
+    // the first play added is the book's primary (docs/adr/009-playbook-switcher.md)
+    expect(readPlaybooks(s)).toEqual({ wk1: { id: "wk1", name: "Week 1", plays: ["a", "b"], primary: "a" } });
     const after = remove("a", s);
     expect(Object.keys(after.plays)).toEqual(["b"]);
     expect(after.playbooks.wk1?.plays).toEqual(["b"]);
-    expect(readPlaybooks(s).wk1?.plays).toEqual(["b"]);
+    expect(readPlaybooks(s).wk1).toEqual({ id: "wk1", name: "Week 1", plays: ["b"], primary: "b" });
   });
   test("team settings validate the colour", () => {
     const s = memory();

@@ -15,7 +15,11 @@ import { activeLineup, showsNames, withSlots } from "@/lib/play/lineup";
 import { starters } from "@/lib/play/roster";
 import type { Lineups, Player, Roster, RouteType, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
-import { getLineups, getPlays, getServerLineups, getServerTeam, getTeam, playById, savePlay, setLineups, setTeam, subscribe } from "@/lib/play/library";
+import {
+  addPlayToPlaybook, currentBook, getCurrentBookId, getLineups, getPlays, getServerLineups, getServerTeam, getTeam, playById, playbookById,
+  primaryPlay, savePlay, setCurrentBook, setLineups, setTeam, subscribe,
+} from "@/lib/play/library";
+import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { mirrorRoute, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
@@ -258,6 +262,9 @@ export function App() {
       openToolsTimer = window.setTimeout(() => { setLeftOpen(true); }, 0);
       window.history.replaceState(null, "", "/");
     }
+    // "Open in designer" from inside a book: /?open=<play id>&book=<book id> makes that book the current one
+    const book = params.get("book");
+    if (book && setCurrentBook(book)) window.history.replaceState(null, "", "/");
     // "Open" from the playbook gallery: /?open=<play id>
     const saved = playById(params.get("open"));
     if (saved) {
@@ -326,6 +333,47 @@ export function App() {
     dispatch({ type: "newPlay", side });
     say("New play");
   }, [say]);
+  // a saved play put on the board whole, as "Open" from the gallery does; the one already there is left alone.
+  // Roster mode hides the routes and titles the field "Roster", so a play picked there is shown in play mode
+  const openPlay = useCallback((play: SavedPlay) => {
+    setMode("play");
+    if (play.id === s.id) return;
+    dispatch({ type: "load", id: play.id, name: play.name, notes: play.notes, side: play.side, artShadow: play.artShadow, los: play.los, players: play.players });
+  }, [s.id]);
+  // the play name's list: a play of the current playbook picked
+  const onOpenPlay = useCallback((id: string) => {
+    const play = playById(id);
+    if (!play) { say("That play isn't on this device any more", 2600); return; }
+    openPlay(play);
+    say(`Opened “${play.name}”`);
+  }, [openPlay, say]);
+  const onAddToBook = useCallback(() => {
+    const book = currentBook();
+    if (!book || !s.id) return;
+    const r = addPlayToPlaybook(book.id, s.id);
+    if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); return; }
+    say(`Added to “${book.name}”`);
+  }, [s.id, say]);
+  // the Playbooks tile's menu: switching books opens the new book's primary play, or clears the board
+  // when it has none (docs/adr/009-playbook-switcher.md); the book already current is left as it is
+  const onSwitchBook = useCallback((id: string) => {
+    const book = playbookById(id);
+    if (!book) return;
+    if (id === getCurrentBookId()) { say(`Already in “${book.name}”`); return; }
+    setCurrentBook(id);
+    const primary = primaryPlay(book);
+    if (!primary) {
+      setMode("play");
+      dispatch({ type: "newPlay", side: s.side });
+      say(`Switched to “${book.name}” · board cleared`, 2600);
+    } else if (primary.id === s.id) {
+      openPlay(primary);
+      say(`Switched to “${book.name}”`);
+    } else {
+      openPlay(primary);
+      say(`Switched to “${book.name}” · opened “${primary.name}”`, 2600);
+    }
+  }, [openPlay, s.id, s.side, say]);
   const shareUrl = useCallback(() =>
     `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] }, noRunZones)}`,
   [s.name, s.notes, s.side, s.artShadow, s.los, s.players, noRunZones]);
@@ -433,11 +481,15 @@ export function App() {
         <Sidebar id="play-sidebar" side="left" open={leftOpen} label="Play tools" overlay={compact}>
           <PlaySidebar
             name={s.name}
+            playId={s.id}
             notes={s.notes}
             notesOpen={notesOpen}
             side={s.side}
             vis={s.vis}
             onName={(name) => { dispatch({ type: "setName", name }); }}
+            onOpenPlay={onOpenPlay}
+            onAddToBook={onAddToBook}
+            onSwitchBook={onSwitchBook}
             onNotes={(notes) => { dispatch({ type: "setNotes", notes }); }}
             onToggleNotes={() => { setNotesOpen((o) => !o); }}
             onNew={onNew}

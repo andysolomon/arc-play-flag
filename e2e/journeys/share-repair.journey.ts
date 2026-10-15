@@ -83,10 +83,11 @@ async function drawAndSave(page: Page, steps: Step[]): Promise<Designer> {
   return d;
 }
 
-/** From the designer to the book, the way a coach goes: Play tools › Playbooks, then Open. */
+/** From the designer to the book, the way a coach goes: Play tools › Playbooks › All playbooks, then Open. */
 async function hopToBook(d: Designer): Promise<void> {
   await d.tools();
-  await d.page.locator("#play-sidebar").getByRole("link", { name: "Playbooks" }).click();
+  await d.page.locator("#play-sidebar").getByRole("button", { name: "Playbooks" }).click();
+  await d.page.getByRole("menu", { name: "Playbooks" }).getByRole("menuitem", { name: "All playbooks ›" }).click();
   await expect(d.page).toHaveURL(/\/playbooks$/);
   // the book's own Open, not the play card's Open into the designer
   await d.page.locator(`a[href="/playbooks?book=${BOOK.id}"]`, { hasText: "Open" }).click();
