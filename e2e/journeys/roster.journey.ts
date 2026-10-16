@@ -455,10 +455,17 @@ test("a player already on the team is picked for another position by name, only 
 
   // the player's page counts the new position; the team is the same on every lineup, Priya with no position on this one
   const players = panel(page).getByRole("group", { name: "Players" });
-  await expect(players.locator("li").getByRole("button")).toHaveText([/^Aaliyah/, /^Devon/, /^Marcus Lee/, /^Priya\s*No position$/]);
+  await expect(players.locator("li").getByRole("button")).toHaveText([/^Aaliyah/, /^Devon/, /^Marcus Lee\s*Y starter, X 2nd$/, /^Priya\s*No position$/]);
   await players.getByRole("button", { name: "Devon", exact: true }).click();
   await expect(panel(page).getByRole("group", { name: "Devon's positions" }).locator("li").getByRole("button"))
     .toHaveText(["X · Starter", "LC · Starter", "Y · 2nd"]);
+  await panel(page).getByRole("button", { name: "‹ Back", exact: true }).click();
+  // the positions a player starts at come first, though X (where Marcus Lee is 2nd) is earlier on the roster
+  await players.getByRole("button", { name: "Marcus Lee", exact: true }).click();
+  const marcus = panel(page).getByRole("group", { name: "Marcus Lee's positions" }).locator("li").getByRole("button");
+  await expect(marcus).toHaveText(["Y · Starter", "X · 2nd"]);
+  const marcusPage = await marcus.allTextContents();
+  await panel(page).screenshot({ path: `test-results/roster-${device}-starter-first.png` });
   await panel(page).getByRole("button", { name: "‹ Back", exact: true }).click();
 
   // "devon" at LC is Devon: across the ball, a name typed two ways is already down (both sides on view to reach LC)
@@ -506,7 +513,7 @@ test("a player already on the team is picked for another position by name, only 
     players: ["Devon", "Marcus Lee", "Aaliyah", "Priya", "Jordan", "Sam", "Riley", "Kai", "Noor"],
   };
   await expect.poll(() => storedLineups(page)).toEqual(expected);
-  writeFileSync(`test-results/roster-${device}-from-team.json`, `${JSON.stringify({ stored: await storedLineups(page) }, null, 2)}\n`);
+  writeFileSync(`test-results/roster-${device}-from-team.json`, `${JSON.stringify({ marcusPage, stored: await storedLineups(page) }, null, 2)}\n`);
 });
 
 test("lineups branch from the starting lineup or from each other, each with its own depth charts, and the field follows the one picked", async ({ page }, info) => {
