@@ -2,7 +2,7 @@
 
 import { memo, useId, useRef, useState, type ReactNode, type ChangeEvent } from "react";
 import { LOS_CHOICES, inNoRunZone, losChoice } from "@/lib/play/field";
-import { activeLineup, hasNames, lineupName, showsNames, withActive, withNames } from "@/lib/play/lineup";
+import { activeLineup, allLineups, hasNames, lineupName, showsNames, withActive, withNames } from "@/lib/play/lineup";
 import { MAX_NOTES } from "@/lib/play/storage";
 import { EndZoneName, EndZonePicker } from "./endzone/EndZonePicker";
 import { Fold } from "./Fold";
@@ -248,7 +248,7 @@ function PlaySidebarImpl({
             onChange={(e: ChangeEvent<HTMLSelectElement>) => { onLineups(withActive(lineups, e.target.value)); }}
             className={`${select} w-full flex-none`}
           >
-            {lineups.lineups.map((l) => <option key={l.id} value={l.id}>{lineupName(l)}</option>)}
+            {allLineups(lineups).map((l) => <option key={l.id} value={l.id}>{lineupName(l)}</option>)}
           </select>
         </>
       )}

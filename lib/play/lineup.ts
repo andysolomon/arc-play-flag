@@ -1,8 +1,8 @@
 /**
  * Lineups: versions of the roster (docs/adr/008-roster-depth-chart.md). The starting lineup is always
- * there; a coach branches any lineup into a copy and changes it, so a day without a starter, or a
- * different opponent, has its own roster without touching the main one. Pure; storage reads and writes
- * them in lib/play/storage.ts.
+ * there, and the Secondary Lineup made from its depth charts; a coach branches any lineup into a copy and
+ * changes it, so a day without a starter, or a different opponent, has its own roster without touching the
+ * main one. Pure; storage reads and writes them in lib/play/storage.ts.
  *
  * Ways it could go wrong, written down before the code:
  *
@@ -39,6 +39,27 @@
  *   depth charts already hold more names than that (typed before the team's list, T6) keeps every one of
  *   them, and is full until it is back under.
  *
+ * The Secondary Lineup is made, not kept: the starting lineup's depth charts with the next player up starting
+ * at each position, the second unit a coach rotates in. It sits after the starting lineup wherever lineups are
+ * listed. Ways that could go wrong:
+ *
+ * - S1 a position with nobody behind its starter: the starter keeps it, there being nobody else to play it.
+ * - S2 one player next up at two positions on one side (Priya behind both X and Y): they can't start at both
+ *   at once, so among the standard formation's positions nobody starts twice on a side. The positions take
+ *   their starters a line down the charts at a time, one with fewer names first (so a position with only one
+ *   choice gets it), then in roster order; one left with nobody free keeps its starter (S1). Offense and
+ *   defense are apart: a player may start on both. A tag the formation lacks (FS, H) stands in for one of its
+ *   positions on a play, so it takes its next player up as it is, never held against the others.
+ * - S3 the starting lineup changed (a line moved, a player renamed or removed): the Secondary Lineup follows at
+ *   once, being made from it on every read and never stored.
+ * - S4 a change asked of it (its name, a depth chart, deleting it): nothing changes, and the panel offers none
+ *   of it; a coach who wants it otherwise branches it.
+ * - S5 a branch of it: a copy of its depth charts as made at that moment (V4), the coach's to change like any
+ *   branch, and no longer following the starting lineup.
+ * - S6 a device from before it, a backup, or a stored lineup claiming its id: nothing is stored for it but the
+ *   pick (`active`) and a branch's `from`, so old lineups read as they were, a stored lineup with its id is
+ *   dropped, and it does not count toward MAX_LINEUPS.
+ *
  * The standard formation roster mode lays out is the team's too: a coach drags a position, or steps it
  * with the arrow keys, to stand it where they like. Ways that could go wrong:
  *
@@ -60,13 +81,16 @@
  *   panel asks once.
  */
 
-import { MAX_NAME, cleanName, playerNames, renamedIn, sameName, withoutName } from "./roster";
+import { MAX_DEPTH, MAX_NAME, cleanName, playerNames, renamedIn, sameName, withoutName } from "./roster";
 import { LOS_GAP, X_MAX, X_MIN, Y_MAX, Y_MIN, defaults } from "./routes";
 import type { Lineup, Lineups, Player, Roster, Spot, Team } from "./types";
 
 export const MAIN_LINEUP = "main";
 export const MAIN_NAME = "Starting Lineup";
-/** Lineups a team may keep. */
+/** The Secondary Lineup's id: made from the starting lineup's depth charts, never stored (S6). */
+export const SECOND_LINEUP = "second";
+export const SECOND_NAME = "Secondary Lineup";
+/** Lineups a team may keep; the Secondary Lineup, being made, is not counted (S6). */
 export const MAX_LINEUPS = 20;
 export const MAX_LINEUP_NAME = 40;
 /** Players a team may hold. */
@@ -76,8 +100,57 @@ export function defaultLineups(): Lineups {
   return { active: MAIN_LINEUP, lineups: [{ id: MAIN_LINEUP, name: MAIN_NAME, slots: [] }], players: [] };
 }
 
+/** The standard formation's positions by team and tag: the ones on the field together, so nobody starts at two (S2). */
+const STANDARD = new Set(defaults().map((p) => `${p.team}:${p.label}`));
+
+/**
+ * A roster with the next player up starting at each position (S1): every depth chart moved up a line, its
+ * starter to the foot, and nobody starting at two of the standard formation's positions on one side (S2).
+ * Positions stay in the order they were.
+ */
+export function nextUp(roster: Roster): Roster {
+  const turned = roster.map((s) => [...s.depth.slice(1), ...s.depth.slice(0, 1)]);
+  const starts = new Map<number, string>();
+  const sides: Team[] = ["offense", "defense"];
+  for (const team of sides) {
+    // the formation's positions on this side, fewer names first, then in roster order (the sort is stable)
+    const at = roster.flatMap((s, i) => (s.team === team && STANDARD.has(`${team}:${s.tag}`) ? [i] : []))
+      .sort((a, b) => (roster[a]?.depth.length ?? 0) - (roster[b]?.depth.length ?? 0));
+    const taken: string[] = [];
+    for (let line = 0; line < MAX_DEPTH; line++) {
+      for (const i of at) {
+        const who = turned[i]?.[line];
+        if (who === undefined || starts.has(i) || taken.some((n) => sameName(n, who))) continue;
+        starts.set(i, who);
+        taken.push(who);
+      }
+    }
+  }
+  return roster.map((s, i) => {
+    const line = turned[i] ?? [];
+    // one with nobody free keeps its starter (S1); a tag the formation lacks takes its next player up as is
+    const first = starts.get(i) ?? (STANDARD.has(`${s.team}:${s.tag}`) ? s.depth[0] : line[0]);
+    const at = first === undefined ? -1 : line.indexOf(first);
+    return { ...s, depth: at < 0 ? line : [...line.slice(at, at + 1), ...line.slice(0, at), ...line.slice(at + 1)] };
+  });
+}
+
+/** The Secondary Lineup, made from the starting lineup's depth charts as they are now (S3). */
+export function secondLineup(ls: Lineups): Lineup {
+  const main = ls.lineups.find((l) => l.id === MAIN_LINEUP);
+  return { id: SECOND_LINEUP, name: SECOND_NAME, from: MAIN_LINEUP, slots: nextUp(main?.slots ?? []) };
+}
+
+/** A lineup by id, the Secondary Lineup made fresh (S3); null when there is no such lineup. */
 export function lineupOf(ls: Lineups, id: string | undefined): Lineup | null {
+  if (id === SECOND_LINEUP) return secondLineup(ls);
   return ls.lineups.find((l) => l.id === id) ?? null;
+}
+
+/** Every lineup, as the menus list them: the Secondary Lineup straight after the starting lineup. */
+export function allLineups(ls: Lineups): Lineup[] {
+  const at = ls.lineups.findIndex((l) => l.id === MAIN_LINEUP) + 1;
+  return [...ls.lineups.slice(0, at), secondLineup(ls), ...ls.lineups.slice(at)];
 }
 
 /** The lineup the field shows: the active one, else its parent, else the starting lineup, else the first (V2). */
@@ -105,28 +178,31 @@ export function renamed(ls: Lineups, id: string, name: string): Lineups {
 }
 
 /**
- * A new lineup, a copy of `fromId`'s slots (V4), active at once. Null when there is no such lineup or no
- * room. Named "Lineup n" until the coach names it.
+ * A new lineup, a copy of `fromId`'s slots (V4; the Secondary Lineup's as made now, S5), active at once. Null
+ * when there is no such lineup or no room. Named "Lineup n", its place in the list, until the coach names it.
  */
 export function branched(ls: Lineups, fromId: string, id: string): Lineups | null {
   const from = lineupOf(ls, fromId);
   if (!from || ls.lineups.length >= MAX_LINEUPS || lineupOf(ls, id)) return null;
-  const lineup: Lineup = { id, name: `Lineup ${String(ls.lineups.length + 1)}`, from: from.id, slots: from.slots.map((s) => ({ ...s, depth: [...s.depth] })) };
+  const lineup: Lineup = { id, name: `Lineup ${String(allLineups(ls).length + 1)}`, from: from.id, slots: from.slots.map((s) => ({ ...s, depth: [...s.depth] })) };
   return { ...ls, active: id, lineups: [...ls.lineups, lineup] };
 }
 
-/** The lineups without one; never the starting lineup (V1). Its branches forget it (V3); the field falls back (V2). */
+/**
+ * The lineups without one; never the starting lineup (V1) or the Secondary Lineup (S4). Its branches forget
+ * it (V3); the field falls back (V2).
+ */
 export function without(ls: Lineups, id: string): Lineups {
   const gone = lineupOf(ls, id);
-  if (!gone || id === MAIN_LINEUP) return ls;
+  if (!gone || id === MAIN_LINEUP || id === SECOND_LINEUP) return ls;
   const lineups = ls.lineups.filter((l) => l.id !== id).map((l) => {
     if (l.from !== id) return l;
     const rest = { ...l };
     delete rest.from;
     return rest;
   });
-  const active = ls.active === id ? (gone.from && lineups.some((l) => l.id === gone.from) ? gone.from : MAIN_LINEUP) : ls.active;
-  return { ...ls, active, lineups };
+  const back = gone.from !== undefined && lineupOf({ ...ls, lineups }, gone.from) ? gone.from : MAIN_LINEUP;
+  return { ...ls, active: ls.active === id ? back : ls.active, lineups };
 }
 
 /** Whether any depth chart on any lineup has a name on it: a starter to show on a play (V6). */
@@ -146,7 +222,7 @@ export function withNames(ls: Lineups, on: boolean): Lineups {
   return on && hasNames(ls) ? { ...rest, names: true } : rest;
 }
 
-/** What a lineup was branched from, by name, or null for the starting lineup and an orphan. */
+/** What a lineup was branched from (the Secondary Lineup made from), by name, or null for the starting lineup and an orphan. */
 export function fromName(ls: Lineups, l: Lineup): string | null {
   const parent = lineupOf(ls, l.from);
   return parent ? lineupName(parent) : null;
