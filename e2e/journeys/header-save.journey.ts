@@ -66,7 +66,8 @@ test("a coach saves from the header without opening Play tools, and the header s
   await expect(saveKey(page)).toHaveAttribute("title", "Save this play (⌘S)");
   await expect(dot(page)).toHaveCount(0);
   await expect(toolsToggle(page)).toHaveAttribute("aria-expanded", "false");
-  await expect(status(page, "Draft autosaved")).toBeVisible();
+  // nothing is drawn yet, so nothing has gone into the draft either
+  await expect(status(page, "Unsaved")).toBeVisible();
   await step(page, steps, "fresh play: nothing to save yet");
 
   await d.select("X");
