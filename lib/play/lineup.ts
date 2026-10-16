@@ -38,10 +38,31 @@
  * - T8 the team full, fifteen players (MAX_TEAM): no more can join until one is removed. A device whose
  *   depth charts already hold more names than that (typed before the team's list, T6) keeps every one of
  *   them, and is full until it is back under.
+ *
+ * The standard formation roster mode lays out is the team's too: a coach drags a position, or steps it
+ * with the arrow keys, to stand it where they like. Ways that could go wrong:
+ *
+ * - F1 a position dragged off the field, or over the line of scrimmage: held to its own side, at least
+ *   LOS_GAP off the line and inside the sidelines, as a player on a play is; a stored spot past that is
+ *   pulled back when read.
+ * - F2 a position dropped back on its home spot: nothing is kept for it, so a formation with nothing moved
+ *   stores nothing and Reset spots has nothing to do.
+ * - F3 a spot for a tag the standard formation has no token for (FS, H, a tag stored by hand): it has
+ *   nowhere to stand, since such a position is never drawn (R9), so it is dropped.
+ * - F4 two spots stored for one position: the first is kept, as a second slot for a tag is ignored.
+ * - F5 a spot that is not a number (missing, NaN, a string, Infinity): dropped; the position stands at home.
+ * - F6 the play open behind roster mode: never moved. A spot is the roster's alone, never written into a
+ *   play, its history, a share link, a playbook file or a picture, and leaving roster mode brings the play
+ *   back as it was.
+ * - F7 a position moved with one lineup active: moved on every lineup, like the team, so a branch stands
+ *   where the lineup it came from does.
+ * - F8 Reset spots: every position on the sides on view goes home in one write. It is not undoable, so the
+ *   panel asks once.
  */
 
 import { MAX_NAME, cleanName, playerNames, renamedIn, sameName, withoutName } from "./roster";
-import type { Lineup, Lineups, Roster } from "./types";
+import { LOS_GAP, X_MAX, X_MIN, Y_MAX, Y_MIN, defaults } from "./routes";
+import type { Lineup, Lineups, Player, Roster, Spot, Team } from "./types";
 
 export const MAIN_LINEUP = "main";
 export const MAIN_NAME = "Starting Lineup";
@@ -178,4 +199,59 @@ export function renamedPlayer(ls: Lineups, from: string, to: string): Lineups | 
     players: listed ? ls.players.map((n) => (sameName(n, from) ? clean : n)) : [...ls.players, clean],
     lineups: ls.lineups.map((l) => ({ ...l, slots: renamedIn(l.slots, from, clean) })),
   };
+}
+
+/** The standard formation at its home spots, which roster mode lays out (docs/adr/008-roster-depth-chart.md). */
+const HOME: readonly Player[] = defaults();
+
+const sameSpot = (s: Spot, team: Team, tag: string): boolean => s.team === team && s.tag === tag;
+
+/**
+ * A position of the standard formation stood at a spot: held to its side of the line and inside the
+ * sidelines (F1). Null when its tag has no token in the formation (F3), or when that is its home spot (F2).
+ */
+export function placedSpot(team: Team, tag: string, x: number, y: number): Spot | null {
+  const home = HOME.find((p) => p.team === team && p.label === tag);
+  if (!home) return null;
+  const sx = Math.max(X_MIN, Math.min(X_MAX, x));
+  const sy = team === "offense" ? Math.max(LOS_GAP, Math.min(Y_MAX, y)) : Math.max(Y_MIN, Math.min(-LOS_GAP, y));
+  if (Math.abs(sx - home.x) < 0.01 && Math.abs(sy - home.y) < 0.01) return null;
+  return { team, tag, x: sx, y: sy };
+}
+
+/** The lineups with these spots: stored only once a position has moved (F2). Everything else is kept. */
+function withSpots(ls: Lineups, spots: readonly Spot[]): Lineups {
+  const rest: Lineups = { ...ls };
+  delete rest.spots;
+  return spots.length ? { ...rest, spots: [...spots] } : rest;
+}
+
+/**
+ * The lineups with a position of the standard formation stood where it was dropped, the same on every
+ * lineup (F7): in place for one moved before, at the end for one moving off home, and gone when it is
+ * dropped back home (F2). A tag the formation has no token for moves nothing (F3).
+ */
+export function withSpot(ls: Lineups, team: Team, tag: string, x: number, y: number): Lineups {
+  const spot = placedSpot(team, tag, x, y);
+  const spots = ls.spots ?? [];
+  if (!spot) return withSpots(ls, spots.filter((s) => !sameSpot(s, team, tag)));
+  return withSpots(ls, spots.some((s) => sameSpot(s, team, tag)) ? spots.map((s) => (sameSpot(s, team, tag) ? spot : s)) : [...spots, spot]);
+}
+
+/** The lineups with every position on these sides back at its home spot, in one write (F8). */
+export function withoutSpots(ls: Lineups, teams: readonly Team[]): Lineups {
+  return withSpots(ls, (ls.spots ?? []).filter((s) => !teams.includes(s.team)));
+}
+
+/** Whether any position on these sides stands off its home spot: something for Reset spots to do (F8). */
+export function hasSpots(ls: Lineups, teams: readonly Team[]): boolean {
+  return (ls.spots ?? []).some((s) => teams.includes(s.team));
+}
+
+/** The standard formation as the coach has stood it: each position at its spot, else at home. The ids are the formation's own. */
+export function formationOf(ls: Lineups): Player[] {
+  return HOME.map((p) => {
+    const spot = ls.spots?.find((s) => sameSpot(s, p.team, p.label));
+    return spot ? { ...p, x: spot.x, y: spot.y } : { ...p };
+  });
 }

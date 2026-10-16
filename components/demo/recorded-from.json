@@ -6,9 +6,9 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "38a25f83515d8222f5bfccc9b0693ef50ff6318d6aff237e194510add8e2007b",
+    "components/App.tsx": "435d33122f47904d33138db6c6dbe62c0a7bdf1940fbeab1d0b6b9251820f597",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "c0f70aea9446a53c3635473e5432f3d0c0e5ac1afc63452b3106b05202c831c3",
+    "components/Field.tsx": "c470e52cd3f6b9a175cef2c9a96df55b2ba568769ea68cee82ae60b04145d78e",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "761fee2a9cb524bbed3a79c3fcc43a4f09e6c16a4380358d3c47808aefb10306",
@@ -23,9 +23,9 @@
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
-    "components/PlayerToken.tsx": "027c2353b964d5f5734437a7523073e5b5feb0c9b499824424f7570ce141b3cc",
+    "components/PlayerToken.tsx": "7fd9550c1091cdb8c3fe9254d22789f56cc17918e0562be1576f8cc3b447bd6e",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "796b12b751e751ff2793cec75f9ef99914c299f3ed42f589d9bc1ab6df1c0a82",
+    "components/RosterSidebar.tsx": "9c541200f6db1accdba12bed180b7dde30c11b95b70e9b9526feb045cb5c8e32",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
@@ -70,9 +70,12 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "only roster mode's ball spot changed (the 15 instead of the 40); no chapter opens roster mode",
+    "reason": "positions drag and step in roster mode, with Reset spots in the roster panel (merged with roster mode's ball on the 15); no chapter enters roster mode (no chapter script names it), and in play mode the field and tokens render and behave as before, so no clip shows it",
     "files": [
-      "components/App.tsx (changed)"
+      "components/App.tsx (changed)",
+      "components/Field.tsx (changed)",
+      "components/PlayerToken.tsx (changed)",
+      "components/RosterSidebar.tsx (changed)"
     ]
   }
 }
