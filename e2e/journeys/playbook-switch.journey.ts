@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Designer, downloadText } from "../support/designer";
 import { CURRENT_BOOK_KEY } from "../../lib/play/current-book";
 import {
-  COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook, playbookFile, seed, storedCurrentBook, storedPlaybooks, storedPlays,
+  COVER_TWO, COVER_TWO_D, OTTERS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook, playbookFile, seed, storedCurrentBook, storedPlaybooks, storedPlays,
 } from "../support/fixtures";
 
 /**
@@ -13,6 +13,7 @@ import {
  *  - the play name's list shows another book's plays, or numbers them differently from the book → "the play name"
  *  - picking a play from it doesn't open that play, or opens it without its routes and read      → "the play name"
  *  - the list doesn't say which play is on the board, or which is the primary                   → "the play name"
+ *  - the list doesn't say which plays are offense and which defense, or the checked row hides it → "offense or defense"
  *  - the arrow keys and Enter can't pick, or Escape doesn't give focus back                      → "the play name"
  *  - a play picked in roster mode opens hidden behind the roster, routes and name out of sight    → "the play name"
  *  - a switch opens the wrong play (the first instead of the primary), or leaves the old board   → "switching"
@@ -76,8 +77,8 @@ test("the play name drops the playbook's plays down, numbered as the book is, an
   expect(first.map((r) => r.name)).toEqual(["Otter Slant Left", "Otter Wheel Right"]);
   expect(first.map((r) => r.checked)).toEqual(["false", "false"]);
   // numbered as the book numbers them, the first play added marked as the primary
-  expect(first[0]?.text).toMatch(/^1\.\s*Otter Slant LeftPrimary$/);
-  expect(first[1]?.text).toMatch(/^2\.\s*Otter Wheel Right$/);
+  expect(first[0]?.text).toMatch(/^1\.\s*Otter Slant LeftOffensePrimary$/);
+  expect(first[1]?.text).toMatch(/^2\.\s*Otter Wheel RightOffense$/);
   await expect(playsMenu(page).getByRole("menuitemradio", { name: "Otter Slant Left" })).toBeFocused();
   await tools(page).screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-plays.png` });
   steps.push(await read(d, "opened the list on a new play", playsMenu(page)));
@@ -131,6 +132,47 @@ test("the play name drops the playbook's plays down, numbered as the book is, an
   await expect(d.routes).toHaveCount(2);
   steps.push(await read(d, "picked Otter Wheel Right after leaving roster mode"));
   save(`${testInfo.project.name}-the-play-name`, steps);
+});
+
+test("offense or defense: every play in the list says which side of the ball it is for", async ({ page }, testInfo) => {
+  const two = playbook("fx-two-way", "Otter Two Way", [SLANT_LEFT, COVER_TWO_D, WHEEL_RIGHT]);
+  await seed(page, { plays: [SLANT_LEFT, COVER_TWO_D, WHEEL_RIGHT], playbooks: [two], team: OTTERS });
+  const d = new Designer(page);
+  const steps: Step[] = [];
+  await d.goto();
+  await d.tools();
+
+  await playsButton(page).click();
+  await expect(playsMenu(page)).toContainText("IN “Otter Two Way”");
+  const listed = await rows(playsMenu(page));
+  expect(listed.map((r) => r.name)).toEqual(["Otter Slant Left", "Otter Cover Two D", "Otter Wheel Right"]);
+  expect(listed[0]?.text).toMatch(/^1\.\s*Otter Slant LeftOffensePrimary$/);
+  expect(listed[1]?.text).toMatch(/^2\.\s*Otter Cover Two DDefense$/);
+  expect(listed[2]?.text).toMatch(/^3\.\s*Otter Wheel RightOffense$/);
+  // the side reaches a screen reader too, as the row's description
+  const call = playsMenu(page).getByRole("menuitemradio", { name: "Otter Cover Two D" });
+  await expect(call).toHaveAccessibleDescription("Open Otter Cover Two D, a defensive call");
+  await expect(call.getByText("Defense", { exact: true })).toBeVisible();
+  // a long name gives way to the side, which is never squeezed out
+  for (const row of await playsMenu(page).getByRole("menuitemradio").all()) {
+    const badge = await row.getByText(/^(Offense|Defense)$/).boundingBox();
+    const box = await row.boundingBox();
+    expect(badge && box && badge.x >= box.x && badge.x + badge.width <= box.x + box.width).toBe(true);
+  }
+  await tools(page).screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-sides.png` });
+  steps.push(await read(d, "opened a two-way book's list", playsMenu(page)));
+
+  // the play on the board turns yellow and still reads its side
+  await call.click();
+  await expect(d.toast).toHaveText("Opened “Otter Cover Two D”");
+  await playsButton(page).click();
+  const checked = playsMenu(page).getByRole("menuitemradio", { checked: true });
+  await expect(checked).toHaveAccessibleName("Otter Cover Two D");
+  await expect(checked).toHaveAccessibleDescription("Otter Cover Two D is on the board, a defensive call");
+  await expect(checked.getByText("Defense", { exact: true })).toBeVisible();
+  await tools(page).screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-sides-checked.png` });
+  steps.push(await read(d, "opened Otter Cover Two D", playsMenu(page)));
+  save(`${testInfo.project.name}-offense-or-defense`, steps);
 });
 
 test("switching playbooks opens the new book's primary play, clears the board for an empty one, and outlasts a reload", async ({ page }, testInfo) => {
