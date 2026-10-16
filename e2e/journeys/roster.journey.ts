@@ -43,12 +43,30 @@ async function addNew(chart: Locator, name: string): Promise<void> {
 }
 /** The same lineups with the names shown on plays. */
 const named = (ls: Lineups): Lineups => ({ ...ls, names: true });
-/** The lineup picker and the name of the active lineup, in the roster panel. */
-const picker = (page: Page) => panel(page).getByRole("combobox", { name: "Lineup", exact: true });
-const lineupName = (page: Page) => panel(page).getByRole("textbox", { name: "Lineup name" });
 /** The SHOW pills in the roster panel: which side of the roster is on the field. */
 const show = (page: Page, which: "Offense" | "Defense" | "Both") =>
   panel(page).getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: which }).check();
+/** The name of the active lineup, the button dropping every lineup down from it, and its menu, in the roster panel. */
+const lineupName = (page: Page) => panel(page).getByRole("textbox", { name: "Lineup name" });
+const lineupsButton = (page: Page) => panel(page).getByRole("button", { name: "Lineups", exact: true });
+const lineupMenu = (page: Page) => panel(page).getByRole("menu", { name: "Lineups" });
+/** Opens the lineups menu and picks one: the field follows it and focus goes back to the button. */
+async function pickLineup(page: Page, name: string): Promise<void> {
+  await lineupsButton(page).click();
+  await lineupMenu(page).getByRole("menuitemradio", { name, exact: true }).click();
+  await expect(lineupMenu(page)).toHaveCount(0);
+  await expect(lineupsButton(page)).toBeFocused();
+}
+/** The lineups the menu lists, in order, and the one checked; Escape closes it again. */
+async function expectLineups(page: Page, names: string[], active: string): Promise<void> {
+  await lineupsButton(page).click();
+  await expect(lineupMenu(page).getByRole("menuitemradio")).toHaveText(names);
+  await expect(lineupMenu(page).getByRole("menuitemradio", { checked: true })).toHaveText(active);
+  await expect(lineupMenu(page).getByRole("menuitemradio", { checked: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(lineupMenu(page)).toHaveCount(0);
+  await expect(lineupsButton(page)).toBeFocused();
+}
 
 test("positions are laid out, each takes a depth chart, the starter is named on the field, kept on the device and out of links", async ({ page }, info) => {
   const device = info.project.name;
@@ -509,18 +527,34 @@ test("lineups branch from the starting lineup or from each other, each with its 
   await expect(d.caption("X")).toHaveText("Devon");
   await d.roster();
   await d.rosterPanel();
-  await expect(picker(page)).toHaveValue("main");
-  await expect(picker(page).getByRole("option")).toHaveText(["Starting Lineup"]);
+  // the lineup is one row: its name, the menu of every lineup dropped down from it, and the fork that branches it
+  const fork = panel(page).getByRole("button", { name: "Branch lineup" });
+  const name = await lineupName(page).boundingBox();
+  const forked = await fork.boundingBox();
+  const menuAt = await lineupsButton(page).boundingBox();
+  expect(name && forked && menuAt).toBeTruthy();
+  if (name && forked && menuAt) {
+    expect(Math.abs(name.y + name.height / 2 - (forked.y + forked.height / 2))).toBeLessThan(2);
+    expect(forked.x).toBeGreaterThanOrEqual(name.x + name.width);
+    expect(menuAt.x + menuAt.width).toBeLessThanOrEqual(name.x + name.width + 1);
+    expect(forked.width).toBeGreaterThanOrEqual(44);
+    expect(forked.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(lineupName(page)).toHaveValue("Starting Lineup");
+  await expectLineups(page, ["Starting Lineup"], "Starting Lineup");
   await expect(page.locator("#field-title")).toContainText("Starting Lineup");
-  await expect(panel(page).getByRole("button", { name: "Delete lineup" })).toHaveCount(0);
+  // the starting lineup can't be deleted: its menu has no Delete
+  await lineupsButton(page).click();
+  await expect(lineupMenu(page).getByRole("menuitem")).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // a branch is a copy of the lineup it comes from, named at once, and the field follows it
-  await panel(page).getByRole("button", { name: "Branch lineup" }).click();
+  await fork.click();
   await expect(lineupName(page)).toBeFocused();
   await expect(lineupName(page)).toHaveValue("Lineup 2");
   await expect(panel(page)).toContainText("Branched from Starting Lineup.");
   await lineupName(page).fill("No Devon");
-  await expect(picker(page).getByRole("option")).toHaveText(["Starting Lineup", "No Devon"]);
+  await expectLineups(page, ["Starting Lineup", "No Devon"], "No Devon");
   await expect(page.locator("#field-title")).toContainText("No Devon");
   await d.select("X");
   const chart = panel(page).getByRole("group", { name: "Depth chart at X" });
@@ -529,17 +563,18 @@ test("lineups branch from the starting lineup or from each other, each with its 
   await expect(lines(chart)).toHaveText(["Marcus Lee"]);
   await expect(d.caption("X")).toHaveText("Marcus Lee");
   // the starting lineup is untouched: picking it back brings Devon back
-  await picker(page).selectOption({ label: "Starting Lineup" });
+  await pickLineup(page, "Starting Lineup");
+  await expect(lineupName(page)).toHaveValue("Starting Lineup");
   await expect(d.caption("X")).toHaveText("Devon");
   await expect(lines(chart)).toHaveText(["Devon", "Marcus Lee"]);
   // the team is the same on every lineup: Devon is still on it, with no position on this one
-  await picker(page).selectOption({ label: "No Devon" });
+  await pickLineup(page, "No Devon");
   await expect(panel(page).getByRole("group", { name: "Players" }).locator("li").getByRole("button"))
     .toHaveText([/^Aaliyah\s*QB starter$/, /^Devon\s*No position$/, /^Marcus Lee\s*X starter$/]);
   await expect(d.caption("X")).toHaveText("Marcus Lee");
 
   // a branch of a branch copies the branch
-  await panel(page).getByRole("button", { name: "Branch lineup" }).click();
+  await fork.click();
   await expect(lineupName(page)).toHaveValue("Lineup 3");
   await expect(panel(page)).toContainText("Branched from No Devon.");
   await lineupName(page).fill("Rainy day");
@@ -561,24 +596,74 @@ test("lineups branch from the starting lineup or from each other, each with its 
   await d.rosterPanel();
   await expect(lineupName(page)).toHaveValue("Rainy day");
 
-  // deleting asks once in place; the field falls back to the lineup it was branched from, and its own branches forget it
-  await picker(page).selectOption({ label: "No Devon" });
-  await panel(page).getByRole("button", { name: "Delete lineup" }).click();
+  // deleting, from the foot of the menu, asks once in place; the field falls back to the lineup it was branched
+  // from, and its own branches forget it
+  await pickLineup(page, "No Devon");
+  await lineupsButton(page).click();
+  await expect(lineupMenu(page).getByRole("menuitem")).toHaveText(["Delete “No Devon”"]);
+  await panel(page).screenshot({ path: `test-results/roster-${device}-lineup-menu.png` });
+  await lineupMenu(page).getByRole("menuitem", { name: "Delete “No Devon”" }).click();
+  await expect(lineupMenu(page)).toHaveCount(0);
   await expect(panel(page)).toContainText("Delete No Devon?");
+  await expect(panel(page).getByRole("button", { name: "Keep" })).toBeFocused();
   await panel(page).getByRole("button", { name: "Keep" }).click();
-  await expect(picker(page).getByRole("option")).toHaveCount(3);
-  await panel(page).getByRole("button", { name: "Delete lineup" }).click();
+  await expect(panel(page)).not.toContainText("Delete No Devon?");
+  await expectLineups(page, ["Starting Lineup", "No Devon", "Rainy day"], "No Devon");
+  await lineupsButton(page).click();
+  await lineupMenu(page).getByRole("menuitem", { name: "Delete “No Devon”" }).click();
   await panel(page).getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(picker(page).getByRole("option")).toHaveText(["Starting Lineup", "Rainy day"]);
+  await expectLineups(page, ["Starting Lineup", "Rainy day"], "Starting Lineup");
   await expect(lineupName(page)).toHaveValue("Starting Lineup");
   await expect(d.caption("X")).toHaveText("Devon");
-  await picker(page).selectOption({ label: "Rainy day" });
+  await pickLineup(page, "Rainy day");
   await expect(panel(page)).not.toContainText("Branched from");
   await expect(d.caption("X")).toHaveText("Marcus Lee");
   const after = await storedLineups(page);
   expect(after?.lineups.map((l) => [l.name, l.from ?? null])).toEqual([["Starting Lineup", null], ["Rainy day", null]]);
 
   writeFileSync(`test-results/roster-${device}-lineups.json`, `${JSON.stringify({ stored, after }, null, 2)}\n`);
+});
+
+test("a long lineup name is shown whole in the lineups menu, so two that differ only at the end are told apart before either is picked", async ({ page }, info) => {
+  const device = info.project.name;
+  const rotA = "Saturday vs Falcons - Rotation A", rotB = "Saturday vs Falcons - Rotation B";
+  await seed(page, {
+    plays: [SLANT_LEFT], team: OTTERS,
+    lineups: {
+      active: "main", players: [],
+      lineups: [{ id: "main", name: "Starting Lineup", slots: [] }, { id: "rot-a", name: rotA, from: "main", slots: [] }, { id: "rot-b", name: rotB, from: "main", slots: [] }],
+    },
+  });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.rosterPanel();
+  /** The words in the open menu that are drawn cut off, and whether the menu itself scrolls sideways. */
+  const cutOff = () => lineupMenu(page).evaluate((menu) => ({
+    words: [...menu.querySelectorAll("[role^='menuitem'] span")].filter((s) => s.scrollWidth > s.clientWidth + 1).map((s) => s.textContent),
+    sideways: menu.scrollWidth > menu.clientWidth + 1,
+  }));
+
+  await lineupsButton(page).click();
+  const rows = lineupMenu(page).getByRole("menuitemradio");
+  await expect(rows).toHaveText(["Starting Lineup", rotA, rotB]);
+  expect(await cutOff()).toEqual({ words: [], sideways: false });
+  // a name too long for one line wraps, and its row grows past the 44px a row starts at
+  const one = await rows.first().boundingBox(), long = await rows.nth(2).boundingBox();
+  expect(one && long).toBeTruthy();
+  if (one && long) {
+    expect(one.height).toBeGreaterThanOrEqual(44);
+    expect(long.height).toBeGreaterThan(one.height);
+  }
+  await panel(page).screenshot({ path: `test-results/roster-${device}-long-lineup-names.png` });
+
+  // the one picked by its whole name is the one on the field, and its Delete names it whole too
+  await rows.nth(2).click();
+  await expect(lineupName(page)).toHaveValue(rotB);
+  await expect(page.locator("#field-title")).toContainText(rotB);
+  await lineupsButton(page).click();
+  await expect(lineupMenu(page).getByRole("menuitem")).toHaveText([`Delete “${rotB}”`]);
+  expect(await cutOff()).toEqual({ words: [], sideways: false });
 });
 
 test("names stay off a play until turned on, follow the lineup picked in Play tools, and go off with the last name on the roster", async ({ page }, info) => {
@@ -629,7 +714,7 @@ test("names stay off a play until turned on, follow the lineup picked in Play to
   await d.select("X");
   await panel(page).getByRole("group", { name: "Depth chart at X" }).getByRole("button", { name: "Remove Marcus Lee" }).click();
   await expect(d.caption("X")).toHaveText("Unassigned");
-  await picker(page).selectOption({ label: "Starting Lineup" });
+  await pickLineup(page, "Starting Lineup");
   await expect(d.caption("X")).toHaveText("Devon");
   await panel(page).getByRole("group", { name: "Depth chart at X" }).getByRole("button", { name: "Remove Devon" }).click();
   await expect(d.caption("X")).toHaveText("Unassigned");
@@ -764,7 +849,7 @@ test("players join the team any time, the same on every lineup, and depth charts
   await panel(page).getByRole("group", { name: "Depth chart at QB" }).getByRole("button", { name: "Remove Josiah" }).click();
   await expect(d.caption("QB")).toHaveText("Unassigned");
   await expect(names).toHaveText([/^Josiah\s*No position$/, /^Logan B\./, /^Noah/]);
-  await picker(page).selectOption({ label: "Starting Lineup" });
+  await pickLineup(page, "Starting Lineup");
   await expect(d.caption("QB")).toHaveText("Josiah");
 
   // removing a player from the team asks once, and takes them off every lineup
@@ -777,7 +862,7 @@ test("players join the team any time, the same on every lineup, and depth charts
   await panel(page).getByRole("button", { name: "Remove", exact: true }).click();
   await expect(names).toHaveText([/^Josiah/, /^Noah/]);
   await expect(d.caption("X")).toHaveText("Unassigned");
-  await picker(page).selectOption({ label: "Lineup 2" });
+  await pickLineup(page, "Lineup 2");
   await expect(names).toHaveText([/^Josiah\s*No position$/, /^Noah/]);
   await expect(d.caption("X")).toHaveText("Unassigned");
   const after = await storedLineups(page);
