@@ -16,7 +16,7 @@ Record at 960×540. Keep clips silent, 6–12 seconds long, readable at phone wi
 
 `components/demo/recorded-from.json`, beside the tour's manifest, records which UI the clips were recorded from (it stays out of `public/demos/`, which holds only what the app serves and precaches). See [Keeping the clips current](#keeping-the-clips-current).
 
-Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses `preload="none"`, and pauses the previous demo when another starts. Do not add a product timeline or scrubber—the playback chapter demonstrates a play running with the browser's native video controls.
+Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses `preload="none"`, and pauses the previous demo when another starts. It plays without the browser's video controls, which draw over the clip (iOS covers it with skip, scrub and AirPlay buttons; `disableRemotePlayback` keeps Android Chrome's cast button off it): the whole clip is one button, named Play or Pause and the chapter, and a play sign shows over it only while it is stopped. Do not add a product timeline or scrubber; at 6–12 seconds a clip is watched through, and a tap starts it over once it ends.
 
 ## Current chapter plan
 

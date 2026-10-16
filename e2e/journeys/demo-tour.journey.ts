@@ -13,14 +13,26 @@ import { STAMP_PATH } from "../../scripts/demo-recorder/freshness";
  *    committed                                                             → "every chapter"
  *  - a clip is not the length its card promises, or not 960×540, so it was cut short or
  *    recorded wrong; a poster is not a 960×540 picture                    → "every chapter"
- *  - starting one clip leaves another playing                              → "one clip at a time"
+ *  - the browser draws its own controls over a clip (iOS covered it with skip, scrub and AirPlay
+ *    buttons; Android Chrome adds a cast button)                           → "plays without the browser's controls"
+ *  - a stopped clip shows no sign that it plays, or the sign stays over the picture once it does,
+ *    or the control over the clip paints over the poster                   → "plays without the browser's controls"
+ *  - a tap on the picture away from the sign does nothing, or the chapter number takes the tap
+ *                                                                          → "plays without the browser's controls"
+ *  - a second tap does not pause it, or a keyboard cannot reach, name or press the control
+ *                                                                          → "plays without the browser's controls"
+ *  - a clip that has finished cannot be played again, or still says Pause  → "plays without the browser's controls"
+ *  - starting one clip leaves another playing, or still marked as playing  → "one clip at a time"
  * Whether the clips still show today's UI is `bun test`'s job (components/demo/demos.test.ts
  * against components/demo/recorded-from.json); the manifest this leaves names the recording's
  * fingerprint so the two can be tied together.
  *
  * Leaves `demo-tour-<device>.json` (every chapter's card, each file's bytes and sha256, what the
- * browser measured, and the recorded-from fingerprint) and, on the desktop project, a frame from
- * the middle of every clip (`demo-tour-chromium-<slug>.png`) in test-results/, uploaded as `demo-tour`.
+ * browser measured, and the recorded-from fingerprint), `demo-tour-<device>-playback.json` (the
+ * first chapter's control, sign and clip after every tap and key) with a picture of that card
+ * stopped and playing (`demo-tour-<device>-stopped.png`, `demo-tour-<device>-playing.png`) and, on
+ * the desktop project, a frame from the middle of every clip (`demo-tour-chromium-<slug>.png`) in
+ * test-results/, uploaded as `demo-tour`.
  */
 
 const DEMOS_DIR = new URL("../../public/demos/", import.meta.url);
@@ -35,6 +47,11 @@ function recordedFrom(): string {
 
 const card = (page: Page, title: string): Locator => page.locator("article").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
 const clip = (page: Page, title: string): Locator => page.getByLabel(`${title} demonstration`, { exact: true });
+/** The one control on a chapter's card: it covers the clip, and its name says what a press does. */
+const control = (page: Page, title: string): Locator => card(page, title).getByRole("button");
+/** The play sign drawn over a stopped clip. */
+const sign = (page: Page, title: string): Locator => control(page, title).locator("svg");
+const playing = (video: Locator): Promise<boolean> => video.evaluate((element: HTMLVideoElement) => !element.paused && !element.ended);
 
 interface Measured { duration: number; width: number; height: number; source: string }
 
@@ -107,9 +124,7 @@ test("every chapter's card matches the manifest, and its clip and poster are the
     let frame: string | null = null;
     if (device === "chromium") {
       await video.scrollIntoViewIfNeeded();
-      // the frame itself, not the browser's controls or its seeking spinner over it
       await video.evaluate(async (element: HTMLVideoElement) => {
-        element.controls = false;
         await new Promise<void>((resolve) => {
           element.addEventListener("seeked", () => { resolve(); }, { once: true });
           element.currentTime = element.duration / 2;
@@ -121,8 +136,8 @@ test("every chapter's card matches the manifest, and its clip and poster are the
         ]);
       });
       frame = `demo-tour-${device}-${demo.slug}.png`;
-      await video.screenshot({ path: `test-results/${frame}` });
-      await video.evaluate((element: HTMLVideoElement) => { element.controls = true; });
+      // the frame itself, not the play sign drawn over a stopped clip
+      await video.screenshot({ path: `test-results/${frame}`, style: "article button svg { visibility: hidden !important; }" });
     }
     chapters.push({
       slug: demo.slug, title: demo.title, time: demo.time, covers: demo.covers,
@@ -135,15 +150,121 @@ test("every chapter's card matches the manifest, and its clip and poster are the
   }, null, 2)}\n`);
 });
 
-test("one clip at a time: starting a second chapter pauses the first", async ({ page }) => {
+interface Step { step: string; name: string | null; sign: boolean; playing: boolean; ended: boolean; controls: boolean; at: number }
+
+test("a clip plays without the browser's controls: a tap anywhere on it or a key plays and pauses it, and nothing covers it while it plays", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const device = testInfo.project.name;
+  await page.goto("/demo");
+
+  // no clip asks the browser for its controls, or lets Android Chrome put a cast button over it
+  for (const demo of DEMOS) {
+    const video = clip(page, demo.title);
+    await expect(video, demo.slug).not.toHaveAttribute("controls");
+    await expect(video, demo.slug).toHaveJSProperty("controls", false);
+    await expect(video, demo.slug).toHaveJSProperty("disableRemotePlayback", true);
+    await expect(control(page, demo.title), demo.slug).toHaveAccessibleName(`Play ${demo.title}`);
+    await expect(sign(page, demo.title), demo.slug).toBeVisible();
+    // the control over the clip is see-through: the poster, then the clip, is all there is under the sign
+    await expect(control(page, demo.title), demo.slug).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  }
+
+  const [demo] = DEMOS;
+  if (!demo) throw new Error("the tour needs a chapter to play");
+  const article = card(page, demo.title);
+  const video = clip(page, demo.title);
+  const button = control(page, demo.title);
+  /**
+   * A real tap (a click on the desktop) at a point on the clip, as a fraction of its size or pixels
+   * from its corner. Measured each time: a screenshot of the card can scroll it.
+   */
+  const tapAt = async (x: number, y: number): Promise<void> => {
+    await video.scrollIntoViewIfNeeded();
+    const box = await video.boundingBox();
+    if (!box) throw new Error(`${demo.slug} has no box on screen`);
+    const [px, py] = [box.x + (x < 1 ? box.width * x : x), box.y + (y < 1 ? box.height * y : y)];
+    if (testInfo.project.use.hasTouch) await page.touchscreen.tap(px, py);
+    else await page.mouse.click(px, py);
+  };
+  const steps: Step[] = [];
+  const record = async (step: string): Promise<void> => {
+    const state = await video.evaluate((element: HTMLVideoElement) => ({
+      playing: !element.paused && !element.ended, ended: element.ended, controls: element.controls, at: element.currentTime,
+    }));
+    steps.push({ step, name: await button.getAttribute("aria-label"), sign: await sign(page, demo.title).isVisible(), ...state });
+  };
+  const expectPlaying = async (): Promise<void> => {
+    await expect.poll(() => playing(video)).toBe(true);
+    await expect(button).toHaveAccessibleName(`Pause ${demo.title}`);
+    await expect(sign(page, demo.title)).toBeHidden();
+    await expect(video).toHaveJSProperty("controls", false);
+  };
+  /** Stopped, and either paused where it was (well before the end, so a tap that missed and let it run out cannot pass) or finished. */
+  const expectStopped = async (how: "paused" | "finished"): Promise<void> => {
+    await expect.poll(() => playing(video)).toBe(false);
+    const { ended, at, duration } = await video.evaluate((element: HTMLVideoElement) => ({ ended: element.ended, at: element.currentTime, duration: element.duration }));
+    expect(ended, how).toBe(how === "finished");
+    if (how === "paused") expect(at, "paused where it was, not run out").toBeLessThan(duration - 1);
+    await expect(button).toHaveAccessibleName(`Play ${demo.title}`);
+    await expect(sign(page, demo.title)).toBeVisible();
+  };
+
+  await record("at rest");
+  await article.screenshot({ path: `test-results/demo-tour-${device}-stopped.png` });
+
+  // a tap on the sign plays it, and the sign gets out of the way
+  await tapAt(0.5, 0.5);
+  await expectPlaying();
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(1);
+  await article.screenshot({ path: `test-results/demo-tour-${device}-playing.png` });
+  await record("tapped the sign: playing");
+
+  // a tap anywhere else on the picture pauses it, and one on the chapter number plays it again
+  await tapAt(0.88, 0.85);
+  await expectStopped("paused");
+  await record("tapped the corner: paused");
+  await tapAt(24, 24);
+  await expectPlaying();
+  await record("tapped the chapter number: playing");
+
+  // once it has finished it says Play again, and a tap plays it from the start
+  await video.evaluate((element: HTMLVideoElement) => { element.currentTime = element.duration - 0.3; });
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.ended)).toBe(true);
+  await expectStopped("finished");
+  await record("finished");
+  await tapAt(0.3, 0.6);
+  await expectPlaying();
+  expect(await video.evaluate((element: HTMLVideoElement) => element.currentTime), "replays from the start").toBeLessThan(3);
+  await record("tapped after the end: playing from the start");
+
+  // a keyboard reaches the same control and presses it either way
+  await button.focus();
+  await page.keyboard.press("Space");
+  await expectStopped("paused");
+  await record("Space: paused");
+  await page.keyboard.press("Enter");
+  await expectPlaying();
+  await record("Enter: playing");
+  await page.keyboard.press("Space");
+  await expectStopped("paused");
+  await record("Space: paused");
+
+  writeFileSync(`test-results/demo-tour-${device}-playback.json`, `${JSON.stringify({ device, chapter: demo.slug, steps }, null, 2)}\n`);
+});
+
+test("one clip at a time: starting a second chapter pauses the first", async ({ page }, testInfo) => {
   await page.goto("/demo");
   const [one, two] = DEMOS;
   if (!one || !two) throw new Error("the tour needs two chapters to switch between");
   const [first, second] = [clip(page, one.title), clip(page, two.title)];
-  const playing = (video: Locator) => video.evaluate((element: HTMLVideoElement) => !element.paused);
-  await first.evaluate((element: HTMLVideoElement) => element.play());
+  const press = (title: string) => (testInfo.project.use.hasTouch ? control(page, title).tap() : control(page, title).click());
+  await press(one.title);
   await expect.poll(() => playing(first)).toBe(true);
-  await second.evaluate((element: HTMLVideoElement) => element.play());
+  await press(two.title);
   await expect.poll(() => playing(second)).toBe(true);
   await expect.poll(() => playing(first)).toBe(false);
+  // and the first one shows it: it offers Play again, under its sign
+  await expect(control(page, one.title)).toHaveAccessibleName(`Play ${one.title}`);
+  await expect(sign(page, one.title)).toBeVisible();
+  await expect(control(page, two.title)).toHaveAccessibleName(`Pause ${two.title}`);
 });
