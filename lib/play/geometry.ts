@@ -1,5 +1,5 @@
 import { blitzTarget } from "./blitz";
-import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, losLabel, toGo } from "./field";
+import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, ROSTER_LOS, losLabel, toGo } from "./field";
 import { chainLinks, quarterback, runsBefore, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
 import { DEF, INK, PITCH_SET, ROUTES, inkFor, jetLegs, routeDef, runLegs } from "./routes";
@@ -14,8 +14,12 @@ export const FIELD_YARDS = 30;
 export const MIN_DEPTH = 24;
 /** The deepest card: 37 yards past the line of scrimmage, unless a player already stands deeper. */
 export const MAX_DEPTH = 45;
-/** Roster mode's card: the standard formation, safety 11 yards deep, with no room kept for routes. */
-export const ROSTER_DEPTH = 21;
+/**
+ * Roster mode's card: 8 yards behind the ball on the 15 up to the goal line, 23 yards, with no room kept for
+ * routes. The safety, 11 yards deep, stands in the no-run band before the goal line, so the card shows that
+ * band whole, its label clear above him, rather than a sliver of it behind him.
+ */
+export const ROSTER_DEPTH = 8 + toGo(ROSTER_LOS);
 
 export function px(x: number): number {
   return x * S;

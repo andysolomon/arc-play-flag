@@ -19,6 +19,9 @@ export const NO_RUN_YARDS = 5;
 /** The spots a coach can put the ball on: from the 40 (the own goal line), the 20, the 10 and the 5. */
 export const LOS_CHOICES: readonly number[] = [LOS_YARD, MIDFIELD_YARD, GOAL_YARD - 10, GOAL_YARD - 5];
 
+/** Where roster mode puts the ball: the 15 (their 15, read as yards to go), the field labelled "LOS 15". */
+export const ROSTER_LOS = GOAL_YARD - 15;
+
 /** The yards from a spot to their goal line: the own goal line is the 40, their 5 the 5. */
 export const toGo = (los: number): number => GOAL_YARD - los;
 

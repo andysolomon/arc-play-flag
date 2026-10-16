@@ -29,6 +29,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 const panel = (page: Page) => page.locator("#route-sidebar");
 const tools = (page: Page) => page.locator("#play-sidebar");
+/** The field's line-of-scrimmage label: "LOS" on the 40, where every drive starts, else "LOS <yards to go>". */
+const losLabel = (d: Designer) => d.field.locator("g[fill-opacity='0.5'] > text").filter({ hasText: /^LOS/ });
 const openSettings = (page: Page) => page.getByRole("button", { name: /team, theme & backup settings/ }).click();
 /** The starting lineup alone, holding these slots, and the team's players. */
 const main = (slots: Roster, players: string[] = []): Lineups => ({ active: "main", lineups: [{ id: "main", name: "Starting Lineup", slots }], players });
@@ -249,6 +251,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   const lcInPlay = await d.playerX("LC", "Defense");
   expect(lcInPlay).toBeGreaterThan(3.5);
   await expect(d.undo).toBeEnabled();
+  await expect(losLabel(d)).toHaveText("LOS");
 
   // the roster lays out the standard formation at its home spots, opening on the call's own side, the defense
   await d.roster();
@@ -257,6 +260,9 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await expect(d.player("FS", "Defense")).toHaveCount(0);
   await expect(d.caption("S", "Defense")).toHaveText("Unassigned");
   expect(await d.playerX("LC", "Defense")).toBeCloseTo(3, 1);
+  // the ball is on the 15 in roster mode, whatever the play's own spot
+  await expect(losLabel(d)).toHaveText("LOS 15");
+  const rosterLos = await losLabel(d).textContent();
   // both sides at full strength, offense first, nothing faded
   await d.rosterView.click();
   await expect(d.rosterView).toHaveAccessibleName("Showing both");
@@ -308,6 +314,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await expect(d.player("FS", "Defense")).toBeVisible();
   await expect(d.caption("FS", "Defense")).toHaveCount(0);
   expect(await d.playerX("LC", "Defense")).toBeCloseTo(lcInPlay, 1);
+  await expect(losLabel(d)).toHaveText("LOS");
   await expect(d.undo).toBeEnabled();
   await d.undo.click();
   await d.undo.click();
@@ -335,7 +342,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await d.newPlay("Defense");
   await expect(d.caption("S", "Defense")).toHaveText("Jordan");
 
-  writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups }, null, 2)}\n`);
+  writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups, rosterLos }, null, 2)}\n`);
 });
 
 /** A saved play with one player retagged, a position the standard formation has no token for. */
@@ -1029,6 +1036,7 @@ test("a name at either sideline stays whole on the field, and no name goes to th
  * Roster mode lays out a formation that stands still, 11 yards deep at the safety, so its card frames just
  * that: no room kept for routes, not stretched down a phone's tall pane, and never Deep field. How this could break, and the check for each:
  *  - roster mode shows as much field as a play                  → on every screen its card shows ROSTER_YARDS, never stretched down a tall pane
+ *  - the ball on the 15 cuts the no-run band behind the safety → the card's top is the goal line, the band whole above him
  *  - framing it closer shrinks the card                         → the roster's card fills its pane across, or top to bottom
  *  - Deep field, on for the plays, opens the roster's card too  → with Deep field on the roster's card is the one it shows with it off
  *  - roster mode offers Deep field                              → no Deep field button in roster mode, with it on or off
@@ -1036,7 +1044,7 @@ test("a name at either sideline stays whole on the field, and no name goes to th
  *  - leaving roster mode loses the play's Deep field            → back on the play, Deep field is still on and the card as deep as before
  * Leaves `roster-<device>-zoom.json` (each step's yards shown and card width) and pictures of the roster's card.
  */
-const ROSTER_YARDS = 21;
+const ROSTER_YARDS = 23;
 test("roster mode is a closer card than a play's, and never the deep field", async ({ page }, info) => {
   const device = info.project.name;
   await seed(page, { team: OTTERS });
@@ -1067,6 +1075,15 @@ test("roster mode is a closer card than a play's, and never the deep field", asy
   await d.rosterView.click();
   await expect(d.rosterView).toHaveAccessibleName("Showing both");
   steps.roster = await card();
+  // the no-run band before their goal line is on the card whole, its label clear of the safety
+  const noRun = d.field.getByText("NO-RUN", { exact: true });
+  await expect(noRun).toBeVisible();
+  const label = await noRun.boundingBox();
+  // the token's painted disc (r 23), not its 34-unit tap target
+  const safety = await d.player("S", "Defense").locator("circle[r='23']").boundingBox();
+  if (!label || !safety) throw new Error("no label or no safety");
+  // capitals with no descenders: the text box runs a few pixels under the letters, which clear the disc
+  expect(label.y + label.height / 2, "the band's label is above the safety, not behind him").toBeLessThan(safety.y);
   expect(steps.roster.yards, "the roster's card frames the formation").toBe(ROSTER_YARDS);
   expect(Math.min(steps.roster.spareX, steps.roster.spareY), "a closer card still fills its pane one way").toBeLessThanOrEqual(1);
   await expect(deepButton).toHaveCount(0);
