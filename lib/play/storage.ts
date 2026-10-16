@@ -3,7 +3,7 @@ import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
 import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, SECOND_LINEUP, defaultLineups, placedSpot, withNames } from "./lineup";
 import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
-import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
+import { MAX_ROUTE_POINTS, X_MAX, X_MIN, Y_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
 import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Spot, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
@@ -257,7 +257,7 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
     const team: Team = v.team === "defense" ? "defense" : "offense";
     const x = Math.max(X_MIN, Math.min(X_MAX, num(v.x, 15)));
     const y0 = num(v.y, team === "offense" ? 1 : -5);
-    const y = team === "offense" ? Math.max(0.9, Math.min(7.4, y0)) : Math.min(-0.9, Math.max(-36, y0));
+    const y = team === "offense" ? Math.max(0.9, Math.min(7.4, y0)) : Math.min(-0.9, Math.max(Y_MIN, y0));
     let id = typeof v.id === "string" && v.id ? v.id.slice(0, 40) : `p${String(i)}`;
     while (ids.has(id)) id = `${id}-${String(i)}`;
     ids.add(id);
