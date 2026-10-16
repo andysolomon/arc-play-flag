@@ -36,8 +36,8 @@ export type Action =
   | { type: "drawMotion" }
   | { type: "removeMotion" }
   | { type: "target"; id: string }
-  /** the selected blitzer comes for the quarterback or the backfield (lib/play/blitz.ts) */
-  | { type: "blitzAim"; aim: "qb" | "backfield" }
+  /** the selected blitzer comes for the quarterback or the backfield, or contains the quarterback (lib/play/blitz.ts) */
+  | { type: "blitzAim"; aim: "qb" | "backfield" | "contain" }
   /** the selected blitzer's Pick a player: like Man, ask who they come for */
   | { type: "blitzTarget" }
   /**

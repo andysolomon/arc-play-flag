@@ -1,6 +1,7 @@
 import { quarterback } from "./lateral";
 import { atSnap } from "./pre-snap";
-import type { Player, Route } from "./types";
+import { X_MAX, X_MIN } from "./routes";
+import type { Pair, Player, Route } from "./types";
 
 /**
  * Who a blitz comes for. Every blitz used to drive at the quarterback, and that is still what a blitz
@@ -24,15 +25,48 @@ import type { Player, Route } from "./types";
  *   reads back byte for byte and the palette says "QB".
  * - B9 a back who is also the only one near the ball but stands too far out (past BACKFIELD_REACH):
  *   not a back for this purpose, so the quarterback.
+ *
+ * A contain blitz (`aim: "contain"`) comes for the quarterback from outside: up the edge on the
+ * rusher's side of them to a landmark CONTAIN_WIDTH outside and CONTAIN_LEAD in front of them, then in
+ * on them, so they can't escape outside that way. Ways it could go wrong, written down before the code:
+ * - C1 no quarterback on the field: it contains the default quarterback slot (15, 5), like B1.
+ * - C2 which edge: the rusher's own side of the quarterback, where the quarterback stands at the snap
+ *   (B4). A rusher lined up right over the quarterback takes the side with more room to the sideline,
+ *   and the left when the quarterback is dead centre, so the edge never flickers or depends on storage.
+ * - C3 the landmark off the field: pulled inside the sideline, where a player may stand.
+ * - C4 a quarterback against the sideline leaves no edge to get outside: when the turn in would be
+ *   shorter than CONTAIN_TURN, it comes straight for the quarterback, the sideline doing the containing,
+ *   and says so. Never a leg with no length, whose arrowhead would point nowhere.
+ * - C5 the landmark level with or behind the quarterback gives up the outside (they step up and out
+ *   past the rusher), and one in front of the line of scrimmage is no rush at all: CONTAIN_LEAD in front
+ *   of them, or halfway to the line when they are under centre, closer to it than twice that.
+ * - C6 a back lined up level with the quarterback, as Z is in a fresh play, sits where a landmark level
+ *   with the quarterback would be: the landmark CONTAIN_LEAD in front keeps the turn clear of their token.
+ * - C7 stored like the backfield's aim: `aim: "contain"`, cleared by QB, replaced by a player's target,
+ *   and a target stored beside it wins. An older build reads it as a quarterback blitz.
+ * - C8 the edge follows the rusher: moved across the quarterback, or the whole play flipped, they
+ *   contain the other edge. A blitz offers no mirror; lining up on the other side is how to switch.
+ * - C9 still a blitz: the rusher keeps BLITZ_DEPTH off the line, and the palette, history, storage
+ *   and share links treat it like any other aim.
  */
 
-/** How a blitz is aimed: at the quarterback (the default), at the backfield, or at one player. */
-export type BlitzAim = "qb" | "backfield" | "player";
+/** How a blitz is aimed: at the quarterback (the default), at the backfield, containing the quarterback from the edge, or at one player. */
+export type BlitzAim = "qb" | "backfield" | "contain" | "player";
 
 /** How far behind the line of scrimmage a player must line up to be in the backfield (the line itself sits at 1 yard). */
 export const BACKFIELD_DEPTH = 2;
 /** How far from the ball (the quarterback or the centre, whichever is nearer) a back may line up and still be blitzed as one, in yards. */
 export const BACKFIELD_REACH = 8;
+/** How far short of whoever it comes for a blitz arrow stops, in yards. */
+export const BLITZ_STOP = 1.8;
+/** How far outside the quarterback a contain blitz's landmark sits, in yards. */
+export const CONTAIN_WIDTH = 4;
+/** How far in front of the quarterback a contain blitz's landmark sits, in yards (C5). */
+export const CONTAIN_LEAD = 2;
+/** The shortest turn in a contain blitz draws, in yards; with less room outside the quarterback it comes straight (C4). */
+export const CONTAIN_TURN = 1;
+/** Where the quarterback slot is when nobody is on it (B1, C1). */
+const QB_SLOT = { x: 15, y: 5 } as const;
 
 /** The centre: the offensive player labelled C, else the default centre slot. */
 export function centre(players: readonly Player[]): Player | undefined {
@@ -43,7 +77,7 @@ export function centre(players: readonly Player[]): Player | undefined {
 export function blitzAim(route: Route | null | undefined): BlitzAim {
   if (route?.type !== "blitz") return "qb";
   if (route.target) return "player";
-  return route.aim === "backfield" ? "backfield" : "qb";
+  return route.aim === "backfield" || route.aim === "contain" ? route.aim : "qb";
 }
 
 const dist = (a: Player, b: Player): number => Math.hypot(a.x - b.x, a.y - b.y);
@@ -89,9 +123,36 @@ export function blitzTarget(route: Route, players: readonly Player[]): Player | 
   return qb ? atSnap(qb) : undefined;
 }
 
-/** A blitz aimed at the quarterback or the backfield: nothing stored for the quarterback (B8). */
-export function aimedBlitz(aim: "qb" | "backfield"): Route {
-  return aim === "backfield" ? { type: "blitz", aim: "backfield" } : { type: "blitz" };
+/** The edge a contain blitz rushes: -1 the picture's left of the quarterback, +1 its right. */
+export type Edge = -1 | 1;
+
+/** A contain blitz's path after the rusher's spot: up the edge to the landmark, then in on the quarterback. */
+export interface ContainPath {
+  edge: Edge;
+  /** where the rusher turns in, in absolute yards */
+  landmark: Pair;
+  /** where the arrow ends, BLITZ_STOP short of the quarterback */
+  end: Pair;
+}
+
+/**
+ * How a rusher contains the quarterback (C1–C6), or null when the sideline leaves no edge outside them
+ * and the blitz comes straight for them instead (C4). Only the rusher's spot is read, not their route.
+ */
+export function containPath(rusher: Pick<Player, "x">, players: readonly Player[]): ContainPath | null {
+  const qb0 = quarterback(players);
+  const qb = qb0 ? atSnap(qb0) : QB_SLOT;
+  const edge: Edge = rusher.x < qb.x ? -1 : rusher.x > qb.x ? 1 : qb.x < QB_SLOT.x ? 1 : -1;
+  const lx = Math.max(X_MIN, Math.min(X_MAX, qb.x + edge * CONTAIN_WIDTH));
+  const ly = qb.y - Math.max(0, Math.min(CONTAIN_LEAD, qb.y / 2));
+  const dx = lx - qb.x, dy = ly - qb.y, L = Math.hypot(dx, dy);
+  if (L - BLITZ_STOP < CONTAIN_TURN) return null;
+  return { edge, landmark: [lx, ly], end: [qb.x + (dx / L) * BLITZ_STOP, qb.y + (dy / L) * BLITZ_STOP] };
+}
+
+/** A blitz aimed at the quarterback, the backfield or containing the quarterback: nothing stored for the quarterback (B8). */
+export function aimedBlitz(aim: "qb" | "backfield" | "contain"): Route {
+  return aim === "qb" ? { type: "blitz" } : { type: "blitz", aim };
 }
 
 /** A blitz aimed at one player; at the quarterback it is the default (B8). */

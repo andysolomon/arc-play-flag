@@ -115,8 +115,8 @@ function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit
   const r: Omit<Route, "type"> & { type: T } = { type };
   if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
-  // a blitz aimed at the backfield; one aimed at a player keeps only the player
-  else if (v.aim === "backfield") r.aim = "backfield";
+  // a blitz aimed at the backfield or containing the quarterback; one aimed at a player keeps only the player
+  else if (v.aim === "backfield" || v.aim === "contain") r.aim = v.aim;
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;

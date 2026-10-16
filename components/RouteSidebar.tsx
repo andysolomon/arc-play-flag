@@ -26,8 +26,8 @@ interface Props {
   onRunBefore: () => void;
   /** the selected blitzer: how their blitz is aimed, who it comes for now, and the back a backfield blitz would come for (lib/play/blitz.ts) */
   blitz: BlitzInfo | null;
-  /** the QB and Backfield pills */
-  onBlitzAim: (aim: "qb" | "backfield") => void;
+  /** the QB, Backfield and Contain pills */
+  onBlitzAim: (aim: "qb" | "backfield" | "contain") => void;
   /** Pick a player: like Man, ask for a red player on the field */
   onBlitzTarget: () => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
@@ -58,6 +58,8 @@ export interface BlitzInfo {
   who: string | null;
   /** the back a backfield blitz comes for, by name; null with nobody lined up back there */
   back: string | null;
+  /** the edge a contain blitz rushes, as the picture shows it; null when the sideline leaves none and it comes straight */
+  edge: "left" | "right" | null;
 }
 
 /** What the blitz does, under the pills. */
@@ -68,7 +70,12 @@ function blitzWords(b: BlitzInfo): string {
       ? `Comes for the nearest back lined up near the ball: ${b.back} now. With nobody back there, the quarterback.`
       : "Comes for the nearest back lined up near the ball. Nobody is back there now, so it comes for the quarterback.";
   }
-  return "Comes for the quarterback. Aim it at the backfield, or pick any red player.";
+  if (b.aim === "contain") {
+    if (!b.edge) return "Contains the quarterback, but the sideline leaves no room outside them, so it comes straight for them.";
+    const other = b.edge === "left" ? "right" : "left";
+    return `Rushes the ${b.edge} edge outside the quarterback, then turns in, so they can't escape that way. To contain the ${other} edge, line up on the other side of the quarterback.`;
+  }
+  return "Comes for the quarterback. Aim it at the backfield, contain an edge, or pick any red player.";
 }
 
 /** Yards as a coach reads them off the field, to the half yard. */
@@ -211,7 +218,7 @@ function RouteSidebarImpl({
               text={`The sideline cuts this ${tableFor(sel.team)[sel.route.type]?.label ?? "route"}: ${yards(cut.room)} of its ${yards(cut.reach)} yards across fit. Move ${sel.label || "this player"} inside to run all of it.`}
             />
           )}
-          {/* who the blitz comes for: the quarterback unless aimed at the backfield or at a player the coach picks */}
+          {/* who the blitz comes for: the quarterback unless aimed at the backfield, containing the quarterback, or at a player the coach picks */}
           {blitz && sel.team === "defense" && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Blitz target">
               <span className={eyebrow}>BLITZ</span>
@@ -229,6 +236,13 @@ function RouteSidebarImpl({
                   className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
                 >
                   Backfield
+                </button>
+                <button
+                  type="button" onClick={() => { onBlitzAim("contain"); }} title="Contain the quarterback: rush the edge outside them, then turn in"
+                  aria-pressed={blitz.aim === "contain"} data-active={blitz.aim === "contain"}
+                  className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                >
+                  Contain
                 </button>
                 <button
                   type="button" onClick={onBlitzTarget} title="Blitz one player: tap them on the field"
