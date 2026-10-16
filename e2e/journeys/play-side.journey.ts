@@ -2,14 +2,19 @@ import { expect, test } from "@playwright/test";
 import { Designer } from "../support/designer";
 import { COVER_TWO, SLANT_LEFT, seed, storedDraft, storedPlays } from "../support/fixtures";
 
-const sideBadge = (d: Designer, side: "Offense" | "Defense") => d.page.getByRole("img", { name: `${side} play` });
+/** Whose play it is, as the field shows it: that team drawn solid, the other faded behind it when it is there at all. */
+async function ownSide(d: Designer, side: "Offense" | "Defense"): Promise<void> {
+  await expect(side === "Offense" ? d.player("X") : d.player("LC", "Defense")).toHaveCSS("opacity", "1");
+  const other = d.field.getByRole("button", { name: side === "Offense" ? /^Defense / : /^Offense / });
+  for (const p of await other.all()) await expect(p).toHaveCSS("opacity", "0.4");
+}
 const shadowTile = (d: Designer, which: "offense" | "defense") =>
   d.page.getByRole("group", { name: `Shadow ${which}` }).getByRole("button", { name: `Shadow ${which}`, exact: true });
 
 test("a coach starts a defensive call, and the choice survives save, reload and reopen", async ({ page }) => {
   const d = new Designer(page);
   await d.goto();
-  await expect(sideBadge(d, "Offense")).toBeVisible();
+  await ownSide(d, "Offense");
 
   await d.tools();
   await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
@@ -18,8 +23,7 @@ test("a coach starts a defensive call, and the choice survives save, reload and 
 
   await d.newPlay("Defense");
   await expect(d.toast).toHaveText("New play");
-  await expect(sideBadge(d, "Defense")).toBeVisible();
-  await expect(sideBadge(d, "Offense")).toHaveCount(0);
+  await ownSide(d, "Defense");
   await expect(shadowTile(d, "offense")).toHaveAttribute("aria-pressed", "true");
   await expect(d.page.getByRole("group", { name: "Shadow defense" })).toHaveCount(0);
   await expect(d.field.getByRole("button")).toHaveCount(10);
@@ -32,18 +36,18 @@ test("a coach starts a defensive call, and the choice survives save, reload and 
 
   await page.reload();
   await expect(d.field).toBeVisible();
-  await expect(sideBadge(d, "Defense")).toBeVisible();
+  await ownSide(d, "Defense");
   expect((await storedDraft(page))?.side).toBe("defense");
 
   await d.tools();
   await d.newPlay("Offense");
-  await expect(sideBadge(d, "Offense")).toBeVisible();
+  await ownSide(d, "Offense");
   await expect(shadowTile(d, "defense")).toHaveAttribute("aria-pressed", "false");
   await expect(d.page.getByRole("group", { name: "Shadow offense" })).toHaveCount(0);
   await expect(d.field.getByRole("button")).toHaveCount(5);
   await d.openSaved("Otter Cover Two");
   await expect(page.getByRole("heading", { name: "Otter Cover Two" })).toBeVisible();
-  await expect(sideBadge(d, "Defense")).toBeVisible();
+  await ownSide(d, "Defense");
 });
 
 test("a defensive call can hide or show the shadow offense, and never offers both teams", async ({ page }) => {

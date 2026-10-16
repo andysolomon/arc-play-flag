@@ -627,19 +627,19 @@ async function buildDefense(d: ChapterDriver): Promise<void> {
   await d.poster();
 }
 
-/** Save, note and share: save, coaching notes, a duplicate, and a snapshot of the play. */
+/** Save, note and share: save from the header, coaching notes, a duplicate, and a snapshot of the play. */
 async function saveShare(d: ChapterDriver): Promise<void> {
   await d.goto(`/?open=${PLAY_ACTION_WHEEL.id}`);
   const tools = d.page.locator("#play-sidebar");
   const toast = d.page.locator("div[role='status']");
   await d.say("Save the play");
-  await d.openPanel("Play tools");
-  await d.click(tools.getByRole("button", { name: "Save", exact: true }), "Save", 200);
+  await d.click(d.page.getByRole("banner").getByRole("button", { name: "Save play", exact: true }), "Save", 200);
   await d.expectState("The app confirms the save", async () => {
     await expect(toast).toHaveText("Saved", { timeout: ASSERT_TIMEOUT });
   }, 420, ["Saving"]);
 
   await d.say("Add coaching notes");
+  await d.openPanel("Play tools");
   await d.click(tools.getByRole("button", { name: "Notes", exact: true }), "Notes", 160);
   await d.type(d.page.getByRole("textbox", { name: "Coaching points" }), "Coaching points", "Sell the handoff first.", 420, ["Notes"]);
 
