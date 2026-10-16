@@ -1,10 +1,10 @@
 import { readLos, withLos } from "./field";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
-import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, defaultLineups, withNames } from "./lineup";
+import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, defaultLineups, placedSpot, withNames } from "./lineup";
 import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
 import { MAX_ROUTE_POINTS, X_MAX, X_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
-import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Team, TeamSettings } from "./types";
+import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Spot, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
 /** The prototype's library, keyed by play name. Read once and migrated into v2. */
@@ -662,10 +662,31 @@ function normalizeTeamPlayers(raw: unknown, lineups: readonly Lineup[]): string[
 }
 
 /**
+ * The positions moved in roster mode: each a team, a tag of the standard formation and a spot in numbers
+ * (F3, F5), held to its side of the line and inside the sidelines (F1); one back home is nothing (F2), and a
+ * second spot for a position is ignored (F4). Empty when there are none, or it isn't a list.
+ */
+function normalizeSpots(raw: unknown): Spot[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Spot[] = [];
+  for (const v of raw) {
+    if (!isRecord(v) || typeof v.tag !== "string" || typeof v.x !== "number" || typeof v.y !== "number") continue;
+    if (!Number.isFinite(v.x) || !Number.isFinite(v.y)) continue;
+    const team: Team = v.team === "defense" ? "defense" : "offense";
+    const tag = v.tag;
+    if (out.some((s) => s.team === team && s.tag === tag)) continue;
+    const spot = placedSpot(team, tag, v.x, v.y);
+    if (spot) out.push(spot);
+  }
+  return out;
+}
+
+/**
  * The lineups from any JSON-ish value: each an id, a name and its slots, with the lineup it was branched
  * from when that one is there too. The starting lineup is always there (put back empty at the front when
  * it isn't), a second lineup with an id already seen is ignored, the active one must exist (else the
- * starting lineup is), and the whole is capped. Null when it isn't a record with a list of lineups.
+ * starting lineup is), and the whole is capped. The positions moved in roster mode come with them, stored
+ * only once one has. Null when it isn't a record with a list of lineups.
  */
 export function normalizeLineups(raw: unknown): Lineups | null {
   if (!isRecord(raw) || !Array.isArray(raw.lineups)) return null;
@@ -689,8 +710,9 @@ export function normalizeLineups(raw: unknown): Lineups | null {
     if (l.from !== undefined && (l.from === l.id || !out.some((p) => p.id === l.from))) delete l.from;
   }
   const active = typeof raw.active === "string" && out.some((l) => l.id === raw.active) ? raw.active : MAIN_LINEUP;
+  const spots = normalizeSpots(raw.spots);
   // the names are shown on plays only when turned on and there is a roster to show (lineup.ts, V6)
-  return withNames({ active, lineups: out, players: normalizeTeamPlayers(raw.players, out) }, raw.names === true);
+  return withNames({ active, lineups: out, players: normalizeTeamPlayers(raw.players, out), ...(spots.length ? { spots } : {}) }, raw.names === true);
 }
 
 /** The device's lineups; the starting lineup alone, empty, when none have been set. */
