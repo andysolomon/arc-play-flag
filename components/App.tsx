@@ -8,10 +8,10 @@ import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
-import { LOS_YARD, inNoRunZone, withLos } from "@/lib/play/field";
+import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
-import { activeLineup, showsNames, withSlots } from "@/lib/play/lineup";
+import { activeLineup, formationOf, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
 import { offFieldId, offFieldPositions, starters } from "@/lib/play/roster";
 import type { Lineups, Player, Roster, RouteType, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
@@ -21,7 +21,7 @@ import {
 } from "@/lib/play/library";
 import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { defaults, mirrorRoute, routeDef } from "@/lib/play/routes";
+import { mirrorRoute, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
@@ -88,9 +88,10 @@ export function App() {
   const [view, setView] = useState<Vis>("offense");
   const rosteringRef = useRef(rostering);
   useEffect(() => { rosteringRef.current = rostering; }, [rostering]);
-  // roster mode is the team's, not a play's: the standard formation, both sides at their home spots with the
-  // standard tags, and a selection of its own. The play open in the designer is left exactly as it was.
-  const formation = useMemo(() => defaults(), []);
+  // roster mode is the team's, not a play's: the standard formation, both sides with the standard tags, each
+  // at its home spot or where the coach dragged it on the roster, and a selection of its own. The play open in
+  // the designer is left exactly as it was (lib/play/lineup.ts, F6).
+  const formation = useMemo(() => formationOf(lineups), [lineups]);
   const [rosterPick, setRosterPick] = useState<string | null>(null);
   // a depth chart kept for a tag the formation has no token for (FS, H) stays in reach from the panel: every
   // tag a lineup keeps a chart for, the open play wears or a saved play wears (lib/play/roster.ts, R9)
@@ -159,10 +160,6 @@ export function App() {
     setRosterPick(id);
     openRight(true);
   }, [openRight]);
-  // the field's only edit in roster mode is a tap: a position picked, or the turf tapped to let it go
-  const rosterDispatch = useCallback((a: Action) => {
-    if (a.type === "select") setRosterPick(a.id);
-  }, []);
   // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
   // short there, the toast says so once it is drawn, and the palette says by how much
   const playersRef = useRef(s.players);
@@ -419,6 +416,15 @@ export function App() {
     if (!r.ok) { say(failureMessage(r.error), 3200); record("storage", r.error); }
   }, [say]);
   const onRoster = useCallback((next: Roster) => { onLineups(withSlots(lineups, lineup.id, next)); }, [lineup.id, lineups, onLineups]);
+  // the field's edits in roster mode: a position picked, the turf tapped to let it go, or a position dragged or
+  // stepped with the arrow keys, which stands it there on the roster, on every lineup, like a line of a depth
+  // chart: at once and never undone. The play's own history never hears of it (lib/play/lineup.ts, F6, F7)
+  const rosterDispatch = useCallback((a: Action) => {
+    if (a.type === "select") setRosterPick(a.id);
+    if (a.type !== "move" || !a.commit) return;
+    const p = formation.find((q) => q.id === a.id);
+    if (p) onLineups(withSpot(lineups, p.team, p.label, a.x, a.y));
+  }, [formation, lineups, onLineups]);
   // the starter at each position on the field, from the active lineup, shortened to fit under the token;
   // on a play only once the coach has turned the names on, in roster mode always
   const fieldPlayers = rostering ? formation : s.players;
@@ -567,7 +573,7 @@ export function App() {
           showTitle
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
-          los={rostering ? LOS_YARD : s.los}
+          los={rostering ? ROSTER_LOS : s.los}
           starters={rostering || namesOn ? starterNames : undefined}
           roster={rostering}
         />

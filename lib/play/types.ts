@@ -171,6 +171,15 @@ export interface Lineup {
   slots: Roster;
 }
 
+/** Where roster mode stands one position of the standard formation, moved off its home spot (absolute yards). */
+export interface Spot {
+  team: Team;
+  /** the position's tag in the standard formation: C, QB, X, Y, Z, LC, LB, R, RC or S */
+  tag: string;
+  x: number;
+  y: number;
+}
+
 /** The team's players, every lineup, which one the field shows, and whether a play shows its starters' names. */
 export interface Lineups {
   active: string;
@@ -182,6 +191,11 @@ export interface Lineups {
    * and only once some depth chart has a name to show (stored only when true, and never without one).
    */
   names?: true;
+  /**
+   * The positions the coach has dragged in roster mode, each where it was dropped; any other stands at its
+   * home spot. The same on every lineup, like the team, and never on a play (stored only once one has moved).
+   */
+  spots?: Spot[];
 }
 
 export interface TeamSettings {

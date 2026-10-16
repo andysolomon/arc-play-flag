@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { Lineups, Roster, SavedPlay } from "../../lib/play/types";
+import type { Lineups, Roster, SavedPlay, Spot } from "../../lib/play/types";
 import { Designer, armSabotage, downloadText, sabotage } from "../support/designer";
 import { OTTERS, SLANT_LEFT, jsonUpload, play, seed, storedLineups } from "../support/fixtures";
 
@@ -14,8 +14,9 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * under the tag in roster mode, and on a play only once "Show player names" is on in Play tools, which
  * waits for a roster and picks the lineup to show. The roster is the device's (it outlasts a reload, goes
  * into a device backup and comes back from one), and never reaches a share link. Roster mode is the
- * team's standard formation, never the play that is open: none of its routes, tags, spots or tools,
- * nothing to drag or undo, and the play is back as it was on the way out. A write the device refuses is
+ * team's standard formation, never the play that is open: none of its routes, tags, spots or tools, and
+ * nothing in it undoes; a position dragged or stepped there stands on the roster, on every lineup and held
+ * to its side of the line, until Reset spots, and the play is back as it was on the way out. A write the device refuses is
  * said, and stores nothing. Every name on the lineup has a page of its own: the positions they play and
  * where they sit at each. Lineups are versions of it all: the Starting Lineup is always there, and the
  * Secondary Lineup made from its depth charts (the next player up starting, nobody twice on a side, read
@@ -29,6 +30,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 const panel = (page: Page) => page.locator("#route-sidebar");
 const tools = (page: Page) => page.locator("#play-sidebar");
+/** The field's line-of-scrimmage label: "LOS" on the 40, where every drive starts, else "LOS <yards to go>". */
+const losLabel = (d: Designer) => d.field.locator("g[fill-opacity='0.5'] > text").filter({ hasText: /^LOS/ });
 const openSettings = (page: Page) => page.getByRole("button", { name: /team, theme & backup settings/ }).click();
 /** The starting lineup alone, holding these slots, and the team's players. */
 const main = (slots: Roster, players: string[] = []): Lineups => ({ active: "main", lineups: [{ id: "main", name: "Starting Lineup", slots }], players });
@@ -44,6 +47,20 @@ async function addNew(chart: Locator, name: string): Promise<void> {
 }
 /** The same lineups with the names shown on plays. */
 const named = (ls: Lineups): Lineups => ({ ...ls, names: true });
+/** The same lineups with positions of the standard formation dragged off their home spots in roster mode. */
+const spotted = (ls: Lineups, spots: Spot[]): Lineups => ({ ...ls, spots });
+/** Presses a token and drags it by so many pixels, as a coach's finger or mouse does. */
+async function drag(page: Page, token: Locator, dx: number, dy: number): Promise<void> {
+  const box = await token.boundingBox();
+  if (!box) throw new Error("no such token on the field");
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 8 });
+  await page.mouse.up();
+}
+/** The positions stored as moved off their home spots in roster mode, in the order they first moved. */
+const storedSpots = async (page: Page): Promise<Spot[]> => (await storedLineups(page))?.spots ?? [];
 /** The SHOW pills in the roster panel: which side of the roster is on the field. */
 const show = (page: Page, which: "Offense" | "Defense" | "Both") =>
   panel(page).getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: which }).check();
@@ -249,6 +266,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   const lcInPlay = await d.playerX("LC", "Defense");
   expect(lcInPlay).toBeGreaterThan(3.5);
   await expect(d.undo).toBeEnabled();
+  await expect(losLabel(d)).toHaveText("LOS");
 
   // the roster lays out the standard formation at its home spots, opening on the call's own side, the defense
   await d.roster();
@@ -257,6 +275,9 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await expect(d.player("FS", "Defense")).toHaveCount(0);
   await expect(d.caption("S", "Defense")).toHaveText("Unassigned");
   expect(await d.playerX("LC", "Defense")).toBeCloseTo(3, 1);
+  // the ball is on the 15 in roster mode, whatever the play's own spot
+  await expect(losLabel(d)).toHaveText("LOS 15");
+  const rosterLos = await losLabel(d).textContent();
   // both sides at full strength, offense first, nothing faded
   await d.rosterView.click();
   await expect(d.rosterView).toHaveAccessibleName("Showing both");
@@ -273,20 +294,21 @@ test("roster mode is the team's standard formation, never the open play: its tag
   expect(await defense.getByRole("button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))))
     .toEqual(["LC: Unassigned", "LB: Unassigned", "S: Unassigned", "R: Unassigned", "RC: Unassigned", "FS: Unassigned"]);
 
-  // a position is tapped, never dragged or stepped, and its tag is the standard one, not a field to rename
+  // a position drags and steps as a play's player does, standing where it lands on the roster, and its tag is
+  // the standard one, not a field to rename
   await d.foldOverlays();
   const s = d.player("S", "Defense");
   const sAt = await d.playerX("S", "Defense");
-  const box = await s.boundingBox();
-  if (!box) throw new Error("no S on the field");
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 20, { steps: 8 });
-  await page.mouse.up();
-  await expect(s).toHaveAttribute("aria-pressed", "true");
-  expect(await d.playerX("S", "Defense")).toBeCloseTo(sAt, 1);
+  await drag(page, s, 80, 0);
+  await expect.poll(async () => (await storedSpots(page)).length).toBe(1);
+  const dropped = (await storedSpots(page))[0]?.x ?? 0;
+  expect(dropped).toBeGreaterThan(sAt + 1);
+  await expect.poll(() => d.playerX("S", "Defense")).toBeCloseTo(dropped, 1);
   await s.press("ArrowLeft");
-  expect(await d.playerX("S", "Defense")).toBeCloseTo(sAt, 1);
+  await expect(s).toHaveAttribute("aria-pressed", "true");
+  const sSpot: Spot = { team: "defense", tag: "S", x: dropped - 1, y: -11 };
+  await expect.poll(() => storedSpots(page)).toEqual([sSpot]);
+  await expect.poll(() => d.playerX("S", "Defense")).toBeCloseTo(sSpot.x, 1);
   await d.rosterPanel();
   await expect(panel(page).getByRole("heading", { name: "Who plays S" })).toBeVisible();
   await expect(panel(page).getByRole("textbox", { name: "Player tag" })).toHaveCount(0);
@@ -294,20 +316,22 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await addNew(chart, "Jordan");
   await expect(d.caption("S", "Defense")).toHaveText("Jordan");
   await expect(defense.getByRole("button", { name: "S: Jordan" })).toBeVisible();
-  await expect.poll(() => storedLineups(page)).toEqual(main([{ team: "defense", tag: "S", depth: ["Jordan"] }], ["Jordan"]));
+  await expect.poll(() => storedLineups(page)).toEqual(spotted(main([{ team: "defense", tag: "S", depth: ["Jordan"] }], ["Jordan"]), [sSpot]));
   await d.foldOverlays();
   await d.field.screenshot({ path: `test-results/roster-${device}-formation.png` });
   // the keyboard's undo is the play's too, so it does nothing here
   await page.keyboard.press("Control+z");
   await expect(d.player("S", "Defense")).toBeVisible();
 
-  // out of roster mode the call is back as it was drawn, its history whole; with names on, FS is a position
-  // nobody is down for
+  // out of roster mode the call is back as it was drawn, its history whole, and its own S (now FS) is where the
+  // call put it, whatever the roster's S did; with names on, FS is a position nobody is down for
   await d.roster(false);
   await d.showNames(true);
   await expect(d.player("FS", "Defense")).toBeVisible();
   await expect(d.caption("FS", "Defense")).toHaveCount(0);
   expect(await d.playerX("LC", "Defense")).toBeCloseTo(lcInPlay, 1);
+  expect(await d.playerX("FS", "Defense")).toBeCloseTo(sAt, 1);
+  await expect(losLabel(d)).toHaveText("LOS");
   await expect(d.undo).toBeEnabled();
   await d.undo.click();
   await d.undo.click();
@@ -323,19 +347,170 @@ test("roster mode is the team's standard formation, never the open play: its tag
   ]);
   const backup = await downloadText(download);
   const parsed = JSON.parse(backup) as { lineups: Lineups };
-  expect(parsed.lineups).toEqual(named(main([{ team: "defense", tag: "S", depth: ["Jordan"] }], ["Jordan"])));
+  const backedUp = named(spotted(main([{ team: "defense", tag: "S", depth: ["Jordan"] }], ["Jordan"]), [sSpot]));
+  expect(parsed.lineups).toEqual(backedUp);
   await page.evaluate(() => { localStorage.removeItem("ffpd.lineups.v1"); });
   await page.reload();
   await openSettings(page);
   await page.getByLabel("Restore a device backup").setInputFiles(jsonUpload("device-backup.json", backup));
   await page.getByRole("region", { name: "Restore preview" }).getByRole("button", { name: "Replace device data" }).click();
   await expect(page.getByRole("dialog", { name: "Team, theme & backup" }).getByRole("status")).toContainText("Replaced with backup");
-  await expect.poll(() => storedLineups(page)).toEqual(named(main([{ team: "defense", tag: "S", depth: ["Jordan"] }], ["Jordan"])));
+  await expect.poll(() => storedLineups(page)).toEqual(backedUp);
   await d.goto();
   await d.newPlay("Defense");
   await expect(d.caption("S", "Defense")).toHaveText("Jordan");
+  await d.roster();
+  expect(await d.playerX("S", "Defense")).toBeCloseTo(sSpot.x, 1);
 
-  writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups }, null, 2)}\n`);
+  writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups, rosterLos }, null, 2)}\n`);
+});
+
+test("a position dragged or stepped in roster mode stands there on every lineup and after a reload, held to its side of the line, never moving a play, until Reset spots puts its side home", async ({ page }, info) => {
+  const device = info.project.name;
+  await seed(page, { team: OTTERS });
+  const d = new Designer(page);
+  await d.goto();
+  await d.newPlay("Offense");
+  // the play's own X, a yard in: the roster's X starts at home whatever the play does
+  await d.foldOverlays();
+  await d.player("X").press("ArrowRight");
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(4, 1);
+  const steps: { step: string; stored: Lineups | null }[] = [];
+  const note = async (step: string) => { steps.push({ step, stored: await storedLineups(page) }); };
+
+  await d.roster();
+  await d.foldOverlays();
+  expect(await d.playerX("X")).toBeCloseTo(3, 1);
+  // the play's X comes into roster mode picked; Escape lets it go
+  await expect(d.player("X")).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(d.player("X")).toHaveAttribute("aria-pressed", "false");
+  // X dragged right and up over the line: it lands right of home, held behind the line, and a drag picks nothing
+  await drag(page, d.player("X"), 90, -300);
+  await expect.poll(async () => (await storedSpots(page)).length).toBe(1);
+  const xSpot: Spot = { team: "offense", tag: "X", x: (await storedSpots(page))[0]?.x ?? 0, y: 1 };
+  expect(xSpot.x).toBeGreaterThan(4);
+  expect(await storedLineups(page)).toEqual(spotted(main([]), [xSpot]));
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(xSpot.x, 1);
+  await expect(d.player("X")).toHaveAttribute("aria-pressed", "false");
+  await expect(d.caption("X")).toHaveText("Unassigned");
+  // Z stepped two yards in with the arrow keys, then back out onto its home spot, where nothing is kept for it
+  await d.player("Z").press("ArrowLeft");
+  await d.player("Z").press("ArrowLeft");
+  await expect.poll(() => storedLineups(page)).toEqual(spotted(main([]), [xSpot, { team: "offense", tag: "Z", x: 17, y: 5 }]));
+  await expect.poll(() => d.playerX("Z")).toBeCloseTo(17, 1);
+  await note("X dragged, Z stepped in");
+  await d.player("Z").press("ArrowRight");
+  await d.player("Z").press("ArrowRight");
+  await expect.poll(() => storedLineups(page)).toEqual(spotted(main([]), [xSpot]));
+  await expect.poll(() => d.playerX("Z")).toBeCloseTo(19, 1);
+
+  // with both sides on the field, LB dragged down over the line is held on the defense's side of it
+  await d.rosterView.click();
+  await d.rosterView.click();
+  await expect(d.rosterView).toHaveAccessibleName("Showing both");
+  await d.foldOverlays();
+  await drag(page, d.player("LB", "Defense"), 0, 300);
+  const lbSpot: Spot = { team: "defense", tag: "LB", x: 11, y: -1 };
+  await expect.poll(() => storedLineups(page)).toEqual(spotted(main([]), [xSpot, lbSpot]));
+  await note("LB dragged over the line");
+  await d.field.screenshot({ path: `test-results/roster-${device}-spots.png` });
+
+  // a branch stands where its parent does: the spots are the team's, on every lineup
+  await d.rosterPanel();
+  await panel(page).getByRole("button", { name: "Branch lineup" }).click();
+  await expect(lineupName(page)).toHaveValue("Lineup 3");
+  expect(await d.playerX("X")).toBeCloseTo(xSpot.x, 1);
+  await expect.poll(() => storedSpots(page)).toEqual([xSpot, lbSpot]);
+
+  // the play is back as the coach left it, its own X a yard in and its history whole
+  await d.roster(false);
+  await d.foldOverlays();
+  expect(await d.playerX("X")).toBeCloseTo(4, 1);
+  expect(await d.playerX("Z")).toBeCloseTo(19, 1);
+  await d.undo.click();
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(3, 1);
+
+  // the spots outlast a reload
+  await page.reload();
+  await expect(d.field).toBeVisible();
+  await d.roster();
+  await d.foldOverlays();
+  expect(await d.playerX("X")).toBeCloseTo(xSpot.x, 1);
+
+  // Reset spots puts the sides on view back home, asking once: Keep changes nothing, Reset takes the offense
+  // home and leaves the defense where it was
+  await d.rosterPanel();
+  await show(page, "Both");
+  const spots = panel(page).getByRole("group", { name: "Spots" });
+  const reset = spots.getByRole("button", { name: "Reset spots" });
+  await reset.click();
+  await expect(spots).toContainText("Put both sides back at their home spots?");
+  await expect(spots.getByRole("button", { name: "Keep" })).toBeFocused();
+  await spots.getByRole("button", { name: "Keep" }).click();
+  await expect(reset).toBeFocused();
+  expect(await storedSpots(page)).toEqual([xSpot, lbSpot]);
+  await show(page, "Offense");
+  await reset.click();
+  await expect(spots).toContainText("Put the offense back at its home spots?");
+  await panel(page).screenshot({ path: `test-results/roster-${device}-reset.png` });
+  await spots.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(panel(page).getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: "Offense" })).toBeFocused();
+  await expect(reset).toBeDisabled();
+  await expect.poll(() => storedSpots(page)).toEqual([lbSpot]);
+  await d.foldOverlays();
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(3, 1);
+  await note("offense reset");
+  // and the defense's own Reset spots leaves nothing moved, so nothing is stored for the spots at all
+  await d.rosterPanel();
+  await show(page, "Defense");
+  await reset.click();
+  await spots.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(reset).toBeDisabled();
+  await expect.poll(async () => (await storedLineups(page))?.spots).toBeUndefined();
+  await note("defense reset");
+
+  writeFileSync(`test-results/roster-${device}-spots.json`, `${JSON.stringify({ steps }, null, 2)}\n`);
+});
+
+test("spots stored by hand are read as the field allows: held to their side and inside the sidelines, one per position, a tag off the formation or a spot that is no number dropped", async ({ page }, info) => {
+  const device = info.project.name;
+  const junk = [
+    { team: "offense", tag: "X", x: -40, y: -6 },
+    { team: "offense", tag: "X", x: 10, y: 3 },
+    { team: "defense", tag: "S", x: 60, y: 4 },
+    { team: "offense", tag: "Z", x: "far", y: 5 },
+    { team: "offense", tag: "QB", x: null, y: 5 },
+    { team: "defense", tag: "FS", x: 9, y: -9 },
+    { team: "offense", tag: "C", x: 15, y: 1 },
+  ];
+  await seed(page, { team: OTTERS, lineups: { ...main([]), spots: junk } as unknown as Lineups });
+  const d = new Designer(page);
+  await d.goto();
+  await d.roster();
+  await d.rosterView.click();
+  await d.rosterView.click();
+  await expect(d.rosterView).toHaveAccessibleName("Showing both");
+  await d.foldOverlays();
+  // X's first spot, off the field and over the line, is held at the sideline behind it; its second is ignored
+  expect(await d.playerX("X")).toBeCloseTo(1.2, 1);
+  // S, past the far sideline and on the offense's side, is held at that sideline on its own side
+  expect(await d.playerX("S", "Defense")).toBeCloseTo(28.8, 1);
+  // Z and QB, whose spots are no numbers, stand at home, as does C, stored at home; FS has no token to move
+  expect(await d.playerX("Z")).toBeCloseTo(19, 1);
+  expect(await d.playerX("QB")).toBeCloseTo(15, 1);
+  expect(await d.playerX("C")).toBeCloseTo(15, 1);
+  await expect(d.player("FS", "Defense")).toHaveCount(0);
+  await d.field.screenshot({ path: `test-results/roster-${device}-stored-spots.png` });
+
+  // the next write stores them as they were read
+  await d.player("Y").press("ArrowLeft");
+  await expect.poll(() => storedSpots(page)).toEqual([
+    { team: "offense", tag: "X", x: 1.2, y: 0.9 },
+    { team: "defense", tag: "S", x: 28.8, y: -0.9 },
+    { team: "offense", tag: "Y", x: 26, y: 1 },
+  ]);
+  writeFileSync(`test-results/roster-${device}-stored-spots.json`, `${JSON.stringify({ seeded: junk, stored: await storedLineups(page) }, null, 2)}\n`);
 });
 
 /** A saved play with one player retagged, a position the standard formation has no token for. */
