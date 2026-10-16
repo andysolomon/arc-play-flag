@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { DEEP_FIELD_KEY } from "../../lib/deepfield";
 import type { Lineups, Roster, SavedPlay } from "../../lib/play/types";
 import { Designer, armSabotage, downloadText, sabotage } from "../support/designer";
 import { OTTERS, SLANT_LEFT, jsonUpload, play, seed, storedLineups } from "../support/fixtures";
@@ -1015,4 +1016,76 @@ test("a name at either sideline stays whole on the field, and no name goes to th
   await page.emulateMedia({ media: "screen" });
 
   writeFileSync(`test-results/roster-${device}-sidelines.json`, `${JSON.stringify({ field, boxes }, null, 2)}\n`);
+});
+
+/**
+ * Roster mode lays out a formation that stands still, 11 yards deep at the safety, so its card frames just
+ * that: no room kept for routes, not stretched down a phone's tall pane, and never Deep field. How this could break, and the check for each:
+ *  - roster mode shows as much field as a play                  → on every screen its card shows ROSTER_YARDS, never stretched down a tall pane
+ *  - framing it closer shrinks the card                         → the roster's card fills its pane across, or top to bottom
+ *  - Deep field, on for the plays, opens the roster's card too  → with Deep field on the roster's card is the one it shows with it off
+ *  - roster mode offers Deep field                              → no Deep field button in roster mode, with it on or off
+ *  - zoomed in, a position falls off the card                   → with Both on view, every token sits inside the field
+ *  - leaving roster mode loses the play's Deep field            → back on the play, Deep field is still on and the card as deep as before
+ * Leaves `roster-<device>-zoom.json` (each step's yards shown and card width) and pictures of the roster's card.
+ */
+const ROSTER_YARDS = 21;
+test("roster mode is a closer card than a play's, and never the deep field", async ({ page }, info) => {
+  const device = info.project.name;
+  await seed(page, { team: OTTERS });
+  const d = new Designer(page);
+  await d.goto();
+  const deepButton = page.getByRole("button", { name: "Deep field", exact: true });
+  /** The card as drawn: yards top to bottom, its width on screen, and how much of its pane it leaves either way. */
+  const card = async () => {
+    await d.foldOverlays();
+    return d.field.evaluate((el) => {
+      const pane = el.closest("main");
+      if (!pane) throw new Error("no pane");
+      const r = el.getBoundingClientRect(), p = pane.getBoundingClientRect();
+      // the pane's 9px padding is the card's margin, not room it leaves
+      return {
+        yards: (el as SVGSVGElement).viewBox.baseVal.height / 22,
+        width: Math.round(r.width),
+        spareX: Math.round(p.width - 18 - r.width),
+        spareY: Math.round(p.bottom - 9 - r.bottom),
+      };
+    });
+  };
+  const steps: Record<string, Awaited<ReturnType<typeof card>>> = {};
+
+  steps.play = await card();
+  await d.roster();
+  await d.rosterView.click();
+  await d.rosterView.click();
+  await expect(d.rosterView).toHaveAccessibleName("Showing both");
+  steps.roster = await card();
+  expect(steps.roster.yards, "the roster's card frames the formation").toBe(ROSTER_YARDS);
+  expect(Math.min(steps.roster.spareX, steps.roster.spareY), "a closer card still fills its pane one way").toBeLessThanOrEqual(1);
+  await expect(deepButton).toHaveCount(0);
+  const field = await d.field.boundingBox();
+  if (!field) throw new Error("the field has not laid out");
+  for (const [tag, team] of [["C", "Offense"], ["QB", "Offense"], ["X", "Offense"], ["Y", "Offense"], ["Z", "Offense"], ["LC", "Defense"], ["LB", "Defense"], ["R", "Defense"], ["RC", "Defense"], ["S", "Defense"]] as const) {
+    const box = await d.player(tag, team).boundingBox();
+    if (!box) throw new Error(`no ${tag} on the field`);
+    expect(box.y, `${tag} is under the card's top`).toBeGreaterThanOrEqual(field.y);
+    expect(box.y + box.height, `${tag} is over the card's bottom`).toBeLessThanOrEqual(field.y + field.height);
+  }
+  await d.field.screenshot({ path: `test-results/roster-${device}-zoom.png` });
+  await d.roster(false);
+
+  // Deep field on for the plays (from its own key, so a screen that never offers it is checked too)
+  await page.evaluate((key) => { localStorage.setItem(key, "on"); }, DEEP_FIELD_KEY);
+  await page.reload();
+  steps.playDeep = await card();
+  await d.roster();
+  steps.rosterDeep = await card();
+  expect(steps.rosterDeep, "Deep field never reaches the roster").toEqual(steps.roster);
+  await expect(deepButton).toHaveCount(0);
+  await d.field.screenshot({ path: `test-results/roster-${device}-zoom-deep.png` });
+  await d.roster(false);
+  expect((await card()).yards, "the play keeps its Deep field").toBe(steps.playDeep.yards);
+  expect(await page.evaluate((key) => localStorage.getItem(key), DEEP_FIELD_KEY)).toBe("on");
+
+  writeFileSync(`test-results/roster-${device}-zoom.json`, `${JSON.stringify(steps, null, 2)}\n`);
 });

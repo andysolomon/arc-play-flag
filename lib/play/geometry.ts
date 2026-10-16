@@ -14,6 +14,8 @@ export const FIELD_YARDS = 30;
 export const MIN_DEPTH = 24;
 /** The deepest card: 37 yards past the line of scrimmage, unless a player already stands deeper. */
 export const MAX_DEPTH = 45;
+/** Roster mode's card: the standard formation, safety 11 yards deep, with no room kept for routes. */
+export const ROSTER_DEPTH = 21;
 
 export function px(x: number): number {
   return x * S;
@@ -66,6 +68,15 @@ export function depth(players: readonly Player[], pane: Pane | null, minDepth = 
   // from the own goal line the end line is 58 yards off, past the deepest card, so this stays 45
   const max = Math.min(MAX_DEPTH, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2, route));
   return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
+}
+
+/**
+ * Roster mode's card: the formation and a margin above its deepest player, never stretched down a tall pane
+ * the way a play's card is, so it reads close in on a phone as on a laptop. On a tall pane it is centred.
+ */
+export function rosterDepth(players: readonly Player[]): number {
+  const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
+  return Math.max(ROSTER_DEPTH, Math.ceil((8 - deepest + 1.2) * 2) / 2);
 }
 
 export function cardWidth(pane: Pane | null, depthYards: number): number | null {
