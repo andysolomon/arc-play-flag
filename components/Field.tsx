@@ -8,7 +8,7 @@ import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from 
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
-import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, snap } from "@/lib/play/geometry";
+import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, rosterDepth, snap } from "@/lib/play/geometry";
 import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
@@ -217,12 +217,13 @@ function FieldImpl({
   }), [players, live, liveWaypoint, liveCatch, liveRelease]);
   // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
   // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
-  // pre-snap motion stays in the backfield, so drawing it leaves the card as it is
-  const fit = depth(effective, pane, MIN_DEPTH, los);
+  // pre-snap motion stays in the backfield, so drawing it leaves the card as it is;
+  // roster mode's formation stands still, so its card frames just the formation and Deep field is the plays' alone
+  const fit = roster ? rosterDepth(effective) : depth(effective, pane, MIN_DEPTH, los);
   const deepest = depth(effective, pane, MAX_DEPTH, los);
-  const d = !readOnly && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
+  const d = !readOnly && !roster && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
   // offered only where it shows more field, and not while anything is being drawn
-  const offerDeep = !readOnly && draft === null && deepest > fit;
+  const offerDeep = !readOnly && !roster && draft === null && deepest > fit;
   const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;
   const width = cardWidth(pane, d);

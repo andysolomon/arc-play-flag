@@ -8,7 +8,7 @@
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
     "components/App.tsx": "435d33122f47904d33138db6c6dbe62c0a7bdf1940fbeab1d0b6b9251820f597",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "c470e52cd3f6b9a175cef2c9a96df55b2ba568769ea68cee82ae60b04145d78e",
+    "components/Field.tsx": "23f09c1632df3b19231e8823d7e9a55a8d9c66ef7598fce72689853d01229637",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "761fee2a9cb524bbed3a79c3fcc43a4f09e6c16a4380358d3c47808aefb10306",
@@ -70,12 +70,9 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "positions drag and step in roster mode, with Reset spots in the roster panel (merged with roster mode's ball on the 15); no chapter enters roster mode (no chapter script names it), and in play mode the field and tokens render and behave as before, so no clip shows it",
+    "reason": "roster mode's card changed (framed at 23 yards up to the goal line, no Deep field there); outside roster mode Field.tsx sizes the field exactly as before, and no chapter opens roster mode, so no clip shows it",
     "files": [
-      "components/App.tsx (changed)",
-      "components/Field.tsx (changed)",
-      "components/PlayerToken.tsx (changed)",
-      "components/RosterSidebar.tsx (changed)"
+      "components/Field.tsx (changed)"
     ]
   }
 }
