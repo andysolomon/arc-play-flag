@@ -8,7 +8,7 @@
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
     "components/App.tsx": "0873d49b96742b4a2ab9d52506cffab09981a81f939390a2c1de24939c845580",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "c0f70aea9446a53c3635473e5432f3d0c0e5ac1afc63452b3106b05202c831c3",
+    "components/Field.tsx": "f100a7e912702eca753c766c20763246848836babb79304da6ed09f035144463",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "761fee2a9cb524bbed3a79c3fcc43a4f09e6c16a4380358d3c47808aefb10306",
@@ -70,9 +70,9 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "only the roster panel's lineup row changed (name, lineups menu and fork in one row, long names wrapping in the menu); no chapter enters roster mode, so no clip shows it",
+    "reason": "only roster mode's card changed (framed at 21 yards, no Deep field there); outside roster mode Field.tsx sizes the card exactly as before, and no chapter enters roster mode, so no clip shows it",
     "files": [
-      "components/RosterSidebar.tsx (changed)"
+      "components/Field.tsx (changed)"
     ]
   }
 }
