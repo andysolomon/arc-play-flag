@@ -8,7 +8,7 @@ import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
-import { LOS_YARD, inNoRunZone, withLos } from "@/lib/play/field";
+import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import { activeLineup, formationOf, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
@@ -573,7 +573,7 @@ export function App() {
           showTitle
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
-          los={rostering ? LOS_YARD : s.los}
+          los={rostering ? ROSTER_LOS : s.los}
           starters={rostering || namesOn ? starterNames : undefined}
           roster={rostering}
         />

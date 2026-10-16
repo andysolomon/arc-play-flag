@@ -29,6 +29,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 const panel = (page: Page) => page.locator("#route-sidebar");
 const tools = (page: Page) => page.locator("#play-sidebar");
+/** The field's line-of-scrimmage label: "LOS" on the 40, where every drive starts, else "LOS <yards to go>". */
+const losLabel = (d: Designer) => d.field.locator("g[fill-opacity='0.5'] > text").filter({ hasText: /^LOS/ });
 const openSettings = (page: Page) => page.getByRole("button", { name: /team, theme & backup settings/ }).click();
 /** The starting lineup alone, holding these slots, and the team's players. */
 const main = (slots: Roster, players: string[] = []): Lineups => ({ active: "main", lineups: [{ id: "main", name: "Starting Lineup", slots }], players });
@@ -263,6 +265,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   const lcInPlay = await d.playerX("LC", "Defense");
   expect(lcInPlay).toBeGreaterThan(3.5);
   await expect(d.undo).toBeEnabled();
+  await expect(losLabel(d)).toHaveText("LOS");
 
   // the roster lays out the standard formation at its home spots, opening on the call's own side, the defense
   await d.roster();
@@ -271,6 +274,9 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await expect(d.player("FS", "Defense")).toHaveCount(0);
   await expect(d.caption("S", "Defense")).toHaveText("Unassigned");
   expect(await d.playerX("LC", "Defense")).toBeCloseTo(3, 1);
+  // the ball is on the 15 in roster mode, whatever the play's own spot
+  await expect(losLabel(d)).toHaveText("LOS 15");
+  const rosterLos = await losLabel(d).textContent();
   // both sides at full strength, offense first, nothing faded
   await d.rosterView.click();
   await expect(d.rosterView).toHaveAccessibleName("Showing both");
@@ -324,6 +330,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await expect(d.caption("FS", "Defense")).toHaveCount(0);
   expect(await d.playerX("LC", "Defense")).toBeCloseTo(lcInPlay, 1);
   expect(await d.playerX("FS", "Defense")).toBeCloseTo(sAt, 1);
+  await expect(losLabel(d)).toHaveText("LOS");
   await expect(d.undo).toBeEnabled();
   await d.undo.click();
   await d.undo.click();
@@ -354,7 +361,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await d.roster();
   expect(await d.playerX("S", "Defense")).toBeCloseTo(sSpot.x, 1);
 
-  writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups }, null, 2)}\n`);
+  writeFileSync(`test-results/roster-${device}-defense.json`, `${JSON.stringify({ stored: await storedLineups(page), backup: parsed.lineups, rosterLos }, null, 2)}\n`);
 });
 
 test("a position dragged or stepped in roster mode stands there on every lineup and after a reload, held to its side of the line, never moving a play, until Reset spots puts its side home", async ({ page }, info) => {
