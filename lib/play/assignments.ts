@@ -23,6 +23,8 @@
  *   quarterback plain "Blitz", as every blitz did; one aimed at a player who is gone reads "Blitz" too.
  * - L9 a lateral let go on the run (ADR 007) is a pitch: "QB runs and pitches to Z", and the job "Run
  *   and pitch to Z", so the words say the carrier moves with the ball first.
+ * - L10 a deep zone called as a half or a third says so, "Deep half" or "Deep third"; Auto reads
+ *   "Zone deep", as every deep zone did.
  *
  * Text is used as given; the caller cleans it first (T1–T5).
  */
@@ -32,7 +34,7 @@ import { blitzAim, blitzTarget } from "./blitz";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
 import { carriers, chainLinks, chainOf, runsBefore, visits } from "./lateral";
-import { isRun, routeDef } from "./routes";
+import { isRun, routeName } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
 export interface Assignment {
@@ -106,7 +108,7 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
     const target = aim === "player" ? blitzTarget(rt, play.players) : undefined;
     return target ? `Blitz ${who(target)}` : "Blitz";
   }
-  return routeDef(p.team, rt.type)?.label ?? "Custom route";
+  return routeName(p.team, rt) ?? "Custom route";
 }
 
 /** "Pass", "Run", "Play-action", "Double pass", "Lateral pass", "Lateral run", "Lateral · unfinished", or "Defense" for a defensive call; null when nobody has a route. */
