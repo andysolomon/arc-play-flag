@@ -252,6 +252,14 @@ jobs:
           path: test-results/blitz-target-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the deep zones
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-zones
+          path: test-results/deep-zones-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the playbook switcher's menus
         if: always()
         uses: actions/upload-artifact@v4

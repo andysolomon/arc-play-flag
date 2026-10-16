@@ -7,6 +7,7 @@ import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
+import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
@@ -199,6 +200,8 @@ export function App() {
   }, []);
   // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
   const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the DEEP pills: Auto splits the field with the other deep zones, Half and Third call it
+  const onDeepSplit = useCallback((split: DeepSplit | null) => { dispatch({ type: "deepSplit", split }); }, []);
   const onBlitzTarget = useCallback(() => {
     dispatch({ type: "blitzTarget" });
     if (compactRef.current) setRightOpen(false);
@@ -602,6 +605,8 @@ export function App() {
             blitz={blitz}
             onBlitzAim={onBlitzAim}
             onBlitzTarget={onBlitzTarget}
+            deep={sel?.team === "defense" && sel.route?.type === "zoneDeep" ? deepSplit(sel.route) ?? "auto" : null}
+            onDeepSplit={onDeepSplit}
             cut={selCut}
             jet={jetAble}
             hint={hint}
