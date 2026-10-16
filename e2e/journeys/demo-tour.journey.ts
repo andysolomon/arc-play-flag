@@ -14,10 +14,13 @@ import { STAMP_PATH } from "../../scripts/demo-recorder/freshness";
  *  - a clip is not the length its card promises, or not 960×540, so it was cut short or
  *    recorded wrong; a poster is not a 960×540 picture                    → "every chapter"
  *  - the browser draws its own controls over a clip (iOS covered it with skip, scrub and AirPlay
- *    buttons; Android Chrome adds a cast button)                           → "plays without the browser's controls"
- *  - a stopped clip shows no sign that it plays, or the sign stays over the picture once it does,
- *    or the control over the clip paints over the poster                   → "plays without the browser's controls"
- *  - a tap on the picture away from the sign does nothing, or the chapter number takes the tap
+ *    buttons; Android Chrome adds a cast button), or a clip loses playsinline, so an iPhone plays
+ *    it fullscreen under its own controls                                  → "plays without the browser's controls"
+ *  - a stopped clip shows no sign that it plays, the sign or the chapter number stays over the
+ *    picture once it does, or the control over the clip paints over the poster
+ *                                                                          → "plays without the browser's controls"
+ *  - a tap on the picture away from the sign does nothing, the chapter number takes the tap, or a
+ *    held click at the clip's edge misses because pressing shrinks the control
  *                                                                          → "plays without the browser's controls"
  *  - a second tap does not pause it, or a keyboard cannot reach, name or press the control
  *                                                                          → "plays without the browser's controls"
@@ -51,6 +54,9 @@ const clip = (page: Page, title: string): Locator => page.getByLabel(`${title} d
 const control = (page: Page, title: string): Locator => card(page, title).getByRole("button");
 /** The play sign drawn over a stopped clip. */
 const sign = (page: Page, title: string): Locator => control(page, title).locator("svg");
+/** The chapter's number in the clip's corner, shown over a stopped clip like the sign. */
+const number = (page: Page, title: string): Locator =>
+  card(page, title).getByText(String(DEMOS.findIndex((demo) => demo.title === title) + 1), { exact: true });
 const playing = (video: Locator): Promise<boolean> => video.evaluate((element: HTMLVideoElement) => !element.paused && !element.ended);
 
 interface Measured { duration: number; width: number; height: number; source: string }
@@ -137,7 +143,7 @@ test("every chapter's card matches the manifest, and its clip and poster are the
       });
       frame = `demo-tour-${device}-${demo.slug}.png`;
       // the frame itself, not the play sign drawn over a stopped clip
-      await video.screenshot({ path: `test-results/${frame}`, style: "article button svg { visibility: hidden !important; }" });
+      await video.screenshot({ path: `test-results/${frame}`, style: "article button > span { display: none !important; }" });
     }
     chapters.push({
       slug: demo.slug, title: demo.title, time: demo.time, covers: demo.covers,
@@ -150,21 +156,26 @@ test("every chapter's card matches the manifest, and its clip and poster are the
   }, null, 2)}\n`);
 });
 
-interface Step { step: string; name: string | null; sign: boolean; playing: boolean; ended: boolean; controls: boolean; at: number }
+interface Step { step: string; name: string | null; sign: boolean; number: boolean; playing: boolean; ended: boolean; controls: boolean; at: number }
 
 test("a clip plays without the browser's controls: a tap anywhere on it or a key plays and pauses it, and nothing covers it while it plays", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   const device = testInfo.project.name;
+  // as most coaches have it: the sign fades and a press scales, so a shrinking control can miss a click
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/demo");
 
-  // no clip asks the browser for its controls, or lets Android Chrome put a cast button over it
+  // no clip asks the browser for its controls, lets Android Chrome put a cast button over it, or
+  // leaves an iPhone free to play it fullscreen under its own
   for (const demo of DEMOS) {
     const video = clip(page, demo.title);
     await expect(video, demo.slug).not.toHaveAttribute("controls");
     await expect(video, demo.slug).toHaveJSProperty("controls", false);
     await expect(video, demo.slug).toHaveJSProperty("disableRemotePlayback", true);
+    await expect(video, demo.slug).toHaveJSProperty("playsInline", true);
     await expect(control(page, demo.title), demo.slug).toHaveAccessibleName(`Play ${demo.title}`);
     await expect(sign(page, demo.title), demo.slug).toBeVisible();
+    await expect(number(page, demo.title), demo.slug).toBeVisible();
     // the control over the clip is see-through: the poster, then the clip, is all there is under the sign
     await expect(control(page, demo.title), demo.slug).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   }
@@ -175,28 +186,32 @@ test("a clip plays without the browser's controls: a tap anywhere on it or a key
   const video = clip(page, demo.title);
   const button = control(page, demo.title);
   /**
-   * A real tap (a click on the desktop) at a point on the clip, as a fraction of its size or pixels
-   * from its corner. Measured each time: a screenshot of the card can scroll it.
+   * A real tap at a point on the clip, from its top left corner, given its size; on the desktop a
+   * click held as long as a coach holds one. Measured each time: a screenshot of the card can scroll it.
    */
-  const tapAt = async (x: number, y: number): Promise<void> => {
+  const tapAt = async (where: (width: number, height: number) => [number, number]): Promise<void> => {
     await video.scrollIntoViewIfNeeded();
     const box = await video.boundingBox();
     if (!box) throw new Error(`${demo.slug} has no box on screen`);
-    const [px, py] = [box.x + (x < 1 ? box.width * x : x), box.y + (y < 1 ? box.height * y : y)];
-    if (testInfo.project.use.hasTouch) await page.touchscreen.tap(px, py);
-    else await page.mouse.click(px, py);
+    const [x, y] = where(box.width, box.height);
+    if (testInfo.project.use.hasTouch) await page.touchscreen.tap(box.x + x, box.y + y);
+    else await page.mouse.click(box.x + x, box.y + y, { delay: 200 });
   };
   const steps: Step[] = [];
   const record = async (step: string): Promise<void> => {
     const state = await video.evaluate((element: HTMLVideoElement) => ({
       playing: !element.paused && !element.ended, ended: element.ended, controls: element.controls, at: element.currentTime,
     }));
-    steps.push({ step, name: await button.getAttribute("aria-label"), sign: await sign(page, demo.title).isVisible(), ...state });
+    steps.push({
+      step, name: await button.getAttribute("aria-label"),
+      sign: await sign(page, demo.title).isVisible(), number: await number(page, demo.title).isVisible(), ...state,
+    });
   };
   const expectPlaying = async (): Promise<void> => {
     await expect.poll(() => playing(video)).toBe(true);
     await expect(button).toHaveAccessibleName(`Pause ${demo.title}`);
     await expect(sign(page, demo.title)).toBeHidden();
+    await expect(number(page, demo.title)).toBeHidden();
     await expect(video).toHaveJSProperty("controls", false);
   };
   /** Stopped, and either paused where it was (well before the end, so a tap that missed and let it run out cannot pass) or finished. */
@@ -207,23 +222,24 @@ test("a clip plays without the browser's controls: a tap anywhere on it or a key
     if (how === "paused") expect(at, "paused where it was, not run out").toBeLessThan(duration - 1);
     await expect(button).toHaveAccessibleName(`Play ${demo.title}`);
     await expect(sign(page, demo.title)).toBeVisible();
+    await expect(number(page, demo.title)).toBeVisible();
   };
 
   await record("at rest");
   await article.screenshot({ path: `test-results/demo-tour-${device}-stopped.png` });
 
   // a tap on the sign plays it, and the sign gets out of the way
-  await tapAt(0.5, 0.5);
+  await tapAt((width, height) => [width / 2, height / 2]);
   await expectPlaying();
   await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(1);
   await article.screenshot({ path: `test-results/demo-tour-${device}-playing.png` });
   await record("tapped the sign: playing");
 
-  // a tap anywhere else on the picture pauses it, and one on the chapter number plays it again
-  await tapAt(0.88, 0.85);
+  // a tap anywhere else on the picture, right up to its edge, pauses it, and one on the chapter number plays it again
+  await tapAt((width, height) => [width - 3, height / 2]);
   await expectStopped("paused");
-  await record("tapped the corner: paused");
-  await tapAt(24, 24);
+  await record("tapped the edge: paused");
+  await tapAt(() => [24, 24]);
   await expectPlaying();
   await record("tapped the chapter number: playing");
 
@@ -232,13 +248,15 @@ test("a clip plays without the browser's controls: a tap anywhere on it or a key
   await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.ended)).toBe(true);
   await expectStopped("finished");
   await record("finished");
-  await tapAt(0.3, 0.6);
+  await tapAt((width, height) => [width * 0.3, height * 0.6]);
   await expectPlaying();
   expect(await video.evaluate((element: HTMLVideoElement) => element.currentTime), "replays from the start").toBeLessThan(3);
   await record("tapped after the end: playing from the start");
 
-  // a keyboard reaches the same control and presses it either way
-  await button.focus();
+  // a keyboard reaches the same control from the header with one Tab, and presses it either way
+  await page.getByRole("link", { name: "‹ Designer", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await expect(button).toBeFocused();
   await page.keyboard.press("Space");
   await expectStopped("paused");
   await record("Space: paused");

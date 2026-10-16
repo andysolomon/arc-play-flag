@@ -17,6 +17,8 @@ export function DemoClip({ demo, index }: { demo: DemoChapter; index: number }) 
     }
     sync();
   };
+  // the sign and the chapter number fade off a playing clip, so nothing is drawn over it
+  const overClip = `transition-[opacity,visibility,scale] duration-150 motion-reduce:transition-none ${playing ? "invisible opacity-0" : ""}`;
   const toggle = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -28,7 +30,9 @@ export function DemoClip({ demo, index }: { demo: DemoChapter; index: number }) 
     <article className="overflow-hidden rounded-tile border-2 border-ink bg-white shadow-tile [content-visibility:auto] [contain-intrinsic-size:480px]">
       <div className="relative border-b-2 border-ink bg-ink">
         {/* No browser controls: iOS draws skip, scrub and AirPlay buttons over the clip, and Android
-            Chrome a cast button unless remote playback is off. A tap anywhere on it plays or pauses. */}
+            Chrome a cast button unless remote playback is off. A tap anywhere on it plays or pauses.
+            The press feedback is on the sign: shrinking the control itself would let a click at the
+            clip's edge slip off it. */}
         <video
           ref={videoRef}
           data-demo
@@ -51,10 +55,10 @@ export function DemoClip({ demo, index }: { demo: DemoChapter; index: number }) 
           type="button"
           onClick={toggle}
           aria-label={`${playing ? "Pause" : "Play"} ${demo.title}`}
-          className="pressable absolute inset-0 flex cursor-pointer items-center justify-center focus-visible:outline-offset-[-5px]"
+          className="group absolute inset-0 flex cursor-pointer touch-manipulation select-none items-center justify-center focus-visible:outline-offset-[-5px]"
         >
           <span
-            className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow shadow-tile transition-[opacity,visibility] duration-150 motion-reduce:transition-none ${playing ? "invisible opacity-0" : ""}`}
+            className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow shadow-tile group-active:opacity-80 motion-safe:group-active:scale-[0.97] ${overClip}`}
             aria-hidden
           >
             <svg viewBox="0 0 24 24" width="24" height="24" className="ml-1">
@@ -62,7 +66,7 @@ export function DemoClip({ demo, index }: { demo: DemoChapter; index: number }) 
             </svg>
           </span>
         </button>
-        <span className="pointer-events-none absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-hidden>
+        <span className={`pointer-events-none absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base ${overClip}`} aria-hidden>
           {index + 1}
         </span>
       </div>
