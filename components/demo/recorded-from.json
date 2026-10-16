@@ -18,7 +18,7 @@
     "components/ManTagLayer.tsx": "258c32c219b052ff21d75fa6e169e2e6abbc1b3f12036aee17a0c3a779615833",
     "components/Menu.tsx": "c013376e864cc01d1eda1a6725314df661f03fd576ea868adb994a2af7c8ae03",
     "components/OfflineStatus.tsx": "bf355de426d0eda57124b65468b8657713b243ff0b50fb7e1a639c4ed60aea2d",
-    "components/PlayNameField.tsx": "fe6bb06413bcd8f10ab6b90c43944df87df6c212a40444875492faa89770260e",
+    "components/PlayNameField.tsx": "73977b0b1b815cd6543bf4b54e7d0d8e81ee8119e2004565e81bc05034693af9",
     "components/PlaySidebar.tsx": "f3ac2650ed901f930c9710c7f111c068e0c40be54882c0802a0d83025d68026f",
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
@@ -70,9 +70,9 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Starter names under tokens appear only with a roster lineup; no demo chapter seeds or shows one, so no clip draws a name",
+    "reason": "only the play name's plays menu changed (a side badge under each play); no chapter opens that menu, and the closed play name looks the same",
     "files": [
-      "components/PlayerToken.tsx (changed)"
+      "components/PlayNameField.tsx (changed)"
     ]
   }
 }
