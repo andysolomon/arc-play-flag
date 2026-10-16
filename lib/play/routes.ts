@@ -1,3 +1,4 @@
+import { DEEP_NAME, deepSplit } from "./deep";
 import type { DefenseRouteType, OffenseRouteType, Pair, Player, Route, RouteDef, RouteType, Team } from "./types";
 
 export const OFF = "#e5675e";
@@ -130,6 +131,12 @@ export function tableFor(team: Team): Record<string, RouteDef> {
 
 export function routeDef(team: Team, type: RouteType): RouteDef | null {
   return tableFor(team)[type] ?? null;
+}
+
+/** A route's name as pictures and words give it: its tile's label, or a deep zone's half or third. */
+export function routeName(team: Team, route: Route): string | null {
+  const split = deepSplit(route);
+  return split ? DEEP_NAME[split] : routeDef(team, route.type)?.label ?? null;
 }
 
 /**

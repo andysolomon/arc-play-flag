@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "435d33122f47904d33138db6c6dbe62c0a7bdf1940fbeab1d0b6b9251820f597",
+    "components/App.tsx": "8055aec92e488df3191008f4575563cd81e0819e45da84a2f8c6a739d659f822",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "23f09c1632df3b19231e8823d7e9a55a8d9c66ef7598fce72689853d01229637",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
@@ -27,7 +27,7 @@
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "ddacca020e0481883232b22f1c0d23416699bc10d4d7dcdb92f6d8756f79bc03",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
+    "components/RouteSidebar.tsx": "ae4f280bb814879cdc0117829f3855ba307c69f3417084f55a7ecf0cca41c959",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",
@@ -68,5 +68,12 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
+  },
+  "restamped": {
+    "reason": "the route palette's new DEEP pills show only with a deep-zone defender selected and the palette open; build-defense picks Zone deep and the palette folds away at once (recorded build-defense on this merge and checked its contact sheet), and no other chapter opens the palette on a deep zone",
+    "files": [
+      "components/App.tsx (changed)",
+      "components/RouteSidebar.tsx (changed)"
+    ]
   }
 }
