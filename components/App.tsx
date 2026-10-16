@@ -481,8 +481,9 @@ export function App() {
   }, [s.players, visit]);
   // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
   const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
-  // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
-  const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
+  // a lateral's catch dragged somewhere illegal is snapped back, or a player kept off a teammate, and the
+  // coach is told why, on a flag's yellow
+  const onFieldNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
   // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
   const blitz = useMemo(() => {
     if (sel?.team !== "defense" || sel.route?.type !== "blitz") return null;
@@ -566,7 +567,7 @@ export function App() {
           draft={rostering ? null : s.draft}
           dispatch={rostering ? rosterDispatch : fieldDispatch}
           onSelect={rostering ? onRosterSelect : onSelect}
-          onCatchNote={onCatchNote}
+          onNote={onFieldNote}
           lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}

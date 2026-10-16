@@ -6,9 +6,9 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "435d33122f47904d33138db6c6dbe62c0a7bdf1940fbeab1d0b6b9251820f597",
+    "components/App.tsx": "7172ebe1d981092dad0e96db24d3fc00cee9f419fa41ee6922584015c0fccf78",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "23f09c1632df3b19231e8823d7e9a55a8d9c66ef7598fce72689853d01229637",
+    "components/Field.tsx": "e2d6f69f7990745f875fa190327ec2f1039f353a54578c9105da36192ce4bd37",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "761fee2a9cb524bbed3a79c3fcc43a4f09e6c16a4380358d3c47808aefb10306",
@@ -70,9 +70,10 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Starter names under tokens appear only with a roster lineup; no demo chapter seeds or shows one, so no clip draws a name",
+    "reason": "players are now kept 2 yards off a teammate when dragged, stepped or backed off to the blitz line; the tour's one drag (Z out to 25, 2, 2.2 yards from Y) and one blitz (R back to the 7, 5 yards from S) stay clear of every teammate, and no chapter steps a player, so no clip changes; Field's note prop was renamed, which draws nothing",
     "files": [
-      "components/PlayerToken.tsx (changed)"
+      "components/App.tsx (changed)",
+      "components/Field.tsx (changed)"
     ]
   }
 }

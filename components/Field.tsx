@@ -17,6 +17,7 @@ import { isContext, shown } from "@/lib/play/reducer";
 import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import { atSnap, motionPoint } from "@/lib/play/pre-snap";
+import { crowdNote, crowding, freeSnap, freeSpot, stepPast, teammates } from "@/lib/play/spacing";
 import { motionGeom } from "@/lib/play/geometry";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pair, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
@@ -42,8 +43,11 @@ interface Props {
   draft: Draft | null;
   dispatch: (a: Action) => void;
   onSelect: (id: string) => void;
-  /** a lateral's catch, or a pitch's release, was dragged or nudged somewhere illegal and snapped back: say why */
-  onCatchNote?: (text: string) => void;
+  /**
+   * something dragged or nudged somewhere it can't go was held back: a lateral's catch or a pitch's release
+   * snapped back, or a player kept off a teammate (lib/play/spacing.ts). Say why
+   */
+  onNote?: (text: string) => void;
   /** while Lateral asks who takes it: the carrier tossing it, who can't take it from themself */
   lateralFrom?: string | null;
   svgRef: RefObject<SVGSVGElement | null>;
@@ -82,6 +86,11 @@ interface Drag {
   y0: number;
   moved: boolean;
   last: { x: number; y: number } | null;
+  /** the player's tag, and their teammates where they stand, whom they are held clear of (lib/play/spacing.ts) */
+  name: string;
+  mates: Player[];
+  /** whether the coach has been told the player is being kept off a teammate: once a drag */
+  told: boolean;
 }
 
 interface Live {
@@ -144,7 +153,7 @@ function captionFor(p: Player, starters: Readonly<Record<string, string>> | unde
 }
 
 function FieldImpl({
-  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onCatchNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
+  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
   noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
@@ -316,6 +325,14 @@ function FieldImpl({
     return { x: ((cx - r.left) / r.width) * 30, y: topRef.current + ((cy - r.top) / r.height) * dep };
   }, [svgRef]);
 
+  // a player dragged onto a teammate is kept off them, and the coach is told why, once a drag
+  const tellCrowded = useCallback((dr: Drag, at: { x: number; y: number }) => {
+    const mate = dr.told ? null : crowding(at, dr.mates);
+    if (!mate) return;
+    dr.told = true;
+    onNote?.(crowdNote(dr.name, mate.label || mate.id, "kept"));
+  }, [onNote]);
+
   const applyDrag = useCallback(() => {
     rafRef.current = 0;
     const dr = dragRef.current;
@@ -323,8 +340,12 @@ function FieldImpl({
     const y = toYards(dr.last.x, dr.last.y);
     const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
     if (Math.abs(c.x - dr.x0) > 0.25 || Math.abs(c.y - dr.y0) > 0.25) dr.moved = true;
-    if (dr.moved) setLive({ id: dr.id, x: c.x, y: c.y });
-  }, [toYards]);
+    if (!dr.moved) return;
+    // held clear of every teammate: it slides round one in the way, and past them once the pointer is
+    const f = freeSpot(c, dr.team, topRef.current, dr.gap, dr.mates) ?? { x: dr.x0, y: dr.y0 };
+    tellCrowded(dr, c);
+    setLive({ id: dr.id, x: f.x, y: f.y });
+  }, [tellCrowded, toYards]);
 
   const applyWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -343,8 +364,13 @@ function FieldImpl({
     if (dr.moved && dr.last) {
       const y = toYards(dr.last.x, dr.last.y);
       const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
-      const s = clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap);
+      // where it was held clear of every teammate, snapped as every drop is and still clear of them; with
+      // nowhere clear it stays where it was (lib/play/spacing.ts)
+      const f = freeSpot(c, dr.team, topRef.current, dr.gap, dr.mates);
+      const s = f && freeSnap(f, dr.team, topRef.current, dr.gap, dr.mates, snapMode);
       setLive(null);
+      if (!s) return;
+      tellCrowded(dr, clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap));
       dispatch({ type: "move", id: dr.id, x: s.x, y: s.y, commit: true });
       setBoingId(dr.id);
       window.setTimeout(() => { setBoingId((b) => (b === dr.id ? null : b)); }, 380);
@@ -360,7 +386,7 @@ function FieldImpl({
     }
     if (targeting && p.team === "offense") { dispatch({ type: "target", id: p.id }); return; }
     onSelect(p.id);
-  }, [canTake, dispatch, onSelect, players, snapMode, targeting, toYards]);
+  }, [canTake, dispatch, onSelect, players, snapMode, targeting, tellCrowded, toYards]);
 
   const endWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -380,8 +406,8 @@ function FieldImpl({
     window.clearTimeout(shakeTimer.current);
     shakeTimer.current = window.setTimeout(() => { setShakeHop(null); }, 400);
     const from = arcs.find((a) => a.hop === hop)?.from;
-    onCatchNote?.(catchNote(rule, from ? names[from] ?? "" : ""));
-  }, [arcs, names, onCatchNote]);
+    onNote?.(catchNote(rule, from ? names[from] ?? "" : ""));
+  }, [arcs, names, onNote]);
   useEffect(() => () => { window.clearTimeout(shakeTimer.current); window.clearTimeout(shakeReleaseTimer.current); }, []);
   // a release dragged past the line shakes and says so, once as it starts
   const snapBackRelease = useCallback((hop: number) => {
@@ -389,8 +415,8 @@ function FieldImpl({
     window.clearTimeout(shakeReleaseTimer.current);
     shakeReleaseTimer.current = window.setTimeout(() => { setShakeRelease(null); }, 400);
     const from = arcs.find((a) => a.hop === hop)?.from;
-    onCatchNote?.(releaseNote(from ? names[from] ?? "" : ""));
-  }, [arcs, names, onCatchNote]);
+    onNote?.(releaseNote(from ? names[from] ?? "" : ""));
+  }, [arcs, names, onNote]);
 
   /** The release a pointer is over, in yards: snapped like a waypoint, then kept behind the line and on the field. */
   const releaseAt = useCallback((cx: number, cy: number) => {
@@ -524,7 +550,10 @@ function FieldImpl({
     const p = players.find((q) => q.id === id);
     if (!p) return;
     const pt = toYards(e.clientX, e.clientY);
-    dragRef.current = { id, team: p.team, gap: losGap(p.route), ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null };
+    dragRef.current = {
+      id, team: p.team, gap: losGap(p.route), ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null,
+      name: p.label || p.id, mates: teammates(players, id), told: false,
+    };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   }, [players, toYards]);
 
@@ -543,8 +572,10 @@ function FieldImpl({
     const step = STEP[e.key];
     if (step && !playRef.current) {
       e.preventDefault();
-      const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
-      dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
+      // a step onto a teammate goes on past them, or, with the edge of the field first, nowhere (lib/play/spacing.ts)
+      const r = stepPast(p, step, p.team, topRef.current, losGap(p.route), teammates(players, id));
+      if (r.past) onNote?.(crowdNote(p.label || p.id, r.past.label || r.past.id, r.to ? "past" : "stuck"));
+      if (r.to) dispatch({ type: "move", id, x: r.to.x, y: r.to.y, commit: true });
       if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -553,7 +584,7 @@ function FieldImpl({
       } else if (targeting && p.team === "offense") dispatch({ type: "target", id });
       else onSelect(id);
     }
-  }, [canTake, dispatch, onSelect, players, selectedId, targeting]);
+  }, [canTake, dispatch, onNote, onSelect, players, selectedId, targeting]);
 
   const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);

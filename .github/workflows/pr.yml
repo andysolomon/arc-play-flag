@@ -260,6 +260,14 @@ jobs:
           path: test-results/playbook-switch-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the spacing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collisions
+          path: test-results/collisions-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload mobile usability evidence
         if: always()
         uses: actions/upload-artifact@v4
