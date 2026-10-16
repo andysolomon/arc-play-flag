@@ -81,7 +81,7 @@
  *   panel asks once.
  */
 
-import { MAX_DEPTH, MAX_NAME, cleanName, playerNames, renamedIn, sameName, withoutName } from "./roster";
+import { MAX_DEPTH, MAX_NAME, cleanName, offFieldPositions, playerNames, renamedIn, sameName, withoutName } from "./roster";
 import { LOS_GAP, X_MAX, X_MIN, Y_MAX, Y_MIN, defaults } from "./routes";
 import type { Lineup, Lineups, Player, Roster, Spot, Team } from "./types";
 
@@ -330,4 +330,16 @@ export function formationOf(ls: Lineups): Player[] {
     const spot = ls.spots?.find((s) => sameSpot(s, p.team, p.label));
     return spot ? { ...p, x: spot.x, y: spot.y } : { ...p };
   });
+}
+
+/**
+ * Every position the roster lists: the standard formation as the coach has stood it, then each tag the
+ * formation has no token for (R9) that a lineup keeps a depth chart for, or one of `worn` (the open play's
+ * players, every saved play's) wears. Roster mode's panel and the roster's picture and sheet read the same.
+ */
+export function rosterPositions(ls: Lineups, worn: readonly Player[]): Player[] {
+  const formation = formationOf(ls);
+  const kept = ls.lineups.flatMap((l) => l.slots.map((slot) => ({ team: slot.team, tag: slot.tag })));
+  const tagged = worn.filter((p) => p.label).map((p) => ({ team: p.team, tag: p.label }));
+  return [...formation, ...offFieldPositions(formation, [...kept, ...tagged])];
 }

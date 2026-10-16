@@ -11,8 +11,8 @@ import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
-import { activeLineup, formationOf, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
-import { offFieldId, offFieldPositions, starters } from "@/lib/play/roster";
+import { activeLineup, formationOf, rosterPositions, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
+import { offFieldId, starters } from "@/lib/play/roster";
 import type { Lineups, Player, Roster, RouteType, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import {
@@ -95,12 +95,10 @@ export function App() {
   const [rosterPick, setRosterPick] = useState<string | null>(null);
   // a depth chart kept for a tag the formation has no token for (FS, H) stays in reach from the panel: every
   // tag a lineup keeps a chart for, the open play wears or a saved play wears (lib/play/roster.ts, R9)
-  const positions = useMemo(() => {
-    if (!rostering) return formation;
-    const tagged = [...s.players, ...getPlays().flatMap((p) => p.players)].filter((p) => p.label).map((p) => ({ team: p.team, tag: p.label }));
-    const kept = lineups.lineups.flatMap((l) => l.slots.map((slot) => ({ team: slot.team, tag: slot.tag })));
-    return [...formation, ...offFieldPositions(formation, [...kept, ...tagged])];
-  }, [rostering, formation, lineups, s.players]);
+  const positions = useMemo(
+    () => (rostering ? rosterPositions(lineups, [...s.players, ...getPlays().flatMap((p) => p.players)]) : formation),
+    [rostering, formation, lineups, s.players],
+  );
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);

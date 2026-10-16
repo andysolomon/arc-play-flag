@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "435d33122f47904d33138db6c6dbe62c0a7bdf1940fbeab1d0b6b9251820f597",
+    "components/App.tsx": "de0b245c5770caf2861d59be92f98550869b781a84a72faea72ea553ab81ee52",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "23f09c1632df3b19231e8823d7e9a55a8d9c66ef7598fce72689853d01229637",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
@@ -70,9 +70,9 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Starter names under tokens appear only with a roster lineup; no demo chapter seeds or shows one, so no clip draws a name",
+    "reason": "App.tsx only moves roster mode's list of positions into lib/play/lineup.ts (rosterPositions); nothing on screen changes, so no clip does",
     "files": [
-      "components/PlayerToken.tsx (changed)"
+      "components/App.tsx (changed)"
     ]
   }
 }
