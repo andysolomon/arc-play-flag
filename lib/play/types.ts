@@ -158,9 +158,10 @@ export interface RosterSlot {
 export type Roster = RosterSlot[];
 
 /**
- * A lineup: a roster under a name. The starting lineup is always there; any other is a branch, a copy
- * of the lineup it was made from (`from`, by id) changed for a day a player is away, a different
- * opponent, or anything else. Kept on the device, like the team.
+ * A lineup: a roster under a name. The starting lineup is always there, and the Secondary Lineup, made
+ * from its depth charts and never stored (lib/play/lineup.ts); any other is a branch, a copy of the
+ * lineup it was made from (`from`, by id) changed for a day a player is away, a different opponent, or
+ * anything else. Kept on the device, like the team.
  */
 export interface Lineup {
   id: string;

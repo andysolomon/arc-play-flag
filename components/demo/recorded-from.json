@@ -19,13 +19,13 @@
     "components/Menu.tsx": "c013376e864cc01d1eda1a6725314df661f03fd576ea868adb994a2af7c8ae03",
     "components/OfflineStatus.tsx": "bf355de426d0eda57124b65468b8657713b243ff0b50fb7e1a639c4ed60aea2d",
     "components/PlayNameField.tsx": "fe6bb06413bcd8f10ab6b90c43944df87df6c212a40444875492faa89770260e",
-    "components/PlaySidebar.tsx": "0bfa61f286549521cfe7e9cadbf93f97a7f212a9c23d7ced9a8773f0f1b7114f",
+    "components/PlaySidebar.tsx": "f3ac2650ed901f930c9710c7f111c068e0c40be54882c0802a0d83025d68026f",
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
     "components/PlayerToken.tsx": "7fd9550c1091cdb8c3fe9254d22789f56cc17918e0562be1576f8cc3b447bd6e",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
-    "components/RosterSidebar.tsx": "9c541200f6db1accdba12bed180b7dde30c11b95b70e9b9526feb045cb5c8e32",
+    "components/RosterSidebar.tsx": "d9a4f6f3b97d24600f40f1e613c5e520ce738a3817f24f80ec2d2474b91022d8",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
     "components/RouteSidebar.tsx": "14cbf9b0215eceeffd2a337ad5772b834a714f0559da9aff7c8bf2cfcd3a73f5",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
@@ -70,9 +70,10 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "roster mode's card changed (framed at 23 yards up to the goal line, no Deep field there); outside roster mode Field.tsx sizes the field exactly as before, and no chapter opens roster mode, so no clip shows it",
+    "reason": "the Secondary Lineup shows only in the roster panel and in the Lineup picker under Show player names; no chapter enters roster mode or has a roster to turn names on, so no clip shows it",
     "files": [
-      "components/Field.tsx (changed)"
+      "components/PlaySidebar.tsx (changed)",
+      "components/RosterSidebar.tsx (changed)"
     ]
   }
 }

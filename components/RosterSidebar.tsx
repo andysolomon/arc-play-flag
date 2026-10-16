@@ -4,8 +4,8 @@ import { memo, useCallback, useEffect, useId, useRef, useState, type ChangeEvent
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
 import {
-  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, activeLineup, branched, fromName, hasSpots, lineupName, onTeam, renamed, renamedPlayer,
-  teamFull, teamNames, withActive, withPlayer, withSlots, without, withoutPlayer, withoutSpots,
+  MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, SECOND_LINEUP, activeLineup, allLineups, branched, fromName, hasSpots,
+  lineupName, onTeam, renamed, renamedPlayer, teamFull, teamNames, withActive, withPlayer, withSlots, without, withoutPlayer, withoutSpots,
 } from "@/lib/play/lineup";
 import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, isOffField, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
 import { shown } from "@/lib/play/reducer";
@@ -76,6 +76,9 @@ const Fork = () => (
 function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
+  // the Secondary Lineup is made from the starting lineup's depth charts: shown, branched, never changed itself (lineup.ts, S4)
+  const made = lineup.id === SECOND_LINEUP;
+  const source = parent ?? MAIN_NAME;
   const menuId = useId(), nameId = useId(), joinId = useId(), freshId = useId(), viewName = useId();
   // a lineup just branched gets its name field, so the coach can say what it is for straight away
   const nameRef = useRef<HTMLInputElement>(null);
@@ -230,7 +233,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   };
   // the chooser of team players to add to the chart, open over one position at a time
   const [choosing, setChoosing] = useState<string | null>(null);
-  const chooser = sel?.label && choosing === sel.id && depth.length < MAX_DEPTH;
+  const chooser = !made && sel?.label && choosing === sel.id && depth.length < MAX_DEPTH;
   const [fresh, setFresh] = useState("");
   const chooserRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -267,6 +270,8 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
               id={nameId}
               ref={nameRef}
               value={lineup.name}
+              readOnly={made}
+              title={made ? `Made from ${source}: branch it to name and change your own` : undefined}
               maxLength={MAX_LINEUP_NAME}
               placeholder="Lineup name"
               autoComplete="off"
@@ -291,7 +296,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
               <Menu id={menuId} label="Lineups" root={listRoot} trigger={listButton} onClose={closeList}
                 className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[min(50vh,420px)] overflow-y-auto">
                 <MenuHeading>LINEUPS</MenuHeading>
-                {lineups.lineups.map((l) => (
+                {allLineups(lineups).map((l) => (
                   <button
                     key={l.id}
                     type="button"
@@ -303,7 +308,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                     <span className="min-w-0 flex-1 break-words py-2 leading-tight">{lineupName(l)}</span>
                   </button>
                 ))}
-                {lineup.id !== MAIN_LINEUP && (
+                {lineup.id !== MAIN_LINEUP && !made && (
                   <>
                     <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
                     <button type="button" role="menuitem" onClick={askDelete} className={menuItemDanger}>
@@ -323,7 +328,9 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
             <Fork />
           </button>
         </div>
-        {parent && <span className={note}>Branched from {parent}.</span>}
+        {parent && (
+          <span className={note}>{made ? `Made from ${parent}'s depth charts: at each position the next player up starts.` : `Branched from ${parent}.`}</span>
+        )}
         {deleting && (
           <div className="flex flex-none flex-wrap gap-1.5">
             <span className="flex min-h-11 items-center text-small">Delete {lineupName(lineup)}?</span>
@@ -356,7 +363,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
             )}
             <span className={eyebrow}>POSITIONS</span>
             {standings(roster, player).length === 0 ? (
-              <span className="flex-none text-small leading-note text-ink-muted">{player} is not down for any position on {lineupName(lineup)} yet.</span>
+              <span className="flex-none text-small leading-note text-ink-muted">{player} is not down for any position on {lineupName(lineup)}{made ? "" : " yet"}.</span>
             ) : (
               <ul className="flex flex-none flex-col gap-1">
                 {standings(roster, player).map((st) => (
@@ -369,9 +376,13 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                 ))}
               </ul>
             )}
-            <span className={note}>Where {player} plays on {lineupName(lineup)}. Tap a position to change its depth chart.</span>
+            <span className={note}>
+              {made
+                ? `Where ${player} plays on ${lineupName(lineup)}, made from ${source}'s depth charts. Tap a position to see its chart.`
+                : `Where ${player} plays on ${lineupName(lineup)}. Tap a position to change its depth chart.`}
+            </span>
           </div>
-          {openings(player).length > 0 && (
+          {!made && openings(player).length > 0 && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`Put ${player} at a position`}>
               <span className={eyebrow}>PUT AT A POSITION</span>
               <ul className="flex flex-none flex-col gap-1">
@@ -465,30 +476,38 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                       >
                         {name}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => { up(i); }}
-                        disabled={i === 0}
-                        title={i === 0 ? "The starter" : "Move up the depth chart"}
-                        aria-label={`Move ${name} up`}
-                        className={`${pill} min-h-11 min-w-11 flex-none px-2 text-base`}
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { remove(i); }}
-                        title="Take off the depth chart (they stay on the team)"
-                        aria-label={`Remove ${name}`}
-                        className={`${pill} min-h-11 min-w-11 flex-none px-2 text-base`}
-                      >
-                        ✕
-                      </button>
+                      {!made && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { up(i); }}
+                            disabled={i === 0}
+                            title={i === 0 ? "The starter" : "Move up the depth chart"}
+                            aria-label={`Move ${name} up`}
+                            className={`${pill} min-h-11 min-w-11 flex-none px-2 text-base`}
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { remove(i); }}
+                            title="Take off the depth chart (they stay on the team)"
+                            aria-label={`Remove ${name}`}
+                            className={`${pill} min-h-11 min-w-11 flex-none px-2 text-base`}
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ol>
               )}
-              {chooser ? (
+              {made ? (
+                <button type="button" onClick={() => { onLineups(withActive(lineups, MAIN_LINEUP)); }} className={`${small} flex-none self-start`}>
+                  Change {sel.label} on {source}
+                </button>
+              ) : chooser ? (
                 <div
                   ref={chooserRef}
                   role="group"
@@ -546,7 +565,9 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                 </button>
               )}
               <span className={note}>
-                Starter first; ▲ moves a player up. The starter&apos;s name shows under {sel.label} on every play. Kept on this device, never in links or printouts.
+                {made
+                  ? `Made from ${source}'s depth chart at ${sel.label}: the next player up starts${isOffField(sel) ? "" : ", unless they start elsewhere on this side"}. Change it there, or branch this lineup to set your own.`
+                  : <>Starter first; ▲ moves a player up. The starter&apos;s name shows under {sel.label} on every play. Kept on this device, never in links or printouts.</>}
               </span>
             </div>
           )}
@@ -605,7 +626,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           )}
           <span className={note}>
             {names.length > 0
-              ? `Everyone on the team (${String(names.length)} of ${String(MAX_TEAM)}), on every lineup, with where they play on ${lineupName(lineup)}. Tap a name to put them at a position.`
+              ? `Everyone on the team (${String(names.length)} of ${String(MAX_TEAM)}), on every lineup, with where they play on ${lineupName(lineup)}. ${made ? "Tap a name for their page." : "Tap a name to put them at a position."}`
               : "Nobody is on the team yet. Add your players here, then put them on the depth charts."}
           </span>
         </div>
