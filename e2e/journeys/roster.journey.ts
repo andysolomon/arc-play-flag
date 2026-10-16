@@ -1016,3 +1016,51 @@ test("a name at either sideline stays whole on the field, and no name goes to th
 
   writeFileSync(`test-results/roster-${device}-sidelines.json`, `${JSON.stringify({ field, boxes }, null, 2)}\n`);
 });
+
+test("a position tapped far down the panel brings the panel back to its top and lights up the depth chart it is about to change", async ({ page }, info) => {
+  const device = info.project.name;
+  const team = ["Avery", "Blake", "Casey", "Dakota", "Emery", "Finley", "Harper", "Jules", "Kai", "Logan", "Marlow", "Noor"];
+  const slots: Roster = [{ team: "defense", tag: "LC", depth: ["Avery"] }, { team: "defense", tag: "S", depth: ["Blake", "Casey"] }];
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: main(slots, team) });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.rosterPanel();
+  await show(page, "Defense");
+  const scroller = panel(page).locator(":scope > div");
+  const defense = panel(page).getByRole("group", { name: "Defense positions" });
+  const spot = (tag: string) => panel(page).getByRole("group", { name: `Depth chart at ${tag}` }).locator(":scope > span[aria-hidden]");
+  const lit = (tag: string) => spot(tag).evaluate((el) => Number(getComputedStyle(el).opacity));
+  const top = () => scroller.evaluate((el) => el.scrollTop);
+  const log: { tapped: string; scrolledFrom: number; scrolledTo: number; litAtPeak: number; litAtRest: number }[] = [];
+
+  /** Scrolls the panel to its foot, taps a position in the list, and records what the coach saw. */
+  async function tapFromTheFoot(button: string, tag: string): Promise<void> {
+    await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    const from = await top();
+    expect(from).toBeGreaterThan(0);
+    await expect(defense.getByRole("button", { name: button })).toBeInViewport();
+    await defense.getByRole("button", { name: button }).click();
+    let peak = 0;
+    await expect.poll(async () => (peak = Math.max(peak, await lit(tag)))).toBeGreaterThan(0.5);
+    await expect.poll(top).toBe(0);
+    await expect(panel(page).getByRole("heading", { name: `Who plays ${tag}` })).toBeInViewport();
+    await expect(panel(page).getByRole("group", { name: `Depth chart at ${tag}` })).toBeInViewport();
+    await panel(page).screenshot({ path: `test-results/roster-${device}-picked-${tag}.png` });
+    // the highlighter goes out again: it marks the pick, it is not a state
+    await expect.poll(() => lit(tag), { timeout: 5_000 }).toBe(0);
+    log.push({ tapped: button, scrolledFrom: from, scrolledTo: await top(), litAtPeak: peak, litAtRest: await lit(tag) });
+  }
+
+  // a starter already down: S, picked from the foot of the list
+  await tapFromTheFoot("S: Blake, 2 deep", "S");
+  await expect(panel(page).getByRole("group", { name: "Depth chart at S" }).locator("ol")).toContainText("Blake");
+  // nobody down yet: LB, the chart that is about to be filled
+  await tapFromTheFoot("LB: Unassigned", "LB");
+  await expect(panel(page).getByRole("group", { name: "Depth chart at LB" })).toContainText("Nobody is down for LB yet.");
+  // the same position tapped again, after scrolling away from it, comes back to it again
+  await tapFromTheFoot("LB: Unassigned", "LB");
+  // nothing was written by looking: the lineup is as seeded
+  await expect.poll(() => storedLineups(page)).toEqual(main(slots, team));
+  writeFileSync(`test-results/roster-${device}-picked.json`, `${JSON.stringify(log, null, 2)}\n`);
+});

@@ -120,6 +120,21 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   const sits = (name: string): string =>
     standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ") || "No position";
 
+  // a position picked, in the list, from a player's page or on the field, brings its chart into view: the panel
+  // back to its top, where the chart is, and the chart lit up a moment, so a tap far down the list shows what it
+  // is about to change; a tap on the position already picked does it again
+  const topRef = useRef<HTMLSpanElement>(null);
+  const spotRef = useRef<HTMLSpanElement>(null);
+  const [cue, setCue] = useState(0);
+  const pickPosition = (id: string) => { setCue((c) => c + 1); onSelect(id); };
+  const selId = sel?.id ?? null;
+  useEffect(() => {
+    if (selId === null) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    topRef.current?.parentElement?.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+    spotRef.current?.animate([{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }], { duration: 1200, easing: "ease-out" });
+  }, [selId, cue]);
+
   // a player's page: the name, and which selection it was opened over, so a tap on the field turns it back
   // to that position's chart with no effect to time it; it closes once the name is off the team
   const [page, setPage] = useState<{ name: string; over: string | null } | null>(null);
@@ -155,7 +170,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
     setPage(null);
     if (!p) return;
     if (!shown(p, view)) onView(team);
-    onSelect(p.id);
+    pickPosition(p.id);
   };
   // the positions a player is not down for yet, on both sides whatever is on view (a tap only writes the chart):
   // each tag once per team, offense first
@@ -236,7 +251,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
 
   return (
     <>
-      <span className={eyebrow}>ROSTER</span>
+      <span ref={topRef} className={eyebrow}>ROSTER</span>
       <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Lineup">
         <div className="flex flex-none items-center gap-1.5">
           <div ref={listRoot} className="relative min-w-0 flex-1">
@@ -424,7 +439,13 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
             </span>
           )}
           {sel.label && (
-            <div className="flex flex-none flex-col gap-1.5" role="group" aria-label={`Depth chart at ${sel.label}`}>
+            <div className="relative isolate flex flex-none flex-col gap-1.5" role="group" aria-label={`Depth chart at ${sel.label}`}>
+              {/* the highlighter behind the chart, at rest unseen, lit when a position is picked */}
+              <span
+                ref={spotRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute -inset-1.5 -z-10 rounded-tile border-2 border-yellow bg-yellow-soft opacity-0"
+              />
               <span className={eyebrow}>DEPTH CHART</span>
               {depth.length === 0 && (
                 <span className="flex-none text-small leading-note text-ink-muted">Nobody is down for {sel.label} yet.</span>
@@ -617,7 +638,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                   <li key={p.id}>
                     <button
                       type="button"
-                      onClick={() => { onSelect(p.id); }}
+                      onClick={() => { pickPosition(p.id); }}
                       aria-pressed={p.id === sel?.id}
                       data-active={p.id === sel?.id}
                       aria-label={`${p.label || "No tag"}: ${line}`}
