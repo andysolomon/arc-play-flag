@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { encodeShare } from "../../lib/play/share";
 import { Designer, armSabotage, sabotage } from "../support/designer";
-import { storedPlays } from "../support/fixtures";
+import { SLANT_LEFT, storedPlays } from "../support/fixtures";
 
 /**
  * Save is in the header, where the side badge used to be: a coach drawing on a phone saves without
@@ -9,7 +10,7 @@ import { storedPlays } from "../support/fixtures";
  * ⌘S / Ctrl+S does the same as the key (in the play name too), a save that does not land opens Play
  * tools on its warning, and roster mode, which has no play to save, keeps its side switch there.
  *
- * Leaves `header-save-<device>-{save,refused,roster}.json` (each step: the field's status, the dot, the
+ * Leaves `header-save-<device>-{save,refused,roster,never-saved,keys}.json` (each step: the field's status, the dot, the
  * key's title, whether Play tools was open and what was stored) and pictures of the header before and
  * after a save and of a refused save's warning in `test-results/`, uploaded as `header-save`.
  */
@@ -132,6 +133,97 @@ test("a coach saves from the header without opening Play tools, and the header s
   report(device, "save", steps);
 });
 
+test("a play that was never saved keeps its dot through a reload, and so does one opened from a share link", async ({ page }, testInfo) => {
+  const device = testInfo.project.name;
+  const steps: unknown[] = [];
+  const d = new Designer(page);
+  await d.goto();
+  await d.select("X");
+  await d.pick("Slant");
+  await d.closeSidebars();
+  await expect(dot(page)).toBeVisible();
+
+  // the reload restores the draft with no history behind it: still not in the library, so still a dot
+  await page.reload();
+  await expect(d.field).toBeVisible();
+  await expect(d.routes).toHaveCount(1);
+  await expect(dot(page)).toBeVisible();
+  await expect(saveKey(page)).toHaveAttribute("title", "Save changes to this play (⌘S)");
+  await expect((await d.tool("Save")).locator("span[aria-hidden]")).toHaveCount(1);
+  expect(await storedPlays(page)).toEqual({});
+  await step(page, steps, "reloaded, never saved: the dot stays");
+
+  await saveKey(page).click();
+  await expect(d.toast).toHaveText("Saved");
+  await expect(dot(page)).toHaveCount(0);
+  await step(page, steps, "saved from the header");
+
+  // a blank new play has nothing to save, before a reload and after one
+  await d.newPlay();
+  await expect(d.routes).toHaveCount(0);
+  await expect(dot(page)).toHaveCount(0);
+  await page.reload();
+  await expect(d.field).toBeVisible();
+  await expect(dot(page)).toHaveCount(0);
+  await step(page, steps, "a blank new play, reloaded: no dot");
+
+  // a play opened from a share link is not in the library until it is saved
+  await d.goto(`?p=${encodeShare({ name: "Otter Shared Slant", players: SLANT_LEFT.players })}`);
+  await expect(page.getByRole("heading", { name: "Otter Shared Slant" })).toBeVisible();
+  await expect(dot(page)).toBeVisible();
+  await saveKey(page).click();
+  await expect(d.toast).toHaveText("Saved");
+  await expect(dot(page)).toHaveCount(0);
+  expect(Object.values(await storedPlays(page)).map((p) => p.name).sort()).toEqual(["New play", "Otter Shared Slant"]);
+  await step(page, steps, "opened from a share link, then saved from the header");
+  report(device, "never-saved", steps);
+});
+
+test("⌘S finds the S key on a Cyrillic layout, and an autofill keydown with no key breaks nothing", async ({ page }, testInfo) => {
+  const device = testInfo.project.name;
+  const steps: unknown[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (e) => { errors.push(e.message); });
+  const d = new Designer(page);
+  await d.goto();
+  await d.select("X");
+  await d.pick("Slant");
+  await d.closeSidebars();
+  await expect(dot(page)).toBeVisible();
+
+  // Ctrl+S on a Russian layout types "ы" from the S key's place; the app still saves and keeps the browser's save away
+  const prevented = await page.evaluate(() => !window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "ы", code: "KeyS", ctrlKey: true, bubbles: true, cancelable: true,
+  })));
+  expect(prevented, "the browser's own save never opens").toBe(true);
+  await expect(d.toast).toHaveText("Saved");
+  await expect(dot(page)).toHaveCount(0);
+  expect(Object.values(await storedPlays(page))).toHaveLength(1);
+  await step(page, steps, "Ctrl+ы (the S key on a Russian layout) saved");
+
+  // Ctrl+O typed on a Dvorak layout sits where QWERTY has S: its letter wins, so it is not a save
+  await d.select("Y");
+  await d.pick("Out");
+  await d.closeSidebars();
+  await expect(dot(page)).toBeVisible();
+  const taken = await page.evaluate(() => !window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "o", code: "KeyS", ctrlKey: true, bubbles: true, cancelable: true,
+  })));
+  expect(taken).toBe(false);
+  await expect(dot(page)).toBeVisible();
+  await step(page, steps, "Ctrl+O from the S key's place on Dvorak: not a save");
+
+  // a browser filling in a field sends a keydown that is no KeyboardEvent and has no key
+  await d.tools();
+  await d.nameInput.evaluate((el) => { el.dispatchEvent(new Event("keydown", { bubbles: true })); });
+  await d.closeSidebars();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(d.routes).toHaveCount(1);
+  expect(errors, "no page error").toEqual([]);
+  await step(page, steps, "an autofill keydown with no key: no error, and Undo still works");
+  report(device, "keys", steps);
+});
+
 test("a header save that does not land opens Play tools on its warning, and Save again lands it", async ({ page }, testInfo) => {
   const device = testInfo.project.name;
   const steps: unknown[] = [];
@@ -176,6 +268,8 @@ test("roster mode has no play to save: the header keeps its side switch there, a
 
   await d.roster();
   await expect(saveKey(page)).toHaveCount(0);
+  // the roster has both sides, so the field says neither
+  await expect(page.locator("main").getByText(/^(Offensive play|Defensive call)$/)).toHaveCount(0);
   await expect(d.rosterView).toHaveAccessibleName("Showing offense");
   await d.rosterView.click();
   await expect(d.rosterView).toHaveAccessibleName("Showing defense");

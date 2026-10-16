@@ -2,9 +2,14 @@ import { expect, test } from "@playwright/test";
 import { Designer } from "../support/designer";
 import { COVER_TWO, SLANT_LEFT, seed, storedDraft, storedPlays } from "../support/fixtures";
 
-/** Whose play it is, as the field shows it: that team drawn solid, the other faded behind it when it is there at all. */
+/**
+ * Whose play it is, as the field shows it: that team drawn solid, the other faded behind it when it is there at all,
+ * and said to a screen reader beside the play's name.
+ */
 async function ownSide(d: Designer, side: "Offense" | "Defense"): Promise<void> {
   await expect(side === "Offense" ? d.player("X") : d.player("LC", "Defense")).toHaveCSS("opacity", "1");
+  await expect(d.page.locator("main").getByText(side === "Offense" ? "Offensive play" : "Defensive call", { exact: true })).toHaveCount(1);
+  await expect(d.page.locator("main").getByText(side === "Offense" ? "Defensive call" : "Offensive play", { exact: true })).toHaveCount(0);
   const other = d.field.getByRole("button", { name: side === "Offense" ? /^Defense / : /^Offense / });
   for (const p of await other.all()) await expect(p).toHaveCSS("opacity", "0.4");
 }

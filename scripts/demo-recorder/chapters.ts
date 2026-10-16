@@ -633,7 +633,14 @@ async function saveShare(d: ChapterDriver): Promise<void> {
   const tools = d.page.locator("#play-sidebar");
   const toast = d.page.locator("div[role='status']");
   await d.say("Save the play");
-  await d.click(d.page.getByRole("banner").getByRole("button", { name: "Save play", exact: true }), "Save", 200);
+  // the first tap after the page opens can land before React has attached the key's handler
+  await d.clickUntilState(
+    d.page.getByRole("banner").getByRole("button", { name: "Save play", exact: true }),
+    "Save",
+    // read without waiting, as hasAttributeNow does: no toast yet is simply not saved yet
+    async () => toast.evaluateAll((els) => els.some((el) => el.textContent === "Saved")),
+    200,
+  );
   await d.expectState("The app confirms the save", async () => {
     await expect(toast).toHaveText("Saved", { timeout: ASSERT_TIMEOUT });
   }, 420, ["Saving"]);

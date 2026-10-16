@@ -228,10 +228,10 @@ export function App() {
         else dispatch({ type: "select", id: null });
         return;
       }
-      const k = e.key.toLowerCase();
       // ⌘S / Ctrl+S is the header's Save, typing in the play name included, never the browser's "Save page as";
-      // roster mode has no play to save, so there it does nothing
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && k === "s") {
+      // a layout whose S key types no Latin letter is matched by the key's place. Roster mode has no play to save
+      const sKey = e.key === "s" || e.key === "S" || (e.code === "KeyS" && !/^[a-z]$/i.test(e.key));
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && sKey) {
         e.preventDefault();
         if (!e.repeat && !rosteringRef.current) saveRef.current();
         return;
@@ -239,6 +239,7 @@ export function App() {
       if (isEditable(e.target)) return;
       // the play's history is the play's: nothing in roster mode is on it, so nothing there undoes it
       if (rosteringRef.current) return;
+      const k = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && k === "z") {
         e.preventDefault();
         dispatch({ type: e.shiftKey ? "redo" : "undo" });

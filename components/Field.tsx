@@ -709,6 +709,7 @@ function FieldImpl({
         {title !== undefined && showTitle && (
           <div id={FIELD_TITLE_ID} className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
             <h1 className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
+            {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
             {status !== undefined && (
               <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
                 {status}
