@@ -4,8 +4,8 @@ import { memo, useCallback, useEffect, useId, useRef, useState, type ChangeEvent
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
 import {
-  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, activeLineup, branched, fromName, lineupName, onTeam, renamed, renamedPlayer, teamFull,
-  teamNames, withActive, withPlayer, withSlots, without, withoutPlayer,
+  MAIN_LINEUP, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, activeLineup, branched, fromName, hasSpots, lineupName, onTeam, renamed, renamedPlayer,
+  teamFull, teamNames, withActive, withPlayer, withSlots, without, withoutPlayer, withoutSpots,
 } from "@/lib/play/lineup";
 import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, isOffField, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
 import { shown } from "@/lib/play/reducer";
@@ -70,8 +70,8 @@ const Fork = () => (
  * The right sidebar in roster mode (docs/adr/008-roster-depth-chart.md). The team's players come first in
  * the coach's mind: a player joins the team by name, any time, and is then put on depth charts, from the
  * position tapped on the field (its chart is filled from the team) or from the player's own page. Every
- * position on the field is listed to jump between. The roster is the team's, kept on this device, so a
- * change here lands at once and is never undone.
+ * position on the field is listed to jump between, and one dragged on the field stands there until Reset
+ * spots. The roster is the team's, kept on this device, so a change here lands at once and is never undone.
  */
 function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect }: Props) {
   const lineup = activeLineup(lineups);
@@ -116,6 +116,28 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   const sides: Team[] = ["offense", "defense"];
   // the positions listed: the side on view, or both
   const teams: Team[] = view === "both" ? sides : [view];
+  // the positions dragged off their home spots: Reset spots puts the sides on view back, asking once in place
+  // since it is not undoable (lib/play/lineup.ts, F8); Reset gives focus to the SHOW pills above it, since
+  // Reset spots is off once nothing on view has moved
+  const moved = hasSpots(lineups, teams);
+  const [resetting, setResetting] = useState(false);
+  const keepSpotsRef = useRef<HTMLButtonElement>(null);
+  const resetRef = useRef<HTMLButtonElement>(null);
+  const showRef = useRef<HTMLDivElement>(null);
+  // Keep gives focus back to Reset spots, which is only there again once the question has gone
+  const backToReset = useRef(false);
+  useEffect(() => {
+    if (resetting) keepSpotsRef.current?.focus();
+    else if (backToReset.current) resetRef.current?.focus();
+    backToReset.current = false;
+  }, [resetting]);
+  const keepSpots = () => { backToReset.current = true; setResetting(false); };
+  const resetSpots = () => {
+    setResetting(false);
+    showRef.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
+    onLineups(withoutSpots(lineups, teams));
+  };
+  const homeWords = view === "both" ? "both sides back at their home spots" : `the ${view} back at its home spots`;
   // "X starter, LC 2nd": where a player sits on this lineup, for the lists
   const sits = (name: string): string =>
     standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ") || "No position";
@@ -415,7 +437,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
         <div className="flex flex-none flex-col items-center gap-[10px] rounded-tile border-2 border-dashed border-ink px-[10px] py-[18px]">
           <Sticker icon="roster" size={56} className="opacity-75" />
           <span className="text-center text-base leading-body text-ink-muted">
-            Tap a position on the field to set who plays it.
+            Tap a position on the field to set who plays it, or drag it to move it.
           </span>
         </div>
       )}
@@ -612,7 +634,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
       {player === null && (
         <div className="flex flex-none flex-col gap-1.5">
           <span className={eyebrow}>SHOW</span>
-          <div role="radiogroup" aria-label="Show" className={segmented}>
+          <div ref={showRef} role="radiogroup" aria-label="Show" className={segmented}>
             {VIEWS.map((v) => (
               <label key={v} title={VIEW[v].title} className={segment}>
                 <input type="radio" name={viewName} value={v} checked={view === v} onChange={() => { onView(v); }} className={segmentInput} />
@@ -622,6 +644,32 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           </div>
           <span className="flex-none text-caption leading-note text-ink-muted">
             {view === "both" ? "Both sides of the roster on the field at once." : `The ${view} alone on the field; the roster has both sides.`}
+          </span>
+        </div>
+      )}
+      {player === null && (
+        <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Spots">
+          <span className={eyebrow}>SPOTS</span>
+          {resetting && moved ? (
+            <div className="flex flex-none flex-wrap gap-1.5">
+              <span className="flex min-h-11 items-center text-small">Put {homeWords}?</span>
+              <button type="button" onClick={resetSpots} className={`${small} bg-yellow on-yellow hover:bg-yellow`}>Reset</button>
+              <button ref={keepSpotsRef} type="button" onClick={keepSpots} className={small}>Keep</button>
+            </div>
+          ) : (
+            <button
+              ref={resetRef}
+              type="button"
+              onClick={() => { setResetting(true); }}
+              disabled={!moved}
+              title={moved ? `Put ${homeWords}` : "Every position on view is at its home spot"}
+              className={`${small} flex-none self-start`}
+            >
+              Reset spots
+            </button>
+          )}
+          <span className={note}>
+            Drag a position, or step it with the arrow keys, to stand it where you like. It stays there on every lineup, on this device, and never moves a play.
           </span>
         </div>
       )}

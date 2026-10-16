@@ -64,9 +64,9 @@ interface Props {
   /** who starts at each position, by player id, from the roster (docs/adr/008-roster-depth-chart.md) */
   starters?: Readonly<Record<string, string>>;
   /**
-   * Roster mode: the team's standard formation, not a play: both sides at full strength, nothing drawn on it,
-   * nothing to run and nothing to drag, every position captioned with its starter or as unassigned, so the
-   * field reads as the team's depth chart.
+   * Roster mode: the team's standard formation, not a play: both sides at full strength, nothing drawn on it
+   * and nothing to run, every position captioned with its starter or as unassigned, so the field reads as the
+   * team's depth chart. A position drags and steps as a play's player does; where it lands is the roster's.
    */
   roster?: boolean;
 }
@@ -321,10 +321,9 @@ function FieldImpl({
     if (!dr?.last) return;
     const y = toYards(dr.last.x, dr.last.y);
     const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
-    // roster mode's formation is the team's, not a play's: a press there is a tap, never a move
-    if (!roster && (Math.abs(c.x - dr.x0) > 0.25 || Math.abs(c.y - dr.y0) > 0.25)) dr.moved = true;
+    if (Math.abs(c.x - dr.x0) > 0.25 || Math.abs(c.y - dr.y0) > 0.25) dr.moved = true;
     if (dr.moved) setLive({ id: dr.id, x: c.x, y: c.y });
-  }, [roster, toYards]);
+  }, [toYards]);
 
   const applyWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -541,7 +540,7 @@ function FieldImpl({
     const p = players.find((q) => q.id === id);
     if (!p) return;
     const step = STEP[e.key];
-    if (step && !playRef.current && !roster) {
+    if (step && !playRef.current) {
       e.preventDefault();
       const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
       dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
@@ -553,7 +552,7 @@ function FieldImpl({
       } else if (targeting && p.team === "offense") dispatch({ type: "target", id });
       else onSelect(id);
     }
-  }, [canTake, dispatch, onSelect, players, roster, selectedId, targeting]);
+  }, [canTake, dispatch, onSelect, players, selectedId, targeting]);
 
   const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);
@@ -928,7 +927,6 @@ function FieldImpl({
               drawing={draft !== null}
               // the roster is both sides of one team, so neither side is a shadow of the other there
               faded={!roster && isContext(p, side)}
-              fixed={roster}
               caption={captionFor(p, starters, roster)}
               onPointerDown={onDown}
               onKeyDown={onKey}
