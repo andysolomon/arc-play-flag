@@ -2,12 +2,12 @@ import { expect, test, type Locator, type Page, type TestInfo } from "@playwrigh
 import { writeFileSync } from "node:fs";
 import { callOf } from "../../lib/play/call";
 import { S } from "../../lib/play/geometry";
-import { HOLD, buildMotion, type Motion } from "../../lib/play/motion";
+import { HOLD, buildMotion, simulationPlayback, type Motion } from "../../lib/play/motion";
 import { LOS_GAP, PITCH_SET } from "../../lib/play/routes";
 import type { Pair, Player, Route } from "../../lib/play/types";
 import { Designer, downloadBytes } from "../support/designer";
-import { OTTERS, play, playbook, seed, storedDraft, storedPlays } from "../support/fixtures";
-import { keepFile, readDeck, readZip } from "../support/pptx";
+import { OTTERS, moved, play, playbook, seed, storedDraft, storedPlays } from "../support/fixtures";
+import { readDeck, readZip } from "../support/pptx";
 
 /**
  * The quarterback's rollout and boot (docs/adr/010-qb-rollout-and-boot.md): the QB takes the snap, carries
@@ -17,6 +17,12 @@ import { keepFile, readDeck, readZip } from "../support/pptx";
  */
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+/** ▶ plays a simulation that throws to the read when Math.random() < 0.8: pinned, it plays the plan built here. */
+const RANDOM = 0.1;
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((r) => { Math.random = () => r; }, RANDOM);
+});
 
 const out = (info: TestInfo, name: string): string => `test-results/qb-actions-${info.project.name}-${name}`;
 const group = (page: Page, name: string): Locator => page.locator("#route-sidebar").getByRole("group", { name, exact: true });
@@ -28,9 +34,12 @@ const losSelect = (page: Page): Locator => page.locator("#play-sidebar").getByRo
 const QB_SPOT: Pair = [15, 5];
 const ROLL_RIGHT: Pair[] = [[17, 6.2], [20.5, 6.2], [23, 4.2]];
 const ROLL_LEFT: Pair[] = [[13, 6.2], [9.5, 6.2], [7, 4.2]];
-/** a boot away from a fake on the QB's right: a step toward it, back behind the spot, out to the left */
-const BOOT_LEFT: Pair[] = [[16.2, 5.6], [13.5, 6.8], [9.5, 6.4], [7, 4.2]];
-const BOOT_RIGHT: Pair[] = [[13.8, 5.6], [16.5, 6.8], [20.5, 6.4], [23, 4.2]];
+/** a boot away from a fake on the QB's right: it pivots back on the fake's side, bends behind the spot and runs out left */
+const BOOT_LEFT: Pair[] = [[16, 6.6], [12, 7], [9, 6.4], [7, 4.2]];
+const BOOT_RIGHT: Pair[] = [[14, 6.6], [18, 7], [21, 6.4], [23, 4.2]];
+/** from under centre, a yard behind the C: the fake there, then the path measured from 4 yards deep */
+const UNDER_CENTRE: Pair = [15, 2];
+const BOOT_LEFT_UNDER: Pair[] = [[16, 5.6], [12, 6], [9, 5.4], [7, 3.2]];
 /** how long a play-action fake takes to sell, in seconds (lib/play/motion.ts) */
 const FAKE = 0.25;
 
@@ -105,10 +114,22 @@ function expectLegs(drawn: readonly Pair[], legs: readonly Pair[]): void {
   expect(drawn.at(-1)?.[1] ?? 0).toBeGreaterThanOrEqual(PITCH_SET);
 }
 
-/** The plan the app's ▶ builds for the stored draft: with one read and at most one runner it has no coin flips. */
+/** The plan the app's ▶ builds for the stored draft, with the page's pinned random. */
 async function plan(d: Designer): Promise<{ players: Player[]; motion: Motion }> {
   const players = (await storedDraft(d.page))?.players ?? [];
-  return { players, motion: buildMotion(players, await topOf(d)) };
+  return { players, motion: buildMotion(players, await topOf(d), simulationPlayback(() => RANDOM)) };
+}
+
+/** Drags a player's token to a yard point. */
+async function dragToken(d: Designer, label: string, to: Pair): Promise<void> {
+  await d.closeSidebars();
+  const box = await d.player(label).boundingBox();
+  if (!box) throw new Error(`no token for ${label}`);
+  const target = await d.yardPoint(to[0], to[1]);
+  await d.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await d.page.mouse.down();
+  await d.page.mouse.move(target.x, target.y, { steps: 8 });
+  await d.page.mouse.up();
 }
 
 /** Freezes the page's clock and presses ▶. Each step then runs the clock on to a moment of the plan. */
@@ -279,7 +300,7 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   await expect(d.field.locator("desc")).toContainText("boots");
   await page.screenshot({ path: `${out(info, "boot")}-drawn.png` });
 
-  // ▶: the QB waits at the mesh while the ball dips to Z and back, then boots left with it and throws to Y
+  // ▶: the QB fakes from their spot while the ball dips to Z and back, then boots left with it and throws to Y
   const { players, motion: m } = await plan(d);
   expect(callOf(players)).toBe("play-action");
   expect({ kind: m.kind, passer: m.passer, receiver: m.receiver, runner: m.runner }).toEqual({ kind: "pass", passer: "o2", receiver: "o4", runner: "o5" });
@@ -289,13 +310,13 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   const clock = await startPlayback(d);
   await clock.to(m.handAt);
   const fake = { QB: await tokenAt(d, "QB"), Z: await tokenAt(d, "Z"), ball: await ballAt(d) };
-  expect(dist(fake.QB, pt(BOOT_LEFT[0] ?? QB_SPOT))).toBeLessThan(0.05);
+  expect(dist(fake.QB, pt(QB_SPOT))).toBeLessThan(0.01);
   expect(dist(fake.ball, fake.QB)).toBeGreaterThan(0.2);
   expect(dist(fake.ball, fake.Z)).toBeLessThan(dist(fake.QB, fake.Z));
   await page.screenshot({ path: `${out(info, "boot")}-fake.png` });
   await clock.to(m.handAt + FAKE - 0.02);
   const sold = { QB: await tokenAt(d, "QB") };
-  expect(dist(sold.QB, pt(BOOT_LEFT[0] ?? QB_SPOT))).toBeLessThan(0.05);
+  expect(dist(sold.QB, pt(QB_SPOT))).toBeLessThan(0.01);
   await clock.to(m.throwAt - 0.01);
   const launch = { QB: await tokenAt(d, "QB"), ball: await ballAt(d) };
   expect(dist(launch.QB, ring)).toBeLessThan(0.3);
@@ -305,6 +326,11 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   expect(dist(caught.ball, caught.Y)).toBeLessThan(0.3);
   await page.screenshot({ path: `${out(info, "boot")}-caught.png` });
   await finish(d, m, clock);
+
+  // with no read marked, a boot is still a pass: the simulation never hands it off by chance
+  const unmarked = players.map((p) => (p.route?.primary ? { ...p, route: { type: p.route.type } } : p));
+  const coin = [0.1, 0.3, 0.49].map((r) => buildMotion(unmarked, -16, simulationPlayback(() => r)).kind);
+  expect(coin).toEqual(["pass", "pass", "pass"]);
 
   // flipped, Z dives on the QB's left and the boot goes right; undo puts it back
   await d.clickTool("Flip play");
@@ -324,6 +350,9 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   await expect.poll(() => offense(page)).toMatchObject({ Z: { type: "dive", primary: true }, QB: { type: "boot" } });
   await expect(d.field.locator("[data-no-run-flag]")).toHaveCount(1);
   await d.closeSidebars();
+  // the QB throws nothing now: the decoy ends in an arrow, not the ring
+  await expect(d.field.locator("circle[data-set]")).toHaveCount(0);
+  await expect(d.field.locator("desc")).toContainText("as a decoy");
   await page.screenshot({ path: `${out(info, "boot")}-decoy.png` });
 
   // a run now: Z takes the handoff at the mesh, then the QB carries out the boot without the ball
@@ -359,7 +388,71 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
     plan: { snapAt: m.snapAt, handAt: m.handAt, throwAt: m.throwAt, catchAt: m.catchAt, dur: m.dur },
     fake, sold, launch, caught,
     decoyPlan: { kind: r.kind, handAt: r.handAt, handFor: r.handFor, dur: r.dur }, handed, decoy,
-    afterLateral, afterUndo: await offense(page),
+    coin, afterLateral, afterUndo: await offense(page),
+  }, null, 2)}\n`);
+});
+
+test("a boot fakes to the first runner to reach the QB, flips with the play, and fakes from under centre", async ({ page }, info) => {
+  const d = new Designer(page);
+  await d.goto();
+  await d.setName("Otters Boot Reverse");
+
+  // X's reverse comes the long way round behind the QB; Z's dive gets there first, so Z is the fake
+  await d.select("X");
+  await d.pick("Reverse");
+  await d.select("Z");
+  await d.pick("Dive");
+  await d.select("Y");
+  await d.pick("Drag");
+  await d.palette();
+  await d.primaryButton.click();
+  await d.select("QB");
+  await d.pick("Boot");
+  await d.palette();
+  await expect(qbNote(page)).toContainText("fakes the handoff to Z");
+  await d.closeSidebars();
+  const drawn = await qbPath(d);
+  expectLegs(drawn, BOOT_LEFT);
+  const before = await plan(d);
+  expect({ runner: before.motion.runner, kind: before.motion.kind }).toEqual({ runner: "o5", kind: "pass" });
+
+  // flipped, X lines up on the right and Z on the left: still Z first, so the boot turns right and keeps its fake
+  await d.clickTool("Flip play");
+  await d.select("QB");
+  await expect(qbNote(page)).toContainText("fakes the handoff to Z");
+  await d.closeSidebars();
+  const flipped = await qbPath(d);
+  expectLegs(flipped, BOOT_RIGHT);
+  const after = await plan(d);
+  expect(after.motion.runner).toBe("o5");
+  await page.screenshot({ path: `${out(info, "two-runners")}-flipped.png` });
+
+  // under centre the QB fakes a yard behind the C, then drops and boots
+  await d.undo.click();
+  await dragToken(d, "QB", UNDER_CENTRE);
+  await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o2")).toMatchObject({ x: 15, y: 2 });
+  const under = await qbPath(d);
+  expectLegs(under, BOOT_LEFT_UNDER);
+  const { motion: m } = await plan(d);
+  expect({ runner: m.runner, kind: m.kind }).toEqual({ runner: "o5", kind: "pass" });
+  const ring = await ringAt(d);
+  const clock = await startPlayback(d);
+  await clock.to(m.handAt);
+  const fake = { QB: await tokenAt(d, "QB"), Z: await tokenAt(d, "Z"), ball: await ballAt(d) };
+  expect(dist(fake.QB, pt(UNDER_CENTRE))).toBeLessThan(0.01);
+  expect(dist(fake.ball, fake.Z)).toBeLessThan(dist(fake.QB, fake.Z));
+  await clock.to(m.throwAt - 0.01);
+  const launch = { QB: await tokenAt(d, "QB"), ball: await ballAt(d) };
+  expect(dist(launch.QB, ring)).toBeLessThan(0.3);
+  expect(dist(launch.ball, launch.QB)).toBeLessThan(0.3);
+  await page.screenshot({ path: `${out(info, "two-runners")}-under-centre.png` });
+  await finish(d, m, clock);
+
+  writeFileSync(`${out(info, "two-runners")}.json`, `${JSON.stringify({
+    project: info.project.name, drawn, flipped, under, ring,
+    runners: { before: before.motion.runner, after: after.motion.runner },
+    plan: { snapAt: m.snapAt, handAt: m.handAt, throwAt: m.throwAt, catchAt: m.catchAt, dur: m.dur },
+    fake, launch, stored: await offense(page),
   }, null, 2)}\n`);
 });
 
@@ -367,20 +460,25 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
 const SPRINT = play("fx-sprint-right", "Otter Sprint Right", { o2: { type: "rollout" }, o4: { type: "curl", primary: true }, o3: { type: "go" } });
 const BOOT = play("fx-boot-left", "Otter Boot Left", { o5: { type: "dive" }, o2: { type: "boot" }, o4: { type: "drag", primary: true }, o3: { type: "go" } });
 const BOOT_RUN = play("fx-boot-dive", "Otter Boot Dive", { o5: { type: "dive", primary: true }, o2: { type: "boot" }, o3: { type: "go" } });
-const BOOK = playbook("fx-boot-book", "Otter Boot Book", [SPRINT, BOOT, BOOT_RUN]);
+/** The jet is the read on the 5, Z steps up to the line: the QB boots left as a decoy through the corner the flag would sit in. */
+const JET_BOOT = { ...moved(play("fx-jet-boot", "Otter Jet Boot", { o3: { type: "jet", primary: true }, o2: { type: "boot" }, o4: { type: "go" } }), { o5: { x: 22, y: 1 } }), los: 35 };
+const BOOK = playbook("fx-boot-book", "Otter Boot Book", [SPRINT, BOOT, BOOT_RUN, JET_BOOT]);
 
 test("the slides say what the QB does: rolls out, boots off the fake, or hands off and boots as a decoy", async ({ page }, info) => {
   test.setTimeout(120_000);
-  await seed(page, { plays: [SPRINT, BOOT, BOOT_RUN], playbooks: [BOOK], team: OTTERS });
+  await seed(page, { plays: [SPRINT, BOOT, BOOT_RUN, JET_BOOT], playbooks: [BOOK], team: OTTERS });
   await page.goto("/playbooks?book=fx-boot-book");
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 60_000 }),
     page.getByRole("button", { name: "Download slides" }).click(),
   ]);
+  // kept under this journey's own name: the slides journey keeps its deck as slides-<device>.pptx beside it
   const raw = await downloadBytes(download);
-  await keepFile(info, raw);
+  writeFileSync(`${out(info, "slides")}.pptx`, raw);
   const deck = await readDeck(page, readZip(raw));
-  const notes = Object.fromEntries(deck.slides.filter((s) => /^\d+ · /.test(s.title ?? "")).map((s) => [s.title, s.notes]));
+  const notes: Record<string, string | null> = Object.fromEntries(
+    deck.slides.filter((s) => /^\d+ · /.test(s.title ?? "")).map((s) => [s.title ?? "", s.notes] as const),
+  );
   expect(notes).toEqual({
     "1 · Otter Sprint Right":
       "1 · Otter Sprint Right · Pass\n\nPass: QB rolls out right and throws. Primary read: Y (Curl).\n\n" +
@@ -391,6 +489,18 @@ test("the slides say what the QB does: rolls out, boots off the fake, or hands o
     "3 · Otter Boot Dive":
       "3 · Otter Boot Dive · Run\n\nRun: Z takes it (Dive). QB hands off, then boots left as a decoy.\n\n" +
       "Left to right:\nX: Go\nC: Snap\nQB: Hand off to Z, then boot left as a decoy\nZ: Dive (primary read)\nY: No route",
+    "4 · Otter Jet Boot":
+      "4 · Otter Jet Boot · Run\n\nRun: X takes it (Jet sweep). QB hands off, then boots left as a decoy.\n\nFlagged: run in a no-run zone.\n\n" +
+      "Left to right:\nX: Jet sweep (primary read)\nC: Snap\nQB: Hand off to X, then boot left as a decoy\nZ: No route\nY: Go",
   });
-  writeFileSync(`${out(info, "slides")}.json`, `${JSON.stringify({ project: info.project.name, notes }, null, 2)}\n`);
+
+  // in the play's pictures the flag keeps off the decoy's path: the QB boots through the left corner, so it goes right
+  await page.goto("/playbooks");
+  const card = page.getByRole("link", { name: "Open Otter Jet Boot in the designer" }).locator("xpath=..");
+  const stamp = card.getByRole("img").first().locator("[data-no-run-flag] rect");
+  await expect(stamp).toHaveCount(1);
+  const stampX = Number(await stamp.getAttribute("x"));
+  expect(stampX).toBeGreaterThan(330);
+  await card.screenshot({ path: `${out(info, "slides")}-jet-boot-card.png` });
+  writeFileSync(`${out(info, "slides")}.json`, `${JSON.stringify({ project: info.project.name, notes, stampX }, null, 2)}\n`);
 });

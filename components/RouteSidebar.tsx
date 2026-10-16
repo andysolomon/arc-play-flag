@@ -2,7 +2,7 @@
 
 import { memo, useId, useRef, type ChangeEvent } from "react";
 import type { BlitzAim } from "@/lib/play/blitz";
-import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, isRun, mirrorable, tableFor } from "@/lib/play/routes";
+import { DEFENSE_KEYS, PASS_KEYS, QB_KEYS, RUN_KEYS, isQbAction, isRun, mirrorable, tableFor } from "@/lib/play/routes";
 import { teamFill, type SidelineCut } from "@/lib/play/geometry";
 import type { Player, RouteType } from "@/lib/play/types";
 import { Note } from "./Hint";
@@ -37,6 +37,11 @@ interface Props {
    * quarterback or the centre and does not carry the ball in a lateral chain. Nobody else is offered the tile.
    */
   jet: boolean;
+  /**
+   * the selected player is the quarterback, who is offered a rollout and a boot at the snap
+   * (docs/adr/010-qb-rollout-and-boot.md), and what the one they have does; null for anyone else
+   */
+  qb: QbInfo | null;
   hint: string | null;
   onPick: (key: RouteType) => void;
   onMotion: () => void;
@@ -50,6 +55,32 @@ interface Props {
    * flagged. Never on a defensive call, whose shadow offense is the other team's and never flagged.
    */
   noRunZone: boolean;
+}
+
+export interface QbInfo {
+  /** the quarterback's rollout or boot as the play has it; null without one */
+  act: {
+    type: "rollout" | "boot";
+    /** +1 to the quarterback's right */
+    side: 1 | -1;
+    /** who they fake or hand off to, by name; null with no runner on the play */
+    fake: string | null;
+    /** the call is a run: they hand off and carry it out as a decoy */
+    decoy: boolean;
+  } | null;
+}
+
+/** What the quarterback's rollout or boot does, under the QB tiles. */
+function qbWords(name: string, act: NonNullable<QbInfo["act"]>): string {
+  const way = act.side > 0 ? "right" : "left", other = act.side > 0 ? "left" : "right";
+  const verb = act.type === "rollout" ? `rolls out ${way}` : `boots ${way}`;
+  if (act.decoy) return `${name} hands off to ${act.fake ?? "the runner"}, then ${verb} as a decoy. To throw instead, mark a receiver as the read.`;
+  if (act.type === "rollout") {
+    const first = act.fake ? `fakes to ${act.fake} first, then rolls out ${way}` : `takes the snap and rolls out ${way}`;
+    return `${name} ${first}, behind the line, to throw from the ring. ⇄ Mirror route rolls ${other}.`;
+  }
+  if (!act.fake) return `Nothing to fake yet: give a back a run, and ${name} fakes it first, then boots the other way. For now ${name} boots ${way}.`;
+  return `${name} fakes the handoff to ${act.fake}, then boots out the other way, to the ${way}, to throw from the ring. Flip the play to boot ${other}, or pick Rollout to go with the fake.`;
 }
 
 export interface BlitzInfo {
@@ -82,7 +113,7 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, qb, hint, onPick, onMotion, onRemoveMotion,
   onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
@@ -104,8 +135,9 @@ function RouteSidebarImpl({
   // the jet sweep is a handoff at the snap: only for a player who can take one, never a keep after a lateral
   const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS.filter((k) => k !== "jet" || (jet && !hasBall)) : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
-  // the read is someone the final throw goes to, never a player the ball is lateraled through
-  const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
+  // the read is someone the final throw goes to, never a player the ball is lateraled through, nor a
+  // quarterback on a rollout or boot, who throws it
+  const canPrimary = !!(sel && sel.team === "offense" && sel.route && !isQbAction(sel.route.type) && !(laterals && chain.some((p) => p.id === sel.id)));
   const canMirror = mirrorable(sel);
   const primaryOn = !!sel?.route?.primary;
   const runNote = goesOn
@@ -252,6 +284,20 @@ function RouteSidebarImpl({
               </div>
               <span className="text-caption leading-note text-ink-muted">Draw a dashed path behind the line. The route starts where motion ends. One player motions per play; choosing another transfers motion.</span>
             </div>
+          )}
+          {/* the quarterback's own jobs at the snap come first: carry the ball out behind the line and throw */}
+          {qb && at === 0 && (
+            <>
+              <span className={eyebrow}>QB</span>
+              <div className={tileGrid} role="group" aria-label="Quarterback">
+                {QB_KEYS.map((k) => (
+                  <IconTile key={k} icon={k} label={tableFor("offense")[k]?.label ?? k} active={isJob(k)} onClick={() => { onPick(k); }} />
+                ))}
+              </div>
+              {qb.act && isJob(qb.act.type) && (
+                <span data-qb-note className="flex-none text-caption leading-note text-ink-muted">{qbWords(sel.label || "The QB", qb.act)}</span>
+              )}
+            </>
           )}
           {hasBall && (
             <>

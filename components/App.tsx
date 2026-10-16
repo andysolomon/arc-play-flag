@@ -9,7 +9,7 @@ import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
-import { sidelineCut } from "@/lib/play/geometry";
+import { qbAction, quarterback, sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import { activeLineup, formationOf, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
 import { offFieldId, offFieldPositions, starters } from "@/lib/play/roster";
@@ -30,7 +30,7 @@ import { Header, VIEW, type Mode } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
 import { RosterSidebar } from "./RosterSidebar";
-import { RouteSidebar } from "./RouteSidebar";
+import { RouteSidebar, type QbInfo } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
 import { Sidebar } from "./Sidebar";
 import { pillSm } from "./ui";
@@ -481,6 +481,14 @@ export function App() {
   }, [s.players, visit]);
   // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
   const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
+  // the quarterback's rollout and boot, and what the one they have does (docs/adr/010-qb-rollout-and-boot.md)
+  const qbInfo = useMemo((): QbInfo | null => {
+    if (sel?.team !== "offense" || sel.id !== quarterback(s.players)?.id) return null;
+    const act = qbAction(s.players);
+    if (!act) return { act: null };
+    const who = names({ players: s.players });
+    return { act: { type: act.type, side: act.side, fake: act.fake ? who.get(act.fake.id) ?? null : null, decoy: act.decoy } };
+  }, [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
   // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
@@ -604,6 +612,7 @@ export function App() {
             onBlitzTarget={onBlitzTarget}
             cut={selCut}
             jet={jetAble}
+            qb={qbInfo}
             hint={hint}
             onPick={onPick}
             onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}

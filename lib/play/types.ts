@@ -20,7 +20,11 @@ export type OffenseRouteType =
   /** a run whose runner is already crossing the formation at the snap and takes the handoff in stride (ADR 006) */
   | "jet"
   /** the last ball carrier of a lateral chain sets up and throws it forward */
-  | "throw";
+  | "throw"
+  /** the quarterback carries the snap across behind the line and throws on the run (ADR 010) */
+  | "rollout"
+  /** the quarterback fakes the handoff, then rolls out the other way to throw (ADR 010) */
+  | "boot";
 export type DefenseRouteType =
   | "man" | "zoneDeep" | "zoneFlat" | "curlFlat" | "midRead" | "blitz" | "spy" | "custom";
 export type RouteType = OffenseRouteType | DefenseRouteType;
@@ -90,8 +94,13 @@ export interface RouteDef {
   free?: boolean;
   /** the ball carrier's path on a run: laid out through the mesh point beside the QB */
   run?: boolean;
-  /** a job only the player holding the ball can take: set up and throw */
+  /**
+   * a job that sets up and throws: the last carrier's throw, or the quarterback's rollout or boot (who may
+   * hand off first and carry it out as a decoy, docs/adr/010-qb-rollout-and-boot.md)
+   */
   ball?: "throw";
+  /** the quarterback's own action at the snap: only they are offered it, and only then */
+  qb?: true;
 }
 
 /** Measured size of the centre pane, minus its padding. */

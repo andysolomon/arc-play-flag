@@ -5,7 +5,9 @@ import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type 
 import {
   canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
 } from "./lateral";
-import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
+import {
+  MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isQbAction, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags,
+} from "./routes";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 /** What a tap on a red player is waiting to answer: who a man defender covers, who a blitz comes for, or who takes a lateral. */
@@ -290,6 +292,8 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (!p) return s;
       const chain = chainOf(s.players);
       const at = editedVisit(s, chain);
+      // a rollout or boot is the quarterback's own job at the snap, never a carrier's (docs/adr/010-qb-rollout-and-boot.md, Q1)
+      if (isQbAction(a.key) && (p.id !== quarterback(s.players)?.id || at !== 0)) return s;
       if (at !== null && at < chain.length - 1 && a.key !== "man") {
         // a job for a time the ball goes on from them ends the chain there, with that job
         const c = commit(s);
@@ -435,8 +439,9 @@ function reduce(s: PlayState, a: Action): PlayState {
     }
     case "togglePrimary": {
       const sel = selected(s);
-      // a carrier in a lateral chain is never the read: the final throw goes to someone else
-      if (!sel || sel.team !== "offense" || !sel.route || carriers(s.players).has(sel.id)) return s;
+      // a carrier in a lateral chain is never the read: the final throw goes to someone else; nor is a
+      // quarterback on a rollout or boot, who throws it (Q12)
+      if (!sel || sel.team !== "offense" || !sel.route || carriers(s.players).has(sel.id) || isQbAction(sel.route.type)) return s;
       const on = !sel.route.primary;
       const c = commit(s);
       return {
