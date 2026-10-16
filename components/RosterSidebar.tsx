@@ -1,6 +1,10 @@
 "use client";
 
 import { memo, useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type SyntheticEvent } from "react";
+import { record } from "@/lib/diagnostics";
+import { PAPERS, defaultPaper } from "@/lib/export/pages";
+import { PICTURE_SCALE, SHEET_DPI, rosterFile, rosterPicture, rosterSheet, rosterTitle } from "@/lib/export/roster";
+import { exportPdf, exportPng } from "@/lib/export/run";
 import { byLine } from "@/lib/play/assignments";
 import { teamFill } from "@/lib/play/geometry";
 import {
@@ -10,7 +14,7 @@ import {
 import { MAX_DEPTH, MAX_NAME, depthOf, depthWord, isOffField, sameName, standings, starterOf, withDepth } from "@/lib/play/roster";
 import { shown } from "@/lib/play/reducer";
 import { newId } from "@/lib/play/storage";
-import type { Lineups, Player, Roster, Team, Vis } from "@/lib/play/types";
+import type { Lineups, Player, Roster, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { VIEW } from "./Header";
 import { Chevron, Menu, MenuHeading } from "./Menu";
 import { Sticker } from "./Sticker";
@@ -35,6 +39,8 @@ interface Props {
   onView: (next: Vis) => void;
   /** a position in the list tapped: select that player on the field */
   onSelect: (id: string) => void;
+  /** the team's name and colour, for the roster's picture and sheet */
+  team: TeamSettings;
 }
 
 const SIDE_WORD: Record<Team, string> = { offense: "OFFENSE", defense: "DEFENSE" };
@@ -73,7 +79,7 @@ const Fork = () => (
  * position on the field is listed to jump between, and one dragged on the field stands there until Reset
  * spots. The roster is the team's, kept on this device, so a change here lands at once and is never undone.
  */
-function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect }: Props) {
+function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel, players, view, onView, onSelect, team }: Props) {
   const lineup = activeLineup(lineups);
   const parent = fromName(lineups, lineup);
   // the Secondary Lineup is made from the starting lineup's depth charts: shown, branched, never changed itself (lineup.ts, S4)
@@ -144,6 +150,30 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
   // "X starter, LC 2nd": where a player sits on this lineup, for the lists
   const sits = (name: string): string =>
     standings(roster, name).map((s) => `${s.tag} ${depthWord(s.depth).toLowerCase()}`).join(", ") || "No position";
+
+  // the roster's own picture and sheet (docs/adr/010-roster-exports.md), the one way the names leave this device,
+  // and only when the coach asks: they read the lineup on the field and never write it. One at a time, said in
+  // the panel itself, since on a phone the panel is a drawer over the toast
+  const [busy, setBusy] = useState(false);
+  const [exportNews, setExportNews] = useState("");
+  const runExport = (label: string, job: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    setExportNews(`${label}…`);
+    Promise.resolve().then(job)
+      .then(() => { setExportNews("Saved"); }, (e: unknown) => { record("export", e); setExportNews("That export failed. Try again on a bigger screen."); })
+      .finally(() => { setBusy(false); });
+  };
+  // the roster as it is when the coach taps, dated that day
+  const exported = () => ({ lineups, lineup, team, positions: players, on: new Date() });
+  const savePicture = () => {
+    runExport("Drawing the roster picture", () => exportPng(() => rosterPicture({ ...exported(), view }), rosterFile(team, lineup, view, "png"), { scale: PICTURE_SCALE }));
+  };
+  const saveSheet = () => {
+    runExport("Drawing the roster sheet", () => exportPdf(
+      () => rosterSheet({ ...exported(), paper: PAPERS[defaultPaper()] }), rosterFile(team, lineup, "roster-sheet", "pdf"), rosterTitle(team, lineup), { dpi: SHEET_DPI },
+    ));
+  };
 
   // a position picked, in the list, from a player's page or on the field, brings its chart into view: the panel
   // back to its top, where the chart is, and the chart lit up a moment, so a tap far down the list shows what it
@@ -588,7 +618,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
               <span className={note}>
                 {made
                   ? `Made from ${source}'s depth chart at ${sel.label}: the next player up starts${isOffField(sel) ? "" : ", unless they start elsewhere on this side"}. Change it there, or branch this lineup to set your own.`
-                  : <>Starter first; ▲ moves a player up. The starter&apos;s name shows under {sel.label} on every play. Kept on this device, never in links or printouts.</>}
+                  : <>Starter first; ▲ moves a player up. The starter&apos;s name shows under {sel.label} on every play. Kept on this device, never in a play or a link: only the roster picture and sheet you save carry it.</>}
               </span>
             </div>
           )}
@@ -691,6 +721,28 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
           )}
           <span className={note}>
             Drag a position, or step it with the arrow keys, to stand it where you like. It stays there on every lineup, on this device, and never moves a play.
+          </span>
+        </div>
+      )}
+      {player === null && (
+        <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Export roster">
+          <span className={eyebrow}>EXPORT</span>
+          <button
+            type="button"
+            onClick={savePicture}
+            disabled={busy || !roster.length}
+            title={roster.length ? undefined : "Put a player on a depth chart first"}
+            className={`${small} flex-none self-start`}
+          >
+            Save roster picture
+          </button>
+          <button type="button" onClick={saveSheet} disabled={busy} className={`${small} flex-none self-start`}>Download roster sheet PDF</button>
+          <p role="status" className={`${note} empty:hidden`}>{exportNews}</p>
+          <span className={note}>
+            {roster.length
+              ? `The picture is ${view === "both" ? "both sides" : `the ${view}`} of ${lineupName(lineup)} as on the field, every position with its depth chart, to send or post. `
+              : "The picture waits for a player on a depth chart. "}
+            The sheet is every position and player, to print{roster.length ? "" : ", a blank depth chart to fill in until then"}. Both carry your players&apos; names, the one way they leave this device.
           </span>
         </div>
       )}

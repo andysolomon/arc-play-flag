@@ -587,6 +587,7 @@ export function App() {
               view={view}
               onView={onView}
               onSelect={onRosterSelect}
+              team={team}
             />
           ) : (
           <RouteSidebar

@@ -226,7 +226,7 @@ function PlaySidebarImpl({
         />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">
-        Tap a position on the field and set who plays it, starter first. Kept on this device, never in a play, a link or a printout.
+        Tap a position on the field and set who plays it, starter first. Kept on this device, never in a play or a link: only the roster&apos;s own picture and sheet carry the names.
       </span>
       <label className={`flex min-h-11 flex-none items-center gap-2 text-small ${rostered ? "cursor-pointer" : "text-ink-muted"}`}>
         <input
