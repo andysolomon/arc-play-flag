@@ -1503,8 +1503,9 @@ test("roster mode is a closer card than a play's, and never the deep field", asy
  *  - Back loses the play                                        → its routes come back, X where it was stepped, and one undo puts X home
  *  - a phone's drawer is left over the play                     → on a phone or tablet both drawers fold and a tap on the title lands on it;
  *                                                                 on a wide screen the panels stay as the Roster tile leaves them
- *  - focus falls to the page when Back goes                     → focus is on the play's title, ringed only when the keyboard pressed Back,
- *                                                                 and Tab goes on into the field
+ *  - focus falls to the page when Back goes                     → focus is on the play's title, and Tab goes on into the field
+ *  - the title's ring is left to each browser's own rule        → after a tap or a click no ring, nor after a key pressed next; after Enter on
+ *                                                                 Back a ring drawn over the field's frame, whole; on paper never a ring
  *  - a double tap does more to the play                         → a double click on Back leaves the routes, X and the history as they were
  * Leaves `roster-<device>-back.json` (the banner in each mode, the drawers and where focus went) and pictures of the
  * roster's header in both themes and of the screen before and after Back.
@@ -1518,7 +1519,11 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   const title = page.getByRole("heading", { name: SLANT_LEFT.name, level: 1 });
   /** The header's keys, left to right, by the names a screen reader gives them. */
   const keys = () => banner.locator("button, [role='img']").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
-  const ringed = () => title.evaluate((el) => el.matches(":focus-visible"));
+  /** The title's ring as drawn: its outline, and whether it sits over the field's frame, which would hide its bottom edge. */
+  const ring = () => title.evaluate((el) => {
+    const css = getComputedStyle(el);
+    return { outline: css.outlineStyle, over: css.position !== "static" && Number(css.zIndex) > 0 };
+  });
   const compact = await page.evaluate(() => matchMedia("(max-width: 1023px)").matches);
   // the play's own history: X stepped a yard in
   await d.foldOverlays();
@@ -1572,8 +1577,13 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   await expect(d.back).toHaveCount(0);
   expect(await keys()).toEqual(playBanner);
   await expect(title).toBeFocused();
-  const pointer = { focused: true, ringed: await ringed() };
-  expect(pointer.ringed, "a tap or a click puts no ring on the title").toBe(false);
+  const pointer = { focused: true, ring: await ring(), afterKey: { outline: "" } };
+  expect(pointer.ring.outline, "a tap or a click puts no ring on the title").toBe("none");
+  // nor does a key pressed next, Escape letting a pick go, while focus is still there
+  await page.keyboard.press("Escape");
+  await expect(title).toBeFocused();
+  pointer.afterKey = await ring();
+  expect(pointer.afterKey.outline, "a key after a tap puts no ring on the title").toBe("none");
   // the play as the coach left it: its routes, X a yard in, and its history
   await expect(d.routes).toHaveCount(2);
   expect(await d.playerX("X")).toBeCloseTo(xHome + 1, 1);
@@ -1609,8 +1619,13 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   await d.back.focus();
   await page.keyboard.press("Enter");
   await expect(title).toBeFocused();
-  const keyboard = { focused: true, ringed: await ringed(), tabbedInto: "" };
-  expect(keyboard.ringed, "the keyboard's focus is shown").toBe(true);
+  const keyboard = { focused: true, ring: await ring(), print: { outline: "" }, tabbedInto: "" };
+  expect(keyboard.ring, "the keyboard's focus is shown, whole, over the field's frame").toEqual({ outline: "solid", over: true });
+  // and a printout of the play never carries it
+  await page.emulateMedia({ media: "print" });
+  keyboard.print = await ring();
+  expect(keyboard.print.outline, "no ring on paper").toBe("none");
+  await page.emulateMedia({ media: "screen" });
   await page.keyboard.press("Tab");
   keyboard.tabbedInto = await page.evaluate(() => { const el = document.activeElement; return el?.closest("main") ? el.getAttribute("aria-label") ?? el.textContent?.trim() ?? el.tagName : "outside the field"; });
   expect(keyboard.tabbedInto).not.toBe("outside the field");

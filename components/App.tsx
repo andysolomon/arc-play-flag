@@ -446,17 +446,23 @@ export function App() {
   }, [formation, openRight, s]);
   // the header's Back to play: out of roster mode as the Roster tile goes, except that on a phone or tablet, where
   // the drawers cover the field, both fold so the play is in view. Back goes with the mode, so focus goes to the
-  // field's title once it reads the play's name again, never to the page
+  // field's title once it reads the play's name again, never to the page. The title is ringed only when the keyboard
+  // pressed Back: after a tap or a click it stays quiet until focus moves on, whatever a browser's own rule would do
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const backToPlay = useRef(false);
-  const onBack = useCallback(() => {
-    backToPlay.current = true;
+  const backToPlay = useRef<"keyboard" | "pointer" | null>(null);
+  const onBack = useCallback((keyboard: boolean) => {
+    backToPlay.current = keyboard ? "keyboard" : "pointer";
     if (compactRef.current) closePanels();
     onMode("play");
   }, [closePanels, onMode]);
   useEffect(() => {
-    if (!rostering && backToPlay.current) titleRef.current?.focus({ preventScroll: true });
-    backToPlay.current = false;
+    const title = titleRef.current;
+    if (!rostering && backToPlay.current && title) {
+      title.toggleAttribute("data-quiet-focus", backToPlay.current === "pointer");
+      title.addEventListener("blur", () => { title.removeAttribute("data-quiet-focus"); }, { once: true });
+      title.focus({ preventScroll: true });
+    }
+    backToPlay.current = null;
   }, [rostering]);
   // a side taken off the field takes its picked position with it, as hiding the shadow does
   const pickedTeam = positions.find((p) => p.id === rosterPick)?.team ?? null;

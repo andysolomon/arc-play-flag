@@ -24,8 +24,11 @@ interface Props {
   canClear: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
-  /** roster mode's way out at the top: back to the play, as the Roster tile in Play tools goes (docs/adr/008-roster-depth-chart.md) */
-  onBack: () => void;
+  /**
+   * roster mode's way out at the top: back to the play, as the Roster tile in Play tools goes
+   * (docs/adr/008-roster-depth-chart.md); `keyboard` when Enter or Space pressed it, not a tap or a click
+   */
+  onBack: (keyboard: boolean) => void;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
@@ -104,7 +107,7 @@ function HeaderImpl({ side, mode, view, onView, leftOpen, rightOpen, canUndo, ca
       </button>
       {rostering && (
         // nothing in roster mode is the play's to undo or clear, so the way back to it has their room, where a back key goes
-        <button type="button" onClick={onBack} title="Back to play" aria-label="Back to play" className={`${pillSm} ${round}`}>
+        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${round}`}>
           <BackIcon />
           <span className={`${name} min-[479px]:hidden`}>Back</span>
           <span className="max-[479px]:hidden">Back to play</span>
