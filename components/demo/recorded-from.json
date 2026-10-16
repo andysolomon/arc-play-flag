@@ -19,7 +19,7 @@
     "components/Menu.tsx": "c013376e864cc01d1eda1a6725314df661f03fd576ea868adb994a2af7c8ae03",
     "components/OfflineStatus.tsx": "bf355de426d0eda57124b65468b8657713b243ff0b50fb7e1a639c4ed60aea2d",
     "components/PlayNameField.tsx": "fe6bb06413bcd8f10ab6b90c43944df87df6c212a40444875492faa89770260e",
-    "components/PlaySidebar.tsx": "f3ac2650ed901f930c9710c7f111c068e0c40be54882c0802a0d83025d68026f",
+    "components/PlaySidebar.tsx": "7732c6d217f97196320e6abc3ce552c385e308bd32f8e3e7321488deea1e02fd",
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
@@ -34,7 +34,7 @@
     "components/Sidebar.tsx": "1733abd776b94df98ff4e40903cca680cba56888a26a0f8fe24536b043261436",
     "components/Sticker.tsx": "1eb0596e4b6c2c8826629dd0da9b6b6975b3e94723eabb90976d1bf42c66a825",
     "components/Support.tsx": "06c306c59aeb7a559f612a51f61bb597cdfa3e689f9a26efdd5362051a94f7d7",
-    "components/TeamFields.tsx": "6bf0e2d533341f7918aae1da11f65c455ab18351274a3c45cbe0bd23f2d2e842",
+    "components/TeamFields.tsx": "5fa063906c6bd2cf409c4c29764444f03d2357b2222ede32df38aeb4577ce7fd",
     "components/ThemePicker.tsx": "51b354c0d739756810783b83d0ea98ea10f716bec0d63393e9a8fc81928e7df6",
     "components/endzone/Celebration.tsx": "c28ea5f099813da7cd5e88128e4c2a5fb6969e2975a1b2cfde1042134a7f1eb0",
     "components/endzone/EndZoneArt.tsx": "5f905577f143ea8ef22535ce445fc4b73f2c6bbbcdfbc0d2a5140b835c86b048",
@@ -70,7 +70,7 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "the palette's new DEEP pills show only with a deep-zone defender selected and the palette open; build-defense picks Zone deep and the palette folds away at once (re-recorded build-defense and checked its contact sheet), and no other chapter opens the palette on a deep zone",
+    "reason": "the route palette's new DEEP pills show only with a deep-zone defender selected and the palette open; build-defense picks Zone deep and the palette folds away at once (recorded build-defense on this merge and checked its contact sheet), and no other chapter opens the palette on a deep zone",
     "files": [
       "components/App.tsx (changed)",
       "components/RouteSidebar.tsx (changed)"
