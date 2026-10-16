@@ -37,6 +37,8 @@ export interface Route {
    * a target comes for the quarterback, as every blitz did.
    */
   aim?: "backfield";
+  /** a deep zone called as a deep half or a deep third (lib/play/deep.ts); stored only when called */
+  split?: "half" | "third";
   mirror?: boolean;
   primary?: boolean;
 }
