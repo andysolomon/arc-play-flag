@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "0873d49b96742b4a2ab9d52506cffab09981a81f939390a2c1de24939c845580",
+    "components/App.tsx": "38a25f83515d8222f5bfccc9b0693ef50ff6318d6aff237e194510add8e2007b",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "c0f70aea9446a53c3635473e5432f3d0c0e5ac1afc63452b3106b05202c831c3",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
@@ -70,9 +70,9 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "only the roster panel's lineup row changed (name, lineups menu and fork in one row, long names wrapping in the menu); no chapter enters roster mode, so no clip shows it",
+    "reason": "only roster mode's ball spot changed (the 15 instead of the 40); no chapter opens roster mode",
     "files": [
-      "components/RosterSidebar.tsx (changed)"
+      "components/App.tsx (changed)"
     ]
   }
 }
