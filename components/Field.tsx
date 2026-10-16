@@ -61,6 +61,8 @@ interface Props {
   showTitle?: boolean;
   /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
   status?: string;
+  /** the on-screen title, for focus handed to it (the header's Back to play); Tab never stops on it */
+  titleRef?: RefObject<HTMLHeadingElement | null>;
   /** who starts at each position, by player id, from the roster (docs/adr/008-roster-depth-chart.md) */
   starters?: Readonly<Record<string, string>>;
   /**
@@ -145,7 +147,7 @@ function captionFor(p: Player, starters: Readonly<Record<string, string>> | unde
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onCatchNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, starters, roster = false,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, titleRef, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -708,7 +710,7 @@ function FieldImpl({
       <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         {title !== undefined && showTitle && (
           <div id={FIELD_TITLE_ID} className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
-            <h1 className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
+            <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
             {status !== undefined && (
               <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
                 {status}

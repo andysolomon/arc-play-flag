@@ -444,6 +444,20 @@ export function App() {
       openRight(true);
     }
   }, [formation, openRight, s]);
+  // the header's Back to play: out of roster mode as the Roster tile goes, except that on a phone or tablet, where
+  // the drawers cover the field, both fold so the play is in view. Back goes with the mode, so focus goes to the
+  // field's title once it reads the play's name again, never to the page
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const backToPlay = useRef(false);
+  const onBack = useCallback(() => {
+    backToPlay.current = true;
+    if (compactRef.current) closePanels();
+    onMode("play");
+  }, [closePanels, onMode]);
+  useEffect(() => {
+    if (!rostering && backToPlay.current) titleRef.current?.focus({ preventScroll: true });
+    backToPlay.current = false;
+  }, [rostering]);
   // a side taken off the field takes its picked position with it, as hiding the shadow does
   const pickedTeam = positions.find((p) => p.id === rosterPick)?.team ?? null;
   const onView = useCallback((next: Vis) => {
@@ -511,6 +525,7 @@ export function App() {
         onClear={onClear}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
+        onBack={onBack}
         onUndo={() => { dispatch({ type: "undo" }); }}
         onRedo={() => { dispatch({ type: "redo" }); }}
       />
@@ -571,6 +586,7 @@ export function App() {
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}
           showTitle
+          titleRef={titleRef}
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
           los={rostering ? ROSTER_LOS : s.los}

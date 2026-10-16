@@ -17,7 +17,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * into a device backup and comes back from one), and never reaches a share link. Roster mode is the
  * team's standard formation, never the play that is open: none of its routes, tags, spots or tools, and
  * nothing in it undoes; a position dragged or stepped there stands on the roster, on every lineup and held
- * to its side of the line, until Reset spots, and the play is back as it was on the way out. A write the device refuses is
+ * to its side of the line, until Reset spots, and the play is back as it was on the way out, by the Roster
+ * tile or by the header's Back to play, which stands where a play has Undo, Redo and Clear. A write the device refuses is
  * said, and stores nothing. Every name on the lineup has a page of its own: the positions they play and
  * where they sit at each. Lineups are versions of it all: the Starting Lineup is always there, and the
  * Secondary Lineup made from its depth charts (the next player up starting, nobody twice on a side, read
@@ -25,8 +26,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * a deleted lineup falls back to the one it came from. Players join the team by name, any time, the same on every lineup, and a depth chart
  * is filled from the team; a name typed new at a position joins the team too. A caption at a sideline is
  * pulled in so the whole name stays on the field, and no caption is
- * printed. Leaves `roster-<device>*.json` (what was stored at each step) and pictures of the panel and
- * the field in `test-results/`.
+ * printed. Leaves `roster-<device>*.json` (what was stored at each step) and pictures of the panel, the
+ * field and the roster's header in `test-results/`.
  */
 
 const panel = (page: Page) => page.locator("#route-sidebar");
@@ -104,7 +105,9 @@ test("positions are laid out, each takes a depth chart, the starter is named on 
   await expect(page.getByRole("heading", { name: "Roster", level: 1 })).toBeVisible();
   await expect(d.routes).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Run the play" })).toHaveCount(0);
-  await expect(page.getByRole("banner").getByRole("button", { name: "Clear routes" })).toBeDisabled();
+  // nothing there is the play's to clear or undo, so the header's Back to play stands in their place
+  for (const key of ["Undo", "Redo", "Clear routes"]) await expect(page.getByRole("banner").getByRole("button", { name: key })).toHaveCount(0);
+  await expect(d.back).toBeVisible();
   await expect(d.rosterView).toHaveAccessibleName("Showing offense");
   await expect(d.player("X")).toBeVisible();
   await expect(d.player("S", "Defense")).toHaveCount(0);
@@ -205,7 +208,8 @@ test("positions are laid out, each takes a depth chart, the starter is named on 
   await d.foldOverlays();
   await d.field.screenshot({ path: `test-results/roster-${device}-field.png` });
 
-  // back to the play, from the Roster tile (the panel has no way back of its own): the routes return and
+  // back to the play, from the Roster tile (the header's Back to play, the other way out, has a test of its own;
+  // the panel still has no way back of its own): the routes return and
   // the names stay off the play until the coach turns them on, then show under the tags, only where somebody is down
   await d.roster(false);
   await expect(page.getByRole("button", { name: "Route palette" })).toBeVisible();
@@ -285,9 +289,9 @@ test("roster mode is the team's standard formation, never the open play: its tag
   for (const [tag, team] of [["C", "Offense"], ["X", "Offense"], ["LC", "Defense"], ["S", "Defense"]] as const) {
     await expect(d.player(tag, team)).not.toHaveClass(/opacity-40/);
   }
-  // nothing of the play's history is reachable from here
-  await expect(d.undo).toBeDisabled();
-  await expect(d.redo).toBeDisabled();
+  // nothing of the play's history is reachable from here: the header has no Undo or Redo
+  await expect(d.undo).toHaveCount(0);
+  await expect(d.redo).toHaveCount(0);
   await d.rosterPanel();
   await expect(panel(page).getByRole("group", { name: /positions$/ }).first()).toHaveAttribute("aria-label", "Offense positions");
   const defense = panel(page).getByRole("group", { name: "Defense positions" });
@@ -1486,4 +1490,140 @@ test("roster mode is a closer card than a play's, and never the deep field", asy
   expect(deepS.y, "the deep safety is on the card").toBeGreaterThanOrEqual(deepField.y);
 
   writeFileSync(`test-results/roster-${device}-zoom.json`, `${JSON.stringify(steps, null, 2)}\n`);
+});
+
+/**
+ * Roster mode's way out at the top (ADR 008, rule 8): **Back to play** in the header, right of Play tools, where a
+ * play has Undo, Redo and Clear, since nothing in roster mode is the play's to undo or clear. How this could break,
+ * and the check for each:
+ *  - Back shows on a play, or roster mode keeps its dead keys  → on a play the banner has no Back; in roster mode it holds
+ *                                                                 Play tools, Back to play, the badge and the Roster panel toggle, nothing else
+ *  - Escape leaves roster mode as well as letting a pick go     → after Escape the field still reads "Roster", Back still there
+ *  - the arrow is drawn in one theme's ink                      → in either theme the arrow is the header's own ink, chalk on the dark board
+ *  - Back loses the play                                        → its routes come back, X where it was stepped, and one undo puts X home
+ *  - a phone's drawer is left over the play                     → on a phone or tablet both drawers fold and a tap on the title lands on it;
+ *                                                                 on a wide screen the panels stay as the Roster tile leaves them
+ *  - focus falls to the page when Back goes                     → focus is on the play's title, ringed only when the keyboard pressed Back,
+ *                                                                 and Tab goes on into the field
+ *  - a double tap does more to the play                         → a double click on Back leaves the routes, X and the history as they were
+ * Leaves `roster-<device>-back.json` (the banner in each mode, the drawers and where focus went) and pictures of the
+ * roster's header in both themes and of the screen before and after Back.
+ */
+test("the header's Back to play leaves roster mode from the top: in place of Undo, Redo and Clear, the play as it was, a phone's drawers folded, focus on its title", async ({ page }, info) => {
+  const device = info.project.name;
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  const banner = page.getByRole("banner");
+  const title = page.getByRole("heading", { name: SLANT_LEFT.name, level: 1 });
+  /** The header's keys, left to right, by the names a screen reader gives them. */
+  const keys = () => banner.locator("button, [role='img']").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
+  const ringed = () => title.evaluate((el) => el.matches(":focus-visible"));
+  const compact = await page.evaluate(() => matchMedia("(max-width: 1023px)").matches);
+  // the play's own history: X stepped a yard in
+  await d.foldOverlays();
+  const xHome = await d.playerX("X");
+  await d.player("X").press("ArrowRight");
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(xHome + 1, 1);
+  await expect(d.undo).toBeEnabled();
+  await expect(d.back).toHaveCount(0);
+  const playBanner = await keys();
+  expect(playBanner).toEqual(["Play tools", "Offense play", "Undo", "Redo", "Clear routes", "Route palette"]);
+
+  // roster mode: Back to play beside Play tools, and nothing of the play's left in the header
+  await d.roster();
+  await expect(page.getByRole("heading", { name: "Roster", level: 1 })).toBeVisible();
+  const rosterBanner = await keys();
+  expect(rosterBanner).toEqual(["Play tools", "Back to play", "Showing offense", "Roster panel"]);
+  await expect(d.back).toHaveAttribute("title", "Back to play");
+  await expect(d.back).not.toHaveAttribute("aria-pressed");
+  await expect(d.back).not.toHaveAttribute("aria-expanded");
+  await expect(d.back.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  // Escape lets the roster's pick go and nothing more
+  await expect(d.player("X")).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(d.player("X")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("heading", { name: "Roster", level: 1 })).toBeVisible();
+  await expect(d.back).toBeVisible();
+  await banner.screenshot({ path: `test-results/roster-${device}-back-header.png` });
+  // the arrow is drawn in the theme's own ink: chalk on the dark board, as the header's words are
+  const ink = () => banner.evaluate((el) => {
+    const svg = el.querySelector("button[aria-label='Back to play'] svg");
+    return { back: svg ? getComputedStyle(svg).color : null, header: getComputedStyle(el).color };
+  });
+  const light = await ink();
+  expect(light.back).toBe(light.header);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  const dark = await ink();
+  expect(dark.back).toBe(dark.header);
+  expect(dark.back).not.toBe(light.back);
+  await banner.screenshot({ path: `test-results/roster-${device}-back-header-dark.png` });
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", "dark");
+
+  // the owner's case: Play tools open over the field in roster mode, and Back pressed
+  await d.tools();
+  await page.screenshot({ path: `test-results/roster-${device}-back-before.png` });
+  if (info.project.use.hasTouch) await d.back.tap();
+  else await d.back.click();
+  await expect(title).toBeVisible();
+  await d.settle();
+  await expect(d.back).toHaveCount(0);
+  expect(await keys()).toEqual(playBanner);
+  await expect(title).toBeFocused();
+  const pointer = { focused: true, ringed: await ringed() };
+  expect(pointer.ringed, "a tap or a click puts no ring on the title").toBe(false);
+  // the play as the coach left it: its routes, X a yard in, and its history
+  await expect(d.routes).toHaveCount(2);
+  expect(await d.playerX("X")).toBeCloseTo(xHome + 1, 1);
+  await expect(page.getByRole("button", { name: "Run the play" })).toBeVisible();
+  const drawers = {
+    compact,
+    tools: await page.locator("#play-sidebar").getAttribute("aria-hidden"),
+    right: await page.locator("#route-sidebar").getAttribute("aria-hidden"),
+    rightToggle: await banner.getByRole("button", { name: Designer.RIGHT }).getAttribute("aria-label"),
+  };
+  expect(drawers.rightToggle).toBe("Route palette");
+  if (compact) {
+    // the drawers covered the field, so both fold and the play is in view
+    expect(drawers).toMatchObject({ tools: "true", right: "true" });
+    const onTitle = await title.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el;
+    });
+    expect(onTitle, "nothing covers the play's title").toBe(true);
+  } else {
+    // on a wide screen nothing covers the field: the panels stay as the Roster tile leaves them
+    expect(drawers).toMatchObject({ tools: "false", right: "false" });
+  }
+  await page.screenshot({ path: `test-results/roster-${device}-back-after.png` });
+  await d.foldOverlays();
+  await d.undo.click();
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(xHome, 1);
+  await d.redo.click();
+  await expect.poll(() => d.playerX("X")).toBeCloseTo(xHome + 1, 1);
+
+  // from the keyboard: Enter on Back rings the title it hands focus to, and Tab goes on into the field
+  await d.roster();
+  await d.back.focus();
+  await page.keyboard.press("Enter");
+  await expect(title).toBeFocused();
+  const keyboard = { focused: true, ringed: await ringed(), tabbedInto: "" };
+  expect(keyboard.ringed, "the keyboard's focus is shown").toBe(true);
+  await page.keyboard.press("Tab");
+  keyboard.tabbedInto = await page.evaluate(() => { const el = document.activeElement; return el?.closest("main") ? el.getAttribute("aria-label") ?? el.textContent?.trim() ?? el.tagName : "outside the field"; });
+  expect(keyboard.tabbedInto).not.toBe("outside the field");
+
+  // a double tap: the second lands where Back was, which on a play is nothing to press
+  await d.roster();
+  await d.back.dblclick();
+  await expect(title).toBeVisible();
+  await expect(d.routes).toHaveCount(2);
+  expect(await d.playerX("X")).toBeCloseTo(xHome + 1, 1);
+  await expect(page.getByRole("banner").getByRole("button", { name: "Clear routes" })).toBeEnabled();
+  await expect(d.undo).toBeEnabled();
+  await expect(d.redo).toBeDisabled();
+
+  writeFileSync(`test-results/roster-${device}-back.json`, `${JSON.stringify({ playBanner, rosterBanner, ink: { light, dark }, drawers, pointer, keyboard }, null, 2)}\n`);
 });
