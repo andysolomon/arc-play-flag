@@ -33,8 +33,13 @@ interface Props {
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
 
-/** About half the width of a caption in the field's units: Patrick Hand at 15 is about 7 a letter, plus the halo. */
-const captionHalf = (text: string): number => text.length * 3.6 + 4;
+/** A name's size in the field's units: about 14px on a phone-wide field, so it reads at arm's length on the sideline. */
+const CAPTION_SIZE = 24;
+/** How far a name's centre sits from its token's: clear of the token and its selection ring, and of the next row's token. */
+const CAPTION_GAP = 44;
+
+/** About half the width of a caption in the field's units: Patrick Hand is about 0.48em a letter, plus the halo. */
+const captionHalf = (text: string): number => text.length * CAPTION_SIZE * 0.24 + 5;
 
 /** Where a caption's centre goes, relative to its token: over it, or pulled in so a name at a sideline stays whole on the field. */
 function captionX(x: number, text: string): number {
@@ -107,14 +112,14 @@ function PlayerTokenImpl({
         <text
           data-caption
           x={captionX(x, caption.text)}
-          y={caption.above ? -44 : 46}
+          y={caption.above ? -CAPTION_GAP : CAPTION_GAP}
           textAnchor="middle"
           dominantBaseline="central"
           fontFamily="var(--font-hand)"
-          fontSize={15}
+          fontSize={CAPTION_SIZE}
           fill="#1b1a17"
           stroke="#c1f0c1"
-          strokeWidth={4}
+          strokeWidth={5}
           strokeLinejoin="round"
           paintOrder="stroke"
           style={{ fill: FIELD.line, stroke: FIELD.turf }}
