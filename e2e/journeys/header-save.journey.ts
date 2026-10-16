@@ -57,7 +57,6 @@ test("a coach saves from the header without opening Play tools, and the header s
   const steps: unknown[] = [];
   const d = new Designer(page);
   await d.goto();
-  await watchSaveKeys(page);
 
   // the side badge is gone: the field's own colours say whose play it is
   await expect(header(page).getByRole("img")).toHaveCount(0);
@@ -82,6 +81,8 @@ test("a coach saves from the header without opening Play tools, and the header s
 
   await saveKey(page).click();
   await expect(d.toast).toHaveText("Saved");
+  // the app's own key listener is attached by now (the save above needed React), so the spy runs after it
+  await watchSaveKeys(page);
   await expect(status(page, "Saved")).toBeVisible();
   await expect(dot(page)).toHaveCount(0);
   await expect(toolsToggle(page)).toHaveAttribute("aria-expanded", "false");
@@ -164,7 +165,10 @@ test("a play that was never saved keeps its dot through a reload, and so does on
   await expect(dot(page)).toHaveCount(0);
   await page.reload();
   await expect(d.field).toBeVisible();
+  // the restored draft is written back once it is on the board, so this waits for the restore, not the server's page
+  await expect(status(page, "Draft autosaved")).toBeVisible();
   await expect(dot(page)).toHaveCount(0);
+  await expect((await d.tool("Save")).locator("span[aria-hidden]")).toHaveCount(0);
   await step(page, steps, "a blank new play, reloaded: no dot");
 
   // a play opened from a share link is not in the library until it is saved
