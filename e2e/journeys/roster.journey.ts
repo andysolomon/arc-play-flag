@@ -23,7 +23,8 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * Secondary Lineup made from its depth charts (the next player up starting, nobody twice on a side, read
  * only and never stored), any lineup branches into a copy to change, the field follows the one picked, and
  * a deleted lineup falls back to the one it came from. Players join the team by name, any time, the same on every lineup, and a depth chart
- * is filled from the team; a name typed new at a position joins the team too. A caption at a sideline is
+ * is filled from the team; a name typed new at a position joins the team too. A name is drawn at 13px or
+ * more on every screen, its letters clear of every token and every other name; a caption at a sideline is
  * pulled in so the whole name stays on the field, and no caption is
  * printed. Leaves `roster-<device>*.json` (what was stored at each step) and pictures of the panel and
  * the field in `test-results/`.
@@ -1486,4 +1487,55 @@ test("roster mode is a closer card than a play's, and never the deep field", asy
   expect(deepS.y, "the deep safety is on the card").toBeGreaterThanOrEqual(deepField.y);
 
   writeFileSync(`test-results/roster-${device}-zoom.json`, `${JSON.stringify(steps, null, 2)}\n`);
+});
+
+test("a starter's name reads at arm's length: at least 13px on every screen, clear of every token and every other name", async ({ page }, info) => {
+  const device = info.project.name;
+  // the whole standard formation named, both sides on view, as a coach holds it up on the sideline
+  const starters: [Roster[number]["team"], string, string][] = [
+    ["offense", "X", "Logan"], ["offense", "C", "Quinn"], ["offense", "Y", "Noah"], ["offense", "QB", "Josiah"], ["offense", "Z", "Yohann"],
+    ["defense", "S", "Drew"], ["defense", "LC", "Desrael"], ["defense", "LB", "Yohann"], ["defense", "R", "Amelia"], ["defense", "RC", "Avari"],
+  ];
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: main(starters.map(([team, tag, name]) => ({ team, tag, depth: [name] }))) });
+  const d = new Designer(page);
+  await d.openSaved(SLANT_LEFT.name);
+  await d.roster();
+  await d.rosterPanel();
+  await show(page, "Both");
+  await d.closeSidebars();
+
+  type Box = { x: number; y: number; width: number; height: number };
+  const overlap = (a: Box, b: Box): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const names: { tag: string; text: string; px: number; box: Box }[] = [];
+  const tokens: { tag: string; box: Box }[] = [];
+  for (const [team, tag, name] of starters) {
+    const side = team === "offense" ? "Offense" : "Defense";
+    const caption = d.caption(tag, side);
+    await expect(caption).toHaveText(name);
+    // the size the name is drawn at on this screen, in CSS pixels (its font size through the field's scale), and
+    // the box its letters ink, halo and all: the text's own box is the font's line, which runs past the letters
+    const { px, box } = await caption.evaluate((el) => {
+      const text = el as SVGTextElement;
+      const size = Number(text.getAttribute("font-size")) * (text.getScreenCTM()?.a ?? 0);
+      const ctx = document.createElement("canvas").getContext("2d");
+      if (!ctx) throw new Error("no 2D context to measure with");
+      ctx.font = `${String(size)}px ${getComputedStyle(text).fontFamily}`;
+      const m = ctx.measureText(text.textContent ?? "");
+      const r = text.getBoundingClientRect(), baseline = r.top + m.fontBoundingBoxAscent;
+      const halo = (Number(text.getAttribute("stroke-width")) / 2) * (text.getScreenCTM()?.a ?? 0);
+      const top = baseline - m.actualBoundingBoxAscent - halo, bottom = baseline + m.actualBoundingBoxDescent + halo;
+      return { px: size, box: { x: r.x, y: top, width: r.width, height: bottom - top } };
+    });
+    const disc = await d.player(tag, side).locator("circle[r='23']").boundingBox();
+    if (!disc) throw new Error(`${side} ${tag} has not laid out`);
+    names.push({ tag: `${side} ${tag}`, text: name, px, box });
+    tokens.push({ tag: `${side} ${tag}`, box: disc });
+    expect(px, `${side} ${tag}'s name is drawn at least 13px`).toBeGreaterThanOrEqual(13);
+  }
+  for (const n of names) {
+    for (const t of tokens) expect(overlap(n.box, t.box), `${n.tag}'s name is clear of ${t.tag}`).toBe(false);
+    for (const m of names) if (m !== n) expect(overlap(n.box, m.box), `${n.tag}'s name is clear of ${m.tag}'s`).toBe(false);
+  }
+  await d.field.screenshot({ path: `test-results/roster-${device}-legible-names.png` });
+  writeFileSync(`test-results/roster-${device}-legible-names.json`, `${JSON.stringify({ field: await d.field.boundingBox(), names, tokens }, null, 2)}\n`);
 });
