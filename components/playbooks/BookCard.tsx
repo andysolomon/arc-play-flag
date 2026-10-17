@@ -14,6 +14,10 @@ import { MoreMenu, menuItem, menuItemDanger } from "./MoreMenu";
 import type { Say } from "./PlaybooksScreen";
 import { ShareBookButton, useShareCount } from "./ShareBook";
 import { TwoStep } from "./TwoStep";
+import { CopyToItem, CopyToModal } from "./CopyTo";
+import { ago } from "../account/Presence";
+import { useAccount } from "../account/AccountPanel";
+import { stampOf } from "@/lib/org/sync";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 /** the two pages peeking out behind the cover, like a stack of play cards */
@@ -25,9 +29,11 @@ type Props = { book: Playbook; plays: readonly SavedPlay[]; team: TeamSettings; 
 export function BookCard({ book: b, plays, team, say }: Props) {
   const links = useShareCount(b.id);
   const [adding, setAdding] = useState(false);
+  const [copying, setCopying] = useState(false);
   const inBook = b.plays.flatMap((id) => plays.find((p) => p.id === id) ?? []);
   const [cover, ...rest] = inBook;
   const href = `/playbooks?book=${b.id}`;
+  const stamp = useAccount().org ? stampOf("books", b.id) : null;
   return (
     <div className={`${card} flex flex-col gap-2.5`}>
       {/* a compact row on phones, a cover on top from sm up */}
@@ -55,6 +61,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
         </span>
       </Link>
       {links > 0 && <div className="flex"><span className={chip}>Shared</span></div>}
+      {stamp && <span className="text-caption text-ink-muted" data-stamp>changed by {stamp.name}, {ago(stamp.at)}</span>}
       {/* pinned to the bottom so every card in a row lines up */}
       <div className="mt-auto flex items-center gap-2">
         <Link href={href} className={`${pillDark} inline-flex min-h-11 flex-1 items-center justify-center px-3 text-small !text-cream no-underline`}>Open</Link>
@@ -66,6 +73,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
               close();
               download(new Blob([encodePlaybookFile(b, inBook, team.name ? team : null)], { type: "application/json" }), `${kebab(b.name)}.playbook.json`);
             }}>Export playbook file</button>
+            <CopyToItem onPick={() => { close(); setCopying(true); }} />
             <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
             <TwoStep
               label="Delete playbook"
@@ -77,6 +85,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
         </MoreMenu>
       </div>
       {adding && <AddPlaysModal bookId={b.id} say={say} onClose={() => { setAdding(false); }} />}
+      {copying && <CopyToModal plays={inBook} books={[b]} say={say} onClose={() => { setCopying(false); }} />}
     </div>
   );
 }

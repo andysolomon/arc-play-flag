@@ -1,6 +1,8 @@
 import { writeFileSync } from "node:fs";
-import { expect, test, type APIRequestContext } from "@playwright/test";
-import { runId } from "../support/account";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { Designer } from "../support/designer";
+import { expectSaved, marker, panel, reloadedBy, runId, signIn, status, teamButton } from "../support/account";
+import { storedPlays } from "../support/fixtures";
 import { ago, applied, body, coach, createOrg, invite, join, listOrgs, moveTeam, names, ownTeam, poll, readOrg, readTeam, writePlay } from "../support/org";
 import { COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, play, playbook } from "../support/fixtures";
 import type { AccountResponse } from "../../lib/account/types";
@@ -23,13 +25,21 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *  - a removed coach still reads the team, or an admin can't remove in one tap (O1, O5)          → "a viewer"
  *  - deleting the organization takes a coach's own teams with it (rule 1)                        → "a viewer"
  *  - the owner leaves with others in, or can't hand the organization on (O8)                     → "a viewer"
+ * And on the screens, as the coaches see them:
+ *  - an invite link doesn't name the organization before sign-in, or doesn't join after (rule 4)   → "the screens"
+ *  - the team button doesn't list the organization's teams, or a switch doesn't bring one whole    → "the screens"
+ *  - a save on an organization's team doesn't reach the organization, or another coach's save
+ *    doesn't reach this device without a reload (rule 8, D2)                                       → "the screens"
+ *  - the other coach's avatar and the play they are on don't show (rule 8)                        → "the screens"
+ *  - a viewer can save, or isn't told why not; a copy to another team doesn't land (rule 9, 10)    → "a viewer's screen"
+ *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
  * test-results/, uploaded as `organization`.
  */
 
 test.beforeEach(({}, testInfo) => {
   test.skip(!process.env.SHARING_TEST_REDIS_URL || !process.env.DATABASE_URL, "Requires the disposable Redis adapter and database; enabled in CI");
-  test.skip(testInfo.project.name !== "chromium", "The API is the same from every device; the desktop project covers it");
+  test.skip(testInfo.project.name !== "chromium" && !testInfo.title.includes("screen"), "The API is the same from every device; the desktop project covers it");
 });
 
 interface Step { step: string; by: string; result: unknown }
@@ -218,4 +228,146 @@ test("a viewer looks and can't change; removal is at once; deleting the organiza
   expect("teams" in otterAccount ? otterAccount.teams : null).toEqual([]);
   note("Otter deletes the organization: its team goes, Heron's own team stays", "otter", { otterOrgs, heronTeams: "teams" in heronAccount ? heronAccount.teams : null });
   save("a-viewer");
+});
+
+/** Saves a fresh play under a name, as the quickest write a coach makes. */
+async function savePlay(page: Page, name: string): Promise<void> {
+  const d = new Designer(page);
+  await d.newPlay();
+  await d.setName(name);
+  await d.save();
+}
+const deviceNames = async (page: Page): Promise<string[]> => Object.values(await storedPlays(page)).map((p) => p.name).sort();
+
+test("the screens: an invite joins, the team button switches to the organization's team, saves cross between coaches, and avatars show who is where", async ({ page, browser }, testInfo) => {
+  const run = runId();
+  const otter = await coach("otter", run);
+  const own = await ownTeam(otter, [SLANT_LEFT, WHEEL_RIGHT], [BOOK], OTTERS);
+  const org = await createOrg(otter, "Riverside Youth Flag");
+  const team = (await moveTeam(otter, org.id, own.id)).id;
+  const link = await invite(otter, org.id, { heads: [team] });
+  // Heron has a team of their own, so joining opens that and the organization's team is a switch away
+  await ownTeam(await coach("heron", run), [], [], { name: "Heron Hollow", color: "#123456" });
+
+  // Heron opens the invite link: the sign-in page names the organization, and the designer joins after sign-in (rule 4)
+  await page.goto(`/sign-in?run=${run}&invite=${encodeURIComponent(link.token)}`);
+  await expect(page.locator("[data-invite]")).toContainText("You're invited to Riverside Youth Flag");
+  await page.screenshot({ path: `test-results/organization-${testInfo.project.name}-invited.png` });
+  await reloadedBy(page, () => page.getByRole("button", { name: "Continue as Coach Heron" }).click());
+  const d = new Designer(page);
+  await expect(d.toast).toContainText("You're in Riverside Youth Flag", { timeout: 15_000 });
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Heron Hollow");
+  await expect(panel(page).locator("[data-org-count]")).toHaveAttribute("data-org-count", "1");
+  await expect(panel(page)).toContainText("Riverside Youth Flag");
+  note("Heron joins from the invite link", "heron", { toast: await d.toast.innerText().catch(() => "") });
+
+  // the team button lists the organization's team under its name; a switch brings it whole, with the level (rule 11)
+  await teamButton(page).click();
+  const menu = page.getByRole("menu", { name: "Teams" });
+  await expect(menu).toContainText("Riverside Youth Flag");
+  await reloadedBy(page, () => menu.getByRole("menuitemradio", { name: /Riverside Otters/ }).click());
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters");
+  await expect(teamButton(page).locator("[data-level]")).toHaveText("Head coach");
+  await expectSaved(page);
+  await expect(status(page)).toHaveText("Shared with your organization");
+  expect(await deviceNames(page)).toEqual(["Otter Slant Left", "Otter Wheel Right"]);
+  expect(await marker(page)).toMatchObject({ teamId: team, org: org.id, level: 3, dirty: false });
+  await panel(page).screenshot({ path: `test-results/organization-${testInfo.project.name}-switched.png` });
+  note("Heron switches to the organization's team", "heron", { marker: await marker(page), device: await deviceNames(page) });
+
+  // a save goes up on its own, stamped with who made it (rule 7)
+  await savePlay(page, "Heron Smash");
+  await expectSaved(page);
+  const after = await readTeam(otter, org.id, team);
+  expect(after.plays.map((p) => [p.name, p.changed.name]).sort()).toEqual([["Heron Smash", "Coach Heron"], ["Otter Slant Left", "Coach Otter"], ["Otter Wheel Right", "Coach Otter"]]);
+  note("Heron's save reaches the organization, stamped", "heron", { plays: after.plays.map((p) => [p.name, p.changed.name]) });
+
+  // Otter, on another device with no team of their own left, opens the organization's team; a save there reaches Heron without a reload (rule 8)
+  const other = await browser.newContext();
+  const page2 = await other.newPage();
+  await signIn(page2, "Coach Otter", run);
+  const d2 = new Designer(page2);
+  await d2.tools();
+  await expect(teamButton(page2)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page2);
+  await d2.closeSidebars();
+  await savePlay(page2, "Otter Mesh");
+  await expectSaved(page2);
+  await expect.poll(() => deviceNames(page), { timeout: 20_000 }).toEqual(["Heron Smash", "Otter Mesh", "Otter Slant Left", "Otter Wheel Right"]);
+  note("Otter's save reaches Heron's device by the poll", "both", { heronDevice: await deviceNames(page) });
+
+  // each sees the other's avatar, and which play they are on
+  await d2.openSaved("Otter Mesh");
+  const avatars = page.getByRole("list", { name: "Coaches here now" });
+  await expect(avatars.getByRole("listitem")).toHaveCount(1, { timeout: 20_000 });
+  await expect(avatars.getByRole("listitem").first()).toHaveAttribute("aria-label", "Coach Otter, on “Otter Mesh”");
+  await expect(page2.getByRole("list", { name: "Coaches here now" }).getByRole("listitem")).toHaveCount(1, { timeout: 20_000 });
+  await page.screenshot({ path: `test-results/organization-${testInfo.project.name}-avatars.png` });
+  note("each coach sees the other", "both", { heronSees: await avatars.getByRole("listitem").first().getAttribute("aria-label") });
+  await other.close();
+  save(`${testInfo.project.name}-the-screens`);
+});
+
+test("a viewer's screen looks and can't save, a copy lands in another team, and an admin's removal takes the team away", async ({ page, browser }, testInfo) => {
+  const run = runId();
+  const otter = await coach("otter", run);
+  const heron = await coach("heron", run);
+  const own = await ownTeam(otter, [SLANT_LEFT], [BOOK], OTTERS);
+  const org = await createOrg(otter, "Riverside Youth Flag");
+  const team = (await moveTeam(otter, org.id, own.id)).id;
+  await ownTeam(heron, [], [], { name: "Heron Hollow", color: "#123456" });
+  await join(heron, (await invite(otter, org.id, { assists: [team] })).token);
+  await invite(otter, org.id, { email: `ibis.${run}@example.test`, teams: [team] });
+
+  // Ibis, invited by email, is in on their first sign-in, opens the team, and is told it is read-only (rule 9)
+  await signIn(page, "Coach Ibis", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expect(teamButton(page).locator("[data-level]")).toHaveText("Viewer");
+  await expect(panel(page).locator("[data-read-only]")).toContainText("You can look at this team but not change it. Ask an admin of Riverside Youth Flag.");
+  await panel(page).screenshot({ path: `test-results/organization-${testInfo.project.name}-viewer.png` });
+  await d.closeSidebars();
+  await savePlay(page, "Ibis Try");
+  await expect(d.toast).toContainText("You can look at this team but not change it");
+  expect(await deviceNames(page)).toEqual(["Otter Slant Left"]);
+  note("Ibis, a viewer: the team opens, a save is refused in words", "ibis", { toast: await d.toast.innerText(), device: await deviceNames(page) });
+
+  // Heron, an assistant, copies a play from the organization's team into their own (rule 10)
+  const other = await browser.newContext();
+  const page2 = await other.newPage();
+  await signIn(page2, "Coach Heron", run);
+  const d2 = new Designer(page2);
+  await d2.tools();
+  await teamButton(page2).click();
+  await reloadedBy(page2, () => page2.getByRole("menu", { name: "Teams" }).getByRole("menuitemradio", { name: /Riverside Otters/ }).click());
+  await page2.goto("/playbooks");
+  await page2.getByRole("button", { name: "More actions for Otter Slant Left" }).click();
+  await page2.getByRole("button", { name: "Copy to another team…" }).click();
+  await page2.getByRole("group", { name: "Teams to copy to" }).getByRole("button", { name: "Heron Hollow" }).click();
+  await expect(page2.getByRole("status").filter({ hasText: "Copied to “Heron Hollow”" })).toBeVisible();
+  const heronAccount = await body<{ teams: { name: string; plays: number }[] }>(await heron.get("/api/account"), 200, "heron's account");
+  expect(heronAccount.teams.map((t) => [t.name, t.plays])).toEqual([["Heron Hollow", 1]]);
+  note("Heron copies a play to their own team", "heron", { heronTeams: heronAccount.teams });
+
+  // an admin removes Ibis from the members dialog; Ibis's device learns on its next poll (O1)
+  const page3 = await (await browser.newContext()).newPage();
+  await signIn(page3, "Coach Otter", run);
+  const d3 = new Designer(page3);
+  await d3.tools();
+  await panel(page3).getByRole("button", { name: "Members…" }).click();
+  const dialog = page3.getByRole("dialog");
+  await expect(dialog.locator("[data-members]")).toHaveAttribute("data-members", "3");
+  await dialog.screenshot({ path: `test-results/organization-${testInfo.project.name}-members.png` });
+  const ibisRow = dialog.getByRole("group", { name: "Coach Ibis" });
+  await ibisRow.getByRole("button", { name: "Remove" }).click();
+  await ibisRow.getByRole("button", { name: "Tap again to remove" }).click();
+  await expect(dialog.locator("[data-members]")).toHaveAttribute("data-members", "2");
+  await expect(panel(page).locator("[data-read-only]")).toContainText("You no longer have access to this team", { timeout: 20_000 });
+  expect(await deviceNames(page)).toEqual(["Otter Slant Left"]);
+  note("Otter removes Ibis: Ibis's device says so and keeps its copy", "otter", { panel: (await panel(page).innerText()).replace(/\s+/g, " ").trim() });
+  await other.close();
+  save(`${testInfo.project.name}-a-viewers-screen`);
 });

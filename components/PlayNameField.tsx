@@ -6,6 +6,7 @@ import { numbered } from "@/lib/export/numbered";
 import {
   getCurrentBookId, getPlaybooks, getPlays, getServerCurrentBookId, getServerPlaybooks, getServerPlays, primaryPlay, subscribe,
 } from "@/lib/play/library";
+import { getAccountState, getServerAccountState, subscribeAccount } from "@/lib/account/sync";
 import { Chevron, Menu, MenuHeading, MenuNote } from "./Menu";
 import { SideBadge } from "./SideBadge";
 import { chip, input, menuChoice, menuItem } from "./ui";
@@ -31,6 +32,8 @@ export function PlayNameField({ name, playId, onName, onOpenPlay, onAddToBook }:
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
   const books = useSyncExternalStore(subscribe, getPlaybooks, getServerPlaybooks);
   const currentId = useSyncExternalStore(subscribe, getCurrentBookId, getServerCurrentBookId);
+  // the other coaches of the organization on a play right now wear their names on its row (ADR 013, rule 8)
+  const presence = useSyncExternalStore(subscribeAccount, getAccountState, getServerAccountState).presence;
   const book = books.find((b) => b.id === currentId) ?? null;
   const items = book ? numbered(book, plays) : [];
   const primaryId = book ? primaryPlay(book)?.id ?? null : null;
@@ -89,6 +92,7 @@ export function PlayNameField({ name, playId, onName, onOpenPlay, onAddToBook }:
                     <SideBadge side={it.play.side} />
                   </span>
                   {it.play.id === primaryId && <span className={chip}>Primary</span>}
+                  {presence.filter((p) => p.play === it.play.id).map((p) => <span key={p.coach} className={chip} data-here>{p.name}</span>)}
                 </button>
               ))}
               {playId !== null && !inBook && (
