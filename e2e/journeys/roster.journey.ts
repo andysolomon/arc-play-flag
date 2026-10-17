@@ -1544,7 +1544,7 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   await expect(d.undo).toBeEnabled();
   await expect(d.back).toHaveCount(0);
   const playBanner = await keys();
-  expect(playBanner).toEqual(["Play tools", "Save play", "Undo", "Redo", "Clear routes", "Route palette"]);
+  expect(playBanner).toEqual(["Play tools", "Save play", "Duplicate play", "Undo", "Redo", "Clear routes", "Route palette"]);
 
   // roster mode: Back to play beside Play tools, and nothing of the play's left in the header
   await d.roster();
@@ -1623,7 +1623,8 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
     expect(drawers).toMatchObject({ tools: "true", right: "true" });
     const onTitle = await title.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el;
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit !== null && el.contains(hit);
     });
     expect(onTitle, "nothing covers the play's title").toBe(true);
   } else {

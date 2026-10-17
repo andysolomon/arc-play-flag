@@ -357,7 +357,7 @@ const PHONES = [
   { width: 320, height: 568 },
 ] as const;
 
-test("on a tall phone, already 37 yards deep, Deep field is in the top right corner and opens the end zone", async ({ page }, testInfo) => {
+test("on a tall phone, including a 37-yard fit, Deep field is in the top right corner and opens the end zone", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "iphone-15", "a phone's touch screen at each tall phone's size");
   const project = testInfo.project.name;
   const d = new Designer(page);
@@ -367,8 +367,11 @@ test("on a tall phone, already 37 yards deep, Deep field is in the top right cor
     await page.setViewportSize(size);
     await d.goto();
     await d.closeSidebars();
-    // the screen's own shape already gives the deepest card: what hid Deep field before
-    const before = await showing(page, d, DEEPEST);
+    // The editable title needs its own room. Compact sizes can fit less than 37 yards;
+    // the taller cases still exercise the maximum fit that used to hide Deep field.
+    await d.settle();
+    const before = await read(page);
+    expect(before.downfield).toBeLessThanOrEqual(DEEPEST);
     expectFits(before, `${at} before`);
     expectToggle(before, false, `${at} before`);
     await expect(deepToggle(page)).toHaveAttribute("title", "Show the field to the end line");
@@ -385,10 +388,11 @@ test("on a tall phone, already 37 yards deep, Deep field is in the top right cor
     // and a tap back fits the field to the play again
     await deepToggle(page).tap();
     await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "false");
-    const off = await showing(page, d, DEEPEST);
+    const off = await showing(page, d, before.downfield);
     expectToggle(off, false, `${at} off`);
     seen[at] = { before, deep, off };
   }
+  expect(Object.values(seen).some(({ before }) => before.downfield === DEEPEST), "a tall phone still exercises the maximum fitted depth").toBe(true);
   await keep(testInfo, `deep-field-${project}-phones`, { project, seen });
 });
 

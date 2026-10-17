@@ -299,7 +299,8 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   await straight(d.field, "LC", "QB pressed: LC comes straight again", { pills: await pills() });
 
   // 2 yards off the line: the landmark stops CONTAIN_LINE behind the line, not CONTAIN_LEAD in front (C5). The QB
-  // steps 2 yards aside first: right behind the C they stand 2 yards off them (lib/play/spacing.ts), 3 off the line
+  // steps 2 yards aside first: straight behind the C on the 1 the closest they stand is under centre, 2.5 off the
+  // line (UNDER_CENTRE, lib/play/spacing.ts), where CONTAIN_LEAD and CONTAIN_LINE put the landmark in the same place
   await nudge("QB", "Offense", "ArrowLeft", 2);
   await nudge("QB", "Offense", "ArrowUp", 3);
   const under = { lead: Math.min(CONTAIN_LEAD, 2 - CONTAIN_LINE) };

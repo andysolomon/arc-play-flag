@@ -8,7 +8,7 @@ The header stays on one row with seven controls, each at least 44×44 CSS pixels
 
 ## Verification
 
-Production build, ESLint and TypeScript passed. The save, history, playbook switching and new header journeys passed 76 checks across desktop, Pixel 7, iPhone 15 and iPad Chromium projects. After the final responsive and retry refinements, the header editing and header save journeys passed all 32 checks again.
+Production build, full ESLint, TypeScript and the Bun suite passed (339 passed, 7 Redis-dependent tests skipped). Merge verification passed 68 browser checks with 12 device-specific skips across desktop, Pixel 7, iPhone 15 and iPad Chromium projects. This covers phone headers, roster Back to play and focus, deep-field sizing, Duplicate, renaming and Save. The field now measures the complete title row so the editable title cannot make the diagram overflow.
 
 Repeat the final browser checks with:
 
@@ -19,7 +19,7 @@ bun run test:e2e e2e/journeys/header-edit.journey.ts e2e/journeys/header-save.jo
 
 `header-edit` in CI retains screenshots and stored-play/geometry JSON manifests. These projects emulate devices in Chromium; they do not establish real Safari behavior.
 
-The tour was refreshed against the production build, with one isolated chapter and two successful complete captures. Each set passed coverage, duration, codec and resolution checks: 1,880,468 and 1,900,655 bytes, both below the unchanged 2 MB limit. The published files all come from the first complete set. A validation summary is alongside this note. Slightly longer reading pauses in the league rules and wristband chapters and CRF 53/38 keep the clips within their timing and size limits.
+The tour was refreshed again after merging the latest main and fixing title sizing. The final complete set passed coverage, duration, codec, resolution and size checks at 1,869,936 bytes, below the unchanged 2 MB limit. Every published clip comes from this complete set. Earlier capture results and the merge follow-up are recorded in the validation summary. The recorder uses CRF 53/38 and longer reading pauses in the league rules and wristband chapters.
 
 ## Screenshots
 

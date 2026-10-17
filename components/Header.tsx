@@ -52,6 +52,9 @@ const round =
   "max-[767px]:w-11 max-[767px]:rounded-[14px] max-[767px]:px-0 max-[767px]:py-0.5";
 /** The same key for a control whose name comes before its glyph on wider screens (Redo, Routes). */
 const roundAfter = round.replace("max-[767px]:flex-col ", "max-[767px]:flex-col-reverse ");
+/** Roster mode has room to spell out its way back from 479px. */
+const backRound = "inline-flex shrink-0 items-center justify-center gap-1 max-[478px]:min-w-11 max-[478px]:w-11 max-[478px]:flex-col max-[478px]:gap-0.5 " +
+  "max-[478px]:rounded-[14px] max-[478px]:px-0 max-[478px]:py-0.5";
 /** Stickers shrink a little on phones to leave room for the name under them. */
 const glyph = "shrink-0 max-[767px]:h-5 max-[767px]:w-5";
 /** The name under the glyph on phones. */
@@ -105,10 +108,10 @@ function HeaderImpl({
       </button>
       {rostering && (
         // nothing in roster mode is the play's to undo or clear, so the way back to it has their room, where a back key goes
-        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${round}`}>
+        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${backRound}`}>
           <BackIcon />
-          <span className={`${name} min-[768px]:hidden`}>Back</span>
-          <span className="max-[767px]:hidden">Back to play</span>
+          <span className="max-[478px]:text-[11px] max-[478px]:leading-none min-[479px]:hidden">Back</span>
+          <span className="max-[478px]:hidden">Back to play</span>
         </button>
       )}
       <div className="min-w-0 flex-1" />

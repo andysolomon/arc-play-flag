@@ -28,3 +28,11 @@ Demo validation used FFmpeg/ffprobe 6.1.1 and Playwright 1.63.0. An isolated fir
 | B | share | 9.0s | Passed |
 | B | touchdown | 11.0s | Passed |
 | B | trick-plays | 10.0s | Passed |
+
+## Merge follow-up
+
+The latest main (including the QB-under-centre and man-coverage changes) was merged into this branch. Field sizing now observes and subtracts the actual title row height, including its margin. Header expectations include Duplicate; roster Back to play keeps its full label from 479px, and focus checks accept the title's own edit control. The tall-phone journey still proves the maximum fitted-depth case and now permits shorter automatic fits at compact sizes.
+
+Production build, full ESLint and TypeScript passed. The Bun suite passed again: **339 passed, 7 skipped, 0 failed**. The focused browser rerun passed **68 checks, with 12 device-specific skips**. It covers all 27 failures from the original CI run, plus the new header editing and existing header Save journeys.
+
+A fresh complete tour was captured from the merged, corrected production build and passed all recorder checks at **1,869,936 bytes**. The published files and fingerprint are this complete set. The earlier A/B captures above describe the initial implementation.
