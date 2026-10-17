@@ -6,12 +6,12 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "967c743be35e146b74804036846757bb9ea6a502b2dd9c16dd243e8840c4e196",
+    "components/App.tsx": "4e1262dce17fa5a5943528e010c2c1f9f5b1a58b8e8492afb4330be7484bbda9",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "66d7bfa966f49cac72c05d4ae23fab3e6d1aa35f1617554f497da63a19062fd7",
+    "components/Field.tsx": "b95246b082fac44946cce819a5ead73acb8ee82e40390bd482d8bab4e3042547",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
-    "components/Header.tsx": "c24dd640254f4507c31de58443804874fd31eb0ac2aa2977f80c6ece2fe932c4",
+    "components/Header.tsx": "8c6bd773310a6f3ee62358c5eacf9b6ebc7cd2ad4dfc536c399f38d883ea4a96",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "ce9a71e7b78fa295090f67d2660cc54d1aaeffe8ec1d8e819f7d4bdcdf712636",
     "components/LateralLayer.tsx": "badafa29eb6563fedf5e17ef61e7aab244c7234377ecf6620a06c1d63e977ada",
@@ -74,11 +74,11 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "players are kept 2 yards off a teammate when dragged, stepped or backed off to the blitz line, with notes and a shake when a step can't get past; the tour's one drag (Z out to 25, 2, 2.2 yards from Y) and one blitz (R back to the 7, 5 yards from S) stay clear of every teammate and no chapter steps a player, so no clip changes",
+    "reason": "the header's Back to play key, and Undo, Redo and Clear leaving the header, show only in roster mode, which no chapter enters; on a play the header renders as on main, and the field title's focus classes draw nothing unless Back hands it focus",
     "files": [
       "components/App.tsx (changed)",
       "components/Field.tsx (changed)",
-      "components/PlayerToken.tsx (changed)"
+      "components/Header.tsx (changed)"
     ]
   }
 }
