@@ -45,7 +45,7 @@ import type { Hop, Pair, Player, Route } from "./types";
  * - S3 a throw left on a player the chain doesn't reach: taken off.
  * - S4 settling a settled play hands back the very same array, so nothing reads as an edit.
  * - S5 a quarterback with no lateral keeps whatever route, and read, they had, but for a rollout or boot's read.
- * - Q1, Q2 a rollout or boot (docs/adr/010-qb-rollout-and-boot.md) on anyone but the quarterback, or on a
+ * - Q1, Q2 a rollout or boot (docs/adr/011-qb-rollout-and-boot.md) on anyone but the quarterback, or on a
  *   quarterback whose chain has a lateral, is taken off ahead of the carrier rules, which would keep a ball job
  *   on the last carrier; Q12 one on the quarterback is never the read.
  * - P1 a release past the line of scrimmage: snapped back behind it, so no lateral is ever let go past it.

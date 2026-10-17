@@ -279,7 +279,7 @@ function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMo
   const center = centre(players);
   const snapGap = qb && center && center.id !== qb.id ? dist(qb, center) : 0;
   const snapAt = cl(snapGap / 10, 0.12, 0.45);
-  // the quarterback's rollout or boot (docs/adr/010-qb-rollout-and-boot.md): they take the snap before moving (Q3)
+  // the quarterback's rollout or boot (docs/adr/011-qb-rollout-and-boot.md): they take the snap before moving (Q3)
   const own = qb ? tracks[qb.id] : undefined;
   const qbAct = !!(own && qb?.route && isQbAction(qb.route.type));
   if (qbAct && own) own.wait = snapAt;

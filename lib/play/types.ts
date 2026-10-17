@@ -21,9 +21,9 @@ export type OffenseRouteType =
   | "jet"
   /** the last ball carrier of a lateral chain sets up and throws it forward */
   | "throw"
-  /** the quarterback carries the snap across behind the line and throws on the run (ADR 010) */
+  /** the quarterback carries the snap across behind the line and throws on the run (ADR 011) */
   | "rollout"
-  /** the quarterback fakes the handoff, then rolls out the other way to throw (ADR 010) */
+  /** the quarterback fakes the handoff, then rolls out the other way to throw (ADR 011) */
   | "boot";
 export type DefenseRouteType =
   | "man" | "zoneDeep" | "zoneFlat" | "curlFlat" | "midRead" | "blitz" | "spy" | "custom";
@@ -41,6 +41,8 @@ export interface Route {
    * a target comes for the quarterback, as every blitz did.
    */
   aim?: "backfield";
+  /** a deep zone called as a deep half or a deep third (lib/play/deep.ts); stored only when called */
+  split?: "half" | "third";
   mirror?: boolean;
   primary?: boolean;
 }
@@ -96,7 +98,7 @@ export interface RouteDef {
   run?: boolean;
   /**
    * a job that sets up and throws: the last carrier's throw, or the quarterback's rollout or boot (who may
-   * hand off first and carry it out as a decoy, docs/adr/010-qb-rollout-and-boot.md)
+   * hand off first and carry it out as a decoy, docs/adr/011-qb-rollout-and-boot.md)
    */
   ball?: "throw";
   /** the quarterback's own action at the snap: only they are offered it, and only then */

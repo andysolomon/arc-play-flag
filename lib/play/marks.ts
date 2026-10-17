@@ -94,7 +94,7 @@ interface Token { id: string; cx: number; cy: number }
 const tokensOf = (drawn: readonly Player[], top: number): Token[] => drawn.map((p) => ({ id: p.id, cx: px(p.x), cy: py(p.y, top) }));
 
 /**
- * Points along the quarterback's rollout or boot (docs/adr/010-qb-rollout-and-boot.md), in SVG units: the one
+ * Points along the quarterback's rollout or boot (docs/adr/011-qb-rollout-and-boot.md), in SVG units: the one
  * route that runs through the backfield corners a stamp sits in, so a stamp keeps off it when it can.
  */
 function backfieldPaths(drawn: readonly Player[], top: number): Pair[] {

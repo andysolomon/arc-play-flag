@@ -52,7 +52,7 @@ describe("storage", () => {
     expect(rec?.notes).toBe("");
     expect(rec?.players).toEqual([
       { id: "o1", team: "offense", label: "C", x: 1.2, y: 0.9, route: null },
-      { id: "d1", team: "defense", label: "", x: 28.8, y: -36, route: { type: "man", target: "o1" } },
+      { id: "d1", team: "defense", label: "", x: 28.8, y: -48.8, route: { type: "man", target: "o1" } },
       { id: "d2", team: "defense", label: "LB", x: 10, y: -0.9, route: null },
     ]);
     // written through as v2, and the legacy key is left alone
@@ -84,7 +84,7 @@ describe("storage", () => {
       {"id":"d3","team":"defense","x":27,"y":-5,"route":{"type":"man","target":"d1"}},
       {"id":"d4","team":"defense","x":20,"y":-5,"route":{"type":"man","target":"o1"}}
     ]`.replace("1e400", "1e400").replace("NaN", "null")));
-    expect(players[0]?.route).toEqual({ type: "custom", pts: [[28.8, -36], [5, -5]] });
+    expect(players[0]?.route).toEqual({ type: "custom", pts: [[28.8, -48.8], [5, -5]] });
     expect(players[1]?.route).toBeNull();
     expect(players[2]?.route).toBeNull();
     expect(players[3]?.route).toBeNull();

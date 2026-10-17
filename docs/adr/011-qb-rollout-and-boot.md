@@ -1,4 +1,4 @@
-# ADR 010: the quarterback's rollout and boot
+# ADR 011: the quarterback's rollout and boot
 
 Status: implemented.
 

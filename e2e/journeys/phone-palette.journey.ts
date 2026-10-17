@@ -14,7 +14,7 @@ import { Designer } from "../support/designer";
  *  - Play tools and the palette open side by side and push each other off screen     → opening one folds the other
  *  - a right-column choice looks fine but a real tap does not assign it              → tap Post (offense) and Zone flat (defense), then see it pressed (and Post drawn)
  * Checked for the offense palette (routes and runs), the quarterback's (their own Rollout and Boot first,
- * then the routes and runs: the longest offense palette, docs/adr/010-qb-rollout-and-boot.md) and the defense
+ * then the routes and runs: the longest offense palette, docs/adr/011-qb-rollout-and-boot.md) and the defense
  * palette (coverages), at the issue's 390×844 and the narrowest phone the app supports, 320×568, on every
  * device project.
  * Leaves `phone-palette-<device>-<width>.json` (the viewport, the field closed and open, the drawer,

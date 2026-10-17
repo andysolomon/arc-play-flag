@@ -16,7 +16,7 @@ Record at 960×540. Keep clips silent, 6–12 seconds long, readable at phone wi
 
 `components/demo/recorded-from.json`, beside the tour's manifest, records which UI the clips were recorded from (it stays out of `public/demos/`, which holds only what the app serves and precaches). See [Keeping the clips current](#keeping-the-clips-current).
 
-Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses `preload="none"`, and pauses the previous demo when another starts. Do not add a product timeline or scrubber—the playback chapter demonstrates a play running with the browser's native video controls.
+Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses `preload="none"`, and pauses the previous demo when another starts. It plays without the browser's video controls, which draw over the clip (iOS covers it with skip, scrub and AirPlay buttons; `disableRemotePlayback` keeps Android Chrome's cast button off it): the whole clip is one button, named Play or Pause and the chapter, and the play sign and chapter number show over it only while it is stopped. Do not add a product timeline or scrubber; at 6–12 seconds a clip is watched through, and a tap starts it over once it ends.
 
 ## Current chapter plan
 
@@ -275,12 +275,13 @@ bun run build
 git diff --check
 ```
 
-`e2e/journeys/demo-tour.journey.ts` then proves on every pull request that `/demo` lists every chapter as the manifest says, that each clip and poster served is the committed file at the promised length and 960×540, and that one clip plays at a time; it leaves `test-results/demo-tour-<device>.json` and a mid-clip frame of every chapter. Then check the production build in a desktop and 390×844 mobile viewport:
+`e2e/journeys/demo-tour.journey.ts` then proves on every pull request that `/demo` lists every chapter as the manifest says, that each clip and poster served is the committed file at the promised length and 960×540, that no clip shows the browser's controls or cast button or can play fullscreen on an iPhone, that the play sign and chapter number show only while a clip is stopped, that a tap anywhere on a clip, or Tab then Enter or Space, plays and pauses it, and that one clip plays at a time; it leaves `test-results/demo-tour-<device>.json`, `test-results/demo-tour-<device>-playback.json` with a picture of the first card stopped and playing, and a mid-clip frame of every chapter. Then check the production build in a desktop and 390×844 mobile viewport:
 
 - Open **Play tools**, confirm the Demo tile uses the expected icon, and navigate through it.
 - Confirm every poster renders and every card is legible.
 - Play every clip from start to finish in at least one Chromium browser.
 - Confirm a second clip pauses the first.
+- On a real iPhone in Safari, play a clip: nothing of the browser's draws over it, a tap pauses it and brings the play sign back, and a finished clip plays again on a tap. The phone projects in the journeys run Chromium, so only a real device catches WebKit drawing its own controls.
 - Confirm WebM and MP4 URLs return successfully; test Safari when changing codec settings.
 - Confirm no horizontal overflow on mobile.
 - Wait for **Offline ready**, then turn the network off and confirm `/`, `/playbooks`, and `/demo` still open. All advertised clips (including ones not yet played) must load and seek from the service-worker cache.

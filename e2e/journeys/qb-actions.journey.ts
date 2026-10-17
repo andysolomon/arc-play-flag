@@ -10,7 +10,7 @@ import { OTTERS, moved, play, playbook, seed, storedDraft, storedPlays } from ".
 import { readDeck, readZip } from "../support/pptx";
 
 /**
- * The quarterback's rollout and boot (docs/adr/010-qb-rollout-and-boot.md): the QB takes the snap, carries
+ * The quarterback's rollout and boot (docs/adr/011-qb-rollout-and-boot.md): the QB takes the snap, carries
  * the ball across behind the line to a launch point and throws from there; on a boot they fake the handoff
  * first and go the other way. Each test leaves what it saw as `test-results/qb-actions-<device>-<test>.json`
  * with pictures beside it, uploaded as `qb-actions`.

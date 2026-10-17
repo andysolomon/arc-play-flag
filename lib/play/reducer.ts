@@ -1,4 +1,5 @@
 import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
+import { deepSplit, splitDeep, type DeepSplit } from "./deep";
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
@@ -40,6 +41,8 @@ export type Action =
   | { type: "target"; id: string }
   /** the selected blitzer comes for the quarterback or the backfield (lib/play/blitz.ts) */
   | { type: "blitzAim"; aim: "qb" | "backfield" }
+  /** the selected deep zone called Auto, as a deep half or as a deep third (lib/play/deep.ts) */
+  | { type: "deepSplit"; split: DeepSplit | null }
   /** the selected blitzer's Pick a player: like Man, ask who they come for */
   | { type: "blitzTarget" }
   /**
@@ -119,8 +122,9 @@ export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
     return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
       || s.los !== losOf(saved) || JSON.stringify(s.players) !== JSON.stringify(saved.players);
   }
+  // a restored draft or an opened share link has no history yet, so its players are compared as well
   return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow || s.los !== LOS_YARD
-    || (s.name !== "New play" && s.name !== "");
+    || (s.name !== "New play" && s.name !== "") || JSON.stringify(s.players) !== JSON.stringify(defaults());
 }
 
 /** Whether a player is drawn under the current Show filter. */
@@ -292,7 +296,7 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (!p) return s;
       const chain = chainOf(s.players);
       const at = editedVisit(s, chain);
-      // a rollout or boot is the quarterback's own job at the snap, never a carrier's (docs/adr/010-qb-rollout-and-boot.md, Q1)
+      // a rollout or boot is the quarterback's own job at the snap, never a carrier's (docs/adr/011-qb-rollout-and-boot.md, Q1)
       if (isQbAction(a.key) && (p.id !== quarterback(s.players)?.id || at !== 0)) return s;
       if (at !== null && at < chain.length - 1 && a.key !== "man") {
         // a job for a time the ball goes on from them ends the chain there, with that job
@@ -350,6 +354,11 @@ function reduce(s: PlayState, a: Action): PlayState {
       const p = selected(s);
       if (p?.team !== "defense" || p.route?.type !== "blitz" || blitzAim(p.route) === a.aim) return s;
       return { ...setRoute(s, p.id, aimedBlitz(a.aim)), targeting: null };
+    }
+    case "deepSplit": {
+      const p = selected(s);
+      if (p?.team !== "defense" || p.route?.type !== "zoneDeep" || deepSplit(p.route) === a.split) return s;
+      return setRoute(s, p.id, splitDeep(a.split));
     }
     case "blitzTarget": {
       const p = selected(s);
@@ -552,7 +561,7 @@ function reduce(s: PlayState, a: Action): PlayState {
 /**
  * The players as Flip play leaves them, mirrored across the field (x → 30 - x): every spot, route, pre-snap
  * motion, lateral catch and run before a pitch (R13, P7). The palette asks it too, to say whether flipping
- * turns a boot (docs/adr/010-qb-rollout-and-boot.md, Q11).
+ * turns a boot (docs/adr/011-qb-rollout-and-boot.md, Q11).
  */
 export function flipped(players: readonly Player[]): Player[] {
   return players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,

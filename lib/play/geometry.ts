@@ -18,6 +18,11 @@ export const MIN_DEPTH = 24;
 /** The deepest card: 37 yards past the line of scrimmage, unless a player already stands deeper. */
 export const MAX_DEPTH = 45;
 /**
+ * The whole field from the drive start: 8 yards behind the own goal line up to the end line, 50 yards on.
+ * Deep field's card reaches the end line wherever the ball is, so this is as deep as it gets.
+ */
+export const FULL_DEPTH = 8 + GOAL_YARD + END_ZONE_YARDS - LOS_YARD;
+/**
  * Roster mode's card: 8 yards behind the ball on the 15 up to the goal line, 23 yards, with no room kept for
  * routes. The safety, 11 yards deep, stands in the no-run band before the goal line, so the card shows that
  * band whole, its label clear above him, rather than a sliver of it behind him.
@@ -60,9 +65,12 @@ export function clamp(x: number, y: number, team: Team | null, top: number, gap 
  * bounds; a player who already stands past it is never cut off. Nor is a custom route: its
  * waypoints are where the coach put them (a preset route shrinks to fit the card instead), so
  * one drawn deep on a tall screen still shows whole on a wide one and in every picture.
- * A `minDepth` of MAX_DEPTH gives the deepest card the field allows (Deep field, or a route being drawn).
+ * A `minDepth` of MAX_DEPTH gives the deepest card (a route being drawn); `maxDepth` is as far as the
+ * pane's shape or `minDepth` may stretch it, never past the end line; the play itself may go further,
+ * so a waypoint put in the end zone under Deep field is still whole once it is off. Deep field is
+ * FULL_DEPTH for both: the field to the end line.
  */
-export function depth(players: readonly Player[], pane: Pane | null, minDepth = MIN_DEPTH, los = LOS_YARD): number {
+export function depth(players: readonly Player[], pane: Pane | null, minDepth = MIN_DEPTH, los = LOS_YARD, maxDepth = MAX_DEPTH): number {
   const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
   const reach = players.reduce((m, p) => (p.route?.type === "custom" ? (p.route.pts ?? []).reduce((n, q) => Math.min(n, q[1]), m) : m), 8);
   const hasDeep = players.some((p) => p.route?.type === "zoneDeep");
@@ -73,7 +81,8 @@ export function depth(players: readonly Player[], pane: Pane | null, minDepth = 
   const route = Math.ceil((8 - reach + 1.2) * 2) / 2;
   const d = Math.max(aspect, 8 - need + 1.2, route);
   // from the own goal line the end line is 58 yards off, past the deepest card, so this stays 45
-  const max = Math.min(MAX_DEPTH, Math.max(8 + GOAL_YARD + END_ZONE_YARDS - los, 8 - deepest + 1.2, route));
+  // (FULL_DEPTH for Deep field) unless a player or waypoint already stands deeper, put there under Deep field
+  const max = Math.max(Math.min(maxDepth, 8 + GOAL_YARD + END_ZONE_YARDS - los), 8 - deepest + 1.2, route);
   return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
 }
 
@@ -109,7 +118,7 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
   const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
   if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
   if (isQbAction(rt.type) && p.team === "offense") {
-    // the quarterback's rollout or boot, from where they took the snap (docs/adr/010-qb-rollout-and-boot.md)
+    // the quarterback's rollout or boot, from where they took the snap (docs/adr/011-qb-rollout-and-boot.md)
     const side = qbSide(p, players);
     return [[p.x, p.y], ...(rt.type === "rollout" ? rolloutLegs(p.x, p.y, side) : bootLegs(p.x, p.y, side))];
   }
@@ -225,7 +234,7 @@ function passOf(p: Player, players: readonly Player[], q: Pt): { at: number; gap
 }
 
 /**
- * The runner a rollout or boot fakes to, or hands off to when the call is a run (docs/adr/010-qb-rollout-and-boot.md,
+ * The runner a rollout or boot fakes to, or hands off to when the call is a run (docs/adr/011-qb-rollout-and-boot.md,
  * rule 5): the read when it is a run, else whoever first comes within reach of the quarterback after the snap (a
  * jet sweep first of all, since it is already crossing), then any who never do, nearest first (one standing
  * still or running away is never ahead of a back who meshes, Q21), ties to the play's own order. Read from where

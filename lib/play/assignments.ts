@@ -23,7 +23,9 @@
  *   quarterback plain "Blitz", as every blitz did; one aimed at a player who is gone reads "Blitz" too.
  * - L9 a lateral let go on the run (ADR 007) is a pitch: "QB runs and pitches to Z", and the job "Run
  *   and pitch to Z", so the words say the carrier moves with the ball first.
- * - L10 a quarterback's rollout or boot (ADR 010) says which way they go and who they fake to, by the same
+ * - L10 a deep zone called as a half or a third says so, "Deep half" or "Deep third"; Auto reads
+ *   "Zone deep", as every deep zone did.
+ * - L11 a quarterback's rollout or boot (ADR 011) says which way they go and who they fake to, by the same
  *   fake the field and playback use: "QB boots left", "Fake to Z, boot left, throw, look to Y first", and
  *   on a run "Hand off to Z, then boot left as a decoy", never the bare "Rollout" or "Boot".
  *
@@ -36,7 +38,7 @@ import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
 import { qbAction, type QbAction } from "./geometry";
 import { carriers, chainLinks, chainOf, runsBefore, visits } from "./lateral";
-import { isQbAction, isRun, routeDef } from "./routes";
+import { isQbAction, isRun, routeName } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
 export interface Assignment {
@@ -71,7 +73,7 @@ export function names(play: { readonly players: readonly Player[] }): Map<string
 
 /**
  * The ball carrier: the last carrier of a lateral chain that keeps it, the runner a quarterback's rollout or
- * boot fakes or hands off to (L10), else the primary read on a run route, else the first runner.
+ * boot fakes or hands off to (L11), else the primary read on a run route, else the first runner.
  */
 export function runnerOf(play: SavedPlay): Player | null {
   const chain = chainOf(play.players);
@@ -115,7 +117,7 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
     const target = aim === "player" ? blitzTarget(rt, play.players) : undefined;
     return target ? `Blitz ${who(target)}` : "Blitz";
   }
-  return routeDef(p.team, rt.type)?.label ?? "Custom route";
+  return routeName(p.team, rt) ?? "Custom route";
 }
 
 /** Which way a rollout or boot goes, as a job says it ("roll out right", "boot left") or a sentence does ("rolls out right"). */
@@ -161,7 +163,7 @@ export function callLine(play: SavedPlay): string | null {
   const chain = chainOf(play.players);
   const last = chain[chain.length - 1] ?? null;
   const hops = chainLinks(play.players).map((l) => `${who(l.from)} ${runsBefore(l) ? "runs and pitches" : "laterals"} to ${who(l.to)}`).join(", ");
-  // the quarterback's rollout or boot, said in the call (L10)
+  // the quarterback's rollout or boot, said in the call (L11)
   const act = qbAction(play.players);
   const qb = act ? `${who(act.qb)} ${qbMove(act, true)}` : "";
   switch (call) {
@@ -226,7 +228,7 @@ function qbJob(play: SavedPlay, who: Who): string | null {
 }
 
 /**
- * The quarterback's job on a rollout or boot (L10): it follows the call, the way the field draws it. Null
+ * The quarterback's job on a rollout or boot (L11): it follows the call, the way the field draws it. Null
  * when they have none.
  */
 function qbActionJob(play: SavedPlay, who: Who, look: string): string | null {
@@ -247,7 +249,7 @@ function qbActionJob(play: SavedPlay, who: Who, look: string): string | null {
  * ("Lateral to X"), or, the last time, throw, keep it or, with nothing yet, say so. A player who has it
  * more than once gets each in turn: "Lateral to Z, then lateral to X". Null off the chain, and for a
  * quarterback with no lateral, whose own route says their job, but for a throw (a Pitch saved before ADR 004)
- * and a rollout or boot, said by the call (L10).
+ * and a rollout or boot, said by the call (L11).
  */
 function carrierJob(p: Player, chain: readonly Player[], play: SavedPlay, who: Who): { job: string; missing: boolean } | null {
   const at = visits(chain, p.id);
