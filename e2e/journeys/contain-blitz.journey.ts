@@ -298,12 +298,16 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   await pill("QB").click();
   await straight(d.field, "LC", "QB pressed: LC comes straight again", { pills: await pills() });
 
-  // under centre, 2 yards off the line: the landmark stops CONTAIN_LINE behind the line, not CONTAIN_LEAD in front (C5)
+  // 2 yards off the line: the landmark stops CONTAIN_LINE behind the line, not CONTAIN_LEAD in front (C5). The QB
+  // steps 2 yards aside first: straight behind the C on the 1 the closest they stand is under centre, 2.5 off the
+  // line (UNDER_CENTRE, lib/play/spacing.ts), where CONTAIN_LEAD and CONTAIN_LINE put the landmark in the same place
+  await nudge("QB", "Offense", "ArrowLeft", 2);
   await nudge("QB", "Offense", "ArrowUp", 3);
   const under = { lead: Math.min(CONTAIN_LEAD, 2 - CONTAIN_LINE) };
-  await contains(d.field, "R", 1, "the quarterback under centre: R's landmark half a yard behind the line", {}, under);
-  await contains(d.field, "LB", -1, "the quarterback under centre: LB's landmark half a yard behind the line", {}, under);
+  await contains(d.field, "R", 1, "the quarterback 2 yards off the line: R's landmark half a yard behind the line", {}, under);
+  await contains(d.field, "LB", -1, "the quarterback 2 yards off the line: LB's landmark half a yard behind the line", {}, under);
   await nudge("QB", "Offense", "ArrowDown", 3);
+  await nudge("QB", "Offense", "ArrowRight", 2);
   await contains(d.field, "R", 1, "the quarterback back in the shotgun: R's landmark CONTAIN_LEAD in front");
 
   // the whole play flipped: each rusher stands on the other side of the quarterback, so they contain the other edge (C8)

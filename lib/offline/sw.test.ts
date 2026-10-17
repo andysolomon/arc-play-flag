@@ -187,7 +187,7 @@ describe("offline service worker", () => {
     expect(worker.fetched).toContain("/");
     expect(worker.fetched).toContain("/playbooks");
     expect(worker.fetched).toContain("/demo");
-    expect(worker.fetched).toContain("/demos/save-share.mp4");
+    expect(worker.fetched).toContain("/demos/share.mp4");
     expect(worker.fetched).toContain("/icons/zoneFlat.png");
     expect(worker.fetched).toContain("/_next/static/designer.js");
     expect(worker.fetched).toContain("/_next/static/playbooks.js");
@@ -271,7 +271,7 @@ describe("offline service worker", () => {
   });
 
   test("a missing required asset aborts install without a ready marker", async () => {
-    worker.setFetch((input) => Promise.resolve(keyFor(input) === "/demos/save-share.mp4"
+    worker.setFetch((input) => Promise.resolve(keyFor(input) === "/demos/share.mp4"
       ? new Response("missing", { status: 404 })
       : new Response("asset", { status: 200 })));
 
@@ -314,17 +314,17 @@ describe("offline service worker", () => {
 
   test("serves cached media ranges and contains failed background refreshes", async () => {
     const shell = await worker.caches.open("ffpd-shell-test");
-    await shell.put("/demos/run-play.webm", new Response(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]), {
+    await shell.put("/demos/run-game.webm", new Response(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]), {
       headers: { "content-type": "video/webm" },
     }));
     worker.setFetch(() => Promise.reject(new TypeError("offline")));
 
-    const partial = await worker.dispatchFetch(worker.request("/demos/run-play.webm", { range: "bytes=2-5" }));
+    const partial = await worker.dispatchFetch(worker.request("/demos/run-game.webm", { range: "bytes=2-5" }));
     expect(partial.status).toBe(206);
     expect(partial.headers.get("content-range")).toBe("bytes 2-5/8");
     expect([...new Uint8Array(await partial.arrayBuffer())]).toEqual([2, 3, 4, 5]);
 
-    const whole = await worker.dispatchFetch(worker.request("/demos/run-play.webm"));
+    const whole = await worker.dispatchFetch(worker.request("/demos/run-game.webm"));
     expect(whole.status).toBe(200);
   });
 

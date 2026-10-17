@@ -31,7 +31,7 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *  - a save on an organization's team doesn't reach the organization, or another coach's save
  *    doesn't reach this device without a reload (rule 8, D2)                                       → "the screens"
  *  - the other coach's avatar and the play they are on don't show (rule 8)                        → "the screens"
- *  - a viewer can save, or isn't told why not; a copy to another team doesn't land (rule 9, 10)    → "a viewer's screen"
+ *  - a viewer can save, or isn't told why not; a send to another team doesn't land (rule 9, 10)    → "a viewer's screen"
  *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
  * test-results/, uploaded as `organization`.
@@ -345,9 +345,9 @@ test("a viewer's screen looks and can't save, a copy lands in another team, and 
   await reloadedBy(page2, () => page2.getByRole("menu", { name: "Teams" }).getByRole("menuitemradio", { name: /Riverside Otters/ }).click());
   await page2.goto("/playbooks");
   await page2.getByRole("button", { name: "More actions for Otter Slant Left" }).click();
-  await page2.getByRole("button", { name: "Copy to another team…" }).click();
-  await page2.getByRole("group", { name: "Teams to copy to" }).getByRole("button", { name: "Heron Hollow" }).click();
-  await expect(page2.getByRole("status").filter({ hasText: "Copied to “Heron Hollow”" })).toBeVisible();
+  await page2.getByRole("button", { name: "Send to another team…" }).click();
+  await page2.getByRole("group", { name: "Send to" }).getByRole("button", { name: /Heron Hollow/ }).click();
+  await expect(page2.getByRole("status").filter({ hasText: "Sent “Otter Slant Left” to Heron Hollow" })).toBeVisible();
   const heronAccount = await body<{ teams: { name: string; plays: number }[] }>(await heron.get("/api/account"), 200, "heron's account");
   expect(heronAccount.teams.map((t) => [t.name, t.plays])).toEqual([["Heron Hollow", 1]]);
   note("Heron copies a play to their own team", "heron", { heronTeams: heronAccount.teams });

@@ -14,9 +14,9 @@ import { card, chip, flagChip, pillDark } from "../ui";
 import { AddToPlaybookModal } from "./AddPlays";
 import { MoreMenu, menuItem, menuItemDanger } from "./MoreMenu";
 import type { Say } from "./PlaybooksScreen";
+import { SendToTeamItem, SendToTeamModal } from "./SendToTeam";
 import { SharePlayButton, useShareCount } from "./ShareBook";
 import { TwoStep } from "./TwoStep";
-import { CopyToItem, CopyToModal } from "./CopyTo";
 import { ago, usePresenceOn } from "../account/Presence";
 import { useAccount } from "../account/AccountPanel";
 import { stampOf } from "@/lib/org/sync";
@@ -28,7 +28,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
   const links = useShareCount(`play:${p.id}`);
   const holding = booksHolding(p.id).length;
   const [adding, setAdding] = useState(false);
-  const [copying, setCopying] = useState(false);
+  const [sending, setSending] = useState(false);
   // the same flag its picture and printouts carry, in words beside the side it is for
   const flagged = runInNoRunZone(p, hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam)));
   // an organization's play says who changed it last, and who is on it now (ADR 013, rule 7 and 8)
@@ -61,7 +61,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
                   close();
                   download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
                 }}>Export play file</button>
-                <CopyToItem onPick={() => { close(); setCopying(true); }} />
+                <SendToTeamItem onPick={() => { close(); setSending(true); }} />
                 {share.links > 0 && (
                   <button type="button" className={menuItem} onClick={() => { close(); share.manage(); }}>Share link details…</button>
                 )}
@@ -78,7 +78,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
         </SharePlayButton>
       </div>
       {adding && <AddToPlaybookModal play={p} say={say} onClose={() => { setAdding(false); }} />}
-      {copying && <CopyToModal plays={[p]} say={say} onClose={() => { setCopying(false); }} />}
+      {sending && <SendToTeamModal transfer={{ kind: "ffpd.play", version: 1, play: p }} say={say} onClose={() => { setSending(false); }} />}
     </div>
   );
 }

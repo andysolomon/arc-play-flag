@@ -40,13 +40,14 @@ export function importMessage(e: ImportError): string {
   }
 }
 
-export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[], team: TeamSettings | null): string {
+/** The book as a file carries it: the book over the plays it has, full copies of those plays, and the team when it has a name. */
+export function playbookFile(book: Playbook, library: readonly SavedPlay[], team: TeamSettings | null): PlaybookFile {
   const byId = new Map(library.map((p) => [p.id, p]));
   const plays = book.plays.flatMap((id) => { const p = byId.get(id); return p ? [p] : []; });
   const playbook: Playbook = { id: book.id, name: book.name, plays: plays.map((p) => p.id) };
   // the primary goes with the book, when it is one of the plays the file carries (C9)
   if (book.primary !== undefined && playbook.plays.includes(book.primary)) playbook.primary = book.primary;
-  const file: PlaybookFile = {
+  return {
     kind: FILE_KIND,
     version: FILE_VERSION,
     exported: new Date().toISOString(),
@@ -54,7 +55,10 @@ export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[]
     plays,
     team: team && team.name ? team : null,
   };
-  return JSON.stringify(file, null, 2);
+}
+
+export function encodePlaybookFile(book: Playbook, library: readonly SavedPlay[], team: TeamSettings | null): string {
+  return JSON.stringify(playbookFile(book, library, team), null, 2);
 }
 
 /**

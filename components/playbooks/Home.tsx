@@ -66,8 +66,6 @@ export function Home({ say }: { say: Say }) {
 
   return (
     <>
-      <ImportLink />
-      <span className={divider} />
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-baseline gap-2">
           <span className={eyebrow}>PLAYBOOKS</span>
@@ -119,6 +117,9 @@ export function Home({ say }: { say: Say }) {
           {visiblePlays.map((p) => <PlayCard key={p.id} play={p} say={say} />)}
         </div>}
       </>)}
+
+      <span className={divider} />
+      <ImportLink />
     </>
   );
 }

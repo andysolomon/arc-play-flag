@@ -70,7 +70,8 @@ test("short link opens on another device, imports a snapshot, survives reload, a
   try {
     const recipient = await other.newPage();
     await recipient.goto("/playbooks");
-    await recipient.getByRole("textbox", { name: "Have a share link? Paste it here." }).fill(url);
+    await recipient.getByText("Have a share link from another coach?").click();
+    await recipient.getByRole("textbox", { name: "Share link" }).fill(url);
     await recipient.getByRole("button", { name: "Preview link", exact: true }).click();
     await expect(recipient.getByRole("heading", { name: book.name, exact: true })).toBeVisible();
     expect(await storedPlaybooks(recipient)).toEqual({});
@@ -100,7 +101,8 @@ test("short link opens on another device, imports a snapshot, survives reload, a
     await expect(recipient.getByRole("alert").filter({ hasText: /missing|Paste an Arc/ })).toContainText("missing, expired, or revoked");
     expect((await storedPlaybooks(recipient))[book.id]?.name).toBe("Recipient copy");
     await recipient.goto("/playbooks");
-    await recipient.getByRole("textbox", { name: "Have a share link? Paste it here." }).fill("https://evil.test/s/abcdefghijklmnop");
+    await recipient.getByText("Have a share link from another coach?").click();
+    await recipient.getByRole("textbox", { name: "Share link" }).fill("https://evil.test/s/abcdefghijklmnop");
     await recipient.getByRole("button", { name: "Preview link", exact: true }).click();
     await expect(recipient.getByRole("alert").filter({ hasText: /missing|Paste an Arc/ })).toContainText("Paste an Arc Play Flag");
   } finally { await other.close(); }

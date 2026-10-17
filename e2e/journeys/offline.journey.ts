@@ -23,7 +23,7 @@ test("a direct demo mount prepares the shells, exact shared plays, and advertise
   await page.goto("/demo");
   await expect(page.getByRole("heading", { name: "Demo" })).toBeVisible();
   const range = await page.evaluate(async () => {
-    const response = await fetch("/demos/run-play.webm", { headers: { Range: "bytes=0-31" } });
+    const response = await fetch("/demos/run-game.webm", { headers: { Range: "bytes=0-31" } });
     return { status: response.status, range: response.headers.get("content-range"), bytes: (await response.arrayBuffer()).byteLength };
   });
   expect(range).toEqual({ status: 206, range: expect.stringMatching(/^bytes 0-31\/\d+$/), bytes: 32 });
