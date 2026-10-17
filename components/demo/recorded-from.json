@@ -6,9 +6,9 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "288b1713bcf93da4790011d278593238fc32be6608036bfc8d059b60bb0e860f",
+    "components/App.tsx": "967c743be35e146b74804036846757bb9ea6a502b2dd9c16dd243e8840c4e196",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "19098ab3a3c306aeca1c1ace789e2e0cc553a5621ddff2d87d81b2f49e3e2fa6",
+    "components/Field.tsx": "66d7bfa966f49cac72c05d4ae23fab3e6d1aa35f1617554f497da63a19062fd7",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "c24dd640254f4507c31de58443804874fd31eb0ac2aa2977f80c6ece2fe932c4",
@@ -23,7 +23,7 @@
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
-    "components/PlayerToken.tsx": "1caa00fc71d92e5065ab274c86488a151914db8f8f2e4078b0b65d039a373479",
+    "components/PlayerToken.tsx": "f5bf11b75532a2cda761c7086c5be439133a68dc1f1ab5c9650930437cf39d49",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "19f61a3ac6c4675e5f47318ed9c145dc6684b24a4765c5b291b777c2c60e22ff",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
@@ -72,5 +72,13 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
+  },
+  "restamped": {
+    "reason": "players are kept 2 yards off a teammate when dragged, stepped or backed off to the blitz line, with notes and a shake when a step can't get past; the tour's one drag (Z out to 25, 2, 2.2 yards from Y) and one blitz (R back to the 7, 5 yards from S) stay clear of every teammate and no chapter steps a player, so no clip changes",
+    "files": [
+      "components/App.tsx (changed)",
+      "components/Field.tsx (changed)",
+      "components/PlayerToken.tsx (changed)"
+    ]
   }
 }

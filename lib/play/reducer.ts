@@ -7,8 +7,9 @@ import {
   canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
 } from "./lateral";
 import {
-  MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isQbAction, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags,
+  MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef, trimFlags,
 } from "./routes";
+import { spaced } from "./spacing";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 /** What a tap on a red player is waiting to answer: who a man defender covers, who a blitz comes for, or who takes a lateral. */
@@ -191,10 +192,16 @@ function step(s: PlayState, st: HistoryStep | null): PlayState {
   return st ? { ...s, ...st.history, ...st.doc, ...follow(s, st.doc), ...cleared } : s;
 }
 
-/** Sets a route, and backs a new blitzer off to the blitz line if they were lined up closer. */
+/** A player with this route, where it lets them stand (legalSpot), clear of any teammate there (lib/play/spacing.ts, C10). */
+function routed(players: readonly Player[], p: Player, route: Route | null): Player {
+  const next = { ...p, route };
+  return spaced(players, next, legalSpot(next), losGap(route));
+}
+
+/** Sets a route, and backs a new blitzer off to the blitz line if they were lined up closer, beside a teammate there. */
 function setRoute(s: PlayState, id: string, route: Route | null): PlayState {
   const c = commit(s);
-  return { ...c, players: c.players.map((p) => (p.id === id ? legalSpot({ ...p, route }) : p)) };
+  return { ...c, players: c.players.map((p) => (p.id === id ? routed(c.players, p, route) : p)) };
 }
 
 function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
@@ -303,7 +310,7 @@ function reduce(s: PlayState, a: Action): PlayState {
         const c = commit(s);
         const cut = withHops(c.players, hopsUpTo(c.players, at));
         if (a.key === "custom") return { ...c, players: patch(cut, p.id, { route: null }), visit: at, draft: { id: p.id, pts: [] }, targeting: null };
-        return { ...c, players: cut.map((q) => (q.id === p.id ? legalSpot({ ...q, route: { type: a.key } }) : q)), visit: at };
+        return { ...c, players: cut.map((q) => (q.id === p.id ? routed(cut, q, { type: a.key }) : q)), visit: at };
       }
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
       // a jet sweep is a handoff at the snap: not for the quarterback, the centre or a lateral carrier (J8)
