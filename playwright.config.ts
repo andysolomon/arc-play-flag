@@ -49,6 +49,8 @@ export default defineConfig({
     ...(process.env.SHARING_TEST_REDIS_URL ? [{ command: "bun e2e/support/redis-rest.ts", url: "http://127.0.0.1:3134", reuseExistingServer: !CI }] : []),
     {
       command: `bun run start --hostname 127.0.0.1 -p ${String(PORT)}`,
+      // the account journey signs in as the fixture coaches (lib/account/session.ts); the fixture never runs on Vercel
+      env: { ...process.env, ACCOUNT_FIXTURE: "1" },
       url: `http://localhost:${String(PORT)}`,
       reuseExistingServer: !CI,
       timeout: 60_000,

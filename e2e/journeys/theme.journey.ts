@@ -83,7 +83,7 @@ test("a theme picked in playbook settings redraws the designer open in another t
   // the first tap after a navigation can land before React has hydrated; tap again if it did
   await expect(async () => {
     await books.getByRole("button", { name: /team, theme & backup settings/ }).click();
-    await expect(books.getByRole("dialog", { name: "Team, theme & backup" })).toBeVisible({ timeout: 1_000 });
+    await expect(books.getByRole("dialog", { name: "Account, team, theme & backup" })).toBeVisible({ timeout: 1_000 });
   }).toPass();
   await books.getByRole("dialog").getByRole("radio", { name: "Light" }).check();
   await expect(html(books)).toHaveAttribute("data-theme", "light");

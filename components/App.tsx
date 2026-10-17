@@ -176,9 +176,11 @@ export function App() {
   // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
   // short there, the toast says so once it is drawn, and the palette says by how much
   const playersRef = useRef(s.players);
-  const cutWatch = useRef<{ id: string; was: Player | undefined; what?: string } | null>(null);
+  // a note the field says with the move itself (a teammate stepped past) leads the cut's toast, never lost under it
+  const fieldNote = useRef<string | null>(null);
+  const cutWatch = useRef<{ id: string; was: Player | undefined; what?: string; note: string | null } | null>(null);
   const watchCut = useCallback((id: string, what?: string) => {
-    cutWatch.current = { id, was: playersRef.current.find((p) => p.id === id), what };
+    cutWatch.current = { id, was: playersRef.current.find((p) => p.id === id), what, note: fieldNote.current };
   }, []);
   useEffect(() => {
     playersRef.current = s.players;
@@ -186,7 +188,9 @@ export function App() {
     if (!w) return;
     cutWatch.current = null;
     const news = cutNews(w.was, s.players.find((p) => p.id === w.id));
-    if (news) say(`${w.what ?? news} · cut short at the sideline`, 2200);
+    const cut = news ? `${w.what ?? news} · cut short at the sideline` : null;
+    if (cut && w.note) say(`${w.note} ${cut}`, 2600, true);
+    else if (cut) say(cut, 2200);
   }, [s.players, say]);
   // a player dragged or stepped with the arrow keys can take their route to the sideline
   const fieldDispatch = useCallback((a: Action) => {
@@ -558,8 +562,14 @@ export function App() {
       : null;
     return { act: { type: act.type, side: act.side, fake: fake ? who.get(fake.id) ?? null : null, decoy: act.decoy, receivers, turn } };
   }, [sel, s.players]);
-  // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
-  const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
+  // a lateral's catch dragged somewhere illegal is snapped back, or a player kept off a teammate, and the
+  // coach is told why, on a flag's yellow
+  const onFieldNote = useCallback((text: string) => {
+    say(text, 2600, true);
+    // kept only while the press or drop that said it is still being handled, for its move's cut (above)
+    fieldNote.current = text;
+    queueMicrotask(() => { fieldNote.current = null; });
+  }, [say]);
   // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
   const blitz = useMemo(() => {
     if (sel?.team !== "defense" || sel.route?.type !== "blitz") return null;
@@ -651,7 +661,7 @@ export function App() {
           draft={rostering ? null : s.draft}
           dispatch={rostering ? rosterDispatch : fieldDispatch}
           onSelect={rostering ? onRosterSelect : onSelect}
-          onCatchNote={onCatchNote}
+          onNote={onFieldNote}
           lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}

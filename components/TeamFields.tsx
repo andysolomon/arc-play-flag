@@ -138,5 +138,3 @@ export function TeamFields({ team, onTeam }: Props) {
   );
 }
 
-/** What the name and colour reach, for the note under the fields. */
-export const TEAM_NOTE = "Your name is painted across a styled end zone and goes on cards, slides and printed pages. Saved on this device.";
