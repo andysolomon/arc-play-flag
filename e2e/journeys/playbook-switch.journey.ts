@@ -26,6 +26,11 @@ import {
  *  - an empty menu can't be closed with Escape, since nothing in it takes focus                  → "switching"
  *  - a pick whose write the device refused is lost on the next write to the books (C3)           → "a refused pick"
  *  - a file whose book differs here only in its primary is taken as already here, and dropped    → "a different primary"
+ *  - the name over the field has no list, or its list differs from Play tools' (another book's plays,
+ *    another play checked), or it doesn't follow a switch of book                                 → "over the field"
+ *  - that list is cut off by the field's pane, the chevron pushes the field down, or it is too
+ *    small to tap; a pick there doesn't open the play, Escape or a tap elsewhere doesn't close
+ *    the list, or focus is lost; roster mode offers it with no play open; a bare device says nothing → "over the field"
  * Leaves `playbook-switch-<device>-<test>.json` (each step's rows, what was on the board and what the
  * device stored) and a picture of each menu in test-results/, uploaded as `playbook-switch`.
  */
@@ -42,6 +47,9 @@ const tools = (page: Page): Locator => page.locator("#play-sidebar");
 const playsButton = (page: Page): Locator => tools(page).getByRole("button", { name: "Plays in this playbook" });
 const playsMenu = (page: Page): Locator => page.getByRole("menu", { name: "Plays in this playbook" });
 const booksTile = (page: Page): Locator => tools(page).getByRole("button", { name: "Playbooks" });
+/** The chevron beside the play's name over the field, and the list it drops down. */
+const switchButton = (page: Page): Locator => page.getByRole("button", { name: "Switch play" });
+const switchMenu = (page: Page): Locator => page.getByRole("menu", { name: "Switch play" });
 const booksMenu = (page: Page): Locator => page.getByRole("menu", { name: "Playbooks" });
 const items = (page: Page) => page.getByRole("list").getByRole("listitem");
 
@@ -53,7 +61,12 @@ async function rows(menu: Locator): Promise<Row[]> {
 
 /** What a coach sees on the board and what the device stored, after a step. */
 async function read(d: Designer, step: string, menu?: Locator): Promise<Step> {
-  const board = await d.page.locator("#field-title").textContent();
+  // the name and its caption, without the list the chevron beside the name may have dropped down
+  const board = await d.page.locator("#field-title").evaluate((el) => {
+    const copy = el.cloneNode(true) as HTMLElement;
+    copy.querySelector("[role='menu']")?.remove();
+    return copy.textContent;
+  });
   return { step, ...(menu ? { menu: await rows(menu) } : {}), board: board?.trim() ?? "", current: await storedCurrentBook(d.page) };
 }
 
@@ -173,6 +186,121 @@ test("offense or defense: every play in the list says which side of the ball it 
   await tools(page).screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-sides-checked.png` });
   steps.push(await read(d, "opened Otter Cover Two D", playsMenu(page)));
   save(`${testInfo.project.name}-offense-or-defense`, steps);
+});
+
+test("the name over the field drops the same list down, so a play is switched with both sidebars folded away", async ({ page }, testInfo) => {
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [GAME, ROAD, SCOUT], team: OTTERS });
+  const d = new Designer(page);
+  const steps: Step[] = [];
+  await d.goto();
+  await d.closeSidebars();
+  const heading = page.getByRole("heading", { name: "New play", level: 1 });
+  await expect(heading).toBeVisible();
+
+  // the chevron sits in the name's line without making it taller, and reaches 44px around itself for a thumb
+  const button = switchButton(page);
+  const title = page.locator("#field-title");
+  const [box, titleBox, headingBox] = await Promise.all([button.boundingBox(), title.boundingBox(), heading.boundingBox()]);
+  expect(box && titleBox && box.y >= titleBox.y - 1 && box.y + box.height <= titleBox.y + titleBox.height + 1).toBe(true);
+  expect(titleBox && headingBox && Math.abs(titleBox.height - headingBox.height) <= 1).toBe(true);
+  const reach = await page.evaluate(() => {
+    const b = document.querySelector<HTMLElement>("button[aria-label='Switch play']");
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    const cx = r.x + r.width / 2;
+    const cy = r.y + r.height / 2;
+    const at = (x: number, y: number): boolean => b.contains(document.elementFromPoint(x, y));
+    // on a desktop the name sits right under the header, which takes the reach above the chevron
+    const pane = document.querySelector("main")?.getBoundingClientRect();
+    const above = pane && cy - 21 < pane.top ? "under the header" : at(cx, cy - 21);
+    return { width: r.width, height: r.height, above, below: at(cx, cy + 21), left: at(cx - 21, cy), right: at(cx + 21, cy) };
+  });
+  expect(reach).toMatchObject({ below: true, left: true, right: true });
+  expect([true, "under the header"]).toContain(reach?.above);
+
+  // the list drops down under the name, over the field and inside its pane, the first playbook on the device standing in
+  await button.click();
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+  await expect(switchMenu(page)).toBeVisible();
+  await expect(switchMenu(page)).toContainText("IN “Otter Game Plan”");
+  const first = await rows(switchMenu(page));
+  expect(first.map((r) => [r.name, r.checked])).toEqual([["Otter Slant Left", "false"], ["Otter Wheel Right", "false"]]);
+  expect(first[0]?.text).toMatch(/^1\.\s*Otter Slant LeftOffensePrimary$/);
+  await expect(switchMenu(page).getByRole("menuitemradio", { name: "Otter Slant Left" })).toBeFocused();
+  const [menuBox, paneBox] = await Promise.all([switchMenu(page).boundingBox(), page.locator("main").boundingBox()]);
+  expect(menuBox && titleBox && paneBox
+    && menuBox.y >= titleBox.y + titleBox.height
+    && menuBox.x >= paneBox.x && menuBox.x + menuBox.width <= paneBox.x + paneBox.width
+    && menuBox.y + menuBox.height <= paneBox.y + paneBox.height).toBe(true);
+  await page.locator("main").screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-over-the-field.png` });
+  steps.push({ ...(await read(d, "opened the list over the field on a new play", switchMenu(page))), stored: { button: reach, menu: menuBox, pane: paneBox } });
+
+  // the keyboard: down to the second play, Enter opens it whole, and focus comes back to the chevron
+  await page.keyboard.press("ArrowDown");
+  await expect(switchMenu(page).getByRole("menuitemradio", { name: "Otter Wheel Right" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(switchMenu(page)).toBeHidden();
+  await expect(d.toast).toHaveText("Opened “Otter Wheel Right”");
+  await expect(page.getByRole("heading", { name: "Otter Wheel Right", level: 1 })).toBeVisible();
+  await expect(d.routes).toHaveCount(2);
+  await expect(d.primaryRoutes).toHaveCount(1);
+  await expect(button).toBeFocused();
+  steps.push(await read(d, "Enter on Otter Wheel Right"));
+
+  // the play on the board is checked; Escape closes the list and gives focus back; so does a tap elsewhere
+  await button.click();
+  expect((await rows(switchMenu(page))).map((r) => r.checked)).toEqual(["false", "true"]);
+  await expect(switchMenu(page).getByRole("menuitemradio", { name: "Otter Wheel Right" })).toBeFocused();
+  steps.push(await read(d, "opened the list again", switchMenu(page)));
+  await page.keyboard.press("Escape");
+  await expect(switchMenu(page)).toBeHidden();
+  await expect(button).toBeFocused();
+  await expect(button).toHaveAttribute("aria-expanded", "false");
+  await button.click();
+  await expect(switchMenu(page)).toBeVisible();
+  await title.locator("span[aria-live]").click();
+  await expect(switchMenu(page)).toBeHidden();
+
+  // a tap opens a play too
+  await button.click();
+  await switchMenu(page).getByRole("menuitemradio", { name: "Otter Slant Left" }).click();
+  await expect(d.toast).toHaveText("Opened “Otter Slant Left”");
+  await expect(page.getByRole("heading", { name: "Otter Slant Left", level: 1 })).toBeVisible();
+  await expect(d.routes).toHaveCount(2);
+  await expect(d.primaryRoutes).toHaveCount(0);
+  steps.push(await read(d, "tapped Otter Slant Left over the field"));
+
+  // it is the same list as the play name's in Play tools: the same rows, the same play checked
+  await d.tools();
+  await playsButton(page).click();
+  const inTools = await rows(playsMenu(page));
+  await page.keyboard.press("Escape");
+  await d.closeSidebars();
+  await button.click();
+  expect(await rows(switchMenu(page))).toEqual(inTools);
+  await page.keyboard.press("Escape");
+
+  // and it follows a switch of book
+  await d.tools();
+  await booksTile(page).click();
+  await booksMenu(page).getByRole("menuitemradio", { name: "Otter Road Book" }).click();
+  await expect(d.toast).toHaveText("Switched to “Otter Road Book” · opened “Otter Cover Two”");
+  await d.closeSidebars();
+  await button.click();
+  await expect(switchMenu(page)).toContainText("IN “Otter Road Book”");
+  expect((await rows(switchMenu(page))).map((r) => [r.name, r.checked])).toEqual([["Otter Wheel Right", "false"], ["Otter Cover Two", "true"]]);
+  steps.push(await read(d, "switched to Otter Road Book from Play tools", switchMenu(page)));
+  await page.keyboard.press("Escape");
+
+  // roster mode has no play open (ADR 008), so the chevron waits for play mode
+  await d.roster();
+  await expect(page.getByRole("heading", { name: "Roster", level: 1 })).toBeVisible();
+  await expect(button).toHaveCount(0);
+  await d.roster(false);
+  await expect(page.getByRole("heading", { name: "Otter Cover Two", level: 1 })).toBeVisible();
+  await expect(button).toBeVisible();
+  steps.push(await read(d, "back from roster mode"));
+  save(`${testInfo.project.name}-over-the-field`, steps);
 });
 
 test("switching playbooks opens the new book's primary play, clears the board for an empty one, and outlasts a reload", async ({ page }, testInfo) => {
@@ -406,6 +534,14 @@ test("a saved play is added to the current playbook from the play name, and a de
   await expect(playsMenu(page2).getByRole("menuitem", { name: "All playbooks ›" })).toBeFocused();
   steps.push(await read(d2, "a bare device: the play name's list", playsMenu(page2)));
   await page2.keyboard.press("Escape");
+  await d2.closeSidebars();
+  await switchButton(page2).click();
+  await expect(switchMenu(page2)).toContainText("No playbook on this device yet.");
+  await expect(switchMenu(page2).getByRole("menuitemradio")).toHaveCount(0);
+  await expect(switchMenu(page2).getByRole("menuitem", { name: "All playbooks ›" })).toBeFocused();
+  steps.push(await read(d2, "a bare device: the list over the field", switchMenu(page2)));
+  await page2.keyboard.press("Escape");
+  await d2.tools();
   await booksTile(page2).click();
   await expect(booksMenu(page2)).toContainText("No playbooks yet.");
   await expect(booksMenu(page2).getByRole("menuitemradio")).toHaveCount(0);
