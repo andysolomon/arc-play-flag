@@ -6,7 +6,7 @@ import { editedVisit, initialState, reducer, selected, unsaved, type Action } fr
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
-import { blitzAim, blitzTarget, containPath, nearestBack } from "@/lib/play/blitz";
+import { blitzAim, blitzTarget, containEdge, edgePath, nearestBack } from "@/lib/play/blitz";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
@@ -490,9 +490,12 @@ export function App() {
     const t = blitzTarget(sel.route, s.players);
     const back = nearestBack(s.players);
     const aim = blitzAim(sel.route);
-    const contain = aim === "contain" ? containPath(sel, s.players) : null;
-    const edge: BlitzInfo["edge"] = contain ? (contain.edge < 0 ? "left" : "right") : null;
-    return { aim, who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null, edge };
+    // a contain blitz's edge, and whether the sideline leaves room on it and on the other (lib/play/blitz.ts, C2, C4)
+    const edge = containEdge(sel, s.players);
+    const contain: BlitzInfo["contain"] = aim === "contain"
+      ? { edge: edge < 0 ? "left" : "right", room: edgePath(edge, s.players) !== null, other: edgePath(edge < 0 ? 1 : -1, s.players) !== null }
+      : null;
+    return { aim, who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null, contain };
   }, [sel, s.players]);
   const hint = rostering ? null : s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
     : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"

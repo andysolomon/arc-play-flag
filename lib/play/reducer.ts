@@ -344,7 +344,9 @@ function reduce(s: PlayState, a: Action): PlayState {
     }
     case "blitzAim": {
       const p = selected(s);
-      if (p?.team !== "defense" || p.route?.type !== "blitz" || blitzAim(p.route) === a.aim) return s;
+      if (p?.team !== "defense" || p.route?.type !== "blitz") return s;
+      // the lit pill pressed again changes nothing, but still calls off a Pick a player waiting for a tap
+      if (blitzAim(p.route) === a.aim) return s.targeting === "blitz" ? { ...s, targeting: null } : s;
       return { ...setRoute(s, p.id, aimedBlitz(a.aim)), targeting: null };
     }
     case "blitzTarget": {

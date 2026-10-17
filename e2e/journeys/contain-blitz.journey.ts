@@ -2,13 +2,13 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type Locator } from "@playwright/test";
 import { binderPages } from "../../lib/export/binder";
 import { slidePlans } from "../../lib/export/slides";
-import { BLITZ_STOP, CONTAIN_LEAD, CONTAIN_WIDTH } from "../../lib/play/blitz";
+import { BLITZ_STOP, CONTAIN_LEAD, CONTAIN_LINE, CONTAIN_WIDTH } from "../../lib/play/blitz";
 import { S } from "../../lib/play/geometry";
-import { INK, X_MIN } from "../../lib/play/routes";
+import { BLITZ_DEPTH, INK, X_MIN } from "../../lib/play/routes";
 import { PLAYS_KEY } from "../../lib/play/storage";
 import type { Route, SavedPlay } from "../../lib/play/types";
 import { Designer } from "../support/designer";
-import { OTTERS } from "../support/fixtures";
+import { OTTERS, formation, seed } from "../support/fixtures";
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
@@ -17,14 +17,18 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * goes up the edge on their own side of the quarterback to a landmark CONTAIN_WIDTH outside and
  * CONTAIN_LEAD in front of them, then turns in, the arrow stopping BLITZ_STOP short of them. Every path is
  * measured in the picture against the quarterback's token: R on the right contains the right edge, LB on
- * the left the left; R moved across the quarterback contains the other edge, and right over them (dead
- * centre) the left. A quarterback near the sideline pulls the landmark inside it, and one against it
- * leaves no edge, so the blitz comes straight and the palette says so. Undo and redo carry the aim, the
- * saved play stores `aim: "contain"` (and QB stores nothing but the blitz), the reopened play and the
- * share page draw the same paths, and the printouts name it "Contain" with the job "Contain blitz".
- * Leaves `contain-blitz-<device>.json` (every step's pills, caption, measured path in yards from the
- * quarterback and stored route) and pictures of the palette, the field and a printed binder page in
- * `test-results/`.
+ * the left the left. A Pick a player called off by the lit Contain pill leaves the contain alone, and a
+ * player's target replaces it (C7). R moved across the quarterback contains the other edge, right over
+ * them (dead centre) the left (C2), and a flipped play contains the mirrored edges (C8). A quarterback near
+ * the sideline pulls the landmark inside it (C3), and one against it leaves no edge, so the blitz comes
+ * straight and the palette says so, offering only the edge with room (C4); under centre the landmark
+ * stops CONTAIN_LINE behind the line (C5). Undo and redo carry the aim, the saved play stores
+ * `aim: "contain"` (and QB stores nothing but the blitz), the reopened play and the share page draw the
+ * same paths, and the printouts name it "Contain" with the job "Contain blitz". With no quarterback on the
+ * field it bends around their slot (C1). Leaves `contain-blitz-<device>.json` (every step's pills,
+ * caption, measured path in yards from the quarterback, stored route, and the share page's path beside the
+ * designer's), `contain-blitz-<device>-no-qb.json`, and pictures of the palette, the field and a printed
+ * binder page in `test-results/`.
  */
 
 const PLAY = "Otter Contain";
@@ -85,6 +89,14 @@ interface Step {
   caption?: string;
   path?: Measured;
   stored?: Route | null;
+  /** the path after the start, in yards from the blitzer's own token, as the share page and the designer drew it */
+  fromToken?: { share: XY[]; designer: XY[] };
+}
+
+/** The path after its start, in yards from the blitzer's own token. */
+async function fromToken(svg: Locator, blitzer: string): Promise<XY[]> {
+  const [bx, by] = await tokenAt(svg, `Defense ${blitzer}`);
+  return (await blitzPath(svg, blitzer)).points.slice(1).map((p) => [(p[0] - bx) / S, (p[1] - by) / S]);
 }
 
 test("a contain blitz rushes the edge outside the quarterback and turns in, on the field, in the saved play, the share link and the printouts", async ({ page }, testInfo) => {
@@ -123,14 +135,18 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
     };
   }
 
-  /** The blitzer contains `edge` (-1 left, +1 right): one bend, the landmark CONTAIN_WIDTH outside (or at the sideline) and CONTAIN_LEAD in front, turning in at the quarterback. */
-  async function contains(svg: Locator, blitzer: string, edge: -1 | 1, step: string, extra: Partial<Step> = {}, landmarkX = edge * CONTAIN_WIDTH): Promise<Measured> {
+  /**
+   * The blitzer contains `edge` (-1 left, +1 right): one bend, the landmark CONTAIN_WIDTH outside (or `at.x`,
+   * pulled inside the sideline) and CONTAIN_LEAD in front (or `at.lead`, under centre), turning in at the quarterback.
+   */
+  async function contains(svg: Locator, blitzer: string, edge: -1 | 1, step: string, extra: Partial<Step> = {}, at: { x?: number; lead?: number } = {}): Promise<Measured> {
+    const { x = edge * CONTAIN_WIDTH, lead = CONTAIN_LEAD } = at;
     let m: Measured | null = null;
     await expect(async () => {
       m = await measure(svg, blitzer);
       expect(m.legs).toBe(2);
-      expect(Math.abs((m.corner?.[0] ?? NaN) - landmarkX)).toBeLessThanOrEqual(YARDS);
-      expect(Math.abs((m.corner?.[1] ?? NaN) + CONTAIN_LEAD)).toBeLessThanOrEqual(YARDS);
+      expect(Math.abs((m.corner?.[0] ?? NaN) - x)).toBeLessThanOrEqual(YARDS);
+      expect(Math.abs((m.corner?.[1] ?? NaN) + lead)).toBeLessThanOrEqual(YARDS);
       expect(m.turnApart).toBeLessThanOrEqual(TOLERANCE);
       expect(Math.abs(m.short - BLITZ_STOP)).toBeLessThanOrEqual(YARDS);
       // the tip stays on the blitzer's side of the quarterback: the rusher never crosses in front of them
@@ -153,7 +169,7 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   }
 
   /** Steps a player across the field by keyboard, a yard a press. */
-  async function nudge(label: string, team: "Offense" | "Defense", key: "ArrowLeft" | "ArrowRight", yards: number): Promise<void> {
+  async function nudge(label: string, team: "Offense" | "Defense", key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown", yards: number): Promise<void> {
     await d.foldOverlays();
     await d.player(label, team).focus();
     for (let i = 0; i < yards; i++) await page.keyboard.press(key);
@@ -187,7 +203,7 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   await pill("Contain").click();
   read = await pills();
   expect(read).toEqual({ QB: false, Backfield: false, Contain: true, player: false });
-  await expect(caption).toHaveText("Rushes the right edge outside the quarterback, then turns in, so they can't escape that way. To contain the left edge, line up on the other side of the quarterback.");
+  await expect(caption).toHaveText("Rushes the right edge outside the quarterback, then turns in, so they can't escape that way. To contain the left edge, line up left of the quarterback.");
   const right = await contains(d.field, "R", 1, "Contain: R rushes the right edge, then turns in", { pills: read, caption: (await caption.textContent()) ?? "" });
   // the landmark sits in front of Z, who lines up level with the quarterback, not under Z's token (C6)
   const [zx, zy] = await tokenAt(d.field, "Offense Z");
@@ -196,12 +212,39 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   expect(Math.hypot(qx / S + corner[0] - zx / S, qy / S + corner[1] - zy / S)).toBeGreaterThanOrEqual(CONTAIN_LEAD - YARDS);
   await page.locator("#route-sidebar").screenshot({ path: `test-results/contain-blitz-${device}-palette.png` });
 
+  // a Pick a player called off by pressing the lit Contain again: no red player waits for a tap, and R still contains
+  const x = page.getByRole("button", { name: "Offense X, blitz target", exact: true });
+  await pill("Pick a player").click();
+  await expect(d.toast).toHaveText("Blitz who? Tap a red player.");
+  await expect(x).toBeVisible();
+  await d.palette();
+  await pill("Contain").click();
+  await expect(d.toast).toBeHidden();
+  await expect(x).toHaveCount(0);
+  await contains(d.field, "R", 1, "Pick a player called off by the lit Contain: R still contains the right edge", { pills: await pills() });
+  // a player's target replaces the contain (C7): X tapped, the arrow comes straight at X and nothing but the target is stored
+  await pill("Pick a player").click();
+  await d.foldOverlays();
+  await x.click();
+  await expect(d.toast).toBeHidden();
+  read = await pills();
+  expect(read).toEqual({ QB: false, Backfield: false, Contain: false, player: true });
+  await d.setName(PLAY);
+  await d.save();
+  await expect(d.toast).toHaveText("Saved");
+  expect((await stored()).R).toEqual({ type: "blitz", target: "o3" });
+  steps.push({ step: "Pick a player, X tapped: the target replaces the contain", pills: read, stored: (await stored()).R });
+  // and Contain again replaces the target
+  await d.palette();
+  await pill("Contain").click();
+  await contains(d.field, "R", 1, "Contain again: the target is gone and R contains the right edge", { pills: await pills() });
+
   // LB lines up left of the quarterback: the left edge
   await d.select("LB", "Defense");
   await d.pick("Blitz");
   await d.palette();
   await pill("Contain").click();
-  await expect(caption).toHaveText(/^Rushes the left edge .* To contain the right edge/);
+  await expect(caption).toHaveText("Rushes the left edge outside the quarterback, then turns in, so they can't escape that way. To contain the right edge, line up right of the quarterback.");
   await contains(d.field, "LB", -1, "LB contains the left edge", { pills: await pills(), caption: (await caption.textContent()) ?? "" });
   await d.closeSidebars();
   await d.field.screenshot({ path: `test-results/contain-blitz-${device}-field.png` });
@@ -232,15 +275,21 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   await nudge("QB", "Offense", "ArrowLeft", 11);
   const qbX = await d.playerX("QB");
   expect(qbX).toBe(4);
-  await contains(d.field, "LC", -1, "the quarterback on the 4-yard mark: LC's landmark pulled inside the sideline", {}, X_MIN - qbX);
-  // against the sideline there is no edge outside them: straight, and the palette says so (C4)
+  await contains(d.field, "LC", -1, "the quarterback on the 4-yard mark: LC's landmark pulled inside the sideline", {}, { x: X_MIN - qbX });
+  // against the sideline there is no edge outside them: straight, and the palette says so, offering the other edge (C4)
   await nudge("QB", "Offense", "ArrowLeft", 1);
   await straight(d.field, "LC", "the quarterback on the 3-yard mark: no edge, so LC comes straight");
   await d.select("LC", "Defense");
   read = await pills();
   expect(read.Contain).toBe(true);
-  await expect(caption).toHaveText("Contains the quarterback, but the sideline leaves no room outside them, so it comes straight for them.");
+  await expect(caption).toHaveText("The sideline leaves no room outside the quarterback on the left, so it comes straight for them. To contain the right edge, line up right of the quarterback.");
   capture("the quarterback on the 3-yard mark: no edge, so LC comes straight", { pills: read, caption: (await caption.textContent()) ?? "" });
+  // R, on the right, still contains its edge, and is not sent to the left edge, which has no room
+  await contains(d.field, "R", 1, "the quarterback on the 3-yard mark: R contains the right edge");
+  await d.select("R", "Defense");
+  await d.palette();
+  await expect(caption).toHaveText("Rushes the right edge outside the quarterback, then turns in, so they can't escape that way. The sideline leaves no room to contain the left edge.");
+  capture("the quarterback on the 3-yard mark: R contains the right edge", { caption: (await caption.textContent()) ?? "" });
   // back in the middle, LC contains its edge again; then QB takes LC back to a plain blitz
   await nudge("QB", "Offense", "ArrowRight", 12);
   await contains(d.field, "LC", -1, "the quarterback back in the middle: LC contains the left edge");
@@ -248,6 +297,22 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   await d.palette();
   await pill("QB").click();
   await straight(d.field, "LC", "QB pressed: LC comes straight again", { pills: await pills() });
+
+  // under centre, 2 yards off the line: the landmark stops CONTAIN_LINE behind the line, not CONTAIN_LEAD in front (C5)
+  await nudge("QB", "Offense", "ArrowUp", 3);
+  const under = { lead: Math.min(CONTAIN_LEAD, 2 - CONTAIN_LINE) };
+  await contains(d.field, "R", 1, "the quarterback under centre: R's landmark half a yard behind the line", {}, under);
+  await contains(d.field, "LB", -1, "the quarterback under centre: LB's landmark half a yard behind the line", {}, under);
+  await nudge("QB", "Offense", "ArrowDown", 3);
+  await contains(d.field, "R", 1, "the quarterback back in the shotgun: R's landmark CONTAIN_LEAD in front");
+
+  // the whole play flipped: each rusher stands on the other side of the quarterback, so they contain the other edge (C8)
+  await d.clickTool("Flip play");
+  await contains(d.field, "R", -1, "flipped: R contains the left edge");
+  await contains(d.field, "LB", 1, "flipped: LB contains the right edge");
+  await d.clickTool("Flip play");
+  await contains(d.field, "R", 1, "flipped back: R contains the right edge");
+  await contains(d.field, "LB", -1, "flipped back: LB contains the left edge");
 
   // saved: the contain blitzes store their aim, and the quarterback's nothing but the blitz
   await d.setName(PLAY);
@@ -268,8 +333,8 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
 
   // reopened: the same paths, and the palette says Contain
   await d.openSaved(PLAY);
-  const reopenedR = await contains(d.field, "R", 1, "reopened: R contains the right edge", { stored: routes.R });
-  const reopenedLB = await contains(d.field, "LB", -1, "reopened: LB contains the left edge", { stored: routes.LB });
+  await contains(d.field, "R", 1, "reopened: R contains the right edge", { stored: routes.R });
+  await contains(d.field, "LB", -1, "reopened: LB contains the left edge", { stored: routes.LB });
   await d.select("R", "Defense");
   read = await pills();
   expect(read).toEqual({ QB: false, Backfield: false, Contain: true, player: false });
@@ -292,11 +357,7 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   steps.push({ step: `printouts: ${alt.split("\n").find((l) => l.startsWith("Left to right")) ?? ""}` });
 
   // the share link: the snapshot draws the same bends, measured from each blitzer's own token
-  const own = async (svg: Locator, blitzer: string): Promise<XY[]> => {
-    const [bx, by] = await tokenAt(svg, `Defense ${blitzer}`);
-    return (await blitzPath(svg, blitzer)).points.slice(1).map((p) => [(p[0] - bx) / S, (p[1] - by) / S]);
-  };
-  const designer = { R: await own(d.field, "R"), LB: await own(d.field, "LB") };
+  const designer = { R: await fromToken(d.field, "R"), LB: await fromToken(d.field, "LB") };
   await d.clickTool("Copy share link");
   const dialog = page.getByRole("dialog", { name: "Share snapshot" });
   await expect(dialog).toBeVisible();
@@ -308,14 +369,14 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
   const shared = page.getByRole("img", { name: "Play diagram" });
   await expect(shared.getByRole("img", { name: /^Defense / })).toHaveCount(5);
   for (const blitzer of ["R", "LB"] as const) {
-    const there = await own(shared, blitzer);
+    const there = await fromToken(shared, blitzer);
     expect(there).toHaveLength(2);
-    // the corner exactly; the inset end within the arrowhead's rounding
+    // the corner and the inset end, each within a tenth of a yard of the designer's
     there.forEach((p, i) => {
       const want = designer[blitzer][i] ?? [NaN, NaN];
       expect(Math.hypot(p[0] - want[0], p[1] - want[1])).toBeLessThanOrEqual(YARDS);
     });
-    steps.push({ step: `share page: ${blitzer}'s path from their token, yards`, path: { ...(blitzer === "R" ? reopenedR : reopenedLB), legs: there.length } });
+    steps.push({ step: `share page: ${blitzer}'s path from their token, yards`, fromToken: { share: there, designer: designer[blitzer] } });
   }
 
   // the printed binder page, as markup and as the picture a printer gets
@@ -325,6 +386,49 @@ test("a contain blitz rushes the edge outside the quarterback and turns in, on t
 
   writeFileSync(
     `test-results/contain-blitz-${device}.json`,
-    `${JSON.stringify({ play: PLAY, design: { CONTAIN_WIDTH, CONTAIN_LEAD, BLITZ_STOP }, tolerance: { yards: YARDS, degrees: TOLERANCE }, steps }, null, 2)}\n`,
+    `${JSON.stringify({ play: PLAY, design: { CONTAIN_WIDTH, CONTAIN_LEAD, CONTAIN_LINE, BLITZ_STOP }, tolerance: { yards: YARDS, degrees: TOLERANCE }, steps }, null, 2)}\n`,
+  );
+});
+
+test("with no quarterback on the field, a contain blitz bends around the quarterback's slot", async ({ page }, testInfo) => {
+  const device = testInfo.project.name;
+  // R on contain at the blitz line, and nobody labelled QB or in the quarterback's slot (C1)
+  const players = formation({ d3: { type: "blitz", aim: "contain" } })
+    .filter((p) => p.id !== "o2")
+    .map((p) => (p.id === "d3" ? { ...p, y: -BLITZ_DEPTH } : p));
+  const noQb: SavedPlay = { id: "fx-contain-no-qb", name: "Otter Contain No QB", notes: "", side: "defense", players };
+  await seed(page, { plays: [noQb] });
+  const d = new Designer(page);
+  await d.goto(`?open=${noQb.id}`);
+  await expect(d.player("QB")).toHaveCount(0);
+
+  // the slot is (15, 5): the landmark CONTAIN_WIDTH right of it and CONTAIN_LEAD in front, the tip BLITZ_STOP short of it
+  const r = players.find((p) => p.id === "d3") ?? { x: 18, y: -BLITZ_DEPTH };
+  const slot: XY = [15, 5];
+  const landmark: XY = [slot[0] + CONTAIN_WIDTH, slot[1] - CONTAIN_LEAD];
+  const L = Math.hypot(CONTAIN_WIDTH, CONTAIN_LEAD);
+  const tip: XY = [slot[0] + (CONTAIN_WIDTH / L) * BLITZ_STOP, slot[1] - (CONTAIN_LEAD / L) * BLITZ_STOP];
+  const want = { corner: [landmark[0] - r.x, landmark[1] - r.y] as XY, tip: [tip[0] - r.x, tip[1] - r.y] as XY };
+  let drawn: { corner: XY; tip: XY } | null = null;
+  await expect(async () => {
+    const [rx, ry] = await tokenAt(d.field, "Defense R");
+    const path = await blitzPath(d.field, "R");
+    expect(path.points).toHaveLength(3);
+    const c = path.points[1] ?? [NaN, NaN];
+    drawn = { corner: [(c[0] - rx) / S, (c[1] - ry) / S], tip: [(path.tip[0] - rx) / S, (path.tip[1] - ry) / S] };
+    expect(Math.hypot(drawn.corner[0] - want.corner[0], drawn.corner[1] - want.corner[1])).toBeLessThanOrEqual(YARDS);
+    expect(Math.hypot(drawn.tip[0] - want.tip[0], drawn.tip[1] - want.tip[1])).toBeLessThanOrEqual(YARDS);
+  }).toPass({ timeout: 10_000 });
+
+  await d.select("R", "Defense");
+  await d.palette();
+  const group = page.locator("#route-sidebar").getByRole("group", { name: "Blitz target" });
+  await expect(group.getByRole("button", { name: "Contain", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const caption = group.locator("span").last();
+  await expect(caption).toHaveText(/^Rushes the right edge outside the quarterback, then turns in/);
+
+  writeFileSync(
+    `test-results/contain-blitz-${device}-no-qb.json`,
+    `${JSON.stringify({ play: noQb.name, slot, want, drawn, caption: await caption.textContent(), tolerance: { yards: YARDS } }, null, 2)}\n`,
   );
 });

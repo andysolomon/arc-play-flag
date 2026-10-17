@@ -58,8 +58,8 @@ export interface BlitzInfo {
   who: string | null;
   /** the back a backfield blitz comes for, by name; null with nobody lined up back there */
   back: string | null;
-  /** the edge a contain blitz rushes, as the picture shows it; null when the sideline leaves none and it comes straight */
-  edge: "left" | "right" | null;
+  /** a contain blitz: the edge on the rusher's side, as the picture shows it, and whether the sideline leaves room to contain it, or the other one */
+  contain: { edge: "left" | "right"; room: boolean; other: boolean } | null;
 }
 
 /** What the blitz does, under the pills. */
@@ -70,10 +70,14 @@ function blitzWords(b: BlitzInfo): string {
       ? `Comes for the nearest back lined up near the ball: ${b.back} now. With nobody back there, the quarterback.`
       : "Comes for the nearest back lined up near the ball. Nobody is back there now, so it comes for the quarterback.";
   }
-  if (b.aim === "contain") {
-    if (!b.edge) return "Contains the quarterback, but the sideline leaves no room outside them, so it comes straight for them.";
-    const other = b.edge === "left" ? "right" : "left";
-    return `Rushes the ${b.edge} edge outside the quarterback, then turns in, so they can't escape that way. To contain the ${other} edge, line up on the other side of the quarterback.`;
+  if (b.aim === "contain" && b.contain) {
+    const { edge, room, other } = b.contain;
+    const far = edge === "left" ? "right" : "left";
+    const here = room
+      ? `Rushes the ${edge} edge outside the quarterback, then turns in, so they can't escape that way.`
+      : `The sideline leaves no room outside the quarterback on the ${edge}, so it comes straight for them.`;
+    if (other) return `${here} To contain the ${far} edge, line up ${far} of the quarterback.`;
+    return room ? `${here} The sideline leaves no room to contain the ${far} edge.` : here;
   }
   return "Comes for the quarterback. Aim it at the backfield, contain an edge, or pick any red player.";
 }
