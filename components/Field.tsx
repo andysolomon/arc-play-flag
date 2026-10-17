@@ -62,6 +62,8 @@ interface Props {
   readOnly?: boolean;
   /** printed above the field; also shown on screen when `showTitle` is set */
   title?: string;
+  /** designer-only inline title control; shares and roster titles stay plain text */
+  titleControl?: ReactNode;
   /** sit the play name above the diagram instead of squeezing it into the header */
   showTitle?: boolean;
   /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
@@ -170,7 +172,7 @@ function captionFor(p: Player, starters: Readonly<Record<string, string>> | unde
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, switcher, titleRef, starters, roster = false,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, titleControl, showTitle = false, status, switcher, titleRef, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -796,8 +798,9 @@ function FieldImpl({
               ref={titleRef}
               className="min-w-0 truncate text-header font-normal text-ink focus-visible:relative focus-visible:z-[1] data-quiet-focus:outline-none print:outline-none"
               title={title}
+              aria-label={titleControl ? title : undefined}
             >
-              {title}
+              {titleControl ?? title}
             </h1>
             {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
             {switcher}
