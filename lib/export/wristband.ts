@@ -3,7 +3,8 @@ import { losOf } from "@/lib/play/field";
 import { hasNoRunZones } from "@/lib/play/storage";
 import type { TeamSettings, Vis } from "@/lib/play/types";
 import { artView, playerAt, positionName, positionsOf, type Numbered, type Position } from "./numbered";
-import { IN, MUTED, PAPERS, badge, cutRect, field, page, text, type PaperKey, type SvgPage } from "./pages";
+import { IN, MUTED, PAPERS, badge, cutRect, f2, field, page, text, type PaperKey, type SvgPage } from "./pages";
+import { FONT, INK } from "@/lib/render/play-svg";
 import { measure } from "./raster";
 
 /** An insert card in inches and the grid of plays on it. */
@@ -149,4 +150,19 @@ export function wristbandPages(plays: readonly Numbered[], o: WristbandOptions):
     pages.push(page(p.w, p.h, body.join("")));
   }
   return pages;
+}
+
+/**
+ * One insert on its own, as it prints: the card for a position (its name as `positionName` gives
+ * it, "X" or "Everyone"), the first of its set when the plays overflow one insert. A picture of what
+ * a coach gets, for showing before anything is printed; null when no card is titled that.
+ */
+export function wristbandCard(plays: readonly Numbered[], o: WristbandOptions, name: string): string | null {
+  const c = planCards(plays, o.size.rows * o.size.cols).find((card) => card.name === name && card.index === 0);
+  if (!c) return null;
+  const w = o.size.w * IN, h = o.size.h * IN + CAPTION;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f2(w)} ${f2(h)}" width="${f2(w)}" height="${f2(h)}"` +
+    ` font-family="${FONT}" fill="${INK}"><rect width="${f2(w)}" height="${f2(h)}" fill="#ffffff"/>${card(0, 0, c, o)}</svg>`
+  );
 }

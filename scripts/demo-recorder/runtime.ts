@@ -5,7 +5,8 @@ import { basename, join } from "node:path";
 import { chromium } from "@playwright/test";
 import { CHAPTERS, ChapterBeatError, recordChapterActions, type ChapterRun } from "./chapters";
 import { storageFor } from "./fixtures";
-import { deliveryProblems, parseProbe, setProblem, VIDEO_SIZE, type DeliveryKind } from "./media";
+import { HARNESS_HTML, HARNESS_PATH } from "./harness";
+import { APP_VIEWPORT, DEFAULT_FPS, deliveryProblems, parseProbe, setProblem, VIDEO_SIZE, type DeliveryKind } from "./media";
 import { outputNames, type ChapterSlug, type RecorderOptions } from "./options";
 
 /** Runs a task inside a directory that is always removed afterwards, whatever the task does. */
@@ -111,7 +112,7 @@ export async function warmUp(baseUrl: string): Promise<void> {
     await response.arrayBuffer();
   }
   await usingDisposableDirectory("arc-demo-warm-", async (profileDir) => {
-    const context = await chromium.launchPersistentContext(profileDir, { executablePath: chromiumExecutable(), headless: true, viewport: VIDEO_SIZE });
+    const context = await chromium.launchPersistentContext(profileDir, { executablePath: chromiumExecutable(), headless: true, viewport: APP_VIEWPORT });
     try {
       const page = context.pages()[0] ?? await context.newPage();
       for (const path of WARM_PATHS) await page.goto(`${baseUrl}${path}`, { waitUntil: "load" });
@@ -127,14 +128,24 @@ interface RawCapture {
 }
 
 /**
+ * Styles the app wears only on camera, in the app's frame and nowhere else: the offline pill
+ * (the service worker is blocked, so it would only ever say so) stays out of the frame, and
+ * the drawers snap instead of sliding (steadier frames, smaller files) while every other
+ * motion, the route drawing on, the confetti, the end zones' own animation, plays as it does
+ * for a coach.
+ */
+const ON_CAMERA_CSS = "[data-offline-state]{display:none!important}#play-sidebar,#route-sidebar{transition:none!important}";
+
+/**
  * Records one chapter in a brand-new Chromium profile that only ever holds the fictional
  * fixtures. The profile and Playwright's video directory are removed on every exit path;
  * the raw capture is copied out to a held temporary file for encoding.
+ *
+ * The browser is the video's size, 576×720, and films a harness page (./harness.ts) that owns
+ * the caption band and zooms the app's frame 1.5×, so the app is in its phone layout.
  */
 async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<RawCapture> {
   return usingDisposableDirectory("arc-demo-profile-", async (profileDir) => usingDisposableDirectory("arc-demo-video-", async (videoDir) => {
-    // the video starts with the browser, so the chapter clock starts before the launch
-    const startedAt = Date.now();
     const context = await chromium.launchPersistentContext(profileDir, {
       executablePath: chromiumExecutable(),
       headless: !options.headed,
@@ -142,12 +153,15 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
       deviceScaleFactor: 1,
       recordVideo: { dir: videoDir, size: VIDEO_SIZE },
       colorScheme: "light",
-      // drawers and tiles snap instead of sliding: steadier frames and smaller files at 8 fps
-      reducedMotion: "reduce",
+      reducedMotion: "no-preference",
+      // the pill it drives is out of the frame; blocking it also keeps a chapter's seconds free of its install
+      serviceWorkers: "block",
       locale: "en-US",
       timezoneId: "UTC",
       acceptDownloads: true,
     });
+    // the video starts with the page the browser opens; the chapter's lead-in is measured from here
+    const videoT0 = Date.now();
     let closed = false;
     const close = async () => {
       if (closed) return;
@@ -168,13 +182,24 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
       }, Object.entries(storageFor(slug)));
       // the chapter narrates the primary read on ▶, so every coin flip is pinned (see ChapterDefinition)
       if (CHAPTERS[slug].pinRandom) await context.addInitScript(() => { Math.random = () => 0; });
+      await context.addInitScript((css: string) => {
+        if (window === window.top) return;
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(css);
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      }, ON_CAMERA_CSS);
+      const origin = new URL(options.baseUrl).origin;
+      await context.route(`${origin}${HARNESS_PATH}`, (route) => route.fulfill({ contentType: "text/html; charset=utf-8", body: HARNESS_HTML }));
       const page = context.pages()[0] ?? await context.newPage();
       const video = page.video();
       if (!video) throw new Error("Playwright did not create a video for the page");
 
       let run: ChapterRun;
       try {
-        run = await recordChapterActions(slug, page, options.baseUrl, startedAt, options.trace ? (line) => { console.error(line); } : undefined);
+        await page.goto(`${origin}${HARNESS_PATH}`, { waitUntil: "load" });
+        const app = page.frame({ name: "app" });
+        if (!app) throw new Error("the harness page has no app frame");
+        run = await recordChapterActions(slug, page, app, options.baseUrl, videoT0, options.trace ? (line) => { console.error(line); } : undefined);
       } catch (error) {
         // a screenshot of the failed beat is the most useful thing to leave behind
         const shot = join(options.outputDir, `${slug}.failure.png`);
@@ -199,10 +224,24 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
 
 const DELIVERY: ReadonlyArray<readonly [DeliveryKind, string]> = [["webm", "webm"], ["mp4", "mp4"], ["poster", "webp"]];
 
-/** A fixed manifest duration and timestamp-normalized filter for deterministic delivery clips. */
-export function chapterVideoFilter(slug: ChapterSlug): string {
+/**
+ * Encoding quality: coarser than the landscape set's 46 and 33, which the bigger, sharper phone
+ * frame at 10–12 fps pays for; the UI is flat colour and line, and keeps its edges at these. The
+ * end zone chapter, with its painted end zone and confetti, is what sets the budget.
+ */
+const VP9_CRF = 52;
+const H264_CRF = 37;
+
+/**
+ * A fixed manifest duration and timestamp-normalized filter for deterministic delivery clips.
+ * The lead-in (the browser launching and the first screen loading behind the cover) is cut
+ * from the front, so a clip starts where the chapter does.
+ */
+export function chapterVideoFilter(slug: ChapterSlug, leadInSeconds = 0): string {
   const duration = CHAPTERS[slug].targetSeconds.toFixed(3);
-  return `trim=start=0:duration=${duration},setpts=PTS-STARTPTS,fps=8,scale=960:540:flags=lanczos`;
+  const fps = CHAPTERS[slug].fps ?? DEFAULT_FPS;
+  const start = Math.max(0, leadInSeconds).toFixed(3);
+  return `trim=start=${start}:duration=${duration},setpts=PTS-STARTPTS,fps=${String(fps)},scale=${String(VIDEO_SIZE.width)}:${String(VIDEO_SIZE.height)}:flags=lanczos`;
 }
 
 async function verifyDelivery(slug: ChapterSlug, kind: DeliveryKind, path: string): Promise<void> {
@@ -220,10 +259,10 @@ async function encode(slug: ChapterSlug, capture: RawCapture, options: RecorderO
     await writeFile(posterPng, capture.run.poster);
     // Wall-clock capture time varies with browser startup and shutdown. Trim to the
     // manifest duration and reset source timestamps so both formats are repeatable.
-    const videoFilter = chapterVideoFilter(slug);
-    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libvpx-vp9", "-crf", "46", "-b:v", "0", staged("webm")], `${slug} WebM encoding`);
-    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libx264", "-crf", "33", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", staged("mp4")], `${slug} MP4 encoding`);
-    await command("ffmpeg", ["-y", "-i", posterPng, "-frames:v", "1", "-vf", "scale=960:540:flags=lanczos", "-c:v", "libwebp", "-q:v", "72", staged("webp")], `${slug} poster encoding`);
+    const videoFilter = chapterVideoFilter(slug, capture.run.leadIn);
+    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libvpx-vp9", "-crf", String(VP9_CRF), "-b:v", "0", staged("webm")], `${slug} WebM encoding`);
+    await command("ffmpeg", ["-y", "-i", capture.rawPath, "-an", "-vf", videoFilter, "-c:v", "libx264", "-crf", String(H264_CRF), "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", staged("mp4")], `${slug} MP4 encoding`);
+    await command("ffmpeg", ["-y", "-i", posterPng, "-frames:v", "1", "-vf", `scale=${String(VIDEO_SIZE.width)}:${String(VIDEO_SIZE.height)}:flags=lanczos`, "-c:v", "libwebp", "-q:v", "72", staged("webp")], `${slug} poster encoding`);
     if (options.contactSheets) {
       const tile = "fps=1,tile=4x3:padding=6:margin=6:color=white";
       await command("ffmpeg", ["-y", "-i", staged("webm"), "-vf", tile, "-frames:v", "1", staged("sheet.png")], `${slug} contact sheet`);

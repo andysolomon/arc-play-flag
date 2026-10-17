@@ -29,7 +29,7 @@
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "19f61a3ac6c4675e5f47318ed9c145dc6684b24a4765c5b291b777c2c60e22ff",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "20b4dd188e0bd2c46e6f9e8a4659af3ba92ff6bd84a56c753749b5ef3356e99b",
+    "components/RouteSidebar.tsx": "70dbe66680bec6ac59f262807a12ddfdcacd6df14b426b35937fe45554117a3b",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",

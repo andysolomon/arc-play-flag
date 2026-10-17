@@ -6,7 +6,7 @@ An offensive player can have one pre-snap path alongside their existing post-sna
 
 Post-snap geometry starts at the motion endpoint. Preset routes are calculated from that spot; custom routes continue through their existing absolute waypoints. Mirroring a custom route uses the endpoint as its pivot; flipping the play also flips the motion. Clear routes clears both assignments for the selected side.
 
-Playback first runs the pre-snap path at the usual player speed while everyone else and the ball hold. The snap, exchanges, throws, catches and playback duration then shift by that path's duration. Man coverage starts from its target's spot at the snap. Live playback and video exports use the same planner. All diagrams use a dashed motion arrow before the post-snap route; export assignment text names motion before the player's job.
+Playback first runs the pre-snap path at the usual player speed while everyone else and the ball hold. The snap, exchanges, throws, catches and playback duration then shift by that path's duration. Man coverage starts from its target's spot at the snap. Live playback uses the same planner. All diagrams use a dashed motion arrow before the post-snap route; export assignment text names motion before the player's job.
 
 Drafts, saved plays, snapshot URLs, short links, play/playbook files and backups preserve the optional player field through their shared normalization. Screen and print renderers share the motion geometry.
 

@@ -18,7 +18,7 @@ const patrickHand = Patrick_Hand({
 export const metadata: Metadata = {
   title: "Flag Football Play Designer",
   description:
-    "A 5v5 flag-football whiteboard. Drag players on the field, tap one to give them a route or a coverage, save plays and export a PNG.",
+    "A 5v5 flag-football whiteboard. Drag players on the field, tap one to give them a route or a coverage, press play to watch it run, then print wristbands and playbooks or share a link.",
 };
 
 export const viewport: Viewport = {
