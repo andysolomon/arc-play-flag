@@ -117,6 +117,8 @@ function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit
   if (typeof v.target === "string") r.target = v.target.slice(0, 40);
   // a blitz aimed at the backfield; one aimed at a player keeps only the player
   else if (v.aim === "backfield") r.aim = "backfield";
+  // a deep zone called as a half or a third; on any other route, or as anything else, nothing (D1)
+  if (type === "zoneDeep" && (v.split === "half" || v.split === "third")) r.split = v.split;
   if (v.mirror === true) r.mirror = true;
   if (v.primary === true) r.primary = true;
   return r;
