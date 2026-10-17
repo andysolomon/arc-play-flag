@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
  */
 const clerk = !!process.env.CLERK_SECRET_KEY && !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export default clerk ? clerkMiddleware() : () => NextResponse.next();
+export default clerk ? clerkMiddleware({ debug: process.env.CLERK_DEBUG === "1" }) : () => NextResponse.next();
 
 export const config = {
   // every page and API route; never the build output, the service worker or a static file

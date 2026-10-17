@@ -31,6 +31,15 @@ Accounts ([ADR 010](../adr/010-coach-accounts.md)) sign coaches in through [Cler
 - **Rotating Clerk keys** signs everyone out; nothing in Redis changes, since teams are keyed by Clerk's stable user id.
 - **Operator removal** of a team: delete the hash and `LREM` the id from the owner's list together, and clear `…:current` if it names the team.
 
+## Running locally with real Clerk keys
+
+Put the two keys in the environment of `bun run build` (the publishable key is read at build time) and `next start`. Two things to know:
+
+- Start the server **without** `--hostname 127.0.0.1` when Clerk is on, or address it by the hostname you gave. Clerk's middleware passes a request on as a rewrite to its own absolute URL, built from the Host header; Next's router compares that with the address it was started on, and when the two differ (`localhost` in the browser, `127.0.0.1` on the flag) it treats the rewrite as external and forwards the request to itself until it times out. `playwright.config.ts` passes the flag, which is fine only because the journeys never set Clerk's keys.
+- `CLERK_DEBUG=1` makes the middleware log every request's auth state (`proxy.ts`). Behind an egress proxy, give Node `NODE_USE_ENV_PROXY=1` so the server's own calls to Clerk's API go through it.
+
+A complete sign-in without a Google or X account: create a user and a sign-in token with the Backend API (`POST /v1/users`, `POST /v1/sign_in_tokens`), open `/sign-in?__clerk_ticket=<token>`, and Clerk signs the browser in and sends it to the designer. Delete the user afterwards.
+
 ## Local and CI verification
 
 The browser journeys never talk to Clerk. With `ACCOUNT_FIXTURE=1` on the app's process (and never on Vercel), the sign-in page lists two fictional coaches whose sessions are a cookie; `playwright.config.ts` sets it on the server it starts. The account journey also needs the disposable Redis adapter of the sharing journeys:
