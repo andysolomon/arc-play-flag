@@ -1,8 +1,8 @@
-import { getDeepField, setDeepField } from "@/lib/deepfield";
+import { DEEP_FIELD_KEY, getDeepField, setDeepField } from "@/lib/deepfield";
 import { deviceWritten } from "@/lib/device-writes";
-import { getEndZone, getTouchdowns, setEndZone, setTouchdowns } from "@/lib/endzone";
-import { getFieldChoice, getThemeChoice, setFieldChoice, setThemeChoice } from "@/lib/theme";
-import { DEFAULT_PREFS } from "./data";
+import { ENDZONE_KEY, TOUCHDOWNS_KEY, getEndZone, getTouchdowns, setEndZone, setTouchdowns } from "@/lib/endzone";
+import { LOS_KEY, getLosChoice, setLosChoice } from "@/lib/los";
+import { FIELD_KEY, THEME_KEY, getFieldChoice, getThemeChoice, setFieldChoice, setThemeChoice } from "@/lib/theme";
 import type { CoachPrefs } from "./types";
 
 /**
@@ -30,7 +30,8 @@ export function setFirstUseDone(done: boolean): void {
 /** The look as it stands on this device. */
 export function devicePrefs(): CoachPrefs {
   return {
-    theme: getThemeChoice(), field: getFieldChoice(), endZone: getEndZone(), deepField: getDeepField(), touchdowns: getTouchdowns(), firstUseDone: firstUseDone(),
+    theme: getThemeChoice(), field: getFieldChoice(), endZone: getEndZone(), deepField: getDeepField(), los: getLosChoice(), touchdowns: getTouchdowns(),
+    firstUseDone: firstUseDone(),
   };
 }
 
@@ -41,11 +42,19 @@ export function applyPrefs(p: CoachPrefs): void {
   if (now.field !== p.field) setFieldChoice(p.field);
   if (now.endZone !== p.endZone) setEndZone(p.endZone);
   if (now.deepField !== p.deepField) setDeepField(p.deepField);
+  if (now.los !== p.los) setLosChoice(p.los);
   if (now.touchdowns !== p.touchdowns) setTouchdowns(p.touchdowns);
   if (now.firstUseDone !== p.firstUseDone) setFirstUseDone(p.firstUseDone);
 }
 
-/** Back to what a coach gets before they pick anything (a sign-out: the look is in the account). */
+/**
+ * Back to what a coach gets before they pick anything, for a sign-out or a deleted team (the look is in
+ * the account): the keys go, and nothing is redrawn, since the page is about to load fresh. Going through
+ * the setters here would redraw the board on its way out, and the board's autosave would write the draft
+ * back after the device was cleared.
+ */
 export function clearPrefs(): void {
-  applyPrefs(DEFAULT_PREFS);
+  for (const k of [THEME_KEY, FIELD_KEY, ENDZONE_KEY, TOUCHDOWNS_KEY, DEEP_FIELD_KEY, LOS_KEY, FIRST_USE_KEY]) {
+    try { localStorage.removeItem(k); } catch { /* nothing to keep */ }
+  }
 }

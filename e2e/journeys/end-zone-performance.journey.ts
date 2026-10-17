@@ -429,6 +429,7 @@ test.describe("end zone performance", () => {
       for (const depth of ["shallow", "deep"] as const) {
         await page.setViewportSize(WINDOWS[depth]);
         await d.goto(`?open=${depth === "deep" ? GOAL_LINE_FADE.id : MIDFIELD.id}`);
+        await d.spot(depth === "deep" ? GOAL_LINE_FADE.los ?? 0 : MIDFIELD_YARD);
         if (z.id === "classic") {
           await expect(art(page)).toHaveCount(0);
           continue;
@@ -453,6 +454,7 @@ test.describe("end zone performance", () => {
   test("the picker's swatches, drawn all at once, each paint within their budget", async ({ page }) => {
     const d = new Designer(page);
     await d.goto(`?open=${SLANT_LEFT.id}`);
+    await d.spot(0);
     await d.unfold("End zone");
     const swatches = page.locator("[role=radiogroup][aria-label='End zone'] [data-ez-art]");
     await expect(swatches).toHaveCount(END_ZONES.length);
@@ -478,6 +480,7 @@ test.describe("end zone performance", () => {
       for (const zone of ["classic", "matrix"] as const) {
         await store(page, zone);
         await d.goto(`?open=${GOAL_LINE_FADE.id}`);
+        await d.spot(GOAL_LINE_FADE.los ?? 0);
         if (zone === "matrix") await expect(art(page)).toBeVisible();
         await d.settle();
         runs[zone].push(await touchdown(page));
@@ -485,6 +488,7 @@ test.describe("end zone performance", () => {
     }
     // and one more, unmeasured, to step the rain through its celebration column by column
     await d.goto(`?open=${GOAL_LINE_FADE.id}`);
+    await d.spot(GOAL_LINE_FADE.los ?? 0);
     await expect(art(page)).toBeVisible();
     await d.settle();
     await d.foldOverlays();
@@ -522,6 +526,7 @@ test.describe("end zone performance", () => {
     await store(page, "matrix");
     const d = new Designer(page);
     await d.goto(`?open=${MIDFIELD.id}`);
+    await d.spot(MIDFIELD_YARD);
     await expect(art(page)).toHaveAttribute("data-ez-art", "matrix");
     await expect(art(page)).toBeVisible();
     await d.settle();

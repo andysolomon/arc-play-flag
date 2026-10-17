@@ -353,7 +353,7 @@ test("a session that ends keeps the device's work for the next sign-in, which pu
 const endZoneArt = (field: Locator): Locator => field.locator("xpath=..").locator(":scope > [data-ez-backdrop] [data-ez-art]");
 const html = (page: Page): Locator => page.locator("html");
 const deepToggle = (page: Page): Locator => page.getByRole("button", { name: "Deep field", exact: true });
-const LOOK_KEYS = { theme: "ffpd.theme.v1", endZone: "ffpd.endzone.v1", deepField: "ffpd.deepfield.v1" } as const;
+const LOOK_KEYS = { theme: "ffpd.theme.v1", endZone: "ffpd.endzone.v1", deepField: "ffpd.deepfield.v1", los: "ffpd.los.v1" } as const;
 const storedLook = (page: Page) => page.evaluate((keys) => Object.fromEntries(Object.entries(keys).map(([k, key]) => [k, localStorage.getItem(key)])), LOOK_KEYS);
 
 test("a coach picks up exactly where they left off on another device", async ({ page, browser }, testInfo) => {
@@ -371,7 +371,7 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   if (!("teams" in view)) throw new Error("not signed in");
   const teamId = view.teams[0]?.id ?? "";
 
-  // the desk as the coach leaves it: a book picked, a sketch on the board, a dark theme, an end zone, Deep field
+  // the desk as the coach leaves it: a book picked, a sketch on the board, the ball on the 10, a dark theme, an end zone, Deep field
   await page.locator("#play-sidebar").getByRole("button", { name: "Playbooks" }).click();
   await page.getByRole("menu", { name: "Playbooks" }).getByRole("menuitemradio", { name: /Otter Scout/ }).click();
   await expect(d.nameInput).toHaveValue("Otter Wheel Right");
@@ -379,9 +379,11 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   await d.setName("Otter Sketch");
   await d.select("X");
   await d.pick("Post");
+  // Deep field is offered from the drive start on every screen; a phone's card already reaches the end line from the 10
   await d.closeSidebars();
   await deepToggle(page).click();
   await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "true");
+  await d.spot(30);
   await d.unfold("Theme");
   await page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Dark" }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "dark");
@@ -395,9 +397,10 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   expect(left.data.draft?.name).toBe("Otter Sketch");
   expect(left.data.draft?.players.find((p) => p.id === "o3")?.route?.type).toBe("post");
   expect(left.data.currentBook).toBe("fx-scout");
-  expect(left.prefs).toMatchObject({ theme: "dark", endZone: "synthwave", deepField: true });
+  expect(left.prefs).toMatchObject({ theme: "dark", endZone: "synthwave", deepField: true, los: 30 });
+  expect(left.data.draft?.los).toBe(30);
   await page.screenshot({ path: `test-results/account-${testInfo.project.name}-left-off-first.png` });
-  await read(page, "first device: a sketch on the board, Otter Scout picked, dark, Synthwave, Deep field", left);
+  await read(page, "first device: a sketch on the board from the 10, Otter Scout picked, dark, Synthwave, Deep field", left);
 
   // the second device, empty, signed in: the same board, book and look, without a tap
   const other = await browser.newContext();
@@ -411,9 +414,12 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   expect(await storedCurrentBook(page2)).toBe("fx-scout");
   await expect(html(page2)).toHaveAttribute("data-theme", "dark");
   await expect(endZoneArt(d2.field)).toHaveAttribute("data-ez-art", "synthwave");
-  expect(await storedLook(page2)).toEqual({ theme: "dark", endZone: "synthwave", deepField: "on" });
+  expect(await storedLook(page2)).toEqual({ theme: "dark", endZone: "synthwave", deepField: "on", los: "30" });
+  await expect(d2.losSelect).toHaveValue("30");
   await d2.closeSidebars();
-  await expect(deepToggle(page2)).toHaveAttribute("aria-pressed", "true");
+  await expect(d2.field.locator("text", { hasText: /^LOS 10$/ })).toHaveCount(1);
+  // the Deep field button is on screen only where the card falls short of the end line (a laptop from the 10); where it is, it is on
+  if (await deepToggle(page2).count()) await expect(deepToggle(page2)).toHaveAttribute("aria-pressed", "true");
   await expect(d2.routes).toHaveCount(1);
   await page2.screenshot({ path: `test-results/account-${testInfo.project.name}-left-off-second.png` });
   await d2.tools();
@@ -434,7 +440,7 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   await reloadedBy(page2, () => panel(page2).getByRole("button", { name: "Sign out" }).click());
   await expect(html(page2)).toHaveAttribute("data-theme", "light");
   expect(await storedDraft(page2)).toBeNull();
-  expect(await storedLook(page2)).toEqual({ theme: null, endZone: null, deepField: null });
+  expect(await storedLook(page2)).toEqual({ theme: null, endZone: null, deepField: null, los: null });
   await expect(endZoneArt(d2.field)).toHaveCount(0);
   await read(page2, "second device, signed out: a clear board, the default look");
   await other.close();

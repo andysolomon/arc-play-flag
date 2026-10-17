@@ -1,4 +1,5 @@
 import { FIRST_USE_KEY } from "../../components/FirstUse";
+import { LOS_KEY } from "../../lib/los";
 import { GOAL_YARD } from "../../lib/play/field";
 import { defaults } from "../../lib/play/routes";
 import { DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
@@ -250,6 +251,8 @@ export const STORAGE_KEYS = {
   lineups: LINEUPS_KEY,
   draft: DRAFT_KEY,
   firstUse: FIRST_USE_KEY,
+  /** where the board puts the ball (lib/los.ts): a chapter whose play is spotted off the 40 opens there */
+  los: LOS_KEY,
 } as const;
 
 /** Every localStorage key the disposable profile is seeded with before a chapter starts. */
@@ -266,5 +269,7 @@ export function storageFor(slug: ChapterSlug): Readonly<Record<string, string>> 
     [STORAGE_KEYS.draft]: JSON.stringify(draft),
     // the first-use guide is a separate story; it must never cover a recorded chapter
     [STORAGE_KEYS.firstUse]: "done",
+    // the spot is the board's, not the play's (ADR 014): a chapter drawn from their 10 sets the board there
+    ...(draft.los === undefined ? {} : { [STORAGE_KEYS.los]: String(draft.los) }),
   };
 }

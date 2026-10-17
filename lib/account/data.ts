@@ -1,4 +1,5 @@
 import { DEFAULT_END_ZONE, parseEndZone } from "@/lib/endzone";
+import { LOS_YARD, readLos } from "@/lib/play/field";
 import { defaultLineups } from "@/lib/play/lineup";
 import { parsePlaces } from "@/lib/play/reader";
 import {
@@ -130,8 +131,10 @@ export function sameTeamData(a: TeamData, b: TeamData): boolean {
 
 // ---- the coach's look ----------------------------------------------------------------------------------
 
-/** What a coach gets before they pick anything: the device's own light or dark, the green field, the classic end zone. */
-export const DEFAULT_PREFS: CoachPrefs = { theme: "auto", field: "standard", endZone: DEFAULT_END_ZONE, deepField: false, touchdowns: 0, firstUseDone: false };
+/** What a coach gets before they pick anything: the device's own light or dark, the green field, the classic end zone, the ball on the drive start. */
+export const DEFAULT_PREFS: CoachPrefs = {
+  theme: "auto", field: "standard", endZone: DEFAULT_END_ZONE, deepField: false, los: LOS_YARD, touchdowns: 0, firstUseDone: false,
+};
 
 /** A whole number of touchdowns from any value, within what an account counts. */
 export const readTouchdowns = (v: unknown): number =>
@@ -145,6 +148,7 @@ export function readPrefs(raw: unknown): CoachPrefs {
     field: raw.field === "themed" ? "themed" : "standard",
     endZone: parseEndZone(raw.endZone),
     deepField: raw.deepField === true,
+    los: readLos(raw.los),
     touchdowns: readTouchdowns(raw.touchdowns),
     firstUseDone: raw.firstUseDone === true,
   };

@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "44de68886370873064f6df5462d4c8e4206509fc008103094d068b876591c455",
+    "components/App.tsx": "4627f0fb3949290fcc1344a30f1d1b78f7fa01170b364b5ea46ceac0a6a4dd39",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "c66fa35645fc6a35e51d5684704297d456c37aca7619394a0374d5374ce24363",
     "components/FirstUse.tsx": "b2e974561b95cfcbf2462e13977a11430fab08b7efdb8ce015ddb6597a426303",
@@ -19,7 +19,7 @@
     "components/Menu.tsx": "c013376e864cc01d1eda1a6725314df661f03fd576ea868adb994a2af7c8ae03",
     "components/OfflineStatus.tsx": "bf355de426d0eda57124b65468b8657713b243ff0b50fb7e1a639c4ed60aea2d",
     "components/PlayNameField.tsx": "4abd506d95b82526802a67406f555928c73038db569bb3c3adbb0d59a024a3b2",
-    "components/PlaySidebar.tsx": "fee937d500aca7a63c64534564b7e809e340e5b4076b8310a76af8d28a1b15aa",
+    "components/PlaySidebar.tsx": "99d434db961a25f006d062ddc94e57a9163247b59bca456ddc636b1c06c91320",
     "components/PlaySwitcher.tsx": "3a76ab7a5a528b3867a1d55d511e7053f2cd2e07ce2abf69fbef4be3783fe90c",
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
@@ -75,15 +75,5 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
-  },
-  "restamped": {
-    "reason": "the account engine now carries the board, the picked playbook, the reader's place, share links and the coach's look up to the account and brings them down (ADR 013); the tour runs with accounts off, where nothing is pushed or pulled, the account panel reads as before, and the share panel's revoke caption that changed signed in is in no chapter",
-    "files": [
-      "components/App.tsx (changed)",
-      "components/FirstUse.tsx (changed)",
-      "components/account/AccountPanel.tsx (changed)",
-      "components/account/SignInScreen.tsx (changed)",
-      "components/playbooks/ShareBook.tsx (changed)"
-    ]
   }
 }

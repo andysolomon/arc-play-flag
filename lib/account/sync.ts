@@ -3,7 +3,7 @@
  * the plays, playbooks, team settings and lineups on this device mirror one of the account's teams,
  * and with them the rest of the desk (the draft on the chalkboard, the playbook picked in the
  * designer, where each book was last read, the share links made here) and the coach's look (theme,
- * field, end zone, Deep field, touchdowns, the guide seen). Every write to any of them goes up to the
+ * field, end zone, Deep field, the ball's spot, touchdowns, the guide seen). Every write to any of them goes up to the
  * account; another device signed in brings them down, so a coach picks up exactly where they left
  * off. The library (lib/play/library.ts) and storage are unchanged: this engine reads what they
  * wrote and writes what the account sends, so every screen keeps working signed out, offline, or
@@ -61,6 +61,8 @@
  *   that never picked anything takes the account's look.
  * - A27 the pick names a book that isn't in the team: read as none, and the first book stands in (C1).
  * - A28 signing out clears the look too: the next coach on this device starts with the defaults.
+ * - A29 the device is cleared at the moment the page leaves, not before: a page still open redraws on
+ *   any key it watches (the chalkboard follows the board's spot) and would write the draft straight back.
  *
  * Sending a playbook or a play to another of the account's teams (`sendToTeam`), from the playbooks
  * page, writes that team through the same API and leaves this device alone. Its own ways to go wrong:
@@ -256,17 +258,23 @@ function applyLook(prefs: CoachPrefs): void {
   });
 }
 
-/** Takes the team's data and the look off the device (A11, A28): the account has them. */
-function clearDevice(): void {
-  writing(() => {
+/**
+ * Takes the team's data and the look off the device as the page leaves (A11, A28): the account has
+ * them. The keys go at unload, not before: a page still open redraws on any key it watches (the
+ * chalkboard follows the board's spot, and would write the draft straight back), so nothing of the
+ * account is removed while anything on the page can still write. The next document starts fresh.
+ * Returns a way to stand down, for a sign-out that fails before the page leaves.
+ */
+function clearDeviceOnLeave(): () => void {
+  const clear = (): void => {
     for (const k of [PLAYS_KEY, PLAYBOOKS_KEY, TEAM_KEY, LINEUPS_KEY, DRAFT_KEY, CURRENT_BOOK_KEY, READER_KEY, SHARES_KEY, MARKER_KEY]) {
       try { localStorage.removeItem(k); } catch { /* nothing to keep */ }
     }
     clearPrefs();
     lastSynced = null;
-    reread();
-    window.dispatchEvent(new Event(SHARES_EVENT));
-  });
+  };
+  window.addEventListener("pagehide", clear, { once: true });
+  return () => { window.removeEventListener("pagehide", clear); };
 }
 
 // ---- pushing ----------------------------------------------------------------------------------
@@ -622,7 +630,7 @@ export async function deleteTeam(id: string): Promise<void> {
   try {
     await api.deleteTeam(id);
     if (id === state.teamId) {
-      clearDevice();
+      clearDeviceOnLeave();
       window.location.reload();
       return;
     }
@@ -637,13 +645,14 @@ export async function signOut(): Promise<void> {
   if (!state.user) return;
   if (!(await flushed())) return;
   set({ status: "busy", message: null });
+  const standDown = clearDeviceOnLeave();
   try {
-    clearDevice();
     if (state.mode === "fixture") await api.fixtureSignOut();
     else await bridge?.signOut();
     // a full load on purpose (A17): the designer starts over with nothing of the account on the device
     window.location.assign(new URL("/", window.location.origin).href);
   } catch (e) {
+    standDown();
     set(problem(e));
   }
 }

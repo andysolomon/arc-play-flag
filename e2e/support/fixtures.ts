@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { FILE_KIND, FILE_VERSION } from "../../lib/export/playbook-file";
 import { defaults } from "../../lib/play/routes";
 import { CURRENT_BOOK_KEY } from "../../lib/play/current-book";
+import { LOS_KEY } from "../../lib/los";
 import { DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, type DraftRecord } from "../../lib/play/storage";
 import type { Hop, Lineups, Playbook, Player, Route, SavedPlay, Team, TeamSettings } from "../../lib/play/types";
 
@@ -99,6 +100,8 @@ export interface Seed {
   team?: TeamSettings;
   lineups?: Lineups;
   draft?: DraftRecord;
+  /** where the board puts the ball (lib/los.ts, ADR 014): a play stored off the 40 is drawn there only when the board is */
+  los?: number;
 }
 
 /**
@@ -119,8 +122,9 @@ export async function seed(page: Page, data: Seed): Promise<void> {
       if (d.team) localStorage.setItem(keys.team, JSON.stringify(d.team));
       if (d.lineups) localStorage.setItem(keys.lineups, JSON.stringify(d.lineups));
       if (d.draft) localStorage.setItem(keys.draft, JSON.stringify(d.draft));
+      if (d.los !== undefined) localStorage.setItem(keys.los, String(d.los));
     },
-    [{ plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, lineups: LINEUPS_KEY, draft: DRAFT_KEY }, data] as const,
+    [{ plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, lineups: LINEUPS_KEY, draft: DRAFT_KEY, los: LOS_KEY }, data] as const,
   );
 }
 

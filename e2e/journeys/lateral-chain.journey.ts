@@ -470,7 +470,7 @@ test("from their 5 a chain that ends in a throw is a pass, never flagged, and on
     los: 35,
   };
   const d = new Designer(page);
-  await seed(page, { plays: [GOAL_LINE], team: OTTERS });
+  await seed(page, { plays: [GOAL_LINE], team: OTTERS, los: GOAL_LINE.los });
   await d.openSaved(GOAL_LINE.name);
   const flag = d.field.locator("[data-no-run-flag]");
   await expect(d.field.locator("[data-lateral]")).toHaveCount(1);

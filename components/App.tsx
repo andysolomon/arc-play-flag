@@ -5,6 +5,7 @@ import { firstUseDone, setFirstUseDone } from "@/lib/account/prefs";
 import { subscribePulls } from "@/lib/account/sync";
 import { deviceWritten } from "@/lib/device-writes";
 import { install, record } from "@/lib/diagnostics";
+import { getLosChoice, serverLosChoice, setLosChoice, subscribeLosChoice } from "@/lib/los";
 import { editedVisit, flipped, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
@@ -302,6 +303,9 @@ export function App() {
     queueMicrotask(() => { if (active) setDraftWrite({ fingerprint: draftFingerprint, ok: writeOk }); });
     return () => { active = false; };
   }, [draftFingerprint, say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
+  // the ball is where the board's setting puts it (lib/los.ts), for every play opened here, from the first paint on
+  const losChoice = useSyncExternalStore(subscribeLosChoice, getLosChoice, serverLosChoice);
+  useEffect(() => { dispatch({ type: "setLos", los: losChoice }); }, [losChoice]);
   useEffect(() => {
     const d = readDraft();
     let firstUseTimer = 0;
@@ -446,7 +450,8 @@ export function App() {
     `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] }, noRunZones)}`,
   [s.name, s.notes, s.side, s.artShadow, s.los, s.players, noRunZones]);
   // where this play's ball is spotted: saved with the play, never undone (like its name)
-  const onLos = useCallback((los: number) => { dispatch({ type: "setLos", los }); }, []);
+  // the board's setting moves, and the effect above moves the ball with it
+  const onLos = useCallback((los: number) => { setLosChoice(los); }, []);
   // the team's settings: its name and colour, and the field's no-run zones
   const onTeam = useCallback((next: TeamSettings) => {
     const r = setTeam(next);

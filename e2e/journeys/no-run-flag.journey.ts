@@ -39,15 +39,15 @@ const STAMP = "RUN IN NO-RUN ZONE";
 const WORDS = "Run in a no-run zone";
 const NOTICE = "Flagged · run in a no-run zone";
 const PALETTE_NOTE = "The ball is in a no-run zone: a run from here is flagged. A handoff or lateral that ends in a throw is a pass.";
-const DEFAULT_NOTE = "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20.";
-const NO_RUN_NOTE = "Saved with this play. The ball is in a no-run zone, so no runs from here.";
-const FLAGGED_NOTE = "Saved with this play. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball.";
+const DEFAULT_NOTE = "Your board's spot: every play you open or start is drawn from here, and saved from here. Yards count down to their goal line: every drive starts on the 40, midfield is the 20.";
+const NO_RUN_NOTE = "Your board's spot. The ball is in a no-run zone, so no runs from here.";
+const FLAGGED_NOTE = "Your board's spot. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball.";
 // Z holds no ball here, so a Lateral is the quarterback's to start (see lateral-chain.journey.ts)
 const RUNS = ["Handoff", "Dive", "Stretch", "Counter", "Reverse", "Delay", "Jet sweep"];
 
 const flag = (l: Locator): Locator => l.locator("[data-no-run-flag]");
 const losSelect = (page: Page): Locator => page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" });
-const caption = (page: Page): Locator => page.locator("#play-sidebar").getByText(/^Saved with this play\./);
+const caption = (page: Page): Locator => page.locator("#play-sidebar").getByText(/^Your board's spot/);
 const zonesBox = (page: Page): Locator => page.locator("#play-sidebar").getByRole("checkbox", { name: "No-run zones" });
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 
@@ -231,7 +231,8 @@ function flags(svg: string): { count: number; placed: boolean[] } {
 test("a flagged play carries its flag onto its card, the playbook, the share link and every printout, and no legal play ever does", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const out = `test-results/no-run-flag-${testInfo.project.name}`;
-  await seed(page, { plays: PLAYS, playbooks: [BOOK], team: OTTERS });
+  // the board on the 5, where the goal-line plays were stored from (the spot is the board's: ADR 014)
+  await seed(page, { plays: PLAYS, playbooks: [BOOK], team: OTTERS, los: GOAL_LINE_STRETCH.los });
 
   // the gallery: the card says it in words, the thumbnail wears the stamp, and its name says both
   await page.goto("/playbooks");

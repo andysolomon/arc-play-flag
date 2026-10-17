@@ -149,6 +149,18 @@ export class Designer {
     await this.clickTool("Save");
   }
 
+  /** The board's Line of scrimmage picker in Play tools (lib/los.ts): where every play opened here is drawn from. */
+  get losSelect(): Locator {
+    return this.page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" });
+  }
+  /** Puts the ball on a yard line for the whole board, as a coach does from Play tools, and folds the tools away. */
+  async spot(los: number): Promise<void> {
+    await this.tools();
+    await this.losSelect.selectOption(String(los));
+    await expect(this.losSelect).toHaveValue(String(los));
+    await this.closeSidebars();
+  }
+
   /** Tapping a player selects it and opens the palette. */
   player(label: string, team: "Offense" | "Defense" = "Offense"): Locator {
     return this.field.getByRole("button", { name: `${team} ${label}`, exact: true });

@@ -43,6 +43,8 @@ export interface CoachPrefs {
   field: FieldChoice;
   endZone: EndZoneId;
   deepField: boolean;
+  /** where the board puts the ball (lib/los.ts), one of lib/play/field.ts's LOS_CHOICES */
+  los: number;
   touchdowns: number;
   /** the getting-started guide was dismissed or taken */
   firstUseDone: boolean;
