@@ -171,9 +171,11 @@ export function inkFor(p: Player, type: RouteType): string {
 
 /**
  * Where a custom waypoint may sit: the box the field lets you draw in (x across the
- * 30-yard width, y from the deepest defender the card can show to the backfield).
+ * 30-yard width, y from the deepest defender the card can show to the backfield). The deepest
+ * card is Deep field's from the drive start, to the end line 50 yards on, and a player keeps
+ * 1.2 yards under its top (see clamp in geometry.ts), so Y_MIN is 48.8 yards on; defenders keep to it too.
  */
-export const X_MIN = 1.2, X_MAX = 28.8, Y_MIN = -36, Y_MAX = 7.4;
+export const X_MIN = 1.2, X_MAX = 28.8, Y_MIN = -48.8, Y_MAX = 7.4;
 /** Waypoints a custom route may carry: more than a coach could tap out in one drawing. */
 export const MAX_ROUTE_POINTS = 60;
 

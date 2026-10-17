@@ -8,7 +8,7 @@
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
     "components/App.tsx": "1ca526ef7a1ad4818b3b1687e54a93c9d2972fe799cf4686ae6b0a16ebe8d166",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "98d0f9a4b5e1b71d704944e0d2f7240da884fb3acd836b8cdcd5fe539f62d123",
+    "components/Field.tsx": "1a80eaa17d0768b4096e7c5d2cd3f29c23e902733e6ed00cca46eaff01637588",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "c24dd640254f4507c31de58443804874fd31eb0ac2aa2977f80c6ece2fe932c4",
@@ -68,5 +68,11 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
+  },
+  "restamped": {
+    "reason": "Deep field's tooltip and how deep it opens changed (to the end line), and it now shows on tall phones; the clips are 960x540 where the button already showed in the same corner with the same label, and no chapter presses it or puts a player past 36 yards",
+    "files": [
+      "components/Field.tsx (changed)"
+    ]
   }
 }
