@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { expect, test, type Download, type Page, type TestInfo } from "@playwright/test";
 import { DIAGNOSTICS_KEY } from "../../lib/diagnostics";
-import type { Lineups, Roster } from "../../lib/play/types";
+import type { Lineups, Roster, RosterSlot } from "../../lib/play/types";
 import { Designer, armSabotage, downloadBytes, sabotage } from "../support/designer";
 import { OTTERS, SLANT_LEFT, seed, storedLineups } from "../support/fixtures";
 import { latin, pdfPageCount, pdfWords } from "../support/pdf";
@@ -82,6 +82,40 @@ const recorded = (page: Page): Promise<string[]> => page.evaluate(() => (window 
 const words = (svg: string): string =>
   [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => (m[1] ?? "").replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'")).join(" ").replace(/- /g, "-");
 
+/** Whether a run of words has a name in it as a whole name, so "Jo" is never found inside "Jordan". */
+const hasName = (said: string, name: string): boolean => new RegExp(`(^| )${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(said);
+
+const ORDINALS = ["Starter", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+/**
+ * A card's words in the order it draws them: each line of its chart under its depth word, then what stands for a
+ * missing backup (lines to pencil one in on paper, "No backup" on a picture), then its side's name where a shelf
+ * mixes the sides, then its token.
+ */
+function cardWords(slot: RosterSlot, o: { paper: boolean; side: boolean }): string {
+  const lines = slot.depth.map((n, i) => `${ORDINALS[i] ?? ""} ${n}`);
+  if (slot.depth.length === 1) lines.push(o.paper ? "2nd 3rd" : "2nd No backup");
+  return [...lines, ...(o.side ? [slot.team.toUpperCase()] : []), slot.tag].join(" ");
+}
+
+/** The words of a recorded page that are drawn outside its own frame, read off the page laid out in a browser. */
+async function outside(page: Page, svg: string): Promise<string[]> {
+  const sheet = await page.context().newPage();
+  try {
+    await sheet.setContent(`<body style="margin:0">${svg}</body>`);
+    return await sheet.locator("svg").first().evaluate((root) => {
+      const frame = (root as SVGSVGElement).viewBox.baseVal;
+      return Array.from(root.querySelectorAll("text")).flatMap((t) => {
+        const b = t.getBBox();
+        const m = t.getCTM();
+        const a = new DOMPoint(b.x, b.y).matrixTransform(m ?? undefined), z = new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(m ?? undefined);
+        return a.x < -0.5 || a.y < -0.5 || z.x > frame.width + 0.5 || z.y > frame.height + 0.5 ? [t.textContent] : [];
+      });
+    });
+  } finally {
+    await sheet.close();
+  }
+}
+
 const sha256 = (b: Buffer | string): string => createHash("sha256").update(b).digest("hex");
 const out = (info: TestInfo, name: string): string => `test-results/depth-chart-${info.project.name}-${name}`;
 
@@ -103,6 +137,8 @@ function expectPng(bytes: Buffer, file: string, size: { w: number; h: number }):
 }
 
 async function enterRoster(page: Page, ls: Lineups): Promise<Designer> {
+  // every picture and page says the day it was made: the clock pinned keeps the files the same from day to day
+  await page.clock.setFixedTime(new Date(PINNED.clock));
   await seed(page, { plays: [SLANT_LEFT], team: OTTERS, lineups: ls });
   const d = new Designer(page);
   await d.openSaved(SLANT_LEFT.name);
@@ -117,7 +153,6 @@ test.use({ timezoneId: PINNED.timezone });
 test("a coach saves each side of the lineup as a picture and the whole roster as a sheet to print, the same roster twice is the same files, and nothing is written", async ({ page, browser }, info) => {
   test.setTimeout(180_000);
   mkdirSync("test-results", { recursive: true });
-  await page.clock.setFixedTime(new Date(PINNED.clock));
   await recordPages(page);
   await enterRoster(page, lineups(ROSTER));
   const before = await storedLineups(page);
@@ -125,7 +160,7 @@ test("a coach saves each side of the lineup as a picture and the whole roster as
   // the export sits in the panel with what each one is, and says that the names go with it
   await expect(exportGroup(page).getByText("EXPORT", { exact: true })).toBeVisible();
   await expect(exportGroup(page)).toContainText("The picture is the offense of Starting Lineup as on the field");
-  await expect(exportGroup(page)).toContainText("Both carry your players' names, the one way they leave this device.");
+  await expect(exportGroup(page)).toContainText("Both carry your players' names.");
 
   // the side on view, the open play's: the offense
   const pictures: Record<string, { file: string; bytes: number; sha256: string; size: { w: number; h: number }; words: number }> = {};
@@ -156,10 +191,15 @@ test("a coach saves each side of the lineup as a picture and the whole roster as
     expect(said).toContain("Riverside Otters");
     expect(said).toContain(s.heading);
     expect(said).toContain("Starting Lineup");
-    for (const n of s.has) expect(said, `${n} is on the ${s.view} picture`).toContain(n);
-    for (const n of s.not) expect(said, `${n} plays only on the other side`).not.toContain(n);
-    if (s.view !== "Defense") expect(said, "nobody is down at Z").toContain("Unassigned");
-    if (s.view !== "Offense") expect(said, "FS has a chart and no spot in the formation").toContain("NOT IN THIS FORMATION Positions with a depth chart and no spot in the formation.");
+    for (const n of s.has) expect(hasName(said, n), `${n} is on the ${s.view} picture`).toBe(true);
+    for (const n of s.not) expect(hasName(said, n), `${n} plays only on the other side`).toBe(false);
+    // every chart on view, card by card, each in its order
+    for (const slot of ROSTER.filter((r) => s.view === "Both" || r.team === s.view.toLowerCase())) {
+      expect(said, `${slot.tag}'s card`).toContain(cardWords(slot, { paper: false, side: s.view === "Both" && slot.tag === "FS" }));
+    }
+    if (s.view !== "Defense") expect(said, "nobody is down at Z, on Z's own card").toContain("Unassigned Z ");
+    if (s.view !== "Offense") expect(said, "FS has no spot in the formation").toContain("NOT IN THIS FORMATION Positions with no spot in the formation.");
+    expect(await outside(page, svg ?? ""), "every word inside the picture").toEqual([]);
     expect(said, "the gaps on view, said to whoever is sent it").toContain(s.gaps);
     expect(said, "the day it was made").toContain("Riverside Otters · Starting Lineup · Sep 1, 2026");
     pngs.push(bytes);
@@ -185,15 +225,17 @@ test("a coach saves each side of the lineup as a picture and the whole roster as
   }
   const board = pdf.pages[0]?.runs.map((r) => r.s).join(" ").replace(/- /g, "-") ?? "";
   const team = pdf.pages[1]?.runs.map((r) => r.s).join(" ") ?? "";
-  for (const s of ROSTER) for (const n of s.depth) expect(board, `${n} on ${s.tag}'s chart is printed`).toContain(n);
+  // every chart whole, card by card, each in its order
+  for (const slot of ROSTER) expect(board, `${slot.tag}'s card`).toContain(cardWords(slot, { paper: true, side: slot.tag === "FS" }));
   expect(board).toContain("DEFENSE");
   expect(board).toContain("OFFENSE");
   expect(board, "Z has lines to pencil a starter and backups in").toContain("Starter 2nd 3rd Z");
   expect(board, "and QB lines to pencil a backup in").toContain("Starter Aaliyah Brooks-Washington 2nd 3rd QB");
-  expect(board).toContain("NOT IN THIS FORMATION Positions with a depth chart and no spot in the formation.");
+  expect(board).toContain("NOT IN THIS FORMATION Positions with no spot in the formation.");
   expect(board, "the day it was made").toContain("Riverside Otters · Starting Lineup · Sep 1, 2026 · page 1 of 2");
-  for (const n of TEAM) expect(team, `${n} is on the team page`).toContain(n);
+  for (const n of TEAM) expect(hasName(team, n), `${n} is on the team page`).toBe(true);
   expect(team).toContain("Who plays where");
+  expect(team, "Jo's own row").toMatch(/(^| )Jo X 3rd, S 3rd /);
   expect(team).toMatch(/Riley No position/);
   expect(team).toMatch(/Devon X starter, LC 2nd/);
   expect(team).toMatch(/GAPS TO FILL Unassigned Z No backup QB, R, FS No position Riley/);
@@ -244,7 +286,7 @@ test("the Secondary Lineup is saved as the field shows it, made from the startin
   expect(said).toContain("Starter Priya 2nd Sam Y");
   expect(said).toContain("Starter Owen 2nd Marcus Lee C");
   expect(said).toContain("Starter Aaliyah Brooks-Washington 2nd No backup QB");
-  writeFileSync(out(info, "secondary.json"), `${JSON.stringify({ device: info.project.name, file: file.suggestedFilename(), bytes: bytes.length, words: said }, null, 2)}\n`);
+  writeFileSync(out(info, "secondary.json"), `${JSON.stringify({ device: info.project.name, clock: PINNED.clock, file: file.suggestedFilename(), bytes: bytes.length, words: said }, null, 2)}\n`);
 });
 
 test("a picture or sheet the phone cannot draw is said in the panel and recorded, saves nothing, and the buttons come back", async ({ page }) => {
@@ -298,5 +340,5 @@ test("an empty roster waits for a name before its picture, and its sheet is a bl
   expectPng(picture.bytes, out(info, "empty-offense.png"), { w: 1080, h: 1350 });
   const said = words((await recorded(page))[0] ?? "");
   expect(said).toContain("Nobody is on this depth chart yet.");
-  expect(said, "no word about the app on a picture sent to someone").not.toContain("Tap");
+  expect(said, "no word about the app on a picture sent to someone").not.toMatch(/\btap\b|roster mode|panel/i);
 });
