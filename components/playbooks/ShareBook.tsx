@@ -6,30 +6,15 @@ import { PreviewModal } from "./PreviewModal";
 import { encodePlaybookFile } from "@/lib/export/playbook-file";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 import { TOKEN_PATTERN } from "@/lib/sharing/links";
+import { parseShares, readShares, setShares, sharesSnapshot, subscribeShares, type Share } from "@/lib/sharing/shares";
+import { useAccount } from "../account/AccountPanel";
 import { card, eyebrow, input, pill, pillDark } from "../ui";
 import { TwoStep } from "./TwoStep";
 
-type Share = { token: string; revokeKey: string; expiresAt: string; snapshotJson?: string };
-const KEY = "ffpd.shares.v1";
-function subscribe(listener: () => void) {
-  window.addEventListener("storage", listener); window.addEventListener("shares-changed", listener);
-  return () => { window.removeEventListener("storage", listener); window.removeEventListener("shares-changed", listener); };
-}
-function snapshot(): string { try { return localStorage.getItem(KEY) ?? "{}"; } catch { return "{}"; } }
+const subscribe = subscribeShares;
+const snapshot = sharesSnapshot;
 function parse(raw: string): Record<string, Share[]> {
-  try {
-    const value: unknown = JSON.parse(raw);
-    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-    return Object.fromEntries(Object.entries(value).flatMap(([id, entries]: [string, unknown]) => {
-      if (!Array.isArray(entries) || ["__proto__", "constructor", "prototype"].includes(id)) return [];
-      const valid = (entries as unknown[]).filter((entry): entry is Share => {
-        if (!entry || typeof entry !== "object") return false;
-        const s = entry as Partial<Share>;
-        return typeof s.token === "string" && TOKEN_PATTERN.test(s.token) && typeof s.revokeKey === "string" && /^[A-Za-z0-9_-]{32}$/.test(s.revokeKey) && typeof s.expiresAt === "string" && Number.isFinite(Date.parse(s.expiresAt));
-      });
-      return [[id, valid]];
-    }));
-  } catch { return {}; }
+  try { return parseShares(JSON.parse(raw)); } catch { return {}; }
 }
 /** How many live share links this device holds for a play or playbook id. */
 export function useShareCount(id: string): number {
@@ -78,18 +63,16 @@ function SharePanel({ book, plays = [], team, play, menu, initialPreview = false
   const [latest, setLatest] = useState<Share | null>(null);
   const [includeTeam, setIncludeTeam] = useState(false);
   const [copied, setCopied] = useState(false);
+  const account = useAccount();
+  // signed in, the revoke controls go up with the team (docs/adr/014-whole-desk-in-account.md); signed out they are this browser's alone
+  const kept = account.user && account.teamId ? "Revoke controls are saved in your account with the team, so any device signed in can revoke." : "Revoke controls are saved in this browser; clearing site data loses them.";
   useEffect(() => {
     if (!copied) return;
     const t = window.setTimeout(() => { setCopied(false); }, 2000);
     return () => { window.clearTimeout(t); };
   }, [copied]);
   const json = play ? encodePlayFile(play) : book ? encodePlaybookFile(book, plays, includeTeam && team ? team : null) : "";
-  const save = (next: Share[]) => {
-    const all = parse(snapshot());
-    all[id] = next;
-    localStorage.setItem(KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event("shares-changed"));
-  };
+  const save = (next: Share[]) => { setShares(id, next); };
   const copy = async (share: Share) => {
     try {
       if (!navigator.clipboard) throw new Error("Clipboard unavailable");
@@ -100,7 +83,7 @@ function SharePanel({ book, plays = [], team, play, menu, initialPreview = false
   const create = async () => {
     setBusy(true); setMessage("");
     try {
-      const existing = play && (parse(snapshot())[id] ?? []).find(s => s.snapshotJson === json && Date.parse(s.expiresAt) > Date.now());
+      const existing = play && (readShares()[id] ?? []).find(s => s.snapshotJson === json && Date.parse(s.expiresAt) > Date.now());
       if (existing) { setLatest(existing); await copy(existing); return; }
       const response = await fetch("/api/shares", { method: "POST", headers: { "Content-Type": "application/json" }, body: json });
       if (!response.ok) await failure(response);
@@ -108,7 +91,7 @@ function SharePanel({ book, plays = [], team, play, menu, initialPreview = false
       if (!TOKEN_PATTERN.test(share.token) || !/^[A-Za-z0-9_-]{32}$/.test(share.revokeKey)) throw new Error("Sharing returned an invalid link.");
       if (play) share.snapshotJson = json;
       setLatest(share); setPreview(false);
-      try { save([...(parse(snapshot())[id] ?? []), share]); if (!play) setMessage("Link created. Copy it below."); }
+      try { save([...(readShares()[id] ?? []), share]); if (!play) setMessage("Link created. Copy it below."); }
       catch { setOpen(true); setMessage("Link created, but its revoke control could not be saved on this device. Keep this page open to revoke it."); return; }
       if (play) await copy(share);
     } catch (error) { setOpen(true); setMessage(error instanceof Error ? error.message : "Could not create a link. Try again online."); }
@@ -120,7 +103,7 @@ function SharePanel({ book, plays = [], team, play, menu, initialPreview = false
       const response = await fetch(`/api/shares/${share.token}`, { method: "DELETE", headers: { Authorization: `Bearer ${share.revokeKey}` } });
       if (!response.ok) await failure(response);
       if (latest?.token === share.token) setLatest(null);
-      try { save((parse(snapshot())[id] ?? []).filter(s => s.token !== share.token)); } catch { /* server revocation succeeded */ }
+      try { save((readShares()[id] ?? []).filter(s => s.token !== share.token)); } catch { /* server revocation succeeded */ }
       setMessage("Link revoked. Copies already imported are unaffected.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not revoke the link."); }
     finally { setBusy(false); }
@@ -139,7 +122,7 @@ function SharePanel({ book, plays = [], team, play, menu, initialPreview = false
         return <div key={id} className="py-2"><strong>{play?.name ?? "Missing play"}</strong><p className="whitespace-pre-wrap break-words">{play?.notes}</p></div>;
       })}</details>
       <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={includeTeam} onChange={e => { setIncludeTeam(e.target.checked); }} />Include team name and colour: {team.name || "No team name"}</label>
-      <p className="text-caption leading-note text-ink-muted">Links expire after 90 days. Revoke controls are saved in this browser; clearing site data loses them. Imported copies can&apos;t be revoked.</p>
+      <p className="text-caption leading-note text-ink-muted">Links expire after 90 days. {kept} Imported copies can&apos;t be revoked.</p>
       <button type="button" disabled={busy || book.plays.some(id => !plays.some(p => p.id === id))} className={`${pillDark} min-h-11 self-start px-4`} onClick={() => { void create(); }}>{busy ? "Creating link…" : "Create link"}</button>
     </div>}
     {message && <p role="status" className="text-small">{message}</p>}

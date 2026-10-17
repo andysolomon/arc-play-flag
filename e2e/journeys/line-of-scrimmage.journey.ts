@@ -16,14 +16,25 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * to goal line, midfield is the 20, and a 10-yard end zone runs to the end line at the 50.
  * Field yard n sits at y = los - n, in yards from the line of scrimmage. The coach reads the
  * other way, in yards to go: the own goal line is "the 40", their 10 (the 30) "the 10".
+ *
+ * The spot is the board's (docs/adr/015-line-of-scrimmage-setting.md): every play opened or started
+ * is drawn from it, a play is saved from it, and a play's stored spot stands until it is saved again.
+ * How that could break, and the test that catches each:
+ *  - a new play, an opened play or undo moves the ball                       → "the board's spot"
+ *  - the spot is forgotten on reload, or marks a play changed                → "the board's spot"
+ *  - a save, a duplicate, a link or a file loses the spot the board was on   → "the board's spot", "the spot travels", "playbooks, files"
+ *  - a play stored off the 40 is rewritten just by being opened              → "the board's spot" (Slant Left stays as stored)
  */
 const GOAL = 40, END_LINE = 50;
 /** What the field and picker call yard n: the yards left to their goal line. */
 const toGo = (n: number): number => GOAL - n;
 /** The deepest player in the default formation (the safety), whom the card must never cut off. */
 const DEEPEST = Math.min(...formation().map((p) => p.y));
-const DEFAULT_NOTE = "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20.";
-const NO_RUN_NOTE = "Saved with this play. The ball is in a no-run zone, so no runs from here.";
+const DEFAULT_NOTE = "Your board's spot: every play you open or start is drawn from here, and saved from here. Yards count down to their goal line: every drive starts on the 40, midfield is the 20.";
+const NO_RUN_NOTE = "Your board's spot. The ball is in a no-run zone, so no runs from here.";
+/** Where the board keeps its spot (lib/los.ts); the drive start leaves no key. */
+const LOS_KEY = "ffpd.los.v1";
+const storedSpot = (page: Page) => page.evaluate((key) => localStorage.getItem(key), LOS_KEY);
 /** The only spots a coach can pick, as stored: from the 40 (the own goal line), the 20, the 10 and the 5. */
 const CHOICES = [
   { los: 0, option: "From the 40 · drive start" },
@@ -36,7 +47,7 @@ const SPOTS = [20, 30, 35] as const;
 const IN_NO_RUN_ZONE = new Set([35]);
 
 const losSelect = (page: Page): Locator => page.locator("#play-sidebar").getByRole("combobox", { name: "Line of scrimmage" });
-const losNote = (page: Page): Locator => page.locator("#play-sidebar").getByText(/^Saved with this play\./);
+const losNote = (page: Page): Locator => page.locator("#play-sidebar").getByText(/^Your board's spot/);
 const openSettings = (page: Page) => page.getByRole("button", { name: /team, theme & backup settings/ }).click();
 /** Saved / Unsaved / Draft autosaved, under the play's name */
 const status = (page: Page): Locator => page.locator("main span[aria-live='polite']").filter({ hasText: /^(Saved|Unsaved|Draft autosaved|Saving failed)$/ });
@@ -156,7 +167,7 @@ async function keep(testInfo: TestInfo, name: string, data: unknown): Promise<vo
   await testInfo.attach(name, { path: file, contentType: "application/json" });
 }
 
-test("a coach puts the ball on the 10 for a red-zone play, and only that play moves", async ({ page }, testInfo) => {
+test("the board's spot: the ball on the 10 for a red-zone play, and every play opened here is drawn from there", async ({ page }, testInfo) => {
   const project = testInfo.project.name;
   await seed(page, { plays: [RED_ZONE_FADE, SLANT_LEFT], team: OTTERS });
   const d = new Designer(page);
@@ -207,22 +218,24 @@ test("a coach puts the ball on the 10 for a red-zone play, and only that play mo
     sweep.push({ los, option, note, ...m });
   }
 
-  // back on the 40, the field is the same markup it started as, and the draft carries no spot
+  // back on the 40, the field is the same markup it started as, the draft carries no spot, and the board keeps no key
   await d.tools();
   await spot.selectOption("0");
   await d.closeSidebars();
   await expect.poll(() => fieldMarkup(d.field)).toBe(markup0);
   await expect.poll(async () => { const dr = await storedDraft(page); return dr !== null && !("los" in dr); }).toBe(true);
+  expect(await storedSpot(page)).toBeNull();
   await expect(status(page)).toHaveText("Saved");
-  // four spot changes, and nothing to undo: the spot is the play's, like its name
+  // four spot changes, and nothing to undo: the spot is the board's, not an edit to the play
   await expect(d.undo).toBeDisabled();
 
-  // the 10: it marks the play changed and autosaves; undo leaves the spot where it is
+  // the 10: the board moves and the draft carries it, but the play is as saved as it was; undo leaves the spot where it is
   await d.tools();
   await spot.selectOption("30");
-  await expect(status(page)).toHaveText("Draft autosaved");
-  await expect(await d.tool("Save")).toHaveAttribute("title", "Save changes to this play");
   await expect.poll(async () => (await storedDraft(page))?.los).toBe(30);
+  expect(await storedSpot(page)).toBe("30");
+  await expect(status(page)).toHaveText("Saved");
+  await expect(await d.tool("Save")).toHaveAttribute("title", "Save this play");
   await d.clickTool("Clear routes");
   await expect(d.routes).toHaveCount(0);
   await d.undo.click();
@@ -230,14 +243,14 @@ test("a coach puts the ball on the 10 for a red-zone play, and only that play mo
   await d.tools();
   await expect(spot).toHaveValue("30");
 
-  // saved with the play, last, and only because it is off the own goal line
+  // saved from the board's spot, last, and only because it is off the own goal line
   await d.save();
   await expect(d.toast).toHaveText("Saved");
   const saved = (await storedPlays(page))[RED_ZONE_FADE.id];
   expect(saved).toEqual({ ...RED_ZONE_FADE, los: 30 });
   expect(Object.keys(saved ?? {}).at(-1)).toBe("los");
 
-  // a reload and a reopen put the ball back where the coach left it
+  // a reload and a reopen find the board where the coach left it
   await page.reload();
   await expect(d.field).toBeVisible();
   await d.tools();
@@ -254,19 +267,25 @@ test("a coach puts the ball on the 10 for a red-zone play, and only that play mo
   const copy = Object.values(await storedPlays(page)).find((p) => p.name === `${RED_ZONE_FADE.name} copy`);
   expect(copy?.los).toBe(30);
 
-  // a new play, started from the copy on the 10, goes back to the 40
+  // a new play, started from the copy on the 10, stays on the 10: the spot is the board's
   await expect(losSelect(page)).toHaveValue("30");
   await d.newPlay("Offense");
-  await expect(losSelect(page)).toHaveValue("0");
-  await expect(d.field.locator("text", { hasText: /^LOS$/ })).toHaveCount(1);
+  await expect(losSelect(page)).toHaveValue("30");
+  await expect(d.field.locator("text", { hasText: /^LOS 10$/ })).toHaveCount(1);
   await expect.poll(async () => (await storedDraft(page))?.name).toBe("New play");
-  expect(await storedDraft(page)).not.toHaveProperty("los");
+  expect((await storedDraft(page))?.los).toBe(30);
 
-  // every other play stays on the 40, drawn exactly as before
+  // a play stored on the 40 opens on the board's 10, as saved as it was, and its record is untouched
   await d.openSaved(SLANT_LEFT.name);
   await d.tools();
-  await expect(losSelect(page)).toHaveValue("0");
+  await expect(losSelect(page)).toHaveValue("30");
+  await expect(status(page)).toHaveText("Saved");
   await d.closeSidebars();
+  await expect(async () => { expectField(await readField(d.field), 30); }).toPass();
+  expect((await storedPlays(page))[SLANT_LEFT.id]).toEqual(SLANT_LEFT);
+
+  // back on the 40, the same play is drawn exactly as it was
+  await d.spot(0);
   await expect(async () => { expectField(await readField(d.field), 0); }).toPass();
   await expect.poll(() => fieldMarkup(d.field)).toBe(markup0);
 
@@ -281,7 +300,8 @@ test("a coach puts the ball on the 10 for a red-zone play, and only that play mo
 });
 
 test("the spot travels in the share link, and links without one open on the 40", async ({ page }, testInfo) => {
-  await seed(page, { plays: [GOAL_LINE_FADE, SLANT_LEFT], team: OTTERS });
+  // the board on the 5, where the goal-line play was stored from (the spot is the board's: ADR 015)
+  await seed(page, { plays: [GOAL_LINE_FADE, SLANT_LEFT], team: OTTERS, los: GOAL_LINE_FADE.los });
   const d = new Designer(page);
   await d.goto(`?open=${GOAL_LINE_FADE.id}`);
   await d.tools();
@@ -316,10 +336,12 @@ test("the spot travels in the share link, and links without one open on the 40",
   await page.getByRole("link", { name: "Open in designer ›" }).click();
   await expect(d.field).toBeVisible();
   await d.tools();
+  // the board is still on the 5; the link's own spot is the share page's, not the board's
   await expect(losSelect(page)).toHaveValue("35");
 
   // a play on the 40 writes the link without a spot
   await d.openSaved(SLANT_LEFT.name);
+  await d.spot(0);
   await d.clickTool("Copy share link");
   await dialog.getByRole("button", { name: "Copy snapshot link" }).click();
   await expect(d.toast).toHaveText("Link copied");
@@ -456,7 +478,7 @@ test("near their goal, ▶ keeps every player on the field, a man defender inclu
     }, "", "defense"),
     los: 35,
   };
-  await seed(page, { plays: [call] });
+  await seed(page, { plays: [call], los: call.los });
   const d = new Designer(page);
   await d.goto(`?open=${call.id}`);
   await expect(page.getByRole("heading", { name: call.name })).toBeVisible();

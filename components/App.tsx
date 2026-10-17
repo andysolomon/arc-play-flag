@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { firstUseDone, setFirstUseDone } from "@/lib/account/prefs";
+import { subscribePulls } from "@/lib/account/sync";
+import { deviceWritten } from "@/lib/device-writes";
 import { install, record } from "@/lib/diagnostics";
+import { getLosChoice, serverLosChoice, setLosChoice, subscribeLosChoice } from "@/lib/los";
 import { editedVisit, flipped, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
@@ -30,7 +34,7 @@ import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraf
 import { FIELD_TITLE_ID, Field } from "./Field";
 import { EditablePlayTitle } from "./EditablePlayTitle";
 import { PlaySwitcher } from "./PlaySwitcher";
-import { FIRST_USE_KEY, FirstUse } from "./FirstUse";
+import { FirstUse } from "./FirstUse";
 import { Header, VIEW, type Mode } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
@@ -186,6 +190,15 @@ export function App() {
   }, [openRight]);
   // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
   // short there, the toast says so once it is drawn, and the palette says by how much
+  // the account brought another device's desk down (docs/adr/014-whole-desk-in-account.md, A21): the board redraws from its
+  // draft. A team with a clear board leaves this board as it is: the next touch here is the board, and goes up.
+  useEffect(() => subscribePulls(() => {
+    const d = readDraft();
+    if (!d) return;
+    dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, side: d.side, artShadow: d.artShadow, los: d.los, players: d.players });
+    restoredDraft.current = true;
+    setFirstUse(false);
+  }), []);
   const playersRef = useRef(s.players);
   // a note the field says with the move itself (a teammate stepped past) leads the cut's toast, never lost under it
   const fieldNote = useRef<string | null>(null);
@@ -289,6 +302,7 @@ export function App() {
     try {
       writeDraft(withLos({ id: s.id, name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] }, s.los));
       draftBroken.current = false;
+      deviceWritten();
     } catch (e) {
       if (!(e instanceof StorageError)) throw e;
       if (!draftBroken.current) { say(`Autosave is off · ${failureMessage(e)}`, 3200); record("storage", e); }
@@ -299,6 +313,9 @@ export function App() {
     queueMicrotask(() => { if (active) setDraftWrite({ fingerprint: draftFingerprint, ok: writeOk }); });
     return () => { active = false; };
   }, [draftFingerprint, say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
+  // the ball is where the board's setting puts it (lib/los.ts), for every play opened here, from the first paint on
+  const losChoice = useSyncExternalStore(subscribeLosChoice, getLosChoice, serverLosChoice);
+  useEffect(() => { dispatch({ type: "setLos", los: losChoice }); }, [losChoice]);
   useEffect(() => {
     const d = readDraft();
     let firstUseTimer = 0;
@@ -306,14 +323,8 @@ export function App() {
     restoredDraft.current = d !== null;
     if (d) dispatch({ type: "hydrate", id: d.id, name: d.name, notes: d.notes, side: d.side, artShadow: d.artShadow, los: d.los, players: d.players });
     hydratedRef.current = true;
-    try {
-      if (!d && getPlays().length === 0 && window.localStorage.getItem(FIRST_USE_KEY) !== "done") {
-        firstUseTimer = window.setTimeout(() => { setFirstUse(true); }, 0);
-      }
-    } catch {
-      // Storage may be unavailable in a private window; the guide still works for this visit.
-      if (!d && getPlays().length === 0) firstUseTimer = window.setTimeout(() => { setFirstUse(true); }, 0);
-    }
+    // storage may be unavailable in a private window; the guide then shows for this visit
+    if (!d && getPlays().length === 0 && !firstUseDone()) firstUseTimer = window.setTimeout(() => { setFirstUse(true); }, 0);
     const params = new URLSearchParams(window.location.search);
     // "Open in designer" from a share page: /?p=<id> loads the play and cleans the URL
     const shared = params.get("p");
@@ -394,7 +405,7 @@ export function App() {
         : "unsaved";
   const dismissFirstUse = useCallback(() => {
     setFirstUse(false);
-    try { window.localStorage.setItem(FIRST_USE_KEY, "done"); } catch { /* dismiss for this visit */ }
+    setFirstUseDone(true);
   }, []);
   const onExample = useCallback(() => {
     if (restoredDraft.current || dirty) {
@@ -456,7 +467,8 @@ export function App() {
     `${window.location.origin}/p/${encodeShare({ name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] }, noRunZones)}`,
   [s.name, s.notes, s.side, s.artShadow, s.los, s.players, noRunZones]);
   // where this play's ball is spotted: saved with the play, never undone (like its name)
-  const onLos = useCallback((los: number) => { dispatch({ type: "setLos", los }); }, []);
+  // the board's setting moves, and the effect above moves the ball with it
+  const onLos = useCallback((los: number) => { setLosChoice(los); }, []);
   // the team's settings: its name and colour, and the field's no-run zones
   const onTeam = useCallback((next: TeamSettings) => {
     const r = setTeam(next);

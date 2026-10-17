@@ -32,7 +32,7 @@
  */
 import { ApiError } from "@/lib/account/api";
 import * as account from "@/lib/account/api";
-import { canonical, mergeTeamData } from "@/lib/account/data";
+import { EMPTY_DESK, canonical, mergeTeamData } from "@/lib/account/data";
 import {
   ORG_KEY, applied, applyData, deviceData, getAccountState, hashOf, readMarker, set, writeMarker, problem,
 } from "@/lib/account/state";
@@ -475,7 +475,8 @@ export async function copyTo(target: CopyTarget, plays: readonly SavedPlay[], bo
   const copiedBooks: Playbook[] = books.map((b) => settleBook({ ...(normalizePlaybook(b, b.id) ?? b), id: newId(), plays: b.plays.flatMap((id) => { const c = ids.get(id); return c ? [c] : []; }) }));
   let record = await account.readTeam(target.team);
   for (let attempt = 0; attempt < 2; attempt++) {
-    const data: TeamData = mergeTeamData({ plays: copies, playbooks: copiedBooks, team: record.data.team, lineups: record.data.lineups }, record.data);
+    // the copies carry no desk: the team's own board, pick, places and links stand (ADR 015)
+    const data: TeamData = mergeTeamData({ plays: copies, playbooks: copiedBooks, team: record.data.team, lineups: record.data.lineups, ...EMPTY_DESK }, record.data);
     try {
       await account.writeTeam(target.team, data, record.rev);
       return;

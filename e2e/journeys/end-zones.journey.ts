@@ -87,7 +87,7 @@ const GOAL = -20;
 const MIDFIELD_TOP = -30;
 /** A phone-shaped window: with the ball at midfield, the only shape deep enough to show the end zone (the desktop and iPad cards stop short of it). */
 const PHONE = { width: 412, height: 915 };
-/** A play spotted at midfield. */
+/** A play stored from midfield; the board is spotted there too (`los: MIDFIELD` in each seed), since the spot is the board's (ADR 015). */
 const fromMidfield = (p: SavedPlay): SavedPlay => ({ ...p, los: MIDFIELD });
 const STANDARD_ENDZONE = "rgb(167, 229, 167)";
 
@@ -337,7 +337,7 @@ const sha = (path: string): string => createHash("sha256").update(readFileSync(p
 
 test("a fresh device keeps the classic end zone, and the picker says what is open and how to open the rest", async ({ page }) => {
   await showEndZone(page);
-  await seed(page, { plays: [CARRY], team: OTTERS });
+  await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
   const d = new Designer(page);
   await d.goto("?open=fx-td-carry");
 
@@ -390,7 +390,7 @@ test("a fresh device keeps the classic end zone, and the picker says what is ope
 
 test("picking an open end zone paints the field on screen, outlasts a reload and reaches another tab; Classic puts the plain band back", async ({ page, context }) => {
   await showEndZone(page);
-  await seed(page, { plays: [GALLERY], team: OTTERS });
+  await seed(page, { plays: [GALLERY], team: OTTERS , los: MIDFIELD });
   const d = new Designer(page);
   await d.goto("?open=fx-ez-gallery");
   await expect(d.routes).toHaveCount(2);
@@ -457,7 +457,7 @@ test("picking an open end zone paints the field on screen, outlasts a reload and
 test("the team's name is painted across every design and none says END ZONE; it is given in Play tools, repaints at once, is kept, and reaches playbook settings", async ({ page }) => {
   test.slow();
   await showEndZone(page);
-  await seed(page, { plays: [GALLERY], team: OTTERS });
+  await seed(page, { plays: [GALLERY], team: OTTERS , los: MIDFIELD });
   await store(page, { touchdowns: String(Math.max(...END_ZONES.map((z) => z.unlock))) });
   const d = new Designer(page);
   await d.goto("?open=fx-ez-gallery");
@@ -541,7 +541,7 @@ test("the team's name is painted across every design and none says END ZONE; it 
 test("a pass carried over the goal line is a touchdown: the chosen end zone celebrates, the count is kept, and Sakura opens", async ({ page }) => {
   await pinRandom(page);
   await watchTouchdowns(page);
-  await seed(page, { plays: [CARRY], team: OTTERS });
+  await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
   await store(page, { zone: "synthwave" });
   const d = new Designer(page);
   // on the desktop and iPad the end zone is off the top of the field: a touchdown still counts
@@ -591,7 +591,7 @@ test("a pass carried over the goal line is a touchdown: the chosen end zone cele
 test("with the ball near their goal the end zone is on every screen: the design fills its deeper band, and a short pass into it scores", async ({ page }) => {
   await pinRandom(page);
   await watchTouchdowns(page);
-  await seed(page, { plays: [RED_ZONE], team: OTTERS });
+  await seed(page, { plays: [RED_ZONE], team: OTTERS, los: RED_ZONE.los });
   await store(page, { zone: "synthwave" });
   const d = new Designer(page);
   // no phone's window: the goal line is ten yards off, inside even the shallowest card, so the end zone is in view on every device
@@ -632,7 +632,7 @@ test("a completion short of the goal line, a throw to someone else while the pri
   test.slow();
   await pinRandom(page);
   await watchTouchdowns(page);
-  await seed(page, { plays: [SHORT, CHECKDOWN, CARRY], team: OTTERS });
+  await seed(page, { plays: [SHORT, CHECKDOWN, CARRY], team: OTTERS , los: MIDFIELD });
   const d = new Designer(page);
 
   // X catches it and runs on to the 38: two yards short
@@ -673,7 +673,7 @@ test("a catch out the back of the end zone isn't a touchdown, and moving the bal
   test.slow();
   await pinRandom(page);
   await watchTouchdowns(page);
-  await seed(page, { plays: [OUT_THE_BACK, CARRY], team: OTTERS });
+  await seed(page, { plays: [OUT_THE_BACK, CARRY], team: OTTERS, los: OUT_THE_BACK.los });
   const d = new Designer(page);
 
   // X caught it near 21 yards on, beyond the end line at -15 and off the top of the card
@@ -689,6 +689,7 @@ test("a catch out the back of the end zone isn't a touchdown, and moving the bal
   // the carry-in touchdown, but the ball is moved up to their 10 while X is still running, long before
   // he would cross: the play it was watching ends, and nothing is scored at a goal line that has moved
   await d.goto("?open=fx-td-carry");
+  await d.spot(MIDFIELD);
   await runPlay(page, d);
   await d.tools();
   await expect(page.getByRole("button", { name: "Stop the play" })).toBeVisible();
@@ -703,7 +704,7 @@ test("a catch out the back of the end zone isn't a touchdown, and moving the bal
 test("on a defensive call the shadow offense scoring is being scored on: no celebration, no count, nothing opened", async ({ page }) => {
   await pinRandom(page);
   await watchTouchdowns(page);
-  await seed(page, { plays: [SCORED_ON], team: OTTERS });
+  await seed(page, { plays: [SCORED_ON], team: OTTERS , los: MIDFIELD });
   await store(page, { zone: "synthwave" });
   const d = new Designer(page);
   await d.goto(`?open=${SCORED_ON.id}`);
@@ -721,7 +722,7 @@ test("on a defensive call the shadow offense scoring is being scored on: no cele
 
 test("an end zone in use stays drawn and checked after its touchdowns are lost, while the rest stay locked", async ({ page }) => {
   await showEndZone(page);
-  await seed(page, { plays: [CARRY], team: OTTERS });
+  await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
   // picked back when this device had touchdowns; the count has since been cleared
   await store(page, { zone: "matrix", touchdowns: null });
   const d = new Designer(page);
@@ -748,7 +749,7 @@ test("junk in storage falls back to the classic end zone and no touchdowns, and 
   test.slow();
   await showEndZone(page);
   await pinRandom(page);
-  await seed(page, { plays: [CARRY], team: OTTERS });
+  await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
   const d = new Designer(page);
   const tools = page.locator("#play-sidebar");
   const junk: Stored[] = [
@@ -780,7 +781,7 @@ test("with storage blocked a touchdown still celebrates, and what it opened can 
   await showEndZone(page);
   await armSabotage(page);
   await pinRandom(page);
-  await seed(page, { plays: [CARRY], team: OTTERS });
+  await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
   const d = new Designer(page);
   await d.goto("?open=fx-td-carry");
   await sabotage(page, "quota", true);
@@ -812,7 +813,7 @@ test("with storage blocked a touchdown still celebrates, and what it opened can 
 
 test("printing keeps the classic end zone: no design, no lanes, the plain words and the standard green", async ({ page }) => {
   await showEndZone(page);
-  await seed(page, { plays: [GALLERY], team: OTTERS });
+  await seed(page, { plays: [GALLERY], team: OTTERS , los: MIDFIELD });
   await store(page, { zone: "synthwave" });
   const d = new Designer(page);
   await d.goto("?open=fx-ez-gallery");
@@ -837,7 +838,7 @@ test("printing keeps the classic end zone: no design, no lanes, the plain words 
 test("playbook settings have the same picker, and pictures made from plays never wear the device's end zone", async ({ page }) => {
   await showEndZone(page);
   const book = playbook("fx-ez-book", "Otter Red Zone", [CARRY]);
-  await seed(page, { plays: [CARRY], playbooks: [book], team: OTTERS });
+  await seed(page, { plays: [CARRY], playbooks: [book], team: OTTERS , los: MIDFIELD });
   await store(page, { zone: "synthwave", touchdowns: "2" });
 
   await page.goto("/playbooks");
@@ -890,7 +891,7 @@ test.describe("with motion allowed", () => {
   test("confetti moves in the end zone's own way while the swatches hold still, with a picture mid-celebration", async ({ page }, testInfo) => {
     await showEndZone(page);
     await pinRandom(page);
-    await seed(page, { plays: [CARRY], team: OTTERS });
+    await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
     await store(page, { zone: "sakura", touchdowns: "1" });
     const d = new Designer(page);
     await d.goto("?open=fx-td-carry");
@@ -944,7 +945,7 @@ test.describe("with motion allowed, every other way", () => {
     test.slow();
     await showEndZone(page);
     await pinRandom(page);
-    await seed(page, { plays: [CARRY], team: OTTERS });
+    await seed(page, { plays: [CARRY], team: OTTERS , los: MIDFIELD });
     const d = new Designer(page);
     // Sakura's drift has its own test above
     for (const zone of ["classic", "matrix", "synthwave"]) {
@@ -983,7 +984,7 @@ test.describe("the end zones manifest", () => {
   test("every end zone draws its own design in the band on screen, with a picture of each", async ({ page }, testInfo) => {
     const project = testInfo.project.name;
     await showEndZone(page);
-    await seed(page, { plays: [GALLERY], team: OTTERS });
+    await seed(page, { plays: [GALLERY], team: OTTERS , los: MIDFIELD });
     // enough touchdowns to open every one
     await store(page, { touchdowns: String(Math.max(...END_ZONES.map((z) => z.unlock))) });
     const d = new Designer(page);
@@ -1069,7 +1070,7 @@ test.describe("the end zones manifest", () => {
     manifest.touchdownsViewport = page.viewportSize();
     await pinRandom(page);
     await watchTouchdowns(page);
-    await seed(page, { plays: [CARRY, DRAG], team: OTTERS });
+    await seed(page, { plays: [CARRY, DRAG], team: OTTERS , los: MIDFIELD });
     const d = new Designer(page);
     const tools = page.locator("#play-sidebar");
 

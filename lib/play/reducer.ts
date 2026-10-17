@@ -1,6 +1,6 @@
 import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
 import { deepSplit, splitDeep, type DeepSplit } from "./deep";
-import { LOS_YARD, losOf, readLos } from "./field";
+import { LOS_YARD, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import {
@@ -117,14 +117,18 @@ export function selected(s: PlayState): Player | null {
   return s.players.find((p) => p.id === s.selectedId) ?? null;
 }
 
-/** Whether the document holds work its saved record doesn't (or, never saved, anything past a blank new play). */
+/**
+ * Whether the document holds work its saved record doesn't (or, never saved, anything past a blank new
+ * play). The ball's spot is the board's, not the play's (lib/los.ts), so it never counts: a play stored
+ * from the 5 and drawn from the 40 is as saved as it was.
+ */
 export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
   if (saved) {
     return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
-      || s.los !== losOf(saved) || JSON.stringify(s.players) !== JSON.stringify(saved.players);
+      || JSON.stringify(s.players) !== JSON.stringify(saved.players);
   }
   // a restored draft or an opened share link has no history yet, so its players are compared as well
-  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow || s.los !== LOS_YARD
+  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow
     || (s.name !== "New play" && s.name !== "") || JSON.stringify(s.players) !== JSON.stringify(defaults());
 }
 
@@ -184,12 +188,14 @@ function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
 }
 
 /** Replaces the whole document and drops undo and redo, which belong to the play you left. */
+/** A play put on the board whole. The ball stays where the board has it (lib/los.ts): a play's stored spot never moves it. */
 function openPlay(s: PlayState, doc: Doc): PlayState {
-  return { ...s, ...emptyHistory, ...doc, ...opened(s, doc), ...cleared };
+  return { ...s, ...emptyHistory, ...doc, los: s.los, ...opened(s, doc), ...cleared };
 }
 
+/** A step back or forward through the history; the ball stays where the board has it, since the spot is no edit. */
 function step(s: PlayState, st: HistoryStep | null): PlayState {
-  return st ? { ...s, ...st.history, ...st.doc, ...follow(s, st.doc), ...cleared } : s;
+  return st ? { ...s, ...st.history, ...st.doc, los: s.los, ...follow(s, st.doc), ...cleared } : s;
 }
 
 /** A player with this route, where it lets them stand (legalSpot), clear of any teammate there (lib/play/spacing.ts, C10). */
@@ -540,13 +546,15 @@ function reduce(s: PlayState, a: Action): PlayState {
         id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, los: readLos(a.los),
         players: a.players,
       };
-      return { ...s, ...doc, ...opened(s, doc) };
+      // the draft's spot is where the board was when it was written; the board's own setting stands (lib/los.ts)
+      return { ...s, ...doc, los: s.los, ...opened(s, doc) };
     }
     case "setName":
       return { ...s, name: a.name };
     case "setNotes":
       return { ...s, notes: a.notes };
     case "setLos": {
+      // the one way the ball moves: the board's setting (lib/los.ts), never a play's record or a step of history
       const los = readLos(a.los);
       return los === s.los ? s : { ...s, los };
     }

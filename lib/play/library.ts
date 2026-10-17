@@ -314,6 +314,16 @@ export function refresh(): void {
 }
 
 /**
+ * The device was rewritten whole, the pick included (the account engine brought a team down,
+ * docs/adr/014-whole-desk-in-account.md): every snapshot and the pick are read again from storage,
+ * so a pick made on this visit gives way to the one the account holds.
+ */
+export function reread(): void {
+  pickedId = undefined;
+  refresh();
+}
+
+/**
  * Stores an import plan's plays and book as one change, then rebuilds every snapshot.
  * A write that fails part-way is rolled back, so the library is either fully imported
  * or exactly as it was. The team is a courtesy on a fresh device and never blocks.

@@ -83,10 +83,14 @@ describe("Demo recorder chapters and fixtures", () => {
       "demo-goal-to-go", "demo-split-wheel", "demo-halfback-pass", "demo-stack-fade",
     ]);
     expect(DEMO_PLAYS.every((play) => play.name.startsWith("Otter "))).toBe(true);
-    expect(Object.values(STORAGE_KEYS).sort()).toEqual(["ffpd.draft.v1", "ffpd.first-use.v1", "ffpd.lineups.v1", "ffpd.playbooks.v1", "ffpd.plays.v2", "ffpd.team.v1"]);
+    expect(Object.values(STORAGE_KEYS).sort()).toEqual(["ffpd.draft.v1", "ffpd.first-use.v1", "ffpd.lineups.v1", "ffpd.los.v1", "ffpd.playbooks.v1", "ffpd.plays.v2", "ffpd.team.v1"]);
     for (const slug of CHAPTER_SLUGS) {
       const storage = storageFor(slug);
-      expect(Object.keys(storage).sort()).toEqual(Object.values(STORAGE_KEYS).sort());
+      // the board's spot is seeded only for a chapter whose play is spotted off the 40 (ADR 015)
+      const draftLos = (JSON.parse(storage[STORAGE_KEYS.draft] ?? "") as { los?: number }).los;
+      const expectedKeys = Object.values(STORAGE_KEYS).filter((k) => k !== STORAGE_KEYS.los || draftLos !== undefined).sort();
+      expect(Object.keys(storage).sort()).toEqual(expectedKeys);
+      if (draftLos !== undefined) expect(storage[STORAGE_KEYS.los]).toBe(String(draftLos));
       expect(storage[STORAGE_KEYS.firstUse]).toBe("done");
       expect(JSON.parse(storage[STORAGE_KEYS.team] ?? "")).toEqual({ name: "Riverside Otters", color: "#2a9d8f" });
       const draft = JSON.parse(storage[STORAGE_KEYS.draft] ?? "") as { id: string | null; name: string };

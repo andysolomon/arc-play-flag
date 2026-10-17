@@ -1,3 +1,4 @@
+import { deviceWritten } from "@/lib/device-writes";
 import type { Numbered } from "@/lib/export/numbered";
 
 /**
@@ -30,14 +31,31 @@ export function findCalls(items: readonly Numbered[], query: string, limit = 8):
   return [...byNumber, ...byWords].slice(0, limit);
 }
 
-/** Where each book was last read on this device, so the reader opens there again. A convenience: never a reason to fail. */
-const KEY = "ffpd.reader.v1";
+/**
+ * Where each book was last read on this device, so the reader opens there again; signed in, kept in
+ * the account with the team, so another device opens there too (docs/adr/014-whole-desk-in-account.md).
+ * A convenience: never a reason to fail.
+ */
+export const READER_KEY = "ffpd.reader.v1";
 const UNSAFE = new Set(["__proto__", "constructor", "prototype"]);
+/** Books a reader can remember a place in, at most: as many as a team may hold. */
+export const MAX_PLACES = 1_000;
 
-function places(): Record<string, unknown> {
+/** The places from any JSON-ish value: a whole number from 1 under each book id that is one, and nothing else. */
+export function parsePlaces(raw: unknown): Record<string, number> {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [id, n] of Object.entries(raw as Record<string, unknown>).slice(0, MAX_PLACES)) {
+    if (UNSAFE.has(id) || !id || typeof n !== "number" || !Number.isInteger(n) || n < 1) continue;
+    out[id] = n;
+  }
+  return out;
+}
+
+/** Every book's place on this device. */
+export function readPlaces(): Record<string, number> {
   try {
-    const v: unknown = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    return parsePlaces(JSON.parse(localStorage.getItem(READER_KEY) ?? "{}"));
   } catch {
     return {};
   }
@@ -45,15 +63,15 @@ function places(): Record<string, unknown> {
 
 /** The play this book was last read on, or the first. */
 export function lastRead(bookId: string): number {
-  const n = UNSAFE.has(bookId) ? undefined : places()[bookId];
-  return typeof n === "number" && Number.isInteger(n) && n >= 1 ? n : 1;
+  return readPlaces()[bookId] ?? 1;
 }
 
 export function rememberRead(bookId: string, n: number): void {
   if (UNSAFE.has(bookId)) return;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ ...places(), [bookId]: n }));
+    localStorage.setItem(READER_KEY, JSON.stringify({ ...readPlaces(), [bookId]: n }));
   } catch {
     /* a full or blocked storage only costs the reader its memory */
   }
+  deviceWritten();
 }

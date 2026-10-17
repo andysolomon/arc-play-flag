@@ -55,7 +55,7 @@ export function SignInScreen({ up = false }: { up?: boolean }) {
             </p>
           )}
           <p className="m-0 text-center text-base leading-body">
-            An account keeps your plays, playbooks, team and lineups, and opens them on any device. Sign in with Google or X; your work on this device comes with you.
+            An account keeps your plays, playbooks, team and lineups, the play on your board and how the app looks to you, so you pick up where you left off on any device. Sign in with Google or X; your work on this device comes with you.
           </p>
           {CLERK ? (
             up

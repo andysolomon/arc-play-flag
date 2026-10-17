@@ -159,10 +159,10 @@ function PlaySidebarImpl({
           </select>
           <span id={losNote} aria-live="polite" className="flex-none text-caption leading-note text-ink-muted">
             {flagged
-              ? "Saved with this play. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball."
+              ? "Your board's spot. The ball is in a no-run zone and this play is a run, so it is flagged: make it a pass or move the ball."
               : noRunZones && inNoRunZone(los)
-                ? "Saved with this play. The ball is in a no-run zone, so no runs from here."
-                : "Saved with this play. Yards count down to their goal line: every drive starts on the 40, midfield is the 20."}
+                ? "Your board's spot. The ball is in a no-run zone, so no runs from here."
+                : "Your board's spot: every play you open or start is drawn from here, and saved from here. Yards count down to their goal line: every drive starts on the 40, midfield is the 20."}
           </span>
           <label className="flex min-h-11 flex-none cursor-pointer items-center gap-2 text-small">
             <input

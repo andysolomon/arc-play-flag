@@ -1,9 +1,12 @@
 /**
- * Light or dark, chosen per device. "auto" follows the device's own setting
+ * Light or dark, chosen per device and, signed in, kept in the coach's account with the rest of
+ * their look (docs/adr/014-whole-desk-in-account.md). "auto" follows the device's own setting
  * (prefers-color-scheme) and is what a coach gets until they pick one.
  * Past those two sit the premium themes, after Omarchy's collection: each one
  * redraws every token in app/globals.css, and a coach earns them by making a playbook.
  */
+import { deviceWritten } from "@/lib/device-writes";
+
 export type BaseTheme = "light" | "dark";
 
 export interface PremiumTheme {
@@ -123,6 +126,7 @@ export function setThemeChoice(choice: ThemeChoice): void {
   }
   applyTheme(THEME_KEY, THEME_COLOR, choice);
   listeners.forEach((l) => { l(); });
+  deviceWritten();
 }
 
 /** For useSyncExternalStore: this tab's choices and other tabs' (the inline script redraws for those). */
@@ -155,6 +159,7 @@ export function setFieldChoice(choice: FieldChoice): void {
   }
   applyField(FIELD_KEY, choice);
   fieldListeners.forEach((l) => { l(); });
+  deviceWritten();
 }
 
 export function subscribeFieldChoice(onChange: () => void): () => void {

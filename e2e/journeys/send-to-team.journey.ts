@@ -4,6 +4,7 @@ import { Designer } from "../support/designer";
 import { accountView, expectSaved, marker, reloadedBy, runId, signIn, teamButton, teamRecord } from "../support/account";
 import { COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed, storedPlaybooks, storedPlays } from "../support/fixtures";
 import { defaultLineups } from "../../lib/play/lineup";
+import { EMPTY_DESK } from "../../lib/account/data";
 import type { TeamData } from "../../lib/account/types";
 
 /**
@@ -183,7 +184,7 @@ test("a differing play comes in as a copy, a team changed under the send still g
   const otters = view.teams[0]?.id ?? "";
   // the Herons hold their own Slant Left under the same id
   const heronSlant = { ...SLANT_LEFT, notes: "Heron version: X sits down." };
-  const herons = await otherTeam(page, { data: { plays: [heronSlant], playbooks: [], team: { name: "Harbor Herons", color: "#8338ec" }, lineups: defaultLineups() } });
+  const herons = await otherTeam(page, { data: { plays: [heronSlant], playbooks: [], team: { name: "Harbor Herons", color: "#8338ec" }, lineups: defaultLineups(), ...EMPTY_DESK } });
   await page.goto("/playbooks");
   await read(page, "the Herons with their own Slant Left", { otters, herons });
 
