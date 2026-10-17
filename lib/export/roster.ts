@@ -3,8 +3,8 @@
  * formation laid out on turf, each position a card hanging under its token where the player lines up, the
  * starter on the highlighter and the backups in order under. The picture is the side on view, sized for a
  * phone; the sheet is both sides with every chart whole, then the team, every player against every position
- * ("Who plays where") under the gaps to fill. They are the one way the players' names leave the device, and
- * only when the coach asks (docs/adr/008-roster-depth-chart.md, rule 4). Pure: SVG pages in, drawn and saved
+ * ("Who plays where") under the gaps to fill. Beside a device backup they are the only files with the players'
+ * names in them, and only when the coach asks (docs/adr/008-roster-depth-chart.md, rule 4). Pure: SVG pages in, drawn and saved
  * by lib/export/run.ts; every word is a real <text>, so the PDF's invisible text layer finds it.
  *
  * Ways it could go wrong, written down before the code:
@@ -107,6 +107,22 @@ function cutStart(s: string, width: number, size: number): string {
   return `…${t.trimStart()}`;
 }
 
+/** A word wider than its box broken at letters into lines that fit, so none of it is lost (E2). */
+function breakWord(s: string, width: number, size: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const ch of s) {
+    if (line && measure(line + ch, size) > width) { lines.push(line); line = ch; }
+    else line += ch;
+  }
+  if (line) lines.push(line);
+  // as many lines, the letters shared out evenly, so no line is left a lone letter
+  const chars = Array.from(s);
+  const per = Math.ceil(chars.length / lines.length);
+  const even = Array.from({ length: lines.length }, (_, i) => chars.slice(i * per, i * per + per).join("")).filter(Boolean);
+  return even.every((l) => measure(l, size) <= width) ? even : lines;
+}
+
 /** A name's places to break: between words, and after a hyphen ("Brooks-" "Washington"). */
 function pieces(s: string): { t: string; space: boolean }[] {
   return s.trim().split(/\s+/).filter(Boolean).flatMap((word) => word.split(/(?<=-)/).map((t, i) => ({ t, space: i === 0 })));
@@ -129,8 +145,9 @@ interface Fitted { lines: string[]; size: number }
 
 /**
  * A name as large as it fits in as few lines as it can (E2): one line at the two largest sizes, two at the
- * three largest, the last line allowed at any size. Past the smallest the first lines are kept and the last
- * keeps the name's end, cut at its start, so two long names that differ at the end are still two.
+ * three largest, the last line allowed at any size. At the smallest a word wider than the box breaks at its
+ * letters; past `maxLines` the first lines are kept and the last keeps the name's end, cut at its start, so
+ * two long names that differ at the end are still two.
  */
 function fitName(s: string, width: number, sizes: readonly number[], maxLines: number): Fitted {
   for (let n = 1; n <= maxLines; n++) {
@@ -140,10 +157,10 @@ function fitName(s: string, width: number, sizes: readonly number[], maxLines: n
     }
   }
   const size = sizes[sizes.length - 1] ?? 10;
-  const all = wrapName(s, width, size);
-  const kept = all.slice(0, maxLines - 1).map((l) => cut(l, width, size));
-  kept.push(cutStart(all.slice(maxLines - 1).join(" ").replace(/- /g, "-"), width, size));
-  return { lines: kept, size };
+  const all = wrapName(s, width, size).flatMap((l) => (measure(l, size) <= width ? [l] : breakWord(l, width, size)));
+  if (all.length <= maxLines) return { lines: all, size };
+  // what is left is more than a line, so the end that fits one is all past the lines kept
+  return { lines: [...all.slice(0, maxLines - 1), cutStart(s.trim(), width, size)], size };
 }
 
 /** A run wrapped at its spaces, at most `max` lines, the last cut with an ellipsis. */
@@ -325,7 +342,12 @@ function card(pos: Position, cw: number, m: M, co: CardOpts): Card {
     out.push({ word: depthWord(i), lines: f.lines, size: f.size, h, kind: starter ? "starter" : "backup" });
   });
   const more = pos.depth.length - shown.length;
-  if (more > 0) out.push({ word: "", lines: [`+${String(more)} more on the sheet`], size: m.backup[1] ?? 0, h: (m.backup[1] ?? 0) * 0.9 + 13 * m.u, kind: "muted" });
+  if (more > 0) {
+    // no depth word before it, so it has the card's whole inside, wrapped to fit
+    const ms = m.backup[1] ?? 0;
+    const lines = wrapWords(`+${String(more)} more on the sheet`, inner, ms, 2);
+    out.push({ word: "", lines, size: ms, h: (lines.length - 1) * lineH(ms) + ms * 0.9 + 13 * m.u, kind: "muted" });
+  }
   if (pos.depth.length === 1) {
     // nobody behind the starter: said in ink as the 2nd line, or two lines to pencil a backup in (E5)
     if (co.pencil) out.push(blank(1), blank(2));
@@ -384,7 +406,7 @@ function drawCard(c: Card, x: number, y: number, cw: number, m: M, co: CardOpts)
       const base = cy + 6.5 * m.u + l.size * 0.8;
       if (l.word) out.push(text(wordX, base, m.word, l.word, { fill: MUTED }));
       l.lines.forEach((s, k) => {
-        out.push(text(wordX + c.wordW, base + k * lineH(l.size), l.size, s, { fill: l.kind === "muted" ? MUTED : INK }));
+        out.push(text(l.word ? wordX + c.wordW : wordX, base + k * lineH(l.size), l.size, s, { fill: l.kind === "muted" ? MUTED : INK }));
       });
     }
     cy += l.h;
@@ -508,7 +530,7 @@ function drawBoard(b: Layout, x: number, y: number, bh: number, padX: number, sp
 // Not in this formation: tags with a chart and no token (H, FS), on a shelf by the turf in board order (E7)
 
 const SHELF = "Not in this formation";
-const SHELF_NOTE = "Positions with a depth chart and no spot in the formation.";
+const SHELF_NOTE = "Positions with no spot in the formation.";
 
 interface Shelf { h: number; rowH: number[]; draw: (x: number, y: number) => string }
 
@@ -616,25 +638,32 @@ export function rosterPicture(o: RosterExport & { view: Vis }): SvgPage {
   // the gaps on view, over the foot, wrapped at its stops
   const empty = nobody(allOf(v, show));
   const gaps = empty ? [] : wrapWords(gapLine(v, show), tw, 24, 3);
-  const foot = H - 72 - (gaps.length ? gaps.length * 32 + 14 : 0);
   // under the lineup, what it is made from; a side with nobody on it says so in the spare turf, as the app's
-  // empty states do (a dashed box), or under the lineup when the board leaves no room for one (E16)
-  const lay = (notes: readonly string[]) => {
+  // empty states do (a dashed box), or under the lineup when the board leaves no room for one (E16); `below`
+  // are the lines over the foot
+  const lay = (b: Board, notes: readonly string[], below: readonly string[]) => {
+    const foot = H - 72 - (below.length ? below.length * 32 + 14 : 0);
     const top = y + notes.length * 38 + 34;
     const avail = foot - top;
-    const fit = fitBoard(v, show, W - 2 * mx, avail, 22, 1.3, PICTURE_STEPS, { pencil: false, sideTag: show === "both" });
-    const bh = avail - (fit.shelf ? fit.gap + fit.shelf.h : 0);
-    return { notes, top, fit, bh, spare: bh - fit.b.h };
+    const fit = fitBoard(b, show, W - 2 * mx, avail, 22, 1.3, PICTURE_STEPS, { pencil: false, sideTag: show === "both" });
+    const bh = Math.max(fit.b.h, avail - (fit.shelf ? fit.gap + fit.shelf.h : 0));
+    return { b, notes, below, foot, top, fit, bh, spare: bh - fit.b.h };
   };
-  let l = lay(v.note ? [v.note] : []);
-  if (empty && l.spare < 220) l = lay([...l.notes, EMPTY]);
-  const { top, fit, bh, spare } = l;
+  let l = lay(v, v.note ? [v.note] : [], gaps);
+  // a crowd of positions not in the formation that won't fit beside the board: named in a line, drawn on the sheet (E9)
+  const off = shelfOf(v, show);
+  if (!l.fit.ok && off.length) {
+    const named = wrapWords(`${SHELF}, on the sheet: ${off.map((p) => p.tag).join(", ")}`, tw, 24, 2);
+    l = lay({ ...v, offense: onField(v, "offense"), defense: onField(v, "defense") }, l.notes, [...named, ...gaps]);
+  }
+  if (empty && l.spare < 220) l = lay(l.b, [...l.notes, EMPTY], l.below);
+  const { top, fit, bh, spare, foot } = l;
   l.notes.forEach((n, i) => out.push(text(tx, y + 38 * (i + 1), 25, cut(n, tw, 25), { fill: MUTED })));
   const emptyState = empty && spare >= 220;
   out.push(drawBoard(fit.b, mx, top, bh, fit.padX, emptyState));
   if (emptyState) out.push(emptyBox(W / 2, top + fit.b.h + spare / 2, Math.min(760, W - 2 * mx - 80)));
   if (fit.shelf) out.push(fit.shelf.draw(mx, top + bh + fit.gap));
-  gaps.forEach((g, i) => out.push(text(tx, foot + 14 + 24 + i * 32, 24, g)));
+  l.below.forEach((g, i) => out.push(text(tx, foot + 14 + 24 + i * 32, 24, g)));
   out.push(text(mx, H - 32, 22, cut(`${v.team} · ${v.lineup} · ${v.day}`, W * 0.55 - mx, 22), { fill: MUTED }));
   out.push(appMark(W - mx, H - 32, 20));
   return page(W, H, out.join(""));
@@ -698,8 +727,8 @@ export function rosterSheet(o: RosterExport & { paper: Paper }): SvgPage[] {
   const pages: PageFn[] = [];
   const nPos = v.offense.length + v.defense.length;
   const aside = `${count(nPos, "position", "positions")} · ${count(v.players.length, "player", "players")}`;
-  const boardPage = (b: Board, show: Vis, title: string): { fit: Fit; page: PageFn } => {
-    const head: Head = { kicker: show === "both" ? "Depth chart" : VIEW_WORDS[show], title, sub: v.note, aside };
+  const boardPage = (b: Board, show: Vis, title: string, more = false): { fit: Fit; page: PageFn } => {
+    const head: Head = { kicker: (show === "both" ? "Depth chart" : VIEW_WORDS[show]) + (more ? ", continued" : ""), title, sub: v.note, aside };
     const top = sheetFrame(v, W, H, head, 1, 1).top;
     const fit = fitBoard(b, show, cw, bottom - top, 16, PRINT_MAX_U, [{ maxDepth: Infinity, uMin: PRINT_MIN_U }], PRINT);
     return {
@@ -717,8 +746,22 @@ export function rosterSheet(o: RosterExport & { paper: Paper }): SvgPage[] {
   let one = boardPage(v, "both", v.lineup);
   const crowded = !one.fit.ok && shelfOf(v, "both").length > 0;
   if (crowded) one = boardPage(field, "both", v.lineup);
+  // a side a page, and a side too deep for one page on over more, its formation's levels in order: one level
+  // of cards always fits a page at the print floor, so nothing is drawn over the foot or off the page (E9)
+  const sidePages = (t: Team): PageFn[] => {
+    const out: PageFn[] = [];
+    const part = (rows: Position[][]): Board => (t === "offense" ? { ...field, offense: rows.flat() } : { ...field, defense: rows.flat() });
+    let rows = levels(onField(v, t));
+    while (rows.length) {
+      let k = rows.length;
+      while (k > 1 && !boardPage(part(rows.slice(0, k)), t, v.lineup).fit.ok) k--;
+      out.push(boardPage(part(rows.slice(0, k)), t, v.lineup, out.length > 0).page);
+      rows = rows.slice(k);
+    }
+    return out;
+  };
   if (one.fit.ok) pages.push(one.page);
-  else for (const t of sidesOf("both")) pages.push(boardPage(field, t, v.lineup).page);
+  else for (const t of sidesOf("both")) pages.push(...sidePages(t));
   const u = Math.max(PRINT_MIN_U, one.fit.b.m.u);
   if (crowded) pages.push(...shelfPages(v, W, H, u));
   pages.push(...teamPages(v, W, H));
@@ -774,9 +817,12 @@ function teamPages(v: Board, W: number, H: number): PageFn[] {
   const cols = (t: Team): Column[] => sideOf(v, t).map((p) => ({ team: t, tag: p.tag, onField: p.onField, deep: p.depth.length }));
   const colW = (groups: Column[][]): number =>
     Math.min(34, (cw - NAME_W - GROUP_GAP * (groups.length - 1)) / Math.max(1, groups.reduce((n, g) => n + g.length, 0)));
-  // one grid of both sides while a column is at least 18pt; else a grid a side, each down the whole team
+  // one grid of both sides while a column is at least 18pt; else a grid a side, each down the whole team, a
+  // side with more positions than a page holds at 18pt in grids of as many as it does (E9)
   const both = [cols("offense"), cols("defense")].filter((g) => g.length);
-  const grids: Column[][][] = colW(both) >= MIN_COL ? [both] : both.map((g) => [g]);
+  const most = Math.max(1, Math.floor((cw - NAME_W) / MIN_COL));
+  const chunks = (g: Column[]): Column[][] => Array.from({ length: Math.ceil(g.length / most) }, (_, i) => g.slice(i * most, i * most + most));
+  const grids: Column[][][] = colW(both) >= MIN_COL ? [both] : both.flatMap((g) => chunks(g).map((c) => [c]));
   const empty = nobody([...v.offense, ...v.defense]);
 
   const rows: Row[] = v.players.map((pl) => {
@@ -842,6 +888,7 @@ function listWithMore(items: readonly string[], width: number, size: number, max
     const lines = wrapList(s, width, size, Infinity);
     if (lines.length <= max && lines.every((l) => !l.endsWith("…"))) return lines;
   }
+  if (items.length === 1) return wrapWords(items[0] ?? "", width, size, max);
   return [cut(items[0] ?? "", width, size), `and ${String(items.length - 1)} more`];
 }
 
@@ -873,7 +920,7 @@ function drawGaps(v: Board, x: number, y: number, cw: number): string {
  */
 function drawGrid(groups: Column[][], rows: readonly Row[], x: number, y: number, colW: number, empty: boolean): string {
   const out: string[] = [];
-  const r = Math.min(9.5, colW / 2 - 3);
+  const r = Math.max(2, Math.min(9.5, colW / 2 - 3));
   const cells: { c: Column; cx: number }[] = [];
   let cx = x + NAME_W;
   groups.forEach((g, gi) => {
@@ -904,7 +951,7 @@ function drawGrid(groups: Column[][], rows: readonly Row[], x: number, y: number
     for (const { c, cx: ccx } of cells) {
       const at = row.pl.at.find((a) => a.team === c.team && a.tag === c.tag);
       if (!at) { if (!empty) out.push(`<circle cx="${f2(ccx)}" cy="${f2(mid)}" r="1.3" fill="${INK}" opacity="0.25"/>`); continue; }
-      if (at.depth === 0) out.push(`<circle cx="${f2(ccx)}" cy="${f2(mid)}" r="${f2(Math.min(8.5, colW / 2 - 3))}" fill="${YELLOW}" stroke="${INK}" stroke-width="1"/>`);
+      if (at.depth === 0) out.push(`<circle cx="${f2(ccx)}" cy="${f2(mid)}" r="${f2(Math.max(2, Math.min(8.5, colW / 2 - 3)))}" fill="${YELLOW}" stroke="${INK}" stroke-width="1"/>`);
       out.push(text(ccx, mid + 3.6, 10.5, String(at.depth + 1), { anchor: "middle" }));
     }
     ry += row.h;
