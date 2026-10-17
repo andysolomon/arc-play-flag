@@ -120,8 +120,9 @@ export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
     return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
       || s.los !== losOf(saved) || JSON.stringify(s.players) !== JSON.stringify(saved.players);
   }
+  // a restored draft or an opened share link has no history yet, so its players are compared as well
   return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow || s.los !== LOS_YARD
-    || (s.name !== "New play" && s.name !== "");
+    || (s.name !== "New play" && s.name !== "") || JSON.stringify(s.players) !== JSON.stringify(defaults());
 }
 
 /** Whether a player is drawn under the current Show filter. */

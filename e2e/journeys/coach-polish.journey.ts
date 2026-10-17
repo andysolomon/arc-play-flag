@@ -130,7 +130,7 @@ test("the Saved toast sits under the play name, never over it", async ({ page },
 test.describe("phone header", () => {
   const CONTROLS = [
     { name: "Play tools", label: "Play" },
-    { name: "Offense play", label: "Offense" },
+    { name: "Save play", label: "Save" },
     { name: "Undo", label: "Undo" },
     { name: "Redo", label: "Redo" },
     { name: "Clear routes", label: "Clear" },
@@ -147,7 +147,7 @@ test.describe("phone header", () => {
       const header = page.locator("header");
       const found: Record<string, unknown>[] = [];
       for (const c of CONTROLS) {
-        const control: Locator = header.getByRole(c.name === "Offense play" ? "img" : "button", { name: c.name, exact: true });
+        const control: Locator = header.getByRole("button", { name: c.name, exact: true });
         const name = control.getByText(c.label, { exact: true });
         await expect(name, `${c.name} shows "${c.label}"`).toBeVisible();
         const box = await control.boundingBox();
@@ -170,7 +170,7 @@ test.describe("phone header", () => {
         expect(text.x).toBeGreaterThanOrEqual(box.x);
         expect(text.x + text.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
         expect(text.y + text.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
-        if (c.name !== "Offense play") expect(hit, `a tap at the centre of ${c.name} lands on it`).toBe(true);
+        expect(hit, `a tap at the centre of ${c.name} lands on it`).toBe(true);
       }
       const overflow = await header.evaluate((el) => el.scrollWidth - el.clientWidth);
       expect(overflow, "the header fits the screen").toBeLessThanOrEqual(0);
