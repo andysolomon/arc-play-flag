@@ -2,7 +2,7 @@
 
 import {
   memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
-  type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject,
+  type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject,
 } from "react";
 import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from "@/lib/deepfield";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
@@ -66,6 +66,8 @@ interface Props {
   showTitle?: boolean;
   /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
   status?: string;
+  /** dropped beside the on-screen play name: the designer's play switcher (`PlaySwitcher`), which it alone offers */
+  switcher?: ReactNode;
   /**
    * the on-screen title, for focus handed to it (the header's Back to play, which makes it focusable until focus moves
    * on). Its ring is drawn over the field's frame, whose top edge would hide the ring's foot, never under
@@ -168,7 +170,7 @@ function captionFor(p: Player, starters: Readonly<Record<string, string>> | unde
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, titleRef, starters, roster = false,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, switcher, titleRef, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -789,7 +791,7 @@ function FieldImpl({
       {title !== undefined && !showTitle && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
       <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         {title !== undefined && showTitle && (
-          <div id={FIELD_TITLE_ID} className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
+          <div id={FIELD_TITLE_ID} className="relative mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
             <h1
               ref={titleRef}
               className="min-w-0 truncate text-header font-normal text-ink focus-visible:relative focus-visible:z-[1] data-quiet-focus:outline-none print:outline-none"
@@ -798,6 +800,7 @@ function FieldImpl({
               {title}
             </h1>
             {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
+            {switcher}
             {status !== undefined && (
               <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
                 {status}

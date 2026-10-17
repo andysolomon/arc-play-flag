@@ -37,8 +37,11 @@ const ROLL_LEFT: Pair[] = [[13, 6.2], [9.5, 6.2], [7, 4.2]];
 /** a boot away from a fake on the QB's right: it pivots back on the fake's side, bends behind the spot and runs out left */
 const BOOT_LEFT: Pair[] = [[16, 6.6], [12, 7], [9, 6.4], [7, 4.2]];
 const BOOT_RIGHT: Pair[] = [[14, 6.6], [18, 7], [21, 6.4], [23, 4.2]];
-/** from under centre, a yard behind the C: the fake there, then the path measured from 4 yards deep */
-const UNDER_CENTRE: Pair = [15, 2];
+/**
+ * from under centre, right behind the C as close as a teammate may stand (PLAYER_SPACING, lib/play/spacing.ts):
+ * the fake there, then the path measured from 4 yards deep
+ */
+const UNDER_CENTRE: Pair = [15, 3];
 const BOOT_LEFT_UNDER: Pair[] = [[16, 5.6], [12, 6], [9, 5.4], [7, 3.2]];
 /** how long a play-action fake takes to sell, in seconds (lib/play/motion.ts) */
 const FAKE = 0.25;
@@ -452,10 +455,10 @@ test("a boot fakes to the first runner to reach the QB, flips with the play, and
   expect(after.motion.runner).toBe("o5");
   await page.screenshot({ path: `${out(info, "two-runners")}-flipped.png` });
 
-  // under centre the QB fakes a yard behind the C, then drops and boots
+  // under centre the QB fakes two yards behind the C, the closest a teammate stands, then drops and boots
   await d.undo.click();
   await dragToken(d, "QB", UNDER_CENTRE);
-  await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o2")).toMatchObject({ x: 15, y: 2 });
+  await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o2")).toMatchObject({ x: UNDER_CENTRE[0], y: UNDER_CENTRE[1] });
   const under = await qbPath(d);
   expectLegs(under, BOOT_LEFT_UNDER);
   const { motion: m } = await plan(d);

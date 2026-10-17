@@ -1,10 +1,31 @@
+import { DEMO_VIDEO } from "../../components/demo/demos";
+
 /**
  * The Demo asset contract, checked against ffprobe output. Pure functions so the
- * rules can be tested without an encoder: 960×540, silent, 6–12 seconds, real files.
+ * rules can be tested without an encoder: 576×720, silent, 6–12 seconds, real files.
+ *
+ * The frame is a phone's: the app is recorded in its own phone layout, 384 CSS pixels wide
+ * (APP_VIEWPORT) at a device scale of 1.5, under a caption band the recorder draws, so the
+ * field fills the width of a clip instead of a strip of a landscape one. The clip is 4:5, the
+ * shape a phone-first video is shown at.
  */
-export const VIDEO_SIZE = { width: 960, height: 540 } as const;
+export const VIDEO_SIZE = DEMO_VIDEO;
+/**
+ * The app's own viewport inside the harness, in its CSS pixels: a real phone width, so it lays out
+ * as it does on one. The browser's viewport is the video's size; the harness zooms the app's frame
+ * by ZOOM, which is what makes 384 into 576. (Chromium's screencast records CSS pixels whatever the
+ * device scale, so the zoom is the only way to a crisp 1.5× picture.)
+ */
+export const APP_VIEWPORT = { width: 384, height: 480 } as const;
+export const ZOOM = 1.5;
+/** The caption band across the top of the frame, in CSS pixels; the app fills the rest. */
+export const CAPTION_BAND = 52;
 export const MIN_SECONDS = 6;
 export const MAX_SECONDS = 12;
+/** Delivery frame rates: 10 for the designer's taps and drawers, 12 where ▶ plays a ball in flight. */
+export const FRAME_RATES = [10, 12] as const;
+export type FrameRate = (typeof FRAME_RATES)[number];
+export const DEFAULT_FPS: FrameRate = 10;
 /** anything smaller is a broken encode, not a clip */
 export const MIN_FILE_BYTES = 1_000;
 /**
@@ -14,8 +35,8 @@ export const MIN_FILE_BYTES = 1_000;
  * split into eight focused ones (issue #36): the same material, told in smaller pieces,
  * at a higher encoding CRF to pay for the extra chapters. Raised again from 1,700,000
  * for nine chapters (issue #107: the field, end zones and slides) rather than raising the
- * CRF further: the nine came to about 1.85 MB, and the rest is room for an encoder version
- * to land a few percent either way.
+ * CRF further. The phone-shaped frame (576×720 at 10–12 fps) carries ten chapters in less
+ * than the landscape frame carried nine, so the budget stays.
  */
 export const MAX_SET_BYTES = 2_000_000;
 
