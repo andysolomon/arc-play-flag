@@ -29,6 +29,7 @@ import { isBallJob, isRun, mirrorRoute, mirrorable, routeDef } from "@/lib/play/
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
+import { PlaySwitcher } from "./PlaySwitcher";
 import { FirstUse } from "./FirstUse";
 import { Header, VIEW, type Mode } from "./Header";
 import { Hint } from "./Hint";
@@ -675,6 +676,8 @@ export function App() {
           showTitle
           titleRef={titleRef}
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
+          // roster mode has no play open (ADR 008), so the switcher waits for play mode, as Play tools' list does
+          switcher={rostering ? undefined : <PlaySwitcher name={s.name} playId={s.id} onOpenPlay={onOpenPlay} onAddToBook={onAddToBook} />}
           noRunZones={noRunZones}
           los={rostering ? ROSTER_LOS : s.los}
           starters={rostering || namesOn ? starterNames : undefined}

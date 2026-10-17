@@ -12,45 +12,53 @@ Each chapter has one slug in `components/demo/demos.ts` and three matching files
 <slug>.webp  # poster shown before playback
 ```
 
-Record at 960×540. Keep clips silent, 6–12 seconds long, readable at phone width, and focused on one task. The whole tour stays within 90 seconds. The complete poster-and-video set must remain below 2 MB; `components/demo/demos.test.ts` enforces the limit and missing files. The service worker precaches the whole set, so that budget is what an offline install costs: it was raised from 1.25 MB when the five original chapters were split into eight (paid for with a higher encoding CRF), and from 1.7 MB when the field, end zone and slides chapters made nine (issue #107).
+Every clip is 576×720, a phone's 4:5 shape: the app in its own phone layout (384 CSS pixels wide, zoomed 1.5× so it is crisp) under a 52-pixel caption band the recorder owns. Keep clips silent, 6–12 seconds long, readable at the width of a phone card, and focused on one task. The whole tour stays within 120 seconds. The complete poster-and-video set must remain below 2 MB; `components/demo/demos.test.ts` enforces the limit and missing files. The service worker precaches the whole set, so that budget is what an offline install costs: it was raised from 1.25 MB when the five original chapters were split into eight (paid for with a higher encoding CRF), and from 1.7 MB when the field, end zone and slides chapters made nine (issue #107). The phone frame carries ten chapters in the same budget at a higher CRF (52 for VP9, 37 for H.264).
+
+Each chapter's card also lists its captions, in order: the text alternative to a silent clip. The recorder checks that a chapter showed exactly those captions, so the list under a clip is never a paraphrase of it.
 
 `components/demo/recorded-from.json`, beside the tour's manifest, records which UI the clips were recorded from (it stays out of `public/demos/`, which holds only what the app serves and precaches). See [Keeping the clips current](#keeping-the-clips-current).
 
-Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses `preload="none"`, and pauses the previous demo when another starts. It plays without the browser's video controls, which draw over the clip (iOS covers it with skip, scrub and AirPlay buttons; `disableRemotePlayback` keeps Android Chrome's cast button off it): the whole clip is one button, named Play or Pause and the chapter, and the play sign and chapter number show over it only while it is stopped. Do not add a product timeline or scrubber; at 6–12 seconds a clip is watched through, and a tap starts it over once it ends.
+Use short videos instead of GIFs. `DemoClip` lists WebM first, MP4 second, uses `preload="none"`, never crops (`object-contain` in a 4:5 box), and pauses the previous demo when another starts. The first chapter is the hero: `DemoScreen` shows it full width above the grid. It plays without the browser's video controls, which draw over the clip (iOS covers it with skip, scrub and AirPlay buttons; `disableRemotePlayback` keeps Android Chrome's cast button off it): the whole clip is one button, named Play or Pause and the chapter, and the play sign and chapter number show over it only while it is stopped. Do not add a product timeline or scrubber; at 6–12 seconds a clip is watched through, and a tap starts it over once it ends.
 
 ## Current chapter plan
 
-| Slug | Story | Required beats |
-| --- | --- | --- |
-| `build-play` | Draw the offense | Name a play, drag a receiver into the formation, add a quick route, mark the primary read |
-| `custom-routes` | Draw a route of your own | Tap waypoints, finish the route, mirror it, then undo and redo |
-| `run-play` | Watch plays run | Run a handoff to the end, then run play-action through to the primary read |
-| `build-defense` | Build the defense | A deep zone, man coverage picked off the faded shadow offense, a legal blitz, then hide the offense so the man defender wears its "on X" tag |
-| `field-setup` | Make the field yours | Spot the ball on their 10 (**Line of scrimmage**), turn the no-run zones off, then Dark and a premium theme with its themed field |
-| `touchdowns` | Score in your own end zone | Pick an end zone design, letter the team's name across it, throw a touchdown pass into it and see the next design open |
-| `save-share` | Save, note and share | Save, notes, duplicate, copy the snapshot link |
-| `playbooks` | Build a playbook | Name the team, import a handed-over book, create one, add plays through the dialog and order them |
-| `print-playbook` | Print it or present it | Wristbands, binder pages, slides, postcards, flyer, playbook file |
+The tour follows a coach's week, and every chapter opens on a formation of its own (`FORMATIONS` in `fixtures.ts`), so the tour reads like a playbook and not like one play edited ten times.
+
+| Slug | Story | Formation | Required beats |
+| --- | --- | --- | --- |
+| `first-play` | Draw a play, press play (the hero) | New-play spread, one drag into Twins Left | New play, drag Z into the slot, a slant and a go by the tap, star the read, ▶ to the catch |
+| `roster` | Put your players on the play | Bunch Right | Roster mode with the starters' names, X's depth chart, Show player names on the play, the Secondary Lineup |
+| `league-rules` | It knows your league's rules | Pistol | The ball on their 5, the dive stamped RUN IN NO-RUN ZONE, made a pass, the zones switched off |
+| `run-game` | Run it, then fake it | Trips Right | ▶ the jet sweep, then ▶ the jet fake to the post against a faded Cover 1 |
+| `defense` | Call a Cover 1, then watch it move | Cover 1 against Twins Right | Safety to Zone deep, LC in man on X off the faded offense, R's blitz moved back to 7 yards, ▶ with the defense moving |
+| `game-day` | Build the book, call it from the sideline | the 7-play Otter Game Plan | Add a play, move it up, the game-day reader, search "4", Full screen |
+| `wristbands` | Every player gets their own wristband | the same book | Pick the adult slim band, download, X's insert over the panel, then Z's, the binder and the slides |
+| `share` | Send it to your staff | Twins Left | Save the unsaved play, coaching points, copy a link, open the shared page |
+| `touchdown` | Score in your own end zone | Bunch Left at their 10 | Pick Synthwave '84 lettered for the team, draw X a custom route into the end zone, ▶ to the celebration |
+| `trick-plays` | Trick plays, legal by design | Gun Split backs | QB laterals to Z, Z throws, the catch dragged forward snaps back, ▶ the double pass |
 
 A chapter carries at most six `covers` entries; past that it stops being legible on a phone. If a feature does not fit one of these stories, add the smallest useful chapter rather than stretching an existing clip. Update the expected chapter count in `components/demo/demos.test.ts` deliberately.
 
 ### Coverage is a promise, not a caption
 
-The `covers` pills on a chapter's `/demo` card are checked, not asserted by hand. Each beat declares the features it demonstrates, and a feature is only counted once that beat has completed — so a failed assertion never counts as coverage. `driver.finish()` refuses to publish a chapter whose card promises something no beat demonstrated, and a beat that claims a feature the card does not list is an error too. `scripts/demo-recorder/coverage.ts` holds the rules; `coverage.test.ts` covers them without a browser.
+The `covers` pills on a chapter's `/demo` card are checked, not asserted by hand. Each beat declares the features it demonstrates, and a feature is only counted once that beat has completed — so a failed assertion never counts as coverage. `driver.finish()` refuses to publish a chapter whose card promises something no beat demonstrated, and a beat that claims a feature the card does not list is an error too. It refuses, too, a chapter whose captions were not the card's, in the card's order, and one that ends more than 1.5 seconds before its promised length (dead time a viewer sits through: set the chapter's `time` to what it takes, or show more). `scripts/demo-recorder/coverage.ts` holds the coverage rules; `coverage.test.ts` covers them without a browser.
+
+Prove a feature with the beat whose result is on screen, not the tap that triggers it: the print chapter downloads a PDF and then lays the real insert over the panel (`wristbandCard`, the same SVG the PDF rasterises), so "Wristbands" is proven by a wristband, not by a button.
 
 ## The recorder
 
-The development-only recorder in `scripts/demo-recorder/` is the canonical way to regenerate every chapter. It drives the same accessible controls a coach uses, seeds only the stable fictional **Riverside Otters** fixtures, captures the 960×540 viewport, encodes the three delivery files, and verifies them before it writes anything you can keep.
+The development-only recorder in `scripts/demo-recorder/` is the canonical way to regenerate every chapter. It drives the same accessible controls a coach uses, seeds only the stable fictional **Riverside Otters** fixtures, films the app in its phone layout inside a harness page it owns, encodes the three delivery files, and verifies them before it writes anything you can keep.
 
 | File | Holds |
 | --- | --- |
 | `scripts/demo-recorder.ts` | The `bun run demo:record` entry point |
 | `scripts/demo-recorder/options.ts` | Arguments, chapter slugs, output names, `--help` |
 | `scripts/demo-recorder/fixtures.ts` | The fictional plays, playbook, team, and per-chapter starting draft |
-| `scripts/demo-recorder/chapters.ts` | One function per chapter: captions, actions, expected states, poster moment, target length |
+| `scripts/demo-recorder/harness.ts` | The page the recorder films: the caption band, the app in a zoomed same-origin frame under it, the cover shown while a screen loads, and the touch (a dot and a ripple where a beat taps or drags) |
+| `scripts/demo-recorder/chapters.ts` | One function per chapter: captions, actions, expected states, poster moment, target length, frame rate |
 | `scripts/demo-recorder/interactions.ts` | Bounded, state-confirmed retries for controls that can render before React hydration |
 | `scripts/demo-recorder/runtime.ts` | Disposable profile, capture, encoding, verification, publishing into the output directory |
-| `scripts/demo-recorder/media.ts` | The asset contract as pure checks over `ffprobe` output |
+| `scripts/demo-recorder/media.ts` | The frame (576×720, the app at 384 CSS pixels zoomed 1.5×, the 52-pixel band), the frame rates, and the asset contract as pure checks over `ffprobe` output |
 | `scripts/demo-recorder/freshness.ts` | The fingerprint of the UI a recording shows, written as `recorded-from.json`, and the check against it |
 | `scripts/demo-restamp.ts` | The `bun run demo:restamp` entry point, for a UI change no clip shows |
 | `scripts/demo-recorder/*.test.ts` | Unit tests for arguments, fixtures, manifest alignment, cleanup, freshness, and the contract |
@@ -65,7 +73,7 @@ Every chapter launches Chromium with a brand-new temporary profile under the sys
 | --- | --- | --- |
 | Bun | 1.4.0 | `packageManager` in `package.json` |
 | `@playwright/test` | 1.63.0 (Chromium build 1243) | Exact version in `package.json` and integrity-locked in `bun.lock`; `bun run demo:setup` installs the matching browser |
-| FFmpeg / ffprobe | 9.x with `libvpx-vp9`, `libx264`, and `libwebp` | System package; the recorder checks for the encoders and prints the version it used |
+| FFmpeg / ffprobe | 6.x or later with `libvpx-vp9`, `libx264`, and `libwebp` | System package; the recorder checks for the encoders and prints the version it used |
 
 The current set was regenerated with FFmpeg 6.1.1 and the Chromium build its machine shipped (named with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`, the same override `playwright.config.ts` honours). A different FFmpeg major version may change file sizes slightly; the set budget check will say so.
 
@@ -86,7 +94,7 @@ Serve the production build in another terminal, then record one chapter or all c
 bun run build
 bun run start
 
-bun run demo:record --chapter build-play --output-dir /tmp/arc-demo-review
+bun run demo:record --chapter first-play --output-dir /tmp/arc-demo-review
 bun run demo:record --chapter all --output-dir /tmp/arc-demo-review --force
 ```
 
@@ -114,12 +122,14 @@ one_dir=$(mktemp -d /tmp/arc-demo-one.XXXXXX)
 all_dir_a=$(mktemp -d /tmp/arc-demo-all-a.XXXXXX)
 all_dir_b=$(mktemp -d /tmp/arc-demo-all-b.XXXXXX)
 
-bun run demo:record --chapter run-play --output-dir "$one_dir" --contact-sheets --trace
+bun run demo:record --chapter run-game --output-dir "$one_dir" --contact-sheets --trace
 bun run demo:record --chapter all --output-dir "$all_dir_a" --contact-sheets --trace
 bun run demo:record --chapter all --output-dir "$all_dir_b" --contact-sheets --trace
 ```
 
-For each `all` directory, record the final `Complete Demo set` byte count and retain every `Recorded …` line. Probe all eighteen videos and confirm the nine slugs and promised durations still match `components/demo/demos.ts`. Review every `*.sheet.png` at full width and every `*.sheet-390.png` at 390 px. Any exception, `.failure.png`, missing delivery file, duration outside 6–12 seconds, or set at/above 2,000,000 bytes means the run is not acceptance evidence.
+For each `all` directory, record the final `Complete Demo set` byte count and retain every `Recorded …` line. Probe all twenty videos and confirm the ten slugs and promised durations still match `components/demo/demos.ts`. Review every `*.sheet.png` at full width and every `*.sheet-390.png` at 390 px. Any exception, `.failure.png`, missing delivery file, duration outside 6–12 seconds, or set at/above 2,000,000 bytes means the run is not acceptance evidence.
+
+Record one chapter at a time on an otherwise idle machine: a beat's holds are wall-clock, so a build or a test suite running beside the recorder stretches a chapter past its promised length.
 
 To prove clean-checkout reproducibility, repeat the setup, production build/server, dry-run, single-chapter run, and both `all` runs from a newly created checkout of the exact review revision using `bun install --frozen-lockfile`. Record `git rev-parse HEAD`, `git status --short`, `bun --version`, `playwright --version`, `ffmpeg -version`, and `ffprobe -version` with the evidence. Do not reuse `.next`, `node_modules`, a capture directory, or a browser profile from the development checkout.
 
@@ -129,15 +139,18 @@ Publish only one complete set from a validated `all` directory after comparing t
 
 For every chapter the recorder:
 
-1. Plays the chapter's beats, checking each expected state in the app (routes stored, toasts shown, downloads received with the right filename).
-2. Fails if the beats ran past the length promised in `components/demo/demos.ts` (by more than a quarter second): encoding trims every clip to that length, so an overrun would silently cut the last beats, and with them things the card promises. Otherwise it holds the last frame until the promised length, then trims normalized source timestamps to that fixed manifest length (never variable wall-clock capture time).
-3. Encodes WebM (VP9, CRF 46) and MP4 (H.264, CRF 33) at 8 fps, and the poster from a screenshot taken at the chapter's chosen moment.
-4. Probes each file: exactly one video stream, no audio, 960×540, the expected codec, 6–12 seconds, and more than 1 KB.
-5. Moves the three files into the output directory together, from a staging directory, only after every check passes.
+1. Opens the harness page, shows the chapter's first caption in the band, and opens the first screen behind the cover; the chapter's clock starts when that screen is on camera, and the clip starts there (the browser launching and the first load are cut from the front of the raw capture).
+2. Plays the chapter's beats, checking each expected state in the app (routes stored, toasts shown, downloads received with the right filename), drawing the touch where each one taps or drags.
+3. Fails if the beats ran past the length promised in `components/demo/demos.ts` (by more than a quarter second): encoding trims every clip to that length, so an overrun would silently cut the last beats, and with them things the card promises. Fails, too, if they ended more than 1.5 seconds short of it. Otherwise it holds the last frame until the promised length, then trims normalized source timestamps to that fixed manifest length (never variable wall-clock capture time).
+4. Encodes WebM (VP9, CRF 52) and MP4 (H.264, CRF 37) at the chapter's frame rate (12 fps where ▶ plays a ball in flight, 10 elsewhere), and the poster from a screenshot taken at the chapter's chosen moment.
+5. Probes each file: exactly one video stream, no audio, 576×720, the expected codec, 6–12 seconds, and more than 1 KB.
+6. Moves the three files into the output directory together, from a staging directory, only after every check passes.
 
-Before the first chapter it opens each screen once in a throwaway headless browser, so a freshly built server's slow first render and scripts, and the browser's slow first launch, do not eat into the first chapter's length. An `all` run finally adds up the twenty-seven files, fails if they reach 2,000,000 bytes, and writes `recorded-from.json`: the fingerprint of the UI in this checkout when the run began (the app it recorded must be built from the same checkout).
+Before the first chapter it opens each screen once in a throwaway headless browser, so a freshly built server's slow first render and scripts, and the browser's slow first launch, do not eat into the first chapter's length. An `all` run finally adds up the thirty files, fails if they reach 2,000,000 bytes, and writes `recorded-from.json`: the fingerprint of the UI in this checkout when the run began (the app it recorded must be built from the same checkout).
 
-A chapter also fails before any of that if it did not demonstrate every feature its `/demo` card advertises.
+A chapter also fails before any of that if it did not demonstrate every feature its `/demo` card advertises, or showed captions other than the card's.
+
+The service worker is blocked while recording and its pill is styled out of the frame (`ON_CAMERA_CSS` in `runtime.ts`), the drawers snap instead of sliding, and every other motion (a route drawing on, the confetti, an end zone's own animation) plays as it does for a coach.
 
 ### When a beat fails
 
@@ -149,13 +162,13 @@ Failures name the chapter, the beat, and one of five classes, and leave `<slug>.
 | `state` | The control was used but the expected result did not land | Check the app change; adjust the assertion or the fixture |
 | `export` | An in-app download did not happen, failed, or had the wrong name | Check the export path in the app, then the expected filename pattern |
 | `recording` | Navigation, capture, encoding, duration, or output validation failed | Read the message: server not running, encoder missing, beats longer than the promised length (`--trace` shows where the time goes), set over budget |
-| `coverage` | The chapter finished without showing something its `/demo` card promises | Add a beat that demonstrates it, or take the pill off the card in `demos.ts` |
+| `coverage` | The chapter finished without showing something its `/demo` card promises, or showed captions other than the card's | Add a beat that demonstrates it, or take the pill off the card in `demos.ts`; make the `captions` and the `say` calls agree |
 
-Chapters run in the app's compact layout (the 960 px viewport is under the 1024 px breakpoint): the two sidebars are drawers that overlay the field one at a time, and picking a route or the primary read folds the palette away. On a fresh profile, server-rendered controls can also appear before React attaches their handlers. `ChapterDriver` handles both cases with bounded, state-confirmed retries, so use its helpers (`clickUntilState`, `selectPlayer`, `pick`, `paletteAction`, `tapField`, `dragPlayer`, `runPlay`, `choose`, `setChecked`, `unfold`, `pickLook`, `download`, `importPlaybookFile`) rather than raw clicks when adding beats. `unfold` opens the folded Theme and End zone sections of Play tools; `pickLook` picks a theme or end zone and waits for the "Switching to …" interstitial to come down.
+Chapters run in the app's phone layout (384 CSS pixels wide): the two sidebars are drawers that cover most of the field one at a time, and picking a route or the primary read folds the palette away, so show every payoff with the drawers closed (`closePanels`). On a fresh profile, server-rendered controls can also appear before React attaches their handlers. `ChapterDriver` handles both cases with bounded, state-confirmed retries, so use its helpers (`click`, `clickUntilState`, `selectPlayer`, `pick`, `paletteAction`, `tapField`, `dragPlayer`, `dragHandle`, `runPlay`, `choose`, `setChecked`, `unfold`, `pickLook`, `download`, `overlay`) rather than raw clicks when adding beats. `unfold` opens the folded Theme and End zone sections of Play tools; `pickLook` picks a theme or end zone and waits for the "Switching to …" interstitial to come down; a beat whose state is already reached (a drawer already open) is skipped, so no tap ever lands on nothing.
 
-Those helpers also ring the control they are about to use, so a viewer on a phone can see which small control was tapped. The ring stays through the beat's hold only while the control is still on screen (picking a route folds the palette away, and a ring left where the tile was reads as a tap on nothing), and clears on the next caption or assertion.
+The app is in a frame the harness zooms 1.5×, so every tap goes through the driver, which scales a control's box to the page's pixels; Playwright's own `click` on a control in the frame lands in the wrong place. The helpers draw the touch where the tap lands: a dot that shows a moment before, then a ripple, and a dot that follows a drag.
 
-Captions sit under the header on the designer, along the bottom on list screens, and over the middle of the header (`captionEdge = "header"`) in the chapters whose story is the top of the field, their end zone. A chapter that narrates the primary read on ▶ sets `pinRandom` so the simulation always throws to it; such a chapter must never save a play.
+Captions live in the band over the app, never in it, so say the first one before the first `goto` (the band shows it from the clip's first frame) and change it before each story beat. A chapter that narrates the primary read on ▶ sets `pinRandom` so the simulation always throws to it; such a chapter must never save a play. A chapter with a ball in flight sets `fps: 12`.
 
 ### Publishing into the tour
 
@@ -191,10 +204,10 @@ To change what a chapter shows, edit its function in `chapters.ts`: every story 
 
 To add a chapter:
 
-1. Add it to `DEMOS` in `components/demo/demos.ts` with its slug, title, time, summary, and `covers`.
+1. Add it to `DEMOS` in `components/demo/demos.ts` with its slug, title, time, summary, `captions` and `covers`.
 2. Add the slug to `CHAPTER_SLUGS` in `options.ts` and a `CHAPTERS` entry in `chapters.ts` with the same `targetSeconds` as the manifest's `time`.
-3. Add any starting play to `fixtures.ts` and, if the chapter opens one, to `CHAPTER_PLAY`; a chapter that must start mid-edit seeds `CHAPTER_DRAFT` instead.
-4. Give every `covers` entry a beat that proves it: pass the feature names to the `expectState` (or `download`) that confirms the action landed.
+3. Add any starting play to `fixtures.ts` in a formation of its own (`FORMATIONS`) and, if the chapter opens one, to `CHAPTER_PLAY`; a chapter that must start mid-edit seeds `CHAPTER_DRAFT` instead.
+4. Give every `covers` entry a beat that proves it with its result on screen: pass the feature names to the `expectState` (or `download`) that confirms the action landed.
 5. Run `bun test scripts/demo-recorder`; the tests fail until the manifest, slugs, and lengths agree.
 6. Record it, review it, publish the set with its stamp, and add the slug to `DEMOS` in `lib/offline/sw.js` (every build stamps a new release into the worker, so installed copies refresh without a cache version bump).
 
@@ -216,13 +229,13 @@ Never record personal browser chrome, accounts, bookmarks, notifications, or rea
 
 ## 2. Record a chapter
 
-The recorder captures the app viewport at exactly 960×540 with browser chrome hidden and reduced motion on, so drawers snap instead of sliding. Chapter actions and their visible assertions live in `scripts/demo-recorder/chapters.ts`; keep every action deterministic and label each expected state explicitly.
+The recorder captures a 576×720 page: the caption band over the app in its phone layout, zoomed 1.5×, with the drawers snapping instead of sliding and every other motion on. Chapter actions and their visible assertions live in `scripts/demo-recorder/chapters.ts`; keep every action deterministic and label each expected state explicitly.
 
 For each beat:
 
 1. Put the app in its known starting state before capture begins.
 2. Show one short caption describing the intent, not the mouse action.
-3. Move the pointer to the control, pause briefly, activate it, and leave enough time to see the result.
+3. Let the touch land on the control (the driver draws it), and leave enough time to see the result with the drawers closed.
 4. Avoid dead time, fast flashing changes, and overlapping menus.
 5. End on a stable result for roughly half a second.
 
@@ -230,20 +243,20 @@ Review the capture once at full size and once at 390 px wide (`--contact-sheets`
 
 ## 3. Encode the assets
 
-The recorder runs the commands below after a successful capture. They remain here for diagnosing or manually reproducing an encoding failure from a `--keep-raw` capture. Replace `SLUG`, `SECONDS` (the chapter's promised length), and `raw-capture`:
+The recorder runs the commands below after a successful capture. They remain here for diagnosing or manually reproducing an encoding failure from a `--keep-raw` capture. Replace `SLUG`, `LEAD` (the seconds of launch and first load the run cut from the front; `--trace` prints the clock), `SECONDS` (the chapter's promised length), `FPS` (12 for a ▶ chapter, else 10) and `raw-capture`:
 
 ```sh
-ffmpeg -y -i raw-capture.webm -t SECONDS -an -vf "fps=8,scale=960:540:flags=lanczos" \
-  -c:v libvpx-vp9 -crf 46 -b:v 0 SLUG.webm
+ffmpeg -y -i raw-capture.webm -an -vf "trim=start=LEAD:duration=SECONDS,setpts=PTS-STARTPTS,fps=FPS,scale=576:720:flags=lanczos" \
+  -c:v libvpx-vp9 -crf 52 -b:v 0 SLUG.webm
 
-ffmpeg -y -i raw-capture.webm -t SECONDS -an -vf "fps=8,scale=960:540:flags=lanczos" \
-  -c:v libx264 -crf 33 -preset slow -pix_fmt yuv420p -movflags +faststart SLUG.mp4
+ffmpeg -y -i raw-capture.webm -an -vf "trim=start=LEAD:duration=SECONDS,setpts=PTS-STARTPTS,fps=FPS,scale=576:720:flags=lanczos" \
+  -c:v libx264 -crf 37 -preset slow -pix_fmt yuv420p -movflags +faststart SLUG.mp4
 
-ffmpeg -y -i poster-frame.png -frames:v 1 -vf "scale=960:540:flags=lanczos" \
+ffmpeg -y -i poster-frame.png -frames:v 1 -vf "scale=576:720:flags=lanczos" \
   -c:v libwebp -q:v 72 SLUG.webp
 ```
 
-Choose a poster frame that communicates the chapter before playback. If the three new files push the complete set over 2 MB, shorten the clip first, then raise the VP9/MP4 CRF slightly. Keep the 8 fps delivery rate unless motion becomes hard to follow.
+Choose a poster frame that communicates the chapter before playback: a payoff, with the drawers closed; in a ▶ chapter, the ball in the air (`runPlay`'s `posterAt`). If the three new files push the complete set over 2 MB, shorten the clip first, then raise the VP9/MP4 CRF slightly, then drop a ▶ chapter to 10 fps.
 
 Check the results:
 
@@ -257,7 +270,7 @@ du -cb public/demos/* | tail -1
 ## 4. Update the tour
 
 1. Add or edit the chapter in `components/demo/demos.ts`. Keep the slug aligned with all three filenames and with `CHAPTER_SLUGS` in the recorder.
-2. List every demonstrated feature in `covers`; this is the tour's coverage inventory.
+2. List every demonstrated feature in `covers`; this is the tour's coverage inventory. List the captions in `captions`; the recorder holds the chapter to them.
 3. Keep the summary concrete and accurate to the recording.
 4. If the Demo icon changes, preserve the source at `design/assets/icons/demo.png` and commit its optimized sidebar copy at `public/icons/demo.png`.
 5. If a new route or asset family is introduced, add it to `lib/offline/sw.js`; `scripts/stamp-sw.ts` writes it to `public/sw.js` with the build's release, so installed copies refresh.
@@ -275,7 +288,7 @@ bun run build
 git diff --check
 ```
 
-`e2e/journeys/demo-tour.journey.ts` then proves on every pull request that `/demo` lists every chapter as the manifest says, that each clip and poster served is the committed file at the promised length and 960×540, that no clip shows the browser's controls or cast button or can play fullscreen on an iPhone, that the play sign and chapter number show only while a clip is stopped, that a tap anywhere on a clip, or Tab then Enter or Space, plays and pauses it, and that one clip plays at a time; it leaves `test-results/demo-tour-<device>.json`, `test-results/demo-tour-<device>-playback.json` with a picture of the first card stopped and playing, and a mid-clip frame of every chapter. Then check the production build in a desktop and 390×844 mobile viewport:
+`e2e/journeys/demo-tour.journey.ts` then proves on every pull request that `/demo` lists every chapter as the manifest says (its captions under it), that each clip and poster served is the committed file at the promised length and 576×720, that no clip shows the browser's controls or cast button or can play fullscreen on an iPhone, that the play sign and chapter number show only while a clip is stopped, that a tap anywhere on a clip, or Tab then Enter or Space, plays and pauses it, and that one clip plays at a time; it leaves `test-results/demo-tour-<device>.json`, `test-results/demo-tour-<device>-playback.json` with a picture of the first card stopped and playing, and a mid-clip frame of every chapter. Then check the production build in a desktop and 390×844 mobile viewport:
 
 - Open **Play tools**, confirm the Demo tile uses the expected icon, and navigate through it.
 - Confirm every poster renders and every card is legible.

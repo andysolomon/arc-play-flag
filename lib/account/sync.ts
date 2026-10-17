@@ -61,7 +61,24 @@
  *   that never picked anything takes the account's look.
  * - A27 the pick names a book that isn't in the team: read as none, and the first book stands in (C1).
  * - A28 signing out clears the look too: the next coach on this device starts with the defaults.
+ *
+ * Sending a playbook or a play to another of the account's teams (`sendToTeam`), from the playbooks
+ * page, writes that team through the same API and leaves this device alone. Its own ways to go wrong:
+ *
+ * - S1 the other team already has the book, or the play, as it is: nothing is written, and the coach
+ *   is told it is already there.
+ * - S2 the other team has a play under the same id that differs: it comes in as a copy under a new
+ *   id, as a file import would, and the other team's version stands.
+ * - S3 the other team was written by one of its devices between the read and the write: the write is
+ *   refused with the account's copy, the plan is made again over that copy, and the write goes again.
+ * - S4 the other team is gone from the account: the coach is told, and it leaves the list.
+ * - S5 the session ended: the coach is told to sign in again; nothing is written.
+ * - S6 the other team would be bigger than an account holds, or the account is busy: the coach is
+ *   told what the account said; nothing is written.
+ * - S7 the team this device mirrors is never a target, and nothing on this device changes: the source
+ *   stays, the marker stays, and no push is started.
  */
+import { planTransfer, type Transfer } from "@/lib/export/transfer";
 import { reread, subscribe } from "@/lib/play/library";
 import { CURRENT_BOOK_KEY, readCurrentBook } from "@/lib/play/current-book";
 import { subscribeDeviceWrites } from "@/lib/device-writes";
@@ -628,6 +645,65 @@ export async function signOut(): Promise<void> {
     window.location.assign(new URL("/", window.location.origin).href);
   } catch (e) {
     set(problem(e));
+  }
+}
+
+// ---- what the playbooks page does ----------------------------------------------------------------------------------
+
+/** How a send ended: what the other team gained, or one line on why it gained nothing. */
+export type SendResult =
+  | { ok: true; team: TeamSummary; added: number; copied: number; reused: number; /** S1: it was already there, so nothing was written */ unchanged: boolean }
+  | { ok: false; message: string };
+
+/** The other teams of this account, once the device has settled on one of them: where a playbook or a play can be sent (S7: never the one this device mirrors). */
+export const sendTargets = (s: AccountState = state): TeamSummary[] => (s.user && s.teamId ? s.teams.filter((t) => t.id !== s.teamId) : []);
+
+/**
+ * Copies a playbook (with its plays) or a play into another of the account's teams, as importing a
+ * file of it there would: what that team already has is reused, a differing play under the same id
+ * comes in as a copy (S2), and a write refused as changed elsewhere is planned again (S3).
+ */
+export async function sendToTeam(transfer: Transfer, teamId: string): Promise<SendResult> {
+  const target = sendTargets().find((t) => t.id === teamId);
+  if (!target) return { ok: false, message: "That team isn't one you can send to." };
+  try {
+    let record = await api.readTeam(teamId);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const plan = planTransfer(transfer, record.data.plays, record.data.playbooks);
+      const counts = { added: plan.added, copied: plan.copied, reused: plan.reused };
+      if (plan.plays.length === 0 && plan.book === null) {
+        // S1: the team has it already; the summary it carries is the account's latest
+        const team = summaryOf(record);
+        set({ teams: state.teams.map((t) => (t.id === team.id ? team : t)) });
+        return { ok: true, team, ...counts, unchanged: true };
+      }
+      const data: TeamData = {
+        ...record.data,
+        plays: [...record.data.plays, ...plan.plays],
+        playbooks: plan.book ? [...record.data.playbooks, plan.book] : record.data.playbooks,
+      };
+      try {
+        // the look is this device's business, not the send's: the write carries none, and the account's stays (ADR 013)
+        const team = summaryOf(await api.writeTeam(teamId, data, record.rev));
+        set({ teams: state.teams.map((t) => (t.id === team.id ? team : t)) });
+        return { ok: true, team, ...counts, unchanged: false };
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.status !== 409 || !e.record) throw e;
+        record = e.record;
+      }
+    }
+    return { ok: false, message: `${target.name} is being changed on another device. Try again in a moment.` };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      signedOutElsewhere();
+      return { ok: false, message: "You were signed out. Sign in again, then send it." };
+    }
+    if (e instanceof ApiError && e.status === 404) {
+      set({ teams: state.teams.filter((t) => t.id !== teamId) });
+      return { ok: false, message: `${target.name} isn't in your account any more.` };
+    }
+    if (e instanceof ApiError) return { ok: false, message: e.status === 0 && !navigator.onLine ? "You're offline. Sending needs a connection." : e.message };
+    return { ok: false, message: "Something went wrong with your account. Nothing was sent." };
   }
 }
 

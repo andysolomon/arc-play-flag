@@ -14,6 +14,7 @@ import { card, chip, flagChip, pillDark } from "../ui";
 import { AddToPlaybookModal } from "./AddPlays";
 import { MoreMenu, menuItem, menuItemDanger } from "./MoreMenu";
 import type { Say } from "./PlaybooksScreen";
+import { SendToTeamItem, SendToTeamModal } from "./SendToTeam";
 import { SharePlayButton, useShareCount } from "./ShareBook";
 import { TwoStep } from "./TwoStep";
 
@@ -24,6 +25,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
   const links = useShareCount(`play:${p.id}`);
   const holding = booksHolding(p.id).length;
   const [adding, setAdding] = useState(false);
+  const [sending, setSending] = useState(false);
   // the same flag its picture and printouts carry, in words beside the side it is for
   const flagged = runInNoRunZone(p, hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam)));
   return (
@@ -50,6 +52,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
                   close();
                   download(new Blob([encodePlayFile(p)], { type: "application/json" }), `${kebab(p.name)}.play.json`);
                 }}>Export play file</button>
+                <SendToTeamItem onPick={() => { close(); setSending(true); }} />
                 {share.links > 0 && (
                   <button type="button" className={menuItem} onClick={() => { close(); share.manage(); }}>Share link details…</button>
                 )}
@@ -66,6 +69,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
         </SharePlayButton>
       </div>
       {adding && <AddToPlaybookModal play={p} say={say} onClose={() => { setAdding(false); }} />}
+      {sending && <SendToTeamModal transfer={{ kind: "ffpd.play", version: 1, play: p }} say={say} onClose={() => { setSending(false); }} />}
     </div>
   );
 }

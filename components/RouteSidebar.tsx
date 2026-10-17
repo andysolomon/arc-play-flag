@@ -166,7 +166,10 @@ function RouteSidebarImpl({
   // offense splits into the passing tree and the run game; defense is one list. A carrier gets no pass route
   const keys: readonly RouteType[] = sel?.team === "offense" ? (hasBall ? [] : PASS_KEYS) : DEFENSE_KEYS;
   // the jet sweep is a handoff at the snap: only for a player who can take one, never a keep after a lateral
-  const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS.filter((k) => k !== "jet" || (jet && !hasBall)) : [];
+  // and a handoff is to someone else: the quarterback keeps, sweeps or laterals, but never hands off to themself
+  const runKeys: readonly RouteType[] = sel?.team === "offense"
+    ? RUN_KEYS.filter((k) => (k !== "jet" || (jet && !hasBall)) && (k !== "handoff" || !qb))
+    : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
   // the read is someone the final throw goes to, never a player the ball is lateraled through, nor a
   // quarterback on a rollout or boot, who throws it

@@ -34,8 +34,9 @@ export const account = (): Promise<AccountResponse> => call("/api/account");
 export const readTeam = (id: string): Promise<TeamRecord> => call(`/api/account/teams/${id}`);
 export const createTeam = (body: ({ data: TeamData } | { name: string; color?: string }) & { prefs?: CoachPrefs }): Promise<TeamRecord> =>
   call("/api/account/teams", json("POST", body));
-export const writeTeam = (id: string, data: TeamData, rev: number, prefs: CoachPrefs): Promise<TeamWritten> =>
-  call(`/api/account/teams/${id}`, json("PUT", { data, rev, prefs }));
+/** Writes a team; with `prefs`, the coach's look goes with it, and without, the account's look is left alone (a send to another team). */
+export const writeTeam = (id: string, data: TeamData, rev: number, prefs?: CoachPrefs): Promise<TeamWritten> =>
+  call(`/api/account/teams/${id}`, json("PUT", { data, rev, ...(prefs ? { prefs } : {}) }));
 export const deleteTeam = (id: string): Promise<null> => call(`/api/account/teams/${id}`, { method: "DELETE" });
 export const setCurrent = (id: string): Promise<null> => call("/api/account/current", json("PUT", { id }));
 export const fixtureSignIn = (coach: string, run: string): Promise<null> => call("/api/account/fixture", json("POST", { coach, run }));
