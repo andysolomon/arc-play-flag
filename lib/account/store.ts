@@ -5,7 +5,7 @@ import { MAX_TEAMS, summarize, teamName } from "./data";
 import type { TeamData, TeamRecord, TeamSummary } from "./types";
 
 /**
- * The accounts' store, server-only (docs/adr/011-coach-accounts.md): each account a list of team ids
+ * The accounts' store, server-only (docs/adr/012-coach-accounts.md): each account a list of team ids
  * and the team it last opened, each team a hash of its owner, write count, data and the summary the
  * list shows. Every write is one Lua script, so a team is only ever written by its owner, against the
  * rev the device read, and the list and the team change together.

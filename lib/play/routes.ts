@@ -37,7 +37,14 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   delay:   { label: "Delay",   pts: null, end: "arrow", run: true, dash: "7 6" },
   jet:     { label: "Jet sweep", pts: null, end: "arrow", run: true },
   throw:   { label: "Throw",   pts: null, end: "set",   ball: "throw" },
+  rollout: { label: "Rollout", pts: null, end: "set",   ball: "throw", qb: true },
+  boot:    { label: "Boot",    pts: null, end: "set",   ball: "throw", qb: true },
 };
+
+/** Yards per second a player covers during playback — brisk, but slow enough to read. */
+export const SPEED = 6.5;
+/** How long a delay runner waits at the snap before going. */
+export const DELAY = 0.8;
 
 /**
  * Run-route legs after the player's own spot, relative to the mesh point beside the
@@ -78,6 +85,41 @@ export function jetLegs(px: number, qx: number, qy: number, across: number): Pai
   return [[entry, ly], [qx + across * 1, ly], [qx + across * 8, ly - 1.5], [qx + across * 11, -5]];
 }
 
+/**
+ * The quarterback's rollout and boot are measured from their depth or this deep, whichever is deeper, so a
+ * quarterback under centre drops before rolling (docs/adr/011-qb-rollout-and-boot.md, Q10).
+ */
+export const ROLL_DEPTH = 4;
+/** How far across the field a rollout or boot takes the quarterback to the launch point, in yards. */
+export const ROLL_ACROSS = 8;
+
+/** A point of the quarterback's path, held on the field and behind the line (rule 6, Q8, Q9). */
+const qbPoint = (x: number, y: number): Pair => [Math.max(X_MIN, Math.min(X_MAX, x)), Math.max(LOS_GAP, Math.min(Y_MAX, y))];
+/** The launch point: as a path's point, and at least PITCH_SET behind the line, so the throw is always legal. */
+const launchPoint = (x: number, y: number): Pair => qbPoint(x, Math.max(PITCH_SET, y));
+
+/**
+ * The rollout's legs after the quarterback's spot (qx, qy): open and gain depth, run flat across, and turn
+ * up to the launch point 8 yards over. `side` is +1 for a rollout to the right.
+ */
+export function rolloutLegs(qx: number, qy: number, side: number): Pair[] {
+  const base = Math.max(qy, ROLL_DEPTH);
+  return [qbPoint(qx + side * 2, base + 1.2), qbPoint(qx + side * 5.5, base + 1.2), launchPoint(qx + side * ROLL_ACROSS, base - 0.8)];
+}
+
+/**
+ * The boot's legs after the quarterback's spot, where they fake: pivot back on the fake's side, bend behind
+ * the spot to the other, run out, and turn up to the launch point 8 yards over. `side` is the way the boot
+ * goes, +1 to the right, so the fake is on the other side.
+ */
+export function bootLegs(qx: number, qy: number, side: number): Pair[] {
+  const base = Math.max(qy, ROLL_DEPTH);
+  return [
+    qbPoint(qx - side * 1, base + 1.6), qbPoint(qx + side * 3, base + 2), qbPoint(qx + side * 6, base + 1.4),
+    launchPoint(qx + side * ROLL_ACROSS, base - 0.8),
+  ];
+}
+
 export const DROUTES: Record<DefenseRouteType, RouteDef> = {
   man:      { label: "Man",       pts: null,                 end: "arrow", dash: "10 8" },
   zoneDeep: { label: "Zone deep", pts: [[0, 0], [0, -8.5]],  end: "zone",  dash: "14 8" },
@@ -94,13 +136,20 @@ export const OFFENSE_KEYS = Object.keys(ROUTES) as OffenseRouteType[];
 export const RUN_KEYS = OFFENSE_KEYS.filter((k) => ROUTES[k].run);
 /** The passing tree. A carrier after the quarterback gets none of it. */
 export const PASS_KEYS = OFFENSE_KEYS.filter((k) => !ROUTES[k].run && !ROUTES[k].ball);
+/** The quarterback's own actions at the snap: the rollout and the boot (docs/adr/011-qb-rollout-and-boot.md). */
+export const QB_KEYS = OFFENSE_KEYS.filter((k) => ROUTES[k].qb);
 
 /** How far behind the line of scrimmage a carrier sets up to throw (it was the pitch runner's set point). */
 export const PITCH_SET = 2.6;
 
-/** True for a job only the player with the ball can take: the last carrier's throw. */
+/** True for a job that sets up and throws: the last carrier's throw, or the quarterback's rollout or boot. */
 export function isBallJob(type: RouteType): boolean {
   return ROUTES[type as OffenseRouteType]?.ball !== undefined;
+}
+
+/** True for the quarterback's own action at the snap: a rollout or a boot. */
+export function isQbAction(type: RouteType): boolean {
+  return ROUTES[type as OffenseRouteType]?.qb === true;
 }
 
 /** True for a route that carries the ball on the ground. */
@@ -220,9 +269,11 @@ export function keepRead(prev: Route | null | undefined, next: Route): Route {
 
 /**
  * The route as it reads after the whole play is flipped (x → 30 - x), keeping every
- * flag. Handed presets need nothing: their side is read from the player's new spot.
+ * flag. Handed presets need nothing: their side is read from the player's new spot. A rollout's side
+ * is never read off the spot (a quarterback at x = 15 would never flip), so it turns its mirror (Q11).
  */
 export function flipRoute(route: Route): Route {
+  if (route.type === "rollout") return trimFlags({ ...route, mirror: !route.mirror });
   return route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
 }
 const FIELD_W = 30;
@@ -235,6 +286,9 @@ export function mirrorable(p: Player | null): boolean {
   if (!p?.route) return false;
   const t = p.route.type;
   if (t === "custom") return (p.route.pts ?? []).length > 0;
+  // a rollout goes right unless mirrored; a boot follows its fake, so turning the fake turns it (ADR 011)
+  if (t === "rollout") return p.team === "offense";
+  if (t === "boot") return false;
   const def = routeDef(p.team, t);
   // a jet sweep always crosses toward the far side; to sweep the other way, line the runner up on the other side
   if (def?.run) return t !== "jet";

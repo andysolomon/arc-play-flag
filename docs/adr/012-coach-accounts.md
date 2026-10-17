@@ -1,4 +1,4 @@
-# ADR 011: coach accounts, with teams
+# ADR 012: coach accounts, with teams
 
 Status: implemented. It adds an account over the on-device library of [ADR 001](001-short-playbook-links.md) and the backups that already describe it, without changing what the device stores or how any screen reads it.
 

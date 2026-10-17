@@ -1,7 +1,9 @@
-// Draws the stickers made in code (the runs: dive, stretch, counter, reverse, delay, pitch, jet; and the
-// drag, a pass route) in the style of the design's route icons: ink on paper into design/assets/icons, and the dark board's version
-// (chalk outlines, yellow route) into design/assets/icons-dark. Then run `bun run icons`.
-// Run with `node scripts/run-stickers.ts` — sharp's SVG rasteriser stalls under Bun here.
+// Draws the stickers made in code (the runs: dive, stretch, counter, reverse, delay, pitch, jet; the
+// drag, a pass route; and the quarterback's rollout and boot) in the style of the design's route icons:
+// ink on paper into design/assets/icons, and the dark board's version (chalk outlines, yellow route)
+// into design/assets/icons-dark. Then run `bun run icons`.
+// Run with `node scripts/run-stickers.ts` — sharp's SVG rasteriser stalls under Bun here. Name stickers
+// (`node scripts/run-stickers.ts rollout boot`) to draw only those and leave the rest byte for byte.
 import path from "node:path";
 import sharp from "sharp";
 
@@ -65,12 +67,24 @@ const draw = (P: Palette): Record<string, string> => {
       line("M330 330 Q300 260 250 210") + line("M250 210 L250 96") + head(250, 60, 0, -1) +
       line("M250 210 L120 140") + head(84, 120, -1, -0.55) + ball(470, 300, -40),
     ),
+    // the quarterback drops, sprints out to the right behind the line, and turns up to throw on the run
+    rollout: svg(
+      token(130, 150) + line("M150 232 Q190 392 310 400 Q420 408 430 296") + head(434, 222, 0.05, -1) + ball(300, 290, -10),
+    ),
+    // a fake to the right (dotted, toward the runner), then back behind the spot and out the other way to throw
+    boot: svg(
+      token(300, 140) + line("M404 214 Q448 250 466 330", "1 56") +
+      line("M246 228 Q226 396 150 398 Q84 400 82 300") + head(80, 226, -0.03, -1) + ball(178, 238, 10),
+    ),
   };
 };
+
+const only = new Set(process.argv.slice(2));
 
 for (const [dir, palette] of [["design/assets/icons", LIGHT], ["design/assets/icons-dark", DARK]] as const) {
   const out = path.resolve(dir);
   for (const [name, s] of Object.entries(draw(palette))) {
+    if (only.size && !only.has(name)) continue;
     await sharp(Buffer.from(s)).png().toFile(path.join(out, `${name}.png`));
     console.log("wrote", path.join(dir, name));
   }

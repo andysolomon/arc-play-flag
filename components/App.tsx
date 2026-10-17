@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { editedVisit, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
+import { editedVisit, flipped, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
-import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
+import { blitzAim, blitzTarget, containEdge, edgePath, nearestBack } from "@/lib/play/blitz";
 import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
-import { sidelineCut } from "@/lib/play/geometry";
+import { qbAction, quarterback, sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import { activeLineup, formationOf, rosterPositions, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
 import { offFieldId, starters } from "@/lib/play/roster";
@@ -22,7 +22,7 @@ import {
 } from "@/lib/play/library";
 import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { mirrorRoute, routeDef } from "@/lib/play/routes";
+import { isBallJob, isRun, mirrorRoute, mirrorable, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
@@ -31,7 +31,7 @@ import { Header, VIEW, type Mode } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
 import { RosterSidebar } from "./RosterSidebar";
-import { RouteSidebar } from "./RouteSidebar";
+import { RouteSidebar, type BlitzInfo, type QbInfo } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
 import { Sidebar } from "./Sidebar";
 import { pillSm } from "./ui";
@@ -210,8 +210,8 @@ export function App() {
     dispatch({ type: "runBefore" });
     if (compactRef.current) setRightOpen(false);
   }, []);
-  // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
-  const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the BLITZ pills: QB, Backfield and Contain aim it; Pick a player asks for a red player on the field, like Man
+  const onBlitzAim = useCallback((aim: "qb" | "backfield" | "contain") => { dispatch({ type: "blitzAim", aim }); }, []);
   // the DEEP pills: Auto splits the field with the other deep zones, Half and Third call it
   const onDeepSplit = useCallback((split: DeepSplit | null) => { dispatch({ type: "deepSplit", split }); }, []);
   const onBlitzTarget = useCallback(() => {
@@ -512,6 +512,23 @@ export function App() {
   }, [s.players, visit]);
   // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
   const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
+  // the quarterback's rollout and boot, and what the one they have does (docs/adr/011-qb-rollout-and-boot.md)
+  const qbInfo = useMemo((): QbInfo | null => {
+    if (sel?.team !== "offense" || sel.id !== quarterback(s.players)?.id) return null;
+    const act = qbAction(s.players);
+    if (!act) return { act: null };
+    const who = names({ players: s.players });
+    const receivers = s.players.some((p) => p.team === "offense" && p.id !== act.qb.id && p.route && !isRun(p.route.type) && !isBallJob(p.route.type));
+    // what turns a boot: Flip play, unless the fake goes the same way flipped (a runner lined up on the QB's x), then
+    // ⇄ Mirror on the fake's run, each tried on the play as it would be (docs/adr/011-qb-rollout-and-boot.md, Q11)
+    const turns = (players: readonly Player[]): boolean => qbAction(players)?.side === -act.side;
+    const fake = act.fake;
+    const turn = act.type !== "boot" || !fake ? null
+      : turns(flipped(s.players)) ? "flip"
+      : mirrorable(fake) && turns(s.players.map((p) => (p.id === fake.id && p.route ? { ...p, route: mirrorRoute(p.route, atSnap(p).x).route } : p))) ? "mirror"
+      : null;
+    return { act: { type: act.type, side: act.side, fake: fake ? who.get(fake.id) ?? null : null, decoy: act.decoy, receivers, turn } };
+  }, [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
   // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
@@ -520,7 +537,13 @@ export function App() {
     const who = names({ players: s.players });
     const t = blitzTarget(sel.route, s.players);
     const back = nearestBack(s.players);
-    return { aim: blitzAim(sel.route), who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null };
+    const aim = blitzAim(sel.route);
+    // a contain blitz's edge, and whether the sideline leaves room on it and on the other (lib/play/blitz.ts, C2, C4)
+    const edge = containEdge(sel, s.players);
+    const contain: BlitzInfo["contain"] = aim === "contain"
+      ? { edge: edge < 0 ? "left" : "right", room: edgePath(edge, s.players) !== null, other: edgePath(edge < 0 ? 1 : -1, s.players) !== null }
+      : null;
+    return { aim, who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null, contain };
   }, [sel, s.players]);
   const hint = rostering ? null : s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
     : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
@@ -641,6 +664,7 @@ export function App() {
             onDeepSplit={onDeepSplit}
             cut={selCut}
             jet={jetAble}
+            qb={qbInfo}
             hint={hint}
             onPick={onPick}
             onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}

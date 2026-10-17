@@ -1,8 +1,11 @@
-import { blitzTarget } from "./blitz";
+import { BLITZ_STOP, blitzAim, blitzTarget, containPath } from "./blitz";
+import { callOf, isRunCall } from "./call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, ROSTER_LOS, losLabel, toGo } from "./field";
 import { chainLinks, quarterback, runsBefore, startOf } from "./lateral";
 import { atSnap, motionPoints } from "./pre-snap";
-import { DEF, INK, PITCH_SET, ROUTES, inkFor, jetLegs, routeDef, runLegs } from "./routes";
+import {
+  DEF, DELAY, INK, PITCH_SET, ROUTES, SPEED, Y_MIN, bootLegs, inkFor, isQbAction, isRun, jetLegs, rolloutLegs, routeDef, runLegs,
+} from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
 
@@ -114,18 +117,27 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
   if (!def) return null;
   const sign = (p.x < 15 ? -1 : 1) * (rt.mirror ? -1 : 1);
   if (rt.type === "custom") return [[p.x, p.y], ...(rt.pts ?? [])];
+  if (isQbAction(rt.type) && p.team === "offense") {
+    // the quarterback's rollout or boot, from where they took the snap (docs/adr/011-qb-rollout-and-boot.md)
+    const side = qbSide(p, players);
+    return [[p.x, p.y], ...(rt.type === "rollout" ? rolloutLegs(p.x, p.y, side) : bootLegs(p.x, p.y, side))];
+  }
   if (rt.type === "throw" && p.team === "offense") {
     // a step toward their own sideline, up (never back) to the set depth, and throw from there
     const set: Pair = [Math.max(ACROSS_MIN, Math.min(ACROSS_MAX, p.x + sign * 1.5)), Math.min(p.y, PITCH_SET)];
     return [[p.x, p.y], set];
   }
   if (rt.type === "blitz") {
+    // a contain blitz goes up the edge outside the quarterback and turns in on them, unless the
+    // sideline leaves no edge, when it comes straight like any blitz (lib/play/blitz.ts, C4)
+    const contain = blitzAim(rt) === "contain" ? containPath(p, players) : null;
+    if (contain) return [[p.x, p.y], contain.landmark, contain.end];
     // drive past the line of scrimmage, angled at whoever it comes for: the quarterback unless it is
     // aimed at the backfield or at a player (lib/play/blitz.ts)
     const t = blitzTarget(rt, players);
     const tx = t ? t.x : 15, ty = t ? t.y : 5;
     const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
-    const reach = Math.max(1.5, L - 1.8);
+    const reach = Math.max(1.5, L - BLITZ_STOP);
     return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
   }
   if (rt.type === "man") {
@@ -176,6 +188,108 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     if (!last || Math.abs(last[0] - pt[0]) > 0.001 || Math.abs(last[1] - pt[1]) > 0.001) out.push(pt);
   }
   return out;
+}
+
+/** The card a fake is read on: the deepest, so a run's shape near the quarterback never depends on the card. */
+const FAR_TOP = Y_MIN - 2;
+
+/** How near a runner comes to the quarterback to take a handoff or a fake: every run's mesh is about a yard off them. */
+const MESH_REACH = 1.5;
+
+/**
+ * How a run passes the quarterback standing at `q`: how long after the snap they first come within reach of
+ * them (a Delay counting its wait; never, for one that only runs away or stands still), how near they come,
+ * and how far across the field from the quarterback the rest of their path lies on average, measured along it
+ * from their closest approach (+ is the quarterback's right).
+ */
+function passOf(p: Player, players: readonly Player[], q: Pt): { at: number; gap: number; lean: number } {
+  const path = routeYards(p, players, FAR_TOP) ?? [];
+  const legs: { a: Pair; b: Pair; len: number }[] = [];
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    if (a && b) legs.push({ a, b, len: Math.hypot(b[0] - a[0], b[1] - a[1]) });
+  }
+  const total = legs.reduce((n, l) => n + l.len, 0);
+  const along = (d: number): Pair => {
+    let left = d;
+    for (const l of legs) {
+      if (left <= l.len || l === legs[legs.length - 1]) {
+        const k = l.len > 0 ? Math.min(1, left / l.len) : 1;
+        return [l.a[0] + (l.b[0] - l.a[0]) * k, l.a[1] + (l.b[1] - l.a[1]) * k];
+      }
+      left -= l.len;
+    }
+    return path[0] ?? [q.x, q.y];
+  };
+  let closest = 0, gap = Infinity, reach = Infinity;
+  for (let d = 0; d <= total + 0.05; d += 0.1) {
+    const at = along(Math.min(d, total));
+    const g = Math.hypot(at[0] - q.x, at[1] - q.y);
+    if (g < gap) { gap = g; closest = Math.min(d, total); }
+    if (g <= MESH_REACH && reach === Infinity) reach = Math.min(d, total);
+  }
+  let sum = 0, n = 0;
+  for (let d = closest; d <= total + 0.05; d += 0.1) {
+    sum += along(Math.min(d, total))[0];
+    n++;
+  }
+  const wait = p.route?.type === "delay" ? DELAY : 0;
+  return { at: wait + reach / SPEED, gap, lean: (n ? sum / n : path[path.length - 1]?.[0] ?? q.x) - q.x };
+}
+
+/**
+ * The runner a rollout or boot fakes to, or hands off to when the call is a run (docs/adr/011-qb-rollout-and-boot.md,
+ * rule 5): the read when it is a run, else whoever first comes within reach of the quarterback after the snap (a
+ * jet sweep first of all, since it is already crossing), then any who never do, nearest first (one standing
+ * still or running away is never ahead of a back who meshes, Q21), ties to the play's own order. Read from where
+ * everyone stands at the snap, so the field, the words and playback agree (Q5, Q14), and Flip play never changes
+ * who it is (Q19).
+ */
+export function fakeOf(players: readonly Player[]): Player | undefined {
+  const qb0 = quarterback(players);
+  if (qb0?.team !== "offense") return undefined;
+  const runners = players.filter((p) => p.team === "offense" && p.id !== qb0.id && p.route && isRun(p.route.type));
+  const read = runners.find((p) => p.route?.primary);
+  if (read) return read;
+  const q = atSnap(qb0);
+  let best: Player | undefined, first = Infinity, nearest = Infinity;
+  for (const r of runners) {
+    const pass = r.route?.type === "jet" ? { at: -Infinity, gap: 0 } : passOf(r, players, q);
+    if (!best || pass.at < first || (pass.at === Infinity && first === Infinity && pass.gap < nearest)) {
+      best = r; first = pass.at; nearest = pass.gap;
+    }
+  }
+  return best;
+}
+
+/**
+ * Which way the quarterback goes on a rollout or boot, +1 to their right (rules 4 and 5): a rollout right unless
+ * mirrored, never read off the spot; a boot away from the side the fake goes on after passing them, and right
+ * with no fake or one that stays level with them (Q6, Q7, Q20). `p` is the quarterback as they take the snap.
+ */
+export function qbSide(p: Player, players: readonly Player[]): 1 | -1 {
+  if (p.route?.type === "rollout") return p.route.mirror ? -1 : 1;
+  const fake = fakeOf(players);
+  if (!fake) return 1;
+  return passOf(fake, players, { x: p.x, y: p.y }).lean > 0.01 ? -1 : 1;
+}
+
+/** The quarterback's rollout or boot as the play has it: which way, who they fake or hand off to, and whether the call makes them a decoy. */
+export interface QbAction {
+  qb: Player;
+  type: "rollout" | "boot";
+  side: 1 | -1;
+  fake: Player | null;
+  /** the call is a run: the quarterback hands off and carries the rollout or boot out without the ball (rule 8) */
+  decoy: boolean;
+}
+
+/** The play's quarterback action, or null when the quarterback has no rollout or boot. */
+export function qbAction(players: readonly Player[]): QbAction | null {
+  const qb = quarterback(players);
+  const type = qb?.route?.type;
+  if (qb?.team !== "offense" || (type !== "rollout" && type !== "boot")) return null;
+  return { qb, type, side: qbSide(atSnap(qb), players), fake: fakeOf(players) ?? null, decoy: isRunCall(callOf(players)) };
 }
 
 /**
@@ -282,6 +396,8 @@ export function geom(
   const b = pts[pts.length - 1], a = pts[pts.length - 2];
   if (!a || !b) return null;
   const width = rt.primary ? 6.5 : 5;
+  // a quarterback who hands off and carries the rollout or boot out as a decoy throws nothing: an arrow, not the ring (rule 8)
+  const end = def.end === "set" && isQbAction(rt.type) && isRunCall(callOf(players)) ? "arrow" : def.end;
   const out: RouteGeom = {
     color: inkFor(p, rt.type),
     d: "",
@@ -292,7 +408,7 @@ export function geom(
   };
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const nx = (b[0] - a[0]) / L, ny = (b[1] - a[1]) / L;
-  if (def.end === "arrow") {
+  if (end === "arrow") {
     // head length/half-width grow with the stroke; the stroke stops inside the head so its
     // round cap never pokes out past the tip or the head's flanks
     const s = width * 3.4, w = width * 1.7, bx = b[0] - nx * s, by = b[1] - ny * s;
@@ -302,7 +418,7 @@ export function geom(
       f1(bx + ny * w) + "," + f1(by - nx * w);
     const inset = Math.min(s * 0.8, L * 0.9);
     pts[pts.length - 1] = [b[0] - nx * inset, b[1] - ny * inset];
-  } else if (def.end === "set") {
+  } else if (end === "set") {
     out.set = { cx: b[0], cy: b[1] };
   }
   out.d = "M" + pts.map((q) => f1(q[0]) + " " + f1(q[1])).join("L");

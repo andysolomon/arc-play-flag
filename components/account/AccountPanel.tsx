@@ -39,7 +39,7 @@ export function TeamNote() {
 /**
  * The account corner of Play tools and of the playbooks' settings: who is signed in, which of their
  * teams this device has open, and whether the account has the latest. Signed out, it says what an
- * account is for and leads to sign-in (docs/adr/011-coach-accounts.md).
+ * account is for and leads to sign-in (docs/adr/012-coach-accounts.md).
  */
 export function AccountPanel({ heading = true }: { heading?: boolean }) {
   const s = useAccount();

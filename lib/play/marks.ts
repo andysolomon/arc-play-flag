@@ -1,6 +1,7 @@
 import { byLine, names } from "./assignments";
-import { S, VW, px, py } from "./geometry";
-import type { Player } from "./types";
+import { S, VW, px, py, routeYards } from "./geometry";
+import { isQbAction } from "./routes";
+import type { Pair, Player } from "./types";
 import type { ZoneMap } from "./zones";
 
 /**
@@ -93,16 +94,33 @@ interface Token { id: string; cx: number; cy: number }
 const tokensOf = (drawn: readonly Player[], top: number): Token[] => drawn.map((p) => ({ id: p.id, cx: px(p.x), cy: py(p.y, top) }));
 
 /**
+ * Points along the quarterback's rollout or boot (docs/adr/011-qb-rollout-and-boot.md), in SVG units: the one
+ * route that runs through the backfield corners a stamp sits in, so a stamp keeps off it when it can.
+ */
+function backfieldPaths(drawn: readonly Player[], top: number): Pair[] {
+  return drawn.flatMap((p) => {
+    const path = p.route && isQbAction(p.route.type) ? routeYards(p, drawn, top) ?? [] : [];
+    return path.slice(1).flatMap((b, i): Pair[] => {
+      const a = path[i] ?? b;
+      const n = Math.max(1, Math.ceil((Math.hypot(b[0] - a[0], b[1] - a[1]) * S) / 6));
+      return Array.from({ length: n + 1 }, (_, k): Pair => [px(a[0] + ((b[0] - a[0]) * k) / n), py(a[1] + ((b[1] - a[1]) * k) / n, top)]);
+    });
+  });
+}
+
+/**
  * Where a stamp goes: the bottom-left corner, in the backfield, where a defense-only picture
- * is empty (as on a Madden card); the bottom-right if a player sits there. The coverage stamp
- * and a run's no-run flag both go here. `avoid` is anything else the right corner must keep
- * clear of: on the live field, the ▶ button floating over it.
+ * is empty (as on a Madden card); the bottom-right if a player, or the quarterback's rollout or
+ * boot, runs through it. The coverage stamp and a run's no-run flag both go here. `avoid` is
+ * anything else the right corner must keep clear of: on the live field, the ▶ button floating over it.
  */
 export function stampBox(text: string, drawn: readonly Player[], top: number, vh: number, avoid: readonly Box[] = []): Box {
   const w = stampWidth(text), h = STAMP_H, y = vh - 10 - h;
   const left: Box = { x: 10, y, w, h }, right: Box = { x: VW - 10 - w, y, w, h };
+  const path = backfieldPaths(drawn, top);
   const clear = (b: Box): boolean =>
-    !tokensOf(drawn, top).some((t) => hitsCircle(inflate(b, 4), t.cx, t.cy, TOKEN_R)) && !avoid.some((a) => hitsBox(inflate(b, 4), a));
+    !tokensOf(drawn, top).some((t) => hitsCircle(inflate(b, 4), t.cx, t.cy, TOKEN_R)) && !avoid.some((a) => hitsBox(inflate(b, 4), a))
+    && !path.some(([x, y2]) => hitsCircle(inflate(b, 4), x, y2, 3));
   return clear(left) || !clear(right) ? left : right;
 }
 
