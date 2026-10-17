@@ -6,7 +6,9 @@ import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type 
 import {
   canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
 } from "./lateral";
-import { MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags } from "./routes";
+import {
+  MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isQbAction, isRun, keepRead, legalSpot, mirrorRoute, mirrorable, routeDef, trimFlags,
+} from "./routes";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 /** What a tap on a red player is waiting to answer: who a man defender covers, who a blitz comes for, or who takes a lateral. */
@@ -294,6 +296,8 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (!p) return s;
       const chain = chainOf(s.players);
       const at = editedVisit(s, chain);
+      // a rollout or boot is the quarterback's own job at the snap, never a carrier's (docs/adr/011-qb-rollout-and-boot.md, Q1)
+      if (isQbAction(a.key) && (p.id !== quarterback(s.players)?.id || at !== 0)) return s;
       if (at !== null && at < chain.length - 1 && a.key !== "man") {
         // a job for a time the ball goes on from them ends the chain there, with that job
         const c = commit(s);
@@ -446,8 +450,9 @@ function reduce(s: PlayState, a: Action): PlayState {
     }
     case "togglePrimary": {
       const sel = selected(s);
-      // a carrier in a lateral chain is never the read: the final throw goes to someone else
-      if (!sel || sel.team !== "offense" || !sel.route || carriers(s.players).has(sel.id)) return s;
+      // a carrier in a lateral chain is never the read: the final throw goes to someone else; nor is a
+      // quarterback on a rollout or boot, who throws it (Q12)
+      if (!sel || sel.team !== "offense" || !sel.route || carriers(s.players).has(sel.id) || isQbAction(sel.route.type)) return s;
       const on = !sel.route.primary;
       const c = commit(s);
       return {
@@ -473,17 +478,7 @@ function reduce(s: PlayState, a: Action): PlayState {
     }
     case "flip": {
       const c = commit(s);
-      return {
-        ...c,
-        players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
-          ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
-          // every lateral's catch, and the run before a pitch, flip with the field (R13, P7)
-          ...(p.laterals ? { laterals: p.laterals.map((h): Hop => ({
-            ...h,
-            ...(h.catch ? { catch: [30 - h.catch[0], h.catch[1]] as const } : {}),
-            ...(h.release ? { release: [30 - h.release[0], h.release[1]] as const } : {}),
-          })) } : {}) })),
-      };
+      return { ...c, players: flipped(c.players) };
     }
     case "clearRoutes": {
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
@@ -563,6 +558,22 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (a.on) return { ...s, artShadow: true, shadowForArt: s.vis !== "both", vis: "both" };
       return withVis({ ...s, artShadow: false, shadowForArt: false }, s.shadowForArt ? s.side : s.vis);
   }
+}
+
+/**
+ * The players as Flip play leaves them, mirrored across the field (x → 30 - x): every spot, route, pre-snap
+ * motion, lateral catch and run before a pitch (R13, P7). The palette asks it too, to say whether flipping
+ * turns a boot (docs/adr/011-qb-rollout-and-boot.md, Q11).
+ */
+export function flipped(players: readonly Player[]): Player[] {
+  return players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
+    ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
+    // every lateral's catch, and the run before a pitch, flip with the field (R13, P7)
+    ...(p.laterals ? { laterals: p.laterals.map((h): Hop => ({
+      ...h,
+      ...(h.catch ? { catch: [30 - h.catch[0], h.catch[1]] as const } : {}),
+      ...(h.release ? { release: [30 - h.release[0], h.release[1]] as const } : {}),
+    })) } : {}) }));
 }
 
 /** Route definition for the selected player's current route, if any. */

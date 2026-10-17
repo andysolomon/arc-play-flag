@@ -6,9 +6,10 @@ import {
 } from "react";
 import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from "@/lib/deepfield";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
+import { qbActionLine } from "@/lib/play/assignments";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { LOS_YARD } from "@/lib/play/field";
-import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, rosterDepth, snap } from "@/lib/play/geometry";
+import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, quarterback, rosterDepth, snap } from "@/lib/play/geometry";
 import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
@@ -285,6 +286,11 @@ function FieldImpl({
   const arcs = useMemo(() => (roster ? [] : lateralArcs(effective, top).filter((a) => onField.has(a.from))), [roster, effective, top, onField]);
   const arcsFaded = arcs.length > 0 && side === "defense";
   const names = useMemo(() => Object.fromEntries(effective.map((p) => [p.id, p.label || p.id])), [effective]);
+  // the quarterback's rollout or boot, in the call's words (docs/adr/011-qb-rollout-and-boot.md)
+  const qbWords = useMemo(() => {
+    const qb = quarterback(effective);
+    return roster || !qb || !onField.has(qb.id) ? null : qbActionLine({ players: effective });
+  }, [roster, effective, onField]);
   const routes = useMemo(
     () => {
       if (roster) return [];
@@ -827,6 +833,7 @@ function FieldImpl({
             {tagWords}
             {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
             {visible.some((p) => p.route?.type === "jet") ? " A jet sweep is already crossing behind the line when the ball is snapped and takes the handoff from the quarterback as it passes." : ""}
+            {qbWords ? ` ${qbWords}` : ""}
             {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.from] ?? ""}${a.run ? " runs with it and pitches" : ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
             {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
