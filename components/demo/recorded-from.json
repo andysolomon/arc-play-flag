@@ -6,12 +6,12 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "194826d6e2ae12eeacfad6fcdf2d2e7e2b35a8c276619529d7796cfb925287d9",
+    "components/App.tsx": "11d08c35d6658ef8be63e3f89fc3af9b5f1e276f7ad6cdf0c5db16b7868fa102",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "1a80eaa17d0768b4096e7c5d2cd3f29c23e902733e6ed00cca46eaff01637588",
+    "components/Field.tsx": "9e248ec45b26ae501082e46b0111c2f9f76ba51bbd2db7cc9b52b4909526b22a",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
-    "components/Header.tsx": "c24dd640254f4507c31de58443804874fd31eb0ac2aa2977f80c6ece2fe932c4",
+    "components/Header.tsx": "8c6bd773310a6f3ee62358c5eacf9b6ebc7cd2ad4dfc536c399f38d883ea4a96",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "ce9a71e7b78fa295090f67d2660cc54d1aaeffe8ec1d8e819f7d4bdcdf712636",
     "components/LateralLayer.tsx": "badafa29eb6563fedf5e17ef61e7aab244c7234377ecf6620a06c1d63e977ada",
@@ -70,10 +70,11 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Only the BLITZ pills and their caption changed (a Contain pill); build-defense picks Blitz at 960px, where the palette folds on the pick, and R's blitz still comes straight for the quarterback, so no clip shows the change",
+    "reason": "the header's Back to play key, and Undo, Redo and Clear leaving the header, show only in roster mode, which no chapter enters; on a play the header renders as on main, and the field title's focus classes draw nothing unless Back hands it focus",
     "files": [
       "components/App.tsx (changed)",
-      "components/RouteSidebar.tsx (changed)"
+      "components/Field.tsx (changed)",
+      "components/Header.tsx (changed)"
     ]
   }
 }
