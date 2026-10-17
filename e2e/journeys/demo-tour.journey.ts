@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { DEMOS, TOUR_SECONDS } from "../../components/demo/demos";
+import { DEMOS, DEMO_VIDEO, TOUR_SECONDS } from "../../components/demo/demos";
 import { STAMP_PATH } from "../../scripts/demo-recorder/freshness";
 
 /*
@@ -11,8 +11,9 @@ import { STAMP_PATH } from "../../scripts/demo-recorder/freshness";
  *  - the "Under N seconds" promise no longer covers the tour               → "every chapter"
  *  - a clip or poster is missing, served as something else, or not the bytes that were
  *    committed                                                             → "every chapter"
- *  - a clip is not the length its card promises, or not 960×540, so it was cut short or
- *    recorded wrong; a poster is not a 960×540 picture                    → "every chapter"
+ *  - a clip is not the length its card promises, or not the phone-shaped 576×720 frame, so it
+ *    was cut short or recorded wrong; a poster is not a 576×720 picture    → "every chapter"
+ *  - a card's captions (the silent clip's text alternative) are not the manifest's → "every chapter"
  *  - starting one clip leaves another playing                              → "one clip at a time"
  * Whether the clips still show today's UI is `bun test`'s job (components/demo/demos.test.ts
  * against components/demo/recorded-from.json); the manifest this leaves names the recording's
@@ -79,6 +80,7 @@ test("every chapter's card matches the manifest, and its clip and poster are the
     await expect(article.getByText(demo.time, { exact: true })).toBeVisible();
     await expect(article.getByText(demo.summary, { exact: true })).toBeVisible();
     await expect(article.getByRole("list", { name: "Features covered" }).getByRole("listitem")).toHaveText([...demo.covers]);
+    await expect(article.getByRole("list", { name: "What the clip says" }).getByRole("listitem")).toHaveText(demo.captions.map((caption, step) => `${String(step + 1)}.${caption}`));
 
     // what the server hands a coach is exactly what was committed, as the type the page asks for
     const files: Record<string, { bytes: number; sha256: string; type: string }> = {};
@@ -96,13 +98,13 @@ test("every chapter's card matches the manifest, and its clip and poster are the
     await expect(video).toHaveAttribute("poster", `/demos/${demo.slug}.webp`);
     const measured = await measure(video);
     const promised = Number.parseInt(demo.time, 10);
-    // encoding trims each clip to its promised length at 8 fps: within a frame of it
+    // encoding trims each clip to its promised length at 10 or 12 fps: within a frame of it
     expect(measured.duration, `${demo.slug} runs as long as its card says`).toBeCloseTo(promised, 0);
     expect(Math.abs(measured.duration - promised), `${demo.slug} duration`).toBeLessThanOrEqual(0.2);
-    expect({ width: measured.width, height: measured.height }, demo.slug).toEqual({ width: 960, height: 540 });
+    expect({ width: measured.width, height: measured.height }, demo.slug).toEqual(DEMO_VIDEO);
     expect(new URL(measured.source).pathname).toBe(`/demos/${demo.slug}.webm`);
     const poster = await posterSize(page, `/demos/${demo.slug}.webp`);
-    expect(poster, `${demo.slug} poster`).toEqual({ width: 960, height: 540 });
+    expect(poster, `${demo.slug} poster`).toEqual(DEMO_VIDEO);
 
     let frame: string | null = null;
     if (device === "chromium") {
