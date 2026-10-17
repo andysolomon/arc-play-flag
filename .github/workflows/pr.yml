@@ -268,6 +268,14 @@ jobs:
           path: test-results/playbook-switch-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the header save
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: header-save
+          path: test-results/header-save-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload mobile usability evidence
         if: always()
         uses: actions/upload-artifact@v4

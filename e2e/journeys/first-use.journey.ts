@@ -10,9 +10,11 @@ test("a first-time coach sees the shortest draw-and-run path and can dismiss it 
 
   const guide = page.getByRole("region", { name: "Getting started" });
   await expect(guide).toContainText("Tap a player → pick a route → press ▶");
-  // a new play is an offensive play until New play chooses otherwise
-  await expect(page.getByRole("img", { name: "Offense play" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Defense play" })).toHaveCount(0);
+  // a new play is an offensive play until New play chooses otherwise: the offense alone, drawn solid
+  await expect(d.player("X")).toHaveCSS("opacity", "1");
+  await expect(d.field.getByRole("button", { name: /^Defense / })).toHaveCount(0);
+  // the header saves it from here, with nothing to save yet
+  await expect(page.getByRole("banner").getByRole("button", { name: "Save play", exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "Play side" })).toHaveCount(0);
   await expect(page.locator("header").getByRole("link", { name: "Demo" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Play tools" })).toHaveAttribute("aria-expanded", "false");
