@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "4653b3d9cf1d4e13f286fad908c9990e7a00aa771c70a94e4bae1def9d1a1f12",
+    "components/App.tsx": "288b1713bcf93da4790011d278593238fc32be6608036bfc8d059b60bb0e860f",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "19098ab3a3c306aeca1c1ace789e2e0cc553a5621ddff2d87d81b2f49e3e2fa6",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
@@ -27,7 +27,7 @@
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "19f61a3ac6c4675e5f47318ed9c145dc6684b24a4765c5b291b777c2c60e22ff",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "b9d3ca405bb131c75b5a09afde4f4af6841985538ae103e723591829386e477c",
+    "components/RouteSidebar.tsx": "20b4dd188e0bd2c46e6f9e8a4659af3ba92ff6bd84a56c753749b5ef3356e99b",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",

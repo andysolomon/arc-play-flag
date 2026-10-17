@@ -1,4 +1,4 @@
-import { blitzTarget } from "./blitz";
+import { BLITZ_STOP, blitzAim, blitzTarget, containPath } from "./blitz";
 import { callOf, isRunCall } from "./call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, ROSTER_LOS, losLabel, toGo } from "./field";
 import { chainLinks, quarterback, runsBefore, startOf } from "./lateral";
@@ -128,12 +128,16 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
     return [[p.x, p.y], set];
   }
   if (rt.type === "blitz") {
+    // a contain blitz goes up the edge outside the quarterback and turns in on them, unless the
+    // sideline leaves no edge, when it comes straight like any blitz (lib/play/blitz.ts, C4)
+    const contain = blitzAim(rt) === "contain" ? containPath(p, players) : null;
+    if (contain) return [[p.x, p.y], contain.landmark, contain.end];
     // drive past the line of scrimmage, angled at whoever it comes for: the quarterback unless it is
     // aimed at the backfield or at a player (lib/play/blitz.ts)
     const t = blitzTarget(rt, players);
     const tx = t ? t.x : 15, ty = t ? t.y : 5;
     const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1;
-    const reach = Math.max(1.5, L - 1.8);
+    const reach = Math.max(1.5, L - BLITZ_STOP);
     return [[p.x, p.y], [p.x + (dx / L) * reach, p.y + (dy / L) * reach]];
   }
   if (rt.type === "man") {

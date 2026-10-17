@@ -21,6 +21,8 @@
  * - L7 a read marked on a carrier in a chain is not the read: the final throw goes to someone else.
  * - L8 a blitz aimed at a player reads "Blitz Z", at the backfield "Blitz the backfield", and at the
  *   quarterback plain "Blitz", as every blitz did; one aimed at a player who is gone reads "Blitz" too.
+ *   A contain blitz reads "Contain blitz", the same when the sideline leaves no edge and it comes
+ *   straight: the call is still contain, and the picture shows the path.
  * - L9 a lateral let go on the run (ADR 007) is a pitch: "QB runs and pitches to Z", and the job "Run
  *   and pitch to Z", so the words say the carrier moves with the ball first.
  * - L10 a deep zone called as a half or a third says so, "Deep half" or "Deep third"; Auto reads
@@ -114,6 +116,7 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
     // the quarterback's blitz reads as it always did; one aimed elsewhere says where (L8)
     const aim = blitzAim(rt);
     if (aim === "backfield") return "Blitz the backfield";
+    if (aim === "contain") return "Contain blitz";
     const target = aim === "player" ? blitzTarget(rt, play.players) : undefined;
     return target ? `Blitz ${who(target)}` : "Blitz";
   }

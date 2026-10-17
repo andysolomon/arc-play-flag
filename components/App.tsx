@@ -6,7 +6,7 @@ import { editedVisit, flipped, initialState, reducer, selected, unsaved, type Ac
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
-import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
+import { blitzAim, blitzTarget, containEdge, edgePath, nearestBack } from "@/lib/play/blitz";
 import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
@@ -31,7 +31,7 @@ import { Header, VIEW, type Mode } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
 import { RosterSidebar } from "./RosterSidebar";
-import { RouteSidebar, type QbInfo } from "./RouteSidebar";
+import { RouteSidebar, type BlitzInfo, type QbInfo } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
 import { Sidebar } from "./Sidebar";
 import { pillSm } from "./ui";
@@ -210,8 +210,8 @@ export function App() {
     dispatch({ type: "runBefore" });
     if (compactRef.current) setRightOpen(false);
   }, []);
-  // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
-  const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the BLITZ pills: QB, Backfield and Contain aim it; Pick a player asks for a red player on the field, like Man
+  const onBlitzAim = useCallback((aim: "qb" | "backfield" | "contain") => { dispatch({ type: "blitzAim", aim }); }, []);
   // the DEEP pills: Auto splits the field with the other deep zones, Half and Third call it
   const onDeepSplit = useCallback((split: DeepSplit | null) => { dispatch({ type: "deepSplit", split }); }, []);
   const onBlitzTarget = useCallback(() => {
@@ -537,7 +537,13 @@ export function App() {
     const who = names({ players: s.players });
     const t = blitzTarget(sel.route, s.players);
     const back = nearestBack(s.players);
-    return { aim: blitzAim(sel.route), who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null };
+    const aim = blitzAim(sel.route);
+    // a contain blitz's edge, and whether the sideline leaves room on it and on the other (lib/play/blitz.ts, C2, C4)
+    const edge = containEdge(sel, s.players);
+    const contain: BlitzInfo["contain"] = aim === "contain"
+      ? { edge: edge < 0 ? "left" : "right", room: edgePath(edge, s.players) !== null, other: edgePath(edge < 0 ? 1 : -1, s.players) !== null }
+      : null;
+    return { aim, who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null, contain };
   }, [sel, s.players]);
   const hint = rostering ? null : s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
     : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"

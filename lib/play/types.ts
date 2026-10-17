@@ -37,10 +37,11 @@ export interface Route {
   target?: PlayerId;
   /**
    * A blitz aimed at the backfield: it comes for the nearest back lined up near the ball, and for the
-   * quarterback when nobody is (lib/play/blitz.ts). Stored only when set; a blitz with neither this nor
+   * quarterback when nobody is. A contain blitz: it comes for the quarterback from outside, up the edge on
+   * the rusher's side, then in (lib/play/blitz.ts). Stored only when set; a blitz with neither this nor
    * a target comes for the quarterback, as every blitz did.
    */
-  aim?: "backfield";
+  aim?: "backfield" | "contain";
   /** a deep zone called as a deep half or a deep third (lib/play/deep.ts); stored only when called */
   split?: "half" | "third";
   mirror?: boolean;
