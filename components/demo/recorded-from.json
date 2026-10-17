@@ -56,23 +56,34 @@
     "components/endzone/art/synthwave.tsx": "76c3021a3fed4dc97b99645a5b2d570842b07b4bf3daf535cd82c3ce765e5c15",
     "components/fieldPaint.ts": "4b96f84aeb7050c7003e3adbfa8fb061bbc6e1736b51543f7a106ae95608ecee",
     "components/playbooks/AddPlays.tsx": "cd56b66ad16a72d30ef3f3c0017e9f0e5bd01ee99f89f90d14b1e4ed63980a9a",
-    "components/playbooks/BookCard.tsx": "ecf90a7e3e3cbdbe017f901da644c7bfffdd3ea7d29d88f1c140f915799b1479",
+    "components/playbooks/BookCard.tsx": "a624b4ad9ad791900ca59029dfd91b108eb1f85dac56adeb0dd32fc82d8b569c",
     "components/playbooks/BookEditor.tsx": "b608bc8ae4ebef81b48b44da09db46fd2ad3f79222028415321d6d12dfdc4aac",
     "components/playbooks/BookPlayModal.tsx": "d1f2bbf2e3613b1be94f1f709e10503f7abdc664d9711d019ee7f6249f52eefc",
     "components/playbooks/BookReader.tsx": "d5aada8f686acf728781d401319e14cf13b118dd3f05cc8d4720f18c8a853050",
     "components/playbooks/ExportPanel.tsx": "fbf51a48562fb08a5ab4eba7f460e8317bff6c88cf0367640a4b2e4d5075b9c2",
-    "components/playbooks/Home.tsx": "8e1348c35cbf7ad076d9e842121b9bab3211204de6158c6558b5c909d5be1dc9",
-    "components/playbooks/ImportLink.tsx": "e0dc65811b5ed2fffb85e8cf53e6e1ee8de388802a77e19e72df785104197d6f",
+    "components/playbooks/Home.tsx": "c2f38a3f3111d4a40d8c9cc695ef3b2ee2d8ecd630180412521caa6632822cb8",
+    "components/playbooks/ImportLink.tsx": "7880437e9dded7008bdafa050d0d25fcc56e9e7f35d01b359c2ae5b6e3f5a0f7",
     "components/playbooks/ImportPreview.tsx": "3a1e7b7b7245664e070c2b9a41024e6a301b5ba74926a15a36b5f65cab1cade1",
     "components/playbooks/MoreMenu.tsx": "f0e32b248f3708bb8d781c59efb21fc4ff1c6235b722837259192b8b57466fba",
-    "components/playbooks/PlayCard.tsx": "81dbcf049a620de45cbdd37db32dd82d465512770c9b1dad5278cf33f029763d",
+    "components/playbooks/PlayCard.tsx": "c2f204acca0aa3e41d89283f6f0b3e593c2cf3fae8a4462bd02efa60c0b2ba80",
     "components/playbooks/PlaybooksScreen.tsx": "a26737f50bc31e10b6a62c4ba9b5286ab6bb93c843e6b42dc2ae2146d90feb8f",
     "components/playbooks/PreviewModal.tsx": "5ec0d8304a429d8d606322097890b91b2518e5ead633527c5ce80cbaef284f2f",
+    "components/playbooks/SendToTeam.tsx": "baba535f54c8f42b85b390a02bb1ad5ca1ab6be42a331a6a8fe0607b076185f1",
     "components/playbooks/Settings.tsx": "d163cb603494a600c8be8dd0a00293f8802459466a8920dc542ff4424b5953a0",
     "components/playbooks/ShareBook.tsx": "8ffb1cf7a9480cf64faf2ecabfa913bc76b87dcc1ceec2da4dac9b50fce0e479",
     "components/playbooks/SharedBook.tsx": "c1fcb10f1d2ddbd0391ad485bcb0cca07515509e3a67251f2c9b682f7e3f82ed",
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
+  },
+  "restamped": {
+    "reason": "send to another team and the folded share-link box live on the playbooks home list (its cards and dialogs); no chapter opens that list, the two playbook chapters open one book",
+    "files": [
+      "components/playbooks/BookCard.tsx (changed)",
+      "components/playbooks/Home.tsx (changed)",
+      "components/playbooks/ImportLink.tsx (changed)",
+      "components/playbooks/PlayCard.tsx (changed)",
+      "components/playbooks/SendToTeam.tsx (added)"
+    ]
   }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { encodePlaybookFile } from "@/lib/export/playbook-file";
+import { encodePlaybookFile, playbookFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { deletePlaybook } from "@/lib/play/library";
 import { failureMessage, kebab } from "@/lib/play/storage";
@@ -12,6 +12,7 @@ import { card, chip, pillDark } from "../ui";
 import { AddPlaysModal } from "./AddPlays";
 import { MoreMenu, menuItem, menuItemDanger } from "./MoreMenu";
 import type { Say } from "./PlaybooksScreen";
+import { SendToTeamItem, SendToTeamModal } from "./SendToTeam";
 import { ShareBookButton, useShareCount } from "./ShareBook";
 import { TwoStep } from "./TwoStep";
 
@@ -25,6 +26,7 @@ type Props = { book: Playbook; plays: readonly SavedPlay[]; team: TeamSettings; 
 export function BookCard({ book: b, plays, team, say }: Props) {
   const links = useShareCount(b.id);
   const [adding, setAdding] = useState(false);
+  const [sending, setSending] = useState(false);
   const inBook = b.plays.flatMap((id) => plays.find((p) => p.id === id) ?? []);
   const [cover, ...rest] = inBook;
   const href = `/playbooks?book=${b.id}`;
@@ -66,6 +68,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
               close();
               download(new Blob([encodePlaybookFile(b, inBook, team.name ? team : null)], { type: "application/json" }), `${kebab(b.name)}.playbook.json`);
             }}>Export playbook file</button>
+            <SendToTeamItem onPick={() => { close(); setSending(true); }} />
             <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
             <TwoStep
               label="Delete playbook"
@@ -77,6 +80,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
         </MoreMenu>
       </div>
       {adding && <AddPlaysModal bookId={b.id} say={say} onClose={() => { setAdding(false); }} />}
+      {sending && <SendToTeamModal transfer={playbookFile(b, inBook, null)} say={say} onClose={() => { setSending(false); }} />}
     </div>
   );
 }
