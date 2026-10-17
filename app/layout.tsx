@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { Patrick_Hand } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { AccountSync } from "@/components/account/AccountSync";
 import { OfflineStatus } from "@/components/OfflineStatus";
 import { Repainting } from "@/components/Repainting";
 import { themeScript } from "@/lib/theme";
@@ -26,7 +28,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/** Clerk wraps the app only on a deployment with its keys; elsewhere accounts are the journeys' fixture, or off (lib/account/session.ts). */
+const CLERK = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const app = (
+    <>
+      {children}
+      <AccountSync />
+    </>
+  );
   return (
     // data-theme is set by the inline script before hydration, so the server's <html> never has it
     <html lang="en" className={`${patrickHand.variable} h-full`} suppressHydrationWarning>
@@ -34,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="h-full">
-        {children}
+        {CLERK ? <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" signInFallbackRedirectUrl="/" signUpFallbackRedirectUrl="/">{app}</ClerkProvider> : app}
         <Repainting />
         {process.env.NODE_ENV === "production" ? <OfflineStatus /> : null}
       </body>

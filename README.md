@@ -47,7 +47,7 @@ bun run icons    # re-encode design/assets/icons → public/icons (already commi
 
 ## Deploy
 
-Live at **https://arc-play-flag.vercel.app**. Hosted on Vercel: every push to `main` deploys production; pull requests get preview URLs. Plays still live in `localStorage`. Short-link sharing uses a server-side Upstash Redis store (`UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, or the `KV_REST_API_URL`/`KV_REST_API_TOKEN` pair a Vercel Marketplace store injects); local editing and file transfers work without them. See [sharing setup and retention](docs/runbook/sharing.md) and the [architecture decision](docs/adr/001-short-playbook-links.md).
+Live at **https://arc-play-flag.vercel.app**. Hosted on Vercel: every push to `main` deploys production; pull requests get preview URLs. Plays live in `localStorage` and, for a coach signed in with Google or X, in their account too: Clerk signs them in (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`/`CLERK_SECRET_KEY`), and an account holds any number of teams, each with its own plays, playbooks, settings and lineups, kept in the same Redis store as the share links. See [accounts setup](docs/runbook/accounts.md) and [ADR 010](docs/adr/010-coach-accounts.md). Short-link sharing uses a server-side Upstash Redis store (`UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`, or the `KV_REST_API_URL`/`KV_REST_API_TOKEN` pair a Vercel Marketplace store injects); local editing and file transfers work without them. See [sharing setup and retention](docs/runbook/sharing.md) and the [architecture decision](docs/adr/001-short-playbook-links.md).
 
 Manual deploy from a machine with the Vercel CLI:
 
