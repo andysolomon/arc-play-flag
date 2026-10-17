@@ -6,7 +6,7 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "e295626e29e93480e8a510d3299917589aef3e7cb7ab4f0ff7aaf206126adf19",
+    "components/App.tsx": "194826d6e2ae12eeacfad6fcdf2d2e7e2b35a8c276619529d7796cfb925287d9",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
     "components/Field.tsx": "1a80eaa17d0768b4096e7c5d2cd3f29c23e902733e6ed00cca46eaff01637588",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
@@ -27,7 +27,7 @@
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "19f61a3ac6c4675e5f47318ed9c145dc6684b24a4765c5b291b777c2c60e22ff",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "ae4f280bb814879cdc0117829f3855ba307c69f3417084f55a7ecf0cca41c959",
+    "components/RouteSidebar.tsx": "b137e465449234d2b5ba4f2956f9adf6d5e7df608e69815b44dc6703023ed78e",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
     "components/SideBadge.tsx": "29b38e443398d363674eeba19280d5579e24974d437ce836590451b91b931ba7",
@@ -70,9 +70,10 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Deep field's tooltip and how deep it opens changed (to the end line), and it now shows on tall phones; the clips are 960x540 where the button already showed in the same corner with the same label, and no chapter presses it or puts a player past 36 yards",
+    "reason": "Only the BLITZ pills and their caption changed (a Contain pill); build-defense picks Blitz at 960px, where the palette folds on the pick, and R's blitz still comes straight for the quarterback, so no clip shows the change",
     "files": [
-      "components/Field.tsx (changed)"
+      "components/App.tsx (changed)",
+      "components/RouteSidebar.tsx (changed)"
     ]
   }
 }
