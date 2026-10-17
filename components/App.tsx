@@ -446,8 +446,10 @@ export function App() {
   }, [formation, openRight, s]);
   // the header's Back to play: out of roster mode as the Roster tile goes, except that on a phone or tablet, where
   // the drawers cover the field, both fold so the play is in view. Back goes with the mode, so focus goes to the
-  // field's title once it reads the play's name again, never to the page. The title is ringed only when the keyboard
-  // pressed Back: after a tap or a click it stays quiet until focus moves on, whatever a browser's own rule would do
+  // field's title once it reads the play's name again, never to the page; it is focusable only until focus moves on
+  // from it, so on a play it stays words. It is ringed only when the keyboard pressed Back: after a tap or a click it
+  // stays quiet until then, whatever a browser's own rule would do. The window losing focus blurs it too but leaves it
+  // the page's focus, so that blur changes nothing
   const titleRef = useRef<HTMLHeadingElement>(null);
   const backToPlay = useRef<"keyboard" | "pointer" | null>(null);
   const onBack = useCallback((keyboard: boolean) => {
@@ -458,8 +460,15 @@ export function App() {
   useEffect(() => {
     const title = titleRef.current;
     if (!rostering && backToPlay.current && title) {
+      title.tabIndex = -1;
       title.toggleAttribute("data-quiet-focus", backToPlay.current === "pointer");
-      title.addEventListener("blur", () => { title.removeAttribute("data-quiet-focus"); }, { once: true });
+      const movedOn = () => {
+        if (document.activeElement === title) return;
+        title.removeAttribute("tabindex");
+        title.removeAttribute("data-quiet-focus");
+        title.removeEventListener("blur", movedOn);
+      };
+      title.addEventListener("blur", movedOn);
       title.focus({ preventScroll: true });
     }
     backToPlay.current = null;

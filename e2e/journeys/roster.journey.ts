@@ -18,7 +18,7 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * team's standard formation, never the play that is open: none of its routes, tags, spots or tools, and
  * nothing in it undoes; a position dragged or stepped there stands on the roster, on every lineup and held
  * to its side of the line, until Reset spots, and the play is back as it was on the way out, by the Roster
- * tile or by the header's Back to play, which stands where a play has Undo, Redo and Clear. A write the device refuses is
+ * tile or by the header's Back to play, which takes the room of Undo, Redo and Clear beside Play tools. A write the device refuses is
  * said, and stores nothing. Every name on the lineup has a page of its own: the positions they play and
  * where they sit at each. Lineups are versions of it all: the Starting Lineup is always there, and the
  * Secondary Lineup made from its depth charts (the next player up starting, nobody twice on a side, read
@@ -1493,19 +1493,23 @@ test("roster mode is a closer card than a play's, and never the deep field", asy
 });
 
 /**
- * Roster mode's way out at the top (ADR 008, rule 8): **Back to play** in the header, right of Play tools, where a
- * play has Undo, Redo and Clear, since nothing in roster mode is the play's to undo or clear. How this could break,
+ * Roster mode's way out at the top (ADR 008, rule 8): **Back to play** in the header, right of Play tools, taking the
+ * room of Undo, Redo and Clear, since nothing in roster mode is the play's to undo or clear. How this could break,
  * and the check for each:
  *  - Back shows on a play, or roster mode keeps its dead keys  → on a play the banner has no Back; in roster mode it holds
  *                                                                 Play tools, Back to play, the badge and the Roster panel toggle, nothing else
  *  - Escape leaves roster mode as well as letting a pick go     → after Escape the field still reads "Roster", Back still there
  *  - the arrow is drawn in one theme's ink                      → in either theme the arrow is the header's own ink, chalk on the dark board
  *  - Back loses the play                                        → its routes come back, X where it was stepped, and one undo puts X home
- *  - a phone's drawer is left over the play                     → on a phone or tablet both drawers fold and a tap on the title lands on it;
+ *  - a phone's drawer is left over the play                     → on a phone or tablet whichever drawer is open folds (Play tools after a tap,
+ *                                                                 the roster panel after Enter) and a tap on the title lands on it;
  *                                                                 on a wide screen the panels stay as the Roster tile leaves them
  *  - focus falls to the page when Back goes                     → focus is on the play's title, and Tab goes on into the field
- *  - the title's ring is left to each browser's own rule        → after a tap or a click no ring, nor after a key pressed next; after Enter on
- *                                                                 Back a ring drawn over the field's frame, whole; on paper never a ring
+ *  - the title's ring is left to each browser's own rule        → after a tap or a click no ring, nor after a key pressed next, nor after the
+ *                                                                 window loses focus and comes back; after Enter on Back a ring drawn over the
+ *                                                                 field's frame, whole; on paper never a ring
+ *  - the title takes focus on an ordinary play                  → on a play a click on the title and a key leave no focus and no ring there,
+ *                                                                 and once focus moves on from Back's title it is not focusable again
  *  - a double tap does more to the play                         → a double click on Back leaves the routes, X and the history as they were
  * Leaves `roster-<device>-back.json` (the banner in each mode, the drawers and where focus went) and pictures of the
  * roster's header in both themes and of the screen before and after Back.
@@ -1525,6 +1529,12 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
     return { outline: css.outlineStyle, over: css.position !== "static" && Number(css.zIndex) > 0 };
   });
   const compact = await page.evaluate(() => matchMedia("(max-width: 1023px)").matches);
+  // on a play the title is words, not something to focus: a click and a key leave no ring on it
+  await title.click();
+  await page.keyboard.press("Escape");
+  await expect(title).not.toBeFocused();
+  await expect(title).not.toHaveAttribute("tabindex");
+  expect((await ring()).outline, "a play's title never rings").toBe("none");
   // the play's own history: X stepped a yard in
   await d.foldOverlays();
   const xHome = await d.playerX("X");
@@ -1553,8 +1563,8 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   await banner.screenshot({ path: `test-results/roster-${device}-back-header.png` });
   // the arrow is drawn in the theme's own ink: chalk on the dark board, as the header's words are
   const ink = () => banner.evaluate((el) => {
-    const svg = el.querySelector("button[aria-label='Back to play'] svg");
-    return { back: svg ? getComputedStyle(svg).color : null, header: getComputedStyle(el).color };
+    const arrow = el.querySelector("button[aria-label='Back to play'] svg path");
+    return { back: arrow ? getComputedStyle(arrow).stroke : null, header: getComputedStyle(el).color };
   });
   const light = await ink();
   expect(light.back).toBe(light.header);
@@ -1569,6 +1579,12 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
 
   // the owner's case: Play tools open over the field in roster mode, and Back pressed
   await d.tools();
+  /** Which drawers are open: aria-hidden "false" on an open one. */
+  const open = async () => ({
+    tools: await page.locator("#play-sidebar").getAttribute("aria-hidden"),
+    right: await page.locator("#route-sidebar").getAttribute("aria-hidden"),
+  });
+  const beforePointer = await open();
   await page.screenshot({ path: `test-results/roster-${device}-back-before.png` });
   if (info.project.use.hasTouch) await d.back.tap();
   else await d.back.click();
@@ -1584,12 +1600,18 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   await expect(title).toBeFocused();
   pointer.afterKey = await ring();
   expect(pointer.afterKey.outline, "a key after a tap puts no ring on the title").toBe("none");
+  // the window losing focus blurs the title and leaves it the page's focus: still quiet when the coach comes back
+  await title.evaluate((el) => { el.dispatchEvent(new FocusEvent("blur")); });
+  await page.keyboard.press("Escape");
+  await expect(title).toBeFocused();
+  expect((await ring()).outline, "a key after the window comes back puts no ring on the title").toBe("none");
   // the play as the coach left it: its routes, X a yard in, and its history
   await expect(d.routes).toHaveCount(2);
   expect(await d.playerX("X")).toBeCloseTo(xHome + 1, 1);
   await expect(page.getByRole("button", { name: "Run the play" })).toBeVisible();
   const drawers = {
     compact,
+    before: beforePointer,
     tools: await page.locator("#play-sidebar").getAttribute("aria-hidden"),
     right: await page.locator("#route-sidebar").getAttribute("aria-hidden"),
     rightToggle: await banner.getByRole("button", { name: Designer.RIGHT }).getAttribute("aria-label"),
@@ -1616,10 +1638,17 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
 
   // from the keyboard: Enter on Back rings the title it hands focus to, and Tab goes on into the field
   await d.roster();
+  const beforeKeyboard = await open();
   await d.back.focus();
   await page.keyboard.press("Enter");
   await expect(title).toBeFocused();
-  const keyboard = { focused: true, ring: await ring(), print: { outline: "" }, tabbedInto: "" };
+  if (compact) {
+    // entering roster mode opened the roster panel over the field: Back folds that drawer too, not only Play tools
+    expect(beforeKeyboard.right, "the roster panel was over the field").toBe("false");
+    await expect(page.locator("#route-sidebar")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#play-sidebar")).toHaveAttribute("aria-hidden", "true");
+  }
+  const keyboard = { focused: true, drawers: { before: beforeKeyboard, after: await open() }, ring: await ring(), print: { outline: "" }, tabbedInto: "" };
   expect(keyboard.ring, "the keyboard's focus is shown, whole, over the field's frame").toEqual({ outline: "solid", over: true });
   // and a printout of the play never carries it
   await page.emulateMedia({ media: "print" });
@@ -1629,6 +1658,8 @@ test("the header's Back to play leaves roster mode from the top: in place of Und
   await page.keyboard.press("Tab");
   keyboard.tabbedInto = await page.evaluate(() => { const el = document.activeElement; return el?.closest("main") ? el.getAttribute("aria-label") ?? el.textContent?.trim() ?? el.tagName : "outside the field"; });
   expect(keyboard.tabbedInto).not.toBe("outside the field");
+  // focus moved on, so the title is words again
+  await expect(title).not.toHaveAttribute("tabindex");
 
   // a double tap: the second lands where Back was, which on a play is nothing to press
   await d.roster();
