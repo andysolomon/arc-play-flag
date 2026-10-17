@@ -6,12 +6,12 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "288b1713bcf93da4790011d278593238fc32be6608036bfc8d059b60bb0e860f",
+    "components/App.tsx": "b87a62ba18a39250837c2841739f4b795a1752e9e88bf581d2fadcadd362d104",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "19098ab3a3c306aeca1c1ace789e2e0cc553a5621ddff2d87d81b2f49e3e2fa6",
+    "components/Field.tsx": "1497de53eb7ee2c60baf7896fc7f38723e6cd107ae7584b369cd06fb6c92e42e",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
-    "components/Header.tsx": "c24dd640254f4507c31de58443804874fd31eb0ac2aa2977f80c6ece2fe932c4",
+    "components/Header.tsx": "8c6bd773310a6f3ee62358c5eacf9b6ebc7cd2ad4dfc536c399f38d883ea4a96",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "ce9a71e7b78fa295090f67d2660cc54d1aaeffe8ec1d8e819f7d4bdcdf712636",
     "components/LateralLayer.tsx": "badafa29eb6563fedf5e17ef61e7aab244c7234377ecf6620a06c1d63e977ada",
@@ -70,11 +70,11 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "No clip shows the quarterback's rollout and boot: the QB group (Rollout, Boot) only appears with the QB selected, and no chapter selects the QB (they pick X, Z, LC, LB and R); the new stickers live in that group; Field.tsx only adds words to the screen reader's description, and App.tsx passes the group its props. No chapter's play has a rollout or boot.",
+    "reason": "the header's Back to play key, and Undo, Redo and Clear leaving the header, show only in roster mode, which no chapter enters; on a play the header renders as on main, and the field title's focus classes draw nothing unless Back hands it focus",
     "files": [
       "components/App.tsx (changed)",
       "components/Field.tsx (changed)",
-      "components/RouteSidebar.tsx (changed)"
+      "components/Header.tsx (changed)"
     ]
   }
 }
