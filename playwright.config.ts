@@ -23,6 +23,8 @@ export default defineConfig({
   workers: CI ? 2 : undefined,
   timeout: 45_000,
   expect: { timeout: 10_000 },
+  // the organization journey needs the disposable database migrated first; nothing happens without DATABASE_URL
+  globalSetup: "./e2e/support/global-setup.ts",
   reporter: CI
     ? [["github"], ["html", { open: "never" }], ["./e2e/support/summary-reporter.ts"]]
     : [["list"], ["html", { open: "never" }]],

@@ -6,6 +6,7 @@ import { numbered } from "@/lib/export/numbered";
 import {
   getCurrentBookId, getPlaybooks, getPlays, getServerCurrentBookId, getServerPlaybooks, getServerPlays, primaryPlay, subscribe,
 } from "@/lib/play/library";
+import { getAccountState, getServerAccountState, subscribeAccount } from "@/lib/account/sync";
 import { Menu, MenuHeading, MenuNote } from "./Menu";
 import { SideBadge } from "./SideBadge";
 import { chip, menuChoice, menuItem } from "./ui";
@@ -53,6 +54,8 @@ interface Props {
  */
 export function PlaysMenu({ id, label, root, trigger, onClose, className, name, playId, onOpenPlay, onAddToBook }: Props) {
   const { book, items, primaryId, inBook } = useCurrentBook(playId);
+  // the other coaches of the organization on a play right now wear their names on its row (ADR 013, rule 8)
+  const presence = useSyncExternalStore(subscribeAccount, getAccountState, getServerAccountState).presence;
   const pick = (playId: string) => { onClose(); trigger.current?.focus(); onOpenPlay(playId); };
   const add = () => { onClose(); trigger.current?.focus(); onAddToBook(); };
   return (
@@ -78,6 +81,7 @@ export function PlaysMenu({ id, label, root, trigger, onClose, className, name, 
                 <SideBadge side={it.play.side} />
               </span>
               {it.play.id === primaryId && <span className={chip}>Primary</span>}
+              {presence.filter((p) => p.play === it.play.id).map((p) => <span key={p.coach} className={chip} data-here>{p.name}</span>)}
             </button>
           ))}
           {playId !== null && !inBook && (

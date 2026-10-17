@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { transferPlays, type Transfer } from "@/lib/export/transfer";
 import { sendTargets, sendToTeam, type SendResult } from "@/lib/account/sync";
+import { copyTargets, copyTo } from "@/lib/org/sync";
 import { useAccount } from "../account/AccountPanel";
 import { menuItem, pill, pillDark } from "../ui";
 import type { Say } from "./PlaybooksScreen";
@@ -24,7 +25,8 @@ export function sentWords(title: string, r: Extract<SendResult, { ok: true }>): 
  */
 export function SendToTeamItem({ onPick }: { onPick: () => void }) {
   const s = useAccount();
-  if (sendTargets(s).length === 0) return null;
+  // an organization's teams the coach draws on are targets too (ADR 013, rule 10)
+  if (sendTargets(s).length === 0 && copyTargets().filter((t) => t.target.kind === "org").length === 0) return null;
   return <button type="button" className={menuItem} onClick={onPick}>Send to another team…</button>;
 }
 
@@ -32,6 +34,7 @@ export function SendToTeamItem({ onPick }: { onPick: () => void }) {
 export function SendToTeamModal({ transfer, say, onClose }: { transfer: Transfer; say: Say; onClose: () => void }) {
   const s = useAccount();
   const targets = sendTargets(s);
+  const orgTargets = copyTargets().filter((t) => t.target.kind === "org");
   const title = transfer.kind === "ffpd.playbook" ? transfer.playbook.name : transfer.play.name;
   const plays = transferPlays(transfer).length;
   const [sending, setSending] = useState<string | null>(null);
@@ -45,6 +48,20 @@ export function SendToTeamModal({ transfer, say, onClose }: { transfer: Transfer
     say(sentWords(title, r), 3200);
     onClose();
   };
+  /** Into an organization's team: the copies are new records that say where they came from (ADR 013, rule 10). */
+  const sendToOrg = async (t: (typeof orgTargets)[number]) => {
+    setError("");
+    setSending(t.target.team);
+    try {
+      await copyTo(t.target, transferPlays(transfer), transfer.kind === "ffpd.playbook" ? [transfer.playbook] : []);
+      say(`Sent “${title}” to ${t.label}`, 3200);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't send it.");
+    } finally {
+      setSending(null);
+    }
+  };
   const what = transfer.kind === "ffpd.playbook"
     ? `Copies the playbook and its ${plural(plays, "play")} into the team you pick.`
     : "Copies the play into the team you pick.";
@@ -52,7 +69,7 @@ export function SendToTeamModal({ transfer, say, onClose }: { transfer: Transfer
     <PreviewModal title={`Send “${title}” to another team`} closeLabel="Close send to team" onClose={onClose}>
       <div className="flex flex-col gap-2">
         <span className="text-caption leading-note text-ink-muted">{what} Nothing in this team changes. A play that team already has is used as is.</span>
-        {targets.length === 0 && <span className="text-base text-ink-muted">No other team to send to. Make one under settings first.</span>}
+        {targets.length === 0 && orgTargets.length === 0 && <span className="text-base text-ink-muted">No other team to send to. Make one under settings first.</span>}
         <div role="group" aria-label="Send to" className="flex flex-col gap-2">
           {targets.map((t) => (
             <button
@@ -69,6 +86,23 @@ export function SendToTeamModal({ transfer, say, onClose }: { transfer: Transfer
             </button>
           ))}
         </div>
+        {[...new Set(orgTargets.map((t) => t.group))].map((group) => (
+          <div key={group} role="group" aria-label={`Send to ${group}`} className="flex flex-col gap-2">
+            <span className="text-eyebrow tracking-eyebrow text-ink-muted">{group.toUpperCase()}</span>
+            {orgTargets.filter((t) => t.group === group).map((t) => (
+              <button
+                key={t.target.team}
+                type="button"
+                disabled={sending !== null}
+                onClick={() => { void sendToOrg(t); }}
+                className={`${pill} flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left`}
+              >
+                <span className="min-w-0 flex-1 truncate text-base">{t.label}</span>
+                <span className="w-[72px] text-right text-small">{sending === t.target.team ? "Sending…" : "Send"}</span>
+              </button>
+            ))}
+          </div>
+        ))}
         {error && <p role="alert" className="text-small">{error}</p>}
         <button type="button" onClick={onClose} className={`${pillDark} mt-1 min-h-11 self-end px-5 text-small`}>Cancel</button>
       </div>

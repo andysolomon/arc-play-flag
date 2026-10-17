@@ -10,6 +10,7 @@ import { TypeFilter } from "./TypeFilter";
 import { PlayCard } from "./PlayCard";
 import { BookCard } from "./BookCard";
 import { SettingsButton } from "./Settings";
+import { Presence } from "../account/Presence";
 import {
   createPlaybook, discoverPlays, getPlaybooks, getPlays, getServerPlaybooks, getServerPlays,
   getServerTeam, getTeam, subscribe,
@@ -70,7 +71,7 @@ export function Home({ say }: { say: Say }) {
           <span className={eyebrow}>PLAYBOOKS</span>
           {books.length > 0 && <span className="text-caption text-ink-muted">{plural(books.length, "playbook")}</span>}
         </div>
-        <SettingsButton />
+        <Presence /><SettingsButton />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={onNew} className={`${pillDark} min-h-11 px-4 text-small`}>+ New playbook</button>

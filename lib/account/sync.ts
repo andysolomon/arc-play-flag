@@ -56,150 +56,25 @@
  *   stays, the marker stays, and no push is started.
  */
 import { planTransfer, type Transfer } from "@/lib/export/transfer";
-import { refresh, subscribe } from "@/lib/play/library";
-import { CURRENT_BOOK_KEY } from "@/lib/play/current-book";
-import {
-  DRAFT_KEY, LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, StorageError, TEAM_KEY, failureMessage, readAll, readLineups, readPlaybooks, readTeam,
-  writeMany,
-} from "@/lib/play/storage";
+import { subscribe } from "@/lib/play/library";
 import * as api from "./api";
 import { ApiError } from "./api";
 import { UNNAMED_TEAM, canonical, emptyTeamData, hasWork, mergeTeamData } from "./data";
-import type { AccountMode, AccountResponse, AccountUser, TeamData, TeamRecord, TeamSummary } from "./types";
+import {
+  applyData, clearDevice, currentTeam, deviceData, getAccountState, getLastSynced, hashOf, isApplying, problem, readMarker, set, setLastSynced, writeMarker,
+  type AccountState, type Marker,
+} from "./state";
+import type { AccountResponse, TeamData, TeamRecord, TeamSummary } from "./types";
+import * as orgApi from "@/lib/org/api";
+import * as org from "@/lib/org/sync";
+import type { Grants, OrgSummary, OrgTeamSummary } from "@/lib/org/types";
 
-/**
- * Which team this device mirrors, the rev it last agreed with the account on, whether anything written
- * since has not gone up, and a hash of the data as it was then, so a write made signed out (A5) or in
- * another tab is seen for what it is on the next sign-in.
- */
-export const MARKER_KEY = "ffpd.account.v1";
-export interface Marker {
-  teamId: string;
-  rev: number;
-  dirty: boolean;
-  hash?: string;
-}
+export {
+  MARKER_KEY, ORG_KEY, currentOrgTeam, currentTeam, getAccountState, getServerAccountState, hashOf, readMarker, subscribeAccount,
+  type AccountState, type Marker, type SyncStatus,
+} from "./state";
 
-/** FNV-1a over the canonical JSON: short, cheap, and enough to tell "changed" from "the same". */
-export function hashOf(canonicalJson: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < canonicalJson.length; i++) {
-    h ^= canonicalJson.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h.toString(36) + canonicalJson.length.toString(36);
-}
-
-export type SyncStatus =
-  | "idle"
-  /** asking the account who is signed in */
-  | "checking"
-  | "saving"
-  | "saved"
-  /** a write is on the device and not yet in the account (A7) */
-  | "pending"
-  | "offline"
-  | "error"
-  /** a switch, a new team, a deletion or a sign-out is in flight */
-  | "busy";
-
-export interface AccountState {
-  mode: AccountMode | "unknown";
-  user: AccountUser | null;
-  teams: readonly TeamSummary[];
-  /** the team this device mirrors, when it mirrors one of the account's */
-  teamId: string | null;
-  status: SyncStatus;
-  /** the last problem, in one line, or null */
-  message: string | null;
-}
-
-const INITIAL: AccountState = { mode: "unknown", user: null, teams: [], teamId: null, status: "idle", message: null };
-let state: AccountState = INITIAL;
-const listeners = new Set<() => void>();
-const emit = (): void => { for (const cb of listeners) cb(); };
-function set(patch: Partial<AccountState>): void {
-  state = { ...state, ...patch };
-  emit();
-}
-
-export function subscribeAccount(cb: () => void): () => void {
-  listeners.add(cb);
-  return () => { listeners.delete(cb); };
-}
-export const getAccountState = (): AccountState => state;
-export const getServerAccountState = (): AccountState => INITIAL;
-
-/** The team this device mirrors, as the account lists it. */
-export const currentTeam = (s: AccountState = state): TeamSummary | null => s.teams.find((t) => t.id === s.teamId) ?? null;
-
-// ---- the device ----------------------------------------------------------------------------------
-
-export function readMarker(): Marker | null {
-  try {
-    const v: unknown = JSON.parse(localStorage.getItem(MARKER_KEY) ?? "null");
-    if (typeof v !== "object" || v === null) return null;
-    const m = v as Record<string, unknown>;
-    if (typeof m.teamId !== "string" || !m.teamId || typeof m.rev !== "number") return null;
-    return { teamId: m.teamId, rev: m.rev, dirty: m.dirty === true, ...(typeof m.hash === "string" ? { hash: m.hash } : {}) };
-  } catch {
-    return null;
-  }
-}
-
-function writeMarker(m: Marker | null): void {
-  try {
-    if (m) localStorage.setItem(MARKER_KEY, JSON.stringify(m));
-    else localStorage.removeItem(MARKER_KEY);
-  } catch {
-    /* a blocked storage costs the marker its memory past this visit; the data it describes is checked on every visit anyway */
-  }
-}
-
-/** What the device holds, as a team's data (A16: no draft, no picked book). */
-export function deviceData(): TeamData {
-  return { plays: Object.values(readAll()), playbooks: Object.values(readPlaybooks()), team: readTeam(), lineups: readLineups() };
-}
-
-/** True while this engine is writing the device, so its own writes are not taken for the coach's. */
-let applying = false;
-/** The data as last pushed or pulled, canonical; null while unknown. */
-let lastSynced: string | null = null;
-
-/** Writes a team's data to the device as one change (A13: a failed write lands nothing and throws). */
-function applyData(data: TeamData, clearDevice: boolean): void {
-  applying = true;
-  try {
-    writeMany([
-      [PLAYS_KEY, Object.fromEntries(data.plays.map((p) => [p.id, p]))],
-      [PLAYBOOKS_KEY, Object.fromEntries(data.playbooks.map((b) => [b.id, b]))],
-      [TEAM_KEY, data.team],
-      [LINEUPS_KEY, data.lineups],
-      ...(clearDevice ? [[DRAFT_KEY, null] as const] : []),
-    ]);
-    if (clearDevice) {
-      try { localStorage.removeItem(CURRENT_BOOK_KEY); } catch { /* the pick is a convenience */ }
-    }
-    lastSynced = canonical(deviceData());
-    refresh();
-  } finally {
-    applying = false;
-  }
-}
-
-/** Takes the team's data off the device (A11): the account has it. */
-function clearDevice(): void {
-  applying = true;
-  try {
-    for (const k of [PLAYS_KEY, PLAYBOOKS_KEY, TEAM_KEY, LINEUPS_KEY, DRAFT_KEY, CURRENT_BOOK_KEY, MARKER_KEY]) {
-      try { localStorage.removeItem(k); } catch { /* nothing to keep */ }
-    }
-    lastSynced = null;
-    refresh();
-  } finally {
-    applying = false;
-  }
-}
+const state = (): AccountState => getAccountState();
 
 // ---- pushing ----------------------------------------------------------------------------------
 
@@ -210,8 +85,9 @@ let pushAgain = false;
 
 /** Records that the device and the account agree on `data` at `rev`. */
 function synced(teamId: string, rev: number, data: TeamData): void {
-  lastSynced = canonical(data);
-  writeMarker({ teamId, rev, dirty: false, hash: hashOf(lastSynced) });
+  const c = canonical(data);
+  setLastSynced(c);
+  writeMarker({ teamId, rev, dirty: false, hash: hashOf(c) });
 }
 
 /** True when the device holds something other than what its marker says the account last had. */
@@ -221,40 +97,36 @@ function changedSinceMarker(m: Marker): boolean {
 
 /** A write landed on the device: it goes up shortly, with any that follow (A7, A18). */
 function noteWrite(): void {
-  if (applying) return;
+  if (isApplying()) return;
   const m = readMarker();
-  if (!state.user || !state.teamId) {
+  if (m?.org) { org.noteWrite(); return; }
+  const s = state();
+  if (!s.user || !s.teamId) {
     // signed out (A2) or not settled yet: a change to a mirrored team is remembered for the next sign-in (A5)
-    if (m && !m.dirty && !state.user && changedSinceMarker(m)) writeMarker({ ...m, dirty: true });
+    if (m && !m.dirty && !s.user && changedSinceMarker(m)) writeMarker({ ...m, dirty: true });
     return;
   }
-  if (lastSynced !== null && canonical(deviceData()) === lastSynced) return;
+  const last = getLastSynced();
+  if (last !== null && canonical(deviceData()) === last) return;
   if (m && !m.dirty) writeMarker({ ...m, dirty: true });
   set({ status: "pending", message: null });
   window.clearTimeout(pushTimer);
   pushTimer = window.setTimeout(() => { void push(); }, PUSH_DELAY);
 }
 
-function problem(e: unknown): Pick<AccountState, "status" | "message"> {
-  if (e instanceof StorageError) return { status: "error", message: failureMessage(e) };
-  if (e instanceof ApiError) {
-    if (e.status === 0) return { status: navigator.onLine ? "error" : "offline", message: navigator.onLine ? e.message : null };
-    if (e.status === 429) return { status: "pending", message: "Your account is busy. Trying again in a while." };
-    return { status: "error", message: e.message };
-  }
-  return { status: "error", message: "Something went wrong with your account. Your work stays on this device." };
-}
-
 /** Pushes the device's data to its team. Resolves true when the account has it. */
 export function push(): Promise<boolean> {
+  if (state().org) return org.push();
   if (pushing) { pushAgain = true; return pushing; }
   pushing = (async () => {
     window.clearTimeout(pushTimer);
     const m = readMarker();
-    if (!state.user || !m || m.teamId !== state.teamId) return false;
+    const s = state();
+    if (!s.user || !m || m.teamId !== s.teamId) return false;
     let data = deviceData();
     // nothing new since the last push or pull (A18): a resume or a second go is no write
-    if (!m.dirty && lastSynced !== null && canonical(data) === lastSynced) { set({ status: "saved" }); return true; }
+    const last = getLastSynced();
+    if (!m.dirty && last !== null && canonical(data) === last) { set({ status: "saved" }); return true; }
     set({ status: "saving", message: null });
     try {
       let rev = m.rev;
@@ -262,7 +134,7 @@ export function push(): Promise<boolean> {
         try {
           const summary = await api.writeTeam(m.teamId, data, rev);
           synced(m.teamId, summary.rev, data);
-          set({ status: "saved", message: null, teams: state.teams.map((t) => (t.id === summary.id ? summary : t)) });
+          set({ status: "saved", message: null, teams: state().teams.map((t) => (t.id === summary.id ? summary : t)) });
           return true;
         } catch (e) {
           if (!(e instanceof ApiError) || e.status !== 409 || !e.record || attempt === 1) throw e;
@@ -285,7 +157,7 @@ export function push(): Promise<boolean> {
         try {
           const record = await api.createTeam({ data: deviceData() });
           adopt(record, false);
-          set({ status: "saved", message: "That team was deleted elsewhere, so this device's work is now a new team.", teams: [...state.teams, summaryOf(record)], teamId: record.id });
+          set({ status: "saved", message: "That team was deleted elsewhere, so this device's work is now a new team.", teams: [...state().teams, summaryOf(record)], teamId: record.id });
           return true;
         } catch (e2) {
           set(problem(e2));
@@ -306,6 +178,7 @@ const summaryOf = (r: TeamRecord): TeamSummary => ({ id: r.id, name: r.name, col
 
 /** Makes the device mirror a team just read or made, with its data on the device as read. */
 function adopt(record: TeamRecord, clear: boolean): void {
+  org.release();
   applyData(record.data, clear);
   synced(record.id, record.rev, record.data);
 }
@@ -320,12 +193,35 @@ function wire(): void {
   wired = true;
   subscribe(noteWrite);
   const resume = () => {
-    if (state.mode === "unknown" || (state.mode !== "off" && !state.user && state.status === "offline")) { started = false; void start(); return; }
-    if (state.user && readMarker()?.dirty) void push();
+    const s = state();
+    if (s.mode === "unknown" || (s.mode !== "off" && !s.user && s.status === "offline")) { started = false; void start(); return; }
+    if (s.user && readMarker()?.dirty) void push();
+    if (s.user && s.org && s.level !== null && s.level > 0) org.startPolling();
   };
   window.addEventListener("online", resume);
   window.addEventListener("focus", resume);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") resume(); });
+}
+
+/** The coach's organizations and every team of theirs the coach sees (ADR 013). Nothing when they are off. */
+export async function loadOrgs(): Promise<void> {
+  let res;
+  try {
+    res = await orgApi.orgs();
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 503)) { set({ orgMode: "off", orgs: [], orgTeams: [] }); return; }
+    throw e;
+  }
+  if (res.mode === "off") { set({ orgMode: "off", orgs: [], orgTeams: [] }); return; }
+  const orgTeams: OrgTeamSummary[] = [];
+  for (const o of res.orgs) {
+    try {
+      orgTeams.push(...(await orgApi.readOrg(o.id)).teams);
+    } catch {
+      /* an organization that can't be read right now lists no teams; the next visit tries again */
+    }
+  }
+  set({ orgMode: "on", orgs: res.orgs, orgTeams });
 }
 
 /** Finds out who is signed in and settles the device against their account (A1–A6). Once per visit; again after a sign-in. */
@@ -339,16 +235,47 @@ export async function start(): Promise<void> {
     res = await api.account();
   } catch (e) {
     // the device may well be signed in and offline: the panel says so when it mirrors a team, instead of offering sign-in
-    set({ ...problem(e), mode: state.mode, teamId: readMarker()?.teamId ?? null });
+    const m = readMarker();
+    set({ ...problem(e), mode: state().mode, teamId: m?.teamId ?? null, org: m?.org ?? null, level: m?.level ?? null });
     return;
   }
-  if (res.mode === "off") { set({ mode: "off", user: null, teams: [], teamId: null, status: "idle", message: null }); return; }
-  if (!res.user) { set({ mode: res.mode, user: null, teams: [], teamId: null, status: "idle", message: null }); return; }
+  const invite = inviteInUrl();
+  if (res.mode === "off") { set({ mode: "off", user: null, teams: [], teamId: null, status: "idle", message: null, orgMode: "off" }); return; }
+  if (!res.user) {
+    set({ mode: res.mode, user: null, teams: [], teamId: null, status: "idle", message: null });
+    if (invite) window.location.replace(`${SIGN_IN_PATH}?invite=${encodeURIComponent(invite)}`);
+    return;
+  }
   set({ mode: res.mode, user: res.user, teams: res.teams, teamId: null, status: "checking", message: null });
   try {
-    await settle(res.teams, res.current);
+    await loadOrgs();
+    if (invite) await acceptInvite(invite);
+    const m = readMarker();
+    if (m?.org) await org.settle({ teamId: m.teamId, org: m.org, level: m.level, rev: m.rev, dirty: m.dirty });
+    else await settle(res.teams, res.current);
   } catch (e) {
     set(problem(e));
+  }
+}
+
+/** The invite token a link carried here (`?invite=`), taken off the URL; the sign-in page keeps its own, to carry on after sign-in. */
+function inviteInUrl(): string | null {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("invite");
+  if (!token || url.pathname.startsWith(SIGN_IN_PATH) || url.pathname.startsWith("/sign-up")) return null;
+  url.searchParams.delete("invite");
+  window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  return token;
+}
+
+/** Joins the organization an invite names, and says so (rule 4). */
+export async function acceptInvite(token: string): Promise<void> {
+  try {
+    const joined = await orgApi.join(token);
+    await loadOrgs();
+    set({ notice: `You're in ${joined.name}.` });
+  } catch (e) {
+    set({ message: e instanceof ApiError ? e.message : "That invite couldn't be used." });
   }
 }
 
@@ -361,7 +288,7 @@ async function settle(teams: readonly TeamSummary[], current: string | null): Pr
     if (changedSinceMarker(marker)) {
       // A5: written here since the device last agreed with the account (signed out, offline, another tab)
       writeMarker({ ...marker, dirty: true });
-      lastSynced = null;
+      setLastSynced(null);
       await push();
       return;
     }
@@ -371,7 +298,7 @@ async function settle(teams: readonly TeamSummary[], current: string | null): Pr
       set({ status: "saved", message: null });
       return;
     }
-    lastSynced = canonical(device);
+    setLastSynced(canonical(device));
     set({ status: "saved", message: null });
     return;
   }
@@ -388,6 +315,12 @@ async function settle(teams: readonly TeamSummary[], current: string | null): Pr
     adopt(await api.readTeam(target.id), true);
     set({ teamId: target.id, status: "saved", message: null });
     if (target.id !== current) void api.setCurrent(target.id).catch(() => undefined);
+    return;
+  }
+  const first = state().orgTeams[0];
+  if (first) {
+    // an account with no team of its own but an organization's to see: that one opens
+    await org.open(first.org, first.id);
     return;
   }
   const record = await api.createTeam({ data: emptyTeamData(UNNAMED_TEAM) });
@@ -419,16 +352,21 @@ export function openProfile(): void {
 
 /** The pending push, done; false (with the panel told why) when it can't be (A10, A11). */
 async function flushed(): Promise<boolean> {
-  if (!readMarker()?.dirty && lastSynced !== null && canonical(deviceData()) === lastSynced) return true;
+  if (state().org) return org.flushed();
+  const last = getLastSynced();
+  if (!readMarker()?.dirty && last !== null && canonical(deviceData()) === last) return true;
   if (await push()) return true;
   set({ message: "Your latest changes aren't in your account yet. Connect and try again." });
   return false;
 }
 
-/** Makes another of the account's teams the one this device mirrors, and reloads (A17). */
-export async function switchTeam(id: string): Promise<void> {
-  if (!state.user || id === state.teamId || !state.teams.some((t) => t.id === id)) return;
+/** Makes another team the one this device mirrors, the coach's own or an organization's, and reloads (A17). */
+export async function switchTeam(id: string, orgId: string | null = null): Promise<void> {
+  const s = state();
+  if (!s.user || (id === s.teamId && (orgId ?? null) === s.org)) return;
+  if (orgId ? !s.orgTeams.some((t) => t.id === id && t.org === orgId) : !s.teams.some((t) => t.id === id)) return;
   if (!(await flushed())) return;
+  if (orgId) { await org.open(orgId, id); return; }
   set({ status: "busy", message: null });
   try {
     adopt(await api.readTeam(id), true);
@@ -439,12 +377,17 @@ export async function switchTeam(id: string): Promise<void> {
   }
 }
 
-/** Makes an empty team and switches to it. */
-export async function createTeam(name: string): Promise<void> {
-  if (!state.user) return;
+/** Makes an empty team, the coach's own or in an organization, and switches to it. */
+export async function createTeam(name: string, orgId: string | null = null): Promise<void> {
+  if (!state().user) return;
   if (!(await flushed())) return;
   set({ status: "busy", message: null });
   try {
+    if (orgId) {
+      const made = await orgApi.createTeam(orgId, name.trim() || UNNAMED_TEAM);
+      await org.open(orgId, made.id);
+      return;
+    }
     const record = await api.createTeam({ name: name.trim() || UNNAMED_TEAM });
     adopt(record, true);
     window.location.reload();
@@ -453,31 +396,94 @@ export async function createTeam(name: string): Promise<void> {
   }
 }
 
-/** Deletes a team from the account. The team this device mirrors goes with its data; the page reloads onto another. */
-export async function deleteTeam(id: string): Promise<void> {
-  if (!state.user) return;
+/** Deletes a team, the coach's own from the account or an organization's for everyone. The team this device mirrors goes with its data; the page reloads onto another. */
+export async function deleteTeam(id: string, orgId: string | null = null): Promise<void> {
+  const s = state();
+  if (!s.user) return;
   set({ status: "busy", message: null });
   try {
-    await api.deleteTeam(id);
-    if (id === state.teamId) {
+    if (orgId) await orgApi.deleteTeam(orgId, id);
+    else await api.deleteTeam(id);
+    if (id === s.teamId && (orgId ?? null) === s.org) {
+      org.release();
       clearDevice();
       window.location.reload();
       return;
     }
-    set({ teams: state.teams.filter((t) => t.id !== id), status: readMarker()?.dirty ? "pending" : "saved" });
+    set({ teams: orgId ? s.teams : s.teams.filter((t) => t.id !== id), orgTeams: orgId ? s.orgTeams.filter((t) => !(t.id === id && t.org === orgId)) : s.orgTeams, status: readMarker()?.dirty ? "pending" : "saved" });
   } catch (e) {
     set(problem(e));
   }
 }
 
-/** Signs out, after the last push, and clears the device (A11). */
-export async function signOut(): Promise<void> {
-  if (!state.user) return;
+/** Moves the coach's own team this device has open into an organization, where the coach heads it (ADR 013, tier 3). */
+export async function moveTeamToOrg(orgId: string): Promise<void> {
+  const s = state();
+  const team = currentTeam(s);
+  if (!s.user || !team || s.org) return;
   if (!(await flushed())) return;
   set({ status: "busy", message: null });
   try {
+    await orgApi.moveTeam(orgId, team.id);
+    set({ teams: s.teams.filter((t) => t.id !== team.id) });
+    await loadOrgs();
+    await org.open(orgId, team.id);
+  } catch (e) {
+    set(problem(e));
+  }
+}
+
+/** Makes an organization with the coach as its owner. */
+export async function createOrg(name: string): Promise<OrgSummary | null> {
+  try {
+    const made = await orgApi.createOrg(name);
+    await loadOrgs();
+    return made;
+  } catch (e) {
+    set({ message: e instanceof ApiError ? e.message : "Couldn't make the organization." });
+    return null;
+  }
+}
+
+/** Runs one of the organization's management calls and reads the organizations again; the panel gets the error line. */
+export async function manage(run: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await run();
+    await loadOrgs();
+    return true;
+  } catch (e) {
+    set({ message: e instanceof ApiError ? e.message : "Something went wrong with your organization." });
+    return false;
+  }
+}
+
+export const invite = (orgId: string, body: Partial<Grants> & { email?: string }) => orgApi.createInvite(orgId, body);
+export const readOrg = (orgId: string) => orgApi.readOrg(orgId);
+
+/** Leaves an organization; the device drops its team when it was the organization's. */
+export async function leaveOrg(orgId: string): Promise<void> {
+  const s = state();
+  const ok = await manage(() => orgApi.leave(orgId));
+  if (ok && s.org === orgId) { org.release(); clearDevice(); window.location.reload(); }
+}
+
+/** Deletes an organization and its teams; the owner only. The device reloads when it had one of them open. */
+export async function deleteOrg(orgId: string): Promise<void> {
+  const s = state();
+  const ok = await manage(() => orgApi.deleteOrg(orgId));
+  if (ok && s.org === orgId) { org.release(); clearDevice(); window.location.reload(); }
+}
+
+/** Signs out, after the last push, and clears the device (A11). */
+export async function signOut(): Promise<void> {
+  const s = state();
+  if (!s.user) return;
+  if (!(await flushed())) return;
+  set({ status: "busy", message: null });
+  try {
+    org.release();
     clearDevice();
-    if (state.mode === "fixture") await api.fixtureSignOut();
+    if (s.mode === "fixture") await api.fixtureSignOut();
     else await bridge?.signOut();
     // a full load on purpose (A17): the designer starts over with nothing of the account on the device
     window.location.assign(new URL("/", window.location.origin).href);
@@ -494,7 +500,7 @@ export type SendResult =
   | { ok: false; message: string };
 
 /** The other teams of this account, once the device has settled on one of them: where a playbook or a play can be sent (S7: never the one this device mirrors). */
-export const sendTargets = (s: AccountState = state): TeamSummary[] => (s.user && s.teamId ? s.teams.filter((t) => t.id !== s.teamId) : []);
+export const sendTargets = (s: AccountState = state()): TeamSummary[] => (s.user && s.teamId ? s.teams.filter((t) => t.id !== s.teamId) : []);
 
 /**
  * Copies a playbook (with its plays) or a play into another of the account's teams, as importing a
@@ -512,7 +518,7 @@ export async function sendToTeam(transfer: Transfer, teamId: string): Promise<Se
       if (plan.plays.length === 0 && plan.book === null) {
         // S1: the team has it already; the summary it carries is the account's latest
         const team = summaryOf(record);
-        set({ teams: state.teams.map((t) => (t.id === team.id ? team : t)) });
+        set({ teams: state().teams.map((t) => (t.id === team.id ? team : t)) });
         return { ok: true, team, ...counts, unchanged: true };
       }
       const data: TeamData = {
@@ -522,7 +528,7 @@ export async function sendToTeam(transfer: Transfer, teamId: string): Promise<Se
       };
       try {
         const team = await api.writeTeam(teamId, data, record.rev);
-        set({ teams: state.teams.map((t) => (t.id === team.id ? team : t)) });
+        set({ teams: state().teams.map((t) => (t.id === team.id ? team : t)) });
         return { ok: true, team, ...counts, unchanged: false };
       } catch (e) {
         if (!(e instanceof ApiError) || e.status !== 409 || !e.record) throw e;
@@ -536,7 +542,7 @@ export async function sendToTeam(transfer: Transfer, teamId: string): Promise<Se
       return { ok: false, message: "You were signed out. Sign in again, then send it." };
     }
     if (e instanceof ApiError && e.status === 404) {
-      set({ teams: state.teams.filter((t) => t.id !== teamId) });
+      set({ teams: state().teams.filter((t) => t.id !== teamId) });
       return { ok: false, message: `${target.name} isn't in your account any more.` };
     }
     if (e instanceof ApiError) return { ok: false, message: e.status === 0 && !navigator.onLine ? "You're offline. Sending needs a connection." : e.message };
