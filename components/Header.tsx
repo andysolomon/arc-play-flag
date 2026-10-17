@@ -24,6 +24,7 @@ interface Props {
   /** the play differs from its last Save, so the Save key wears a dot */
   unsaved: boolean;
   onSave: () => void;
+  onDuplicate: () => void;
   onToggleLeft: () => void;
   onToggleRight: () => void;
   /**
@@ -45,17 +46,20 @@ export const VIEW: Record<Vis, { label: string; icon: string; next: Vis; title: 
 
 /**
  * On phones each control is a 44px-tall key with its glyph over a small name, so a coach can tell
- * Clear from Undo without trying them; from 480px up the name sits beside the glyph.
+ * Clear from Undo without trying them; from 768px up the name sits beside the glyph.
  */
 const round =
-  "inline-flex shrink-0 items-center justify-center gap-1 max-[479px]:min-w-11 max-[479px]:flex-col max-[479px]:gap-0.5 " +
-  "max-[479px]:rounded-[14px] max-[479px]:px-1 max-[479px]:py-0.5";
+  "inline-flex shrink-0 items-center justify-center gap-1 max-[767px]:min-w-11 max-[767px]:flex-col max-[767px]:gap-0.5 " +
+  "max-[767px]:w-11 max-[767px]:rounded-[14px] max-[767px]:px-0 max-[767px]:py-0.5";
 /** The same key for a control whose name comes before its glyph on wider screens (Redo, Routes). */
-const roundAfter = round.replace("max-[479px]:flex-col ", "max-[479px]:flex-col-reverse ");
+const roundAfter = round.replace("max-[767px]:flex-col ", "max-[767px]:flex-col-reverse ");
+/** Roster mode has room to spell out its way back from 479px. */
+const backRound = "inline-flex shrink-0 items-center justify-center gap-1 max-[478px]:min-w-11 max-[478px]:w-11 max-[478px]:flex-col max-[478px]:gap-0.5 " +
+  "max-[478px]:rounded-[14px] max-[478px]:px-0 max-[478px]:py-0.5";
 /** Stickers shrink a little on phones to leave room for the name under them. */
-const glyph = "shrink-0 max-[479px]:h-5 max-[479px]:w-5";
+const glyph = "shrink-0 max-[767px]:h-5 max-[767px]:w-5";
 /** The name under the glyph on phones. */
-const name = "max-[479px]:text-[11px] max-[479px]:leading-none";
+const name = "max-[767px]:text-[11px] max-[767px]:leading-none";
 
 /** Three-line menu mark for Play tools, so it reads as a menu instead of a panel chevron. */
 function MenuIcon() {
@@ -85,12 +89,12 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
 }
 
 function HeaderImpl({
-  mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, unsaved, onSave, onToggleLeft, onToggleRight, onBack, onUndo, onRedo, onClear,
+  mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, unsaved, onSave, onDuplicate, onToggleLeft, onToggleRight, onBack, onUndo, onRedo, onClear,
 }: Props) {
   const rostering = mode === "roster";
   const showing = VIEW[view];
   return (
-    <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5">
+    <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 max-[1023px]:gap-1.5 max-[399px]:gap-px max-[399px]:px-0.5">
       <button
         type="button"
         onClick={onToggleLeft}
@@ -105,15 +109,15 @@ function HeaderImpl({
       </button>
       {rostering && (
         // nothing in roster mode is the play's to undo or clear, so the way back to it has their room, where a back key goes
-        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${round}`}>
+        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${backRound}`}>
           <BackIcon />
-          <span className={`${name} min-[479px]:hidden`}>Back</span>
-          <span className="max-[479px]:hidden">Back to play</span>
+          <span className="max-[478px]:text-[11px] max-[478px]:leading-none min-[479px]:hidden">Back</span>
+          <span className="max-[478px]:hidden">Back to play</span>
         </button>
       )}
       <div className="min-w-0 flex-1" />
       <Presence className="mr-1" />
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 max-[399px]:gap-px">
         {rostering ? (
           // the roster has both sides and no play to save: the badge is the way between them, and to both at once
           <button
@@ -145,6 +149,10 @@ function HeaderImpl({
         )}
         {!rostering && (
           <>
+            <button type="button" onClick={onDuplicate} title="Save a copy of this play" aria-label="Duplicate play" className={`${pillMd} ${round}`}>
+              <Sticker icon="duplicate" size={22} className={glyph} />
+              <span className={name}>Duplicate</span>
+            </button>
             <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
               <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
               <span className={name}>Undo</span>

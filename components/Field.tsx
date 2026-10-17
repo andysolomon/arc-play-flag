@@ -62,6 +62,8 @@ interface Props {
   readOnly?: boolean;
   /** printed above the field; also shown on screen when `showTitle` is set */
   title?: string;
+  /** designer-only inline title control; shares and roster titles stay plain text */
+  titleControl?: ReactNode;
   /** sit the play name above the diagram instead of squeezing it into the header */
   showTitle?: boolean;
   /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
@@ -176,9 +178,10 @@ function captionFor(
 
 function FieldImpl({
   players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, switcher, titleRef, starters, roster = false,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, titleControl, showTitle = false, status, switcher, titleRef, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
+  const titleRowRef = useRef<HTMLDivElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
   const [live, setLive] = useState<Live | null>(null);
   const [liveWaypoint, setLiveWaypoint] = useState<{ id: string; index: number; x: number; y: number } | null>(null);
@@ -222,13 +225,18 @@ function FieldImpl({
       window.clearTimeout(t);
       t = window.setTimeout(() => {
         const pw = Math.max(240, el.clientWidth - 18);
-        const ph = Math.max(220, el.clientHeight - 18 - (showTitle ? TITLE_CHROME : 0));
+        const titleRow = titleRowRef.current;
+        const titleChrome = !showTitle ? 0 : titleRow
+          ? titleRow.getBoundingClientRect().height + parseFloat(getComputedStyle(titleRow).marginBottom)
+          : TITLE_CHROME;
+        const ph = Math.max(220, el.clientHeight - 18 - titleChrome);
         setPane((prev) => (prev && Math.abs(prev.pw - pw) < 0.5 && Math.abs(prev.ph - ph) < 0.5 ? prev : { pw, ph }));
       }, 16);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
+    if (titleRowRef.current) ro.observe(titleRowRef.current);
     return () => { ro.disconnect(); window.clearTimeout(t); };
   }, [showTitle]);
 
@@ -806,13 +814,14 @@ function FieldImpl({
       {title !== undefined && !showTitle && <h1 className="hidden text-header font-normal print:mb-2 print:block">{title}</h1>}
       <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         {title !== undefined && showTitle && (
-          <div id={FIELD_TITLE_ID} className="relative mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
+          <div ref={titleRowRef} id={FIELD_TITLE_ID} className="relative mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
             <h1
               ref={titleRef}
               className="min-w-0 truncate text-header font-normal text-ink focus-visible:relative focus-visible:z-[1] data-quiet-focus:outline-none print:outline-none"
               title={title}
+              aria-label={titleControl ? title : undefined}
             >
-              {title}
+              {titleControl ?? title}
             </h1>
             {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
             {switcher}

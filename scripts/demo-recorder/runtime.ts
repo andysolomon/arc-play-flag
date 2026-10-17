@@ -229,8 +229,8 @@ const DELIVERY: ReadonlyArray<readonly [DeliveryKind, string]> = [["webm", "webm
  * frame at 10–12 fps pays for; the UI is flat colour and line, and keeps its edges at these. The
  * end zone chapter, with its painted end zone and confetti, is what sets the budget.
  */
-const VP9_CRF = 52;
-const H264_CRF = 37;
+const VP9_CRF = 53;
+const H264_CRF = 38;
 
 /**
  * A fixed manifest duration and timestamp-normalized filter for deterministic delivery clips.

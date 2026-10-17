@@ -341,6 +341,14 @@ jobs:
           path: test-results/header-save-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the header editing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: header-edit
+          path: test-results/header-edit-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the spacing evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -6,12 +6,13 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "6ddc5b8a9be4f3bd991acb0fdee26661d6c8dcd3e0c37df5f1bd3c8e8200fda9",
+    "components/App.tsx": "cea9cf842844efbd8462ab05c2c8a27e0f072b6e69b116999628e2eaaaf51f48",
+    "components/EditablePlayTitle.tsx": "e950bae2fb571cb67cfa1d4f11364b85d155c9fe6038389956769cb86eef43d3",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "afbb6cbe86387ee79a8b8bd36eae2568be60bb7f68283b079562986fa4dc243e",
+    "components/Field.tsx": "7f7513fe0dc73746a56c618a3bfeefd6620e80cc3af7389e1578ec51ded0f4fe",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
-    "components/Header.tsx": "654785d4fc70a8db17042a29f45a876a2fb08dd440394dbd38b7de0a9e302ed0",
+    "components/Header.tsx": "17e4dd308f798a51c6f4d937e6f845676de2a896d670ebc09fb539e747451df8",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "ce9a71e7b78fa295090f67d2660cc54d1aaeffe8ec1d8e819f7d4bdcdf712636",
     "components/LateralLayer.tsx": "badafa29eb6563fedf5e17ef61e7aab244c7234377ecf6620a06c1d63e977ada",
@@ -79,7 +80,7 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Organizations (ADR 013) add avatars, an ORGANIZATION section, change stamps and organization send targets that render nothing without an organization; the tour runs without one, so no clip shows them",
+    "reason": "Merged organizations from main: avatars, organization panels, change stamps and team send targets render nothing without an organization; all ten recorded chapters use personal fixture data without an organization. Readonly Save and Duplicate handling likewise does not run in these chapters.",
     "files": [
       "components/App.tsx (changed)",
       "components/Header.tsx (changed)",
