@@ -6,9 +6,9 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "a918f62f2babe81b4cb744e381affa73cd89d92f8467c24ac42845a3d057c453",
+    "components/App.tsx": "a7eb43ccf3299edc7dc3129007d3f885dfab454389d9ebd5d2c93aecefcc2278",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "cbf6152685e5acf0076e640ca1998215347b4457099cf3ab72a975a844508459",
+    "components/Field.tsx": "f08ac62126ec293e4109e55cb5945bf061a62c367f7bd7c8741aae1cba584b83",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "10792b9853bd8e896ac9776730bedc8f71ca67889a02ca84138a0871d7e6e9c9",
@@ -70,11 +70,10 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "the header's Back to play key, and Undo, Redo and Clear leaving the header, show only in roster mode, which no chapter enters; on a play the header is unchanged, and the field title's tabIndex=-1 and focus ring classes draw nothing until Back hands it focus",
+    "reason": "the field title is focusable, and quiet, only while Back, in roster mode, hands it focus; on a play it renders as before but for focus ring classes that draw nothing unless it holds that focus, and no chapter enters roster mode",
     "files": [
       "components/App.tsx (changed)",
-      "components/Field.tsx (changed)",
-      "components/Header.tsx (changed)"
+      "components/Field.tsx (changed)"
     ]
   }
 }
