@@ -9,7 +9,8 @@ import { download } from "@/lib/export/raster";
 import { getPlaybooks, getPlays, getServerPlaybooks, getServerPlays, getServerTeam, getTeam, refresh, setTeam, subscribe } from "@/lib/play/library";
 import { StorageError, failureMessage, hasNoRunZones } from "@/lib/play/storage";
 import { EndZonePicker } from "../endzone/EndZonePicker";
-import { TEAM_NOTE, TeamFields } from "../TeamFields";
+import { TeamFields } from "../TeamFields";
+import { AccountPanel, TeamNote } from "../account/AccountPanel";
 import { ThemePicker } from "../ThemePicker";
 import { card, divider, eyebrow, pill, pillDark } from "../ui";
 import { PreviewModal } from "./PreviewModal";
@@ -29,10 +30,10 @@ export function SettingsButton() {
         className={`${pill} inline-flex min-h-11 max-w-[220px] items-center gap-2 px-3 text-small`}>
         <span aria-hidden className="h-4 w-4 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} />
         <span className="truncate">{team.name || "Team"}</span>
-        <span className="sr-only"> · team, theme &amp; backup settings</span>
+        <span className="sr-only"> · account, team, theme &amp; backup settings</span>
         <span aria-hidden className="text-ink-muted">⚙</span>
       </button>
-      {open && <PreviewModal title="Team, theme & backup" onClose={() => { setOpen(false); }}><SettingsPanel /></PreviewModal>}
+      {open && <PreviewModal title="Account, team, theme & backup" onClose={() => { setOpen(false); }}><SettingsPanel /></PreviewModal>}
     </>
   );
 }
@@ -80,9 +81,11 @@ function SettingsPanel() {
 
   return (
     <div className="flex flex-col gap-3">
+      <AccountPanel />
+      <span className={divider} />
       <span className={eyebrow}>TEAM</span>
       <TeamFields team={team} onTeam={onTeam} />
-      <span className="text-caption leading-note text-ink-muted">{TEAM_NOTE}</span>
+      <TeamNote />
       <label className="flex min-h-11 cursor-pointer items-center gap-2 text-small">
         <input type="checkbox" checked={hasNoRunZones(team)} onChange={(e) => { onTeam({ ...team, noRunZones: e.target.checked }); }}
           className="h-5 w-5 flex-none cursor-pointer accent-ink" />
@@ -102,7 +105,7 @@ function SettingsPanel() {
       <span className={divider} />
       <span className={eyebrow}>ON-DEVICE BACKUP</span>
       <span className="text-caption leading-note text-ink-muted">
-        Plays, playbooks, team settings, lineups and your current draft are saved on this device. Download a backup before clearing site data or changing devices.
+        Plays, playbooks, team settings, lineups and your current draft are saved on this device (and, signed in, in your account under the team you have open). Download a backup before clearing site data or changing devices.
       </span>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={onBackup} className={`${pillDark} min-h-11 px-4 text-small`}>Download backup</button>

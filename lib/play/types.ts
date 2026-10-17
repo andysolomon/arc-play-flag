@@ -20,7 +20,11 @@ export type OffenseRouteType =
   /** a run whose runner is already crossing the formation at the snap and takes the handoff in stride (ADR 006) */
   | "jet"
   /** the last ball carrier of a lateral chain sets up and throws it forward */
-  | "throw";
+  | "throw"
+  /** the quarterback carries the snap across behind the line and throws on the run (ADR 011) */
+  | "rollout"
+  /** the quarterback fakes the handoff, then rolls out the other way to throw (ADR 011) */
+  | "boot";
 export type DefenseRouteType =
   | "man" | "zoneDeep" | "zoneFlat" | "curlFlat" | "midRead" | "blitz" | "spy" | "custom";
 export type RouteType = OffenseRouteType | DefenseRouteType;
@@ -33,10 +37,11 @@ export interface Route {
   target?: PlayerId;
   /**
    * A blitz aimed at the backfield: it comes for the nearest back lined up near the ball, and for the
-   * quarterback when nobody is (lib/play/blitz.ts). Stored only when set; a blitz with neither this nor
+   * quarterback when nobody is. A contain blitz: it comes for the quarterback from outside, up the edge on
+   * the rusher's side, then in (lib/play/blitz.ts). Stored only when set; a blitz with neither this nor
    * a target comes for the quarterback, as every blitz did.
    */
-  aim?: "backfield";
+  aim?: "backfield" | "contain";
   /** a deep zone called as a deep half or a deep third (lib/play/deep.ts); stored only when called */
   split?: "half" | "third";
   mirror?: boolean;
@@ -92,8 +97,13 @@ export interface RouteDef {
   free?: boolean;
   /** the ball carrier's path on a run: laid out through the mesh point beside the QB */
   run?: boolean;
-  /** a job only the player holding the ball can take: set up and throw */
+  /**
+   * a job that sets up and throws: the last carrier's throw, or the quarterback's rollout or boot (who may
+   * hand off first and carry it out as a decoy, docs/adr/011-qb-rollout-and-boot.md)
+   */
   ball?: "throw";
+  /** the quarterback's own action at the snap: only they are offered it, and only then */
+  qb?: true;
 }
 
 /** Measured size of the centre pane, minus its padding. */

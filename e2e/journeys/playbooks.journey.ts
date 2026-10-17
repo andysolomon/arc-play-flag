@@ -156,7 +156,7 @@ test("a bad file is refused with a reason and changes nothing; a good one lands 
 
   // the file's team is taken on a device that had none
   await page.getByRole("link", { name: "‹ All playbooks" }).click();
-  await page.getByRole("button", { name: /Riverside Otters · team, theme & backup settings/ }).click();
+  await page.getByRole("button", { name: /Riverside Otters · account, team, theme & backup settings/ }).click();
   await expect(page.getByRole("textbox", { name: "Team name" })).toHaveValue("Riverside Otters");
 });
 
@@ -180,7 +180,7 @@ test("a playbook file downloaded on one device imports whole on another", async 
   // the seeded book was never written, so it has no primary yet; written on the other device, its first play is (ADR 009)
   expect(await storedPlaybooks(page2)).toEqual({ "fx-season": { ...season, primary: "fx-cover-two" } });
   await page2.getByRole("link", { name: "‹ All playbooks" }).click();
-  await page2.getByRole("button", { name: /Riverside Otters · team, theme & backup settings/ }).click();
+  await page2.getByRole("button", { name: /Riverside Otters · account, team, theme & backup settings/ }).click();
   await expect(page2.getByRole("textbox", { name: "Team name" })).toHaveValue("Riverside Otters");
   await other.close();
 });

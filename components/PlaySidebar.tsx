@@ -12,7 +12,8 @@ import { IconTile, LinkTile } from "./IconTile";
 import { PlaybookTile } from "./PlaybookTile";
 import { PlayNameField } from "./PlayNameField";
 import { Support } from "./Support";
-import { TEAM_NOTE, TeamColorName, TeamColorPicker, TeamNameField } from "./TeamFields";
+import { TeamColorName, TeamColorPicker, TeamNameField } from "./TeamFields";
+import { AccountPanel, TeamNote } from "./account/AccountPanel";
 import { ThemeName, ThemePicker } from "./ThemePicker";
 import { divider, eyebrow, pill, select, tileGrid } from "./ui";
 
@@ -260,9 +261,11 @@ function PlaySidebarImpl({
             : "Names stay off every play until you turn them on."}
       </span>
       <span className={divider} />
+      <AccountPanel />
+      <span className={divider} />
       <span className={eyebrow}>TEAM</span>
       <TeamNameField team={team} onTeam={onTeam} />
-      <span className="flex-none text-caption leading-note text-ink-muted">{TEAM_NOTE}</span>
+      <TeamNote />
       <span className={divider} />
       <Fold label="Team color" says={<TeamColorName color={team.color} />}>
         <TeamColorPicker team={team} onTeam={onTeam} legend={false} />

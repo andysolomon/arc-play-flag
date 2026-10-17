@@ -1,18 +1,15 @@
-import { quarterback, routeYards } from "./geometry";
+import { fakeOf, quarterback, routeYards } from "./geometry";
 import { centre, chainLinks, runsBefore, type Link } from "./lateral";
-import { isBallJob, isRun } from "./routes";
+import { DELAY, SPEED, isBallJob, isQbAction, isRun } from "./routes";
 import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
 
-/** Yards per second a player covers during playback — brisk, but slow enough to read. */
-export const SPEED = 6.5;
+export { DELAY, SPEED };
 /** How long the play holds at the end before everyone jogs back to their spots. */
 export const HOLD = 0.8;
 /** Yards a man defender keeps between themself and the receiver: one token's width. */
 export const SHADOW = 2.2;
-/** How long a delay runner waits at the snap before going. */
-export const DELAY = 0.8;
 /** How often live playback throws to the primary read when one is marked. */
 export const PRIMARY_ODDS = 0.8;
 /** A play-action fake takes this long to sell. */
@@ -282,6 +279,10 @@ function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMo
   const center = centre(players);
   const snapGap = qb && center && center.id !== qb.id ? dist(qb, center) : 0;
   const snapAt = cl(snapGap / 10, 0.12, 0.45);
+  // the quarterback's rollout or boot (docs/adr/011-qb-rollout-and-boot.md): they take the snap before moving (Q3)
+  const own = qb ? tracks[qb.id] : undefined;
+  const qbAct = !!(own && qb?.route && isQbAction(qb.route.type));
+  if (qbAct && own) own.wait = snapAt;
 
   // a jet-sweep runner is already crossing when the snap begins (docs/adr/006-jet-sweep.md): they start
   // early enough that the ball, snapped as they come, reaches the quarterback a beat before they pass. Their
@@ -295,7 +296,7 @@ function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMo
     tr.wait = -lead;
     jetLead = Math.max(jetLead, lead);
   }
-  const run = cl(Object.values(tracks).reduce((m, t) => Math.max(m, t.wait + t.len / SPEED), 0), 1, 5);
+  let run = cl(Object.values(tracks).reduce((m, t) => Math.max(m, t.wait + t.len / SPEED), 0), 1, 5);
 
   const m: Motion = {
     jetLead,
@@ -320,14 +321,19 @@ function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMo
   const primaryRun = primary?.route ? isRun(primary.route.type) : false;
 
   // The teaching call follows the marked read. An unmarked mixed call demonstrates the
-  // pass with its run action; only explicitly requested simulation flips between outcomes.
+  // pass with its run action; only explicitly requested simulation flips between outcomes. A quarterback on
+  // a rollout or boot throws unless the call is a run, and fakes to (or hands off to) the runner the field
+  // draws them faking to, never one picked by chance (Q5).
   const isRunPlay =
-    runners.length > 0 && (primaryRun || receivers.length === 0 || (!primary && random !== null && random() < 0.5));
-  const runner = isRunPlay && primaryRun
-    ? primary
-    : runners.length > 0
-      ? random ? pickOne(runners, random) : runners[0]
-      : undefined;
+    runners.length > 0 && (primaryRun || receivers.length === 0 || (!primary && !qbAct && random !== null && random() < 0.5));
+  const fake = qbAct ? fakeOf(players) : undefined;
+  const runner = qbAct
+    ? runners.find((p) => p.id === fake?.id)
+    : isRunPlay && primaryRun
+      ? primary
+      : runners.length > 0
+        ? random ? pickOne(runners, random) : runners[0]
+        : undefined;
   if (runner) {
     m.runner = runner.id;
     const tr = tracks[runner.id];
@@ -339,15 +345,24 @@ function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMo
       m.handFor = mesh.gap > 1.5 ? cl(mesh.gap / 12, 0.2, 0.5) : 0.12;
     }
   }
+  if (qbAct && own) {
+    // the quarterback fakes, or hands off, from where they took the snap, and goes once it is done (Q4); the
+    // play then lasts until their rollout or boot does, a decoy's included (Q18)
+    if (runner && Number.isFinite(m.handAt)) own.holds = [{ d: 0, until: m.handAt + (isRunPlay ? m.handFor : FAKE) }];
+    // the quarterback's own track is never cut by the cap, so a decoy behind a late fake reaches its end
+    run = Math.max(cl(Object.values(tracks).reduce((n, t) => Math.max(n, endOf(t)), 0), 1, 5), endOf(own));
+    m.dur = run + HOLD;
+  }
   if (isRunPlay) {
     m.kind = "run";
     return m;
   }
   if (receivers.length === 0) return m;
 
-  // a quarterback on a throw route rolls out to the set point and throws from there
-  const rollout = qb.route?.type === "throw" ? tracks[qb.id] : undefined;
-  const setAt = rollout ? endOf(rollout) + SET_UP : 0;
+  // the quarterback throws from the end of their track: on a rollout or boot as they reach the launch point,
+  // on a throw (a Pitch saved before ADR 004) once they have set their feet at the set point
+  const launch = qbAct || qb.route?.type === "throw" ? tracks[qb.id] : undefined;
+  const setAt = launch ? endOf(launch) + (qbAct ? 0 : SET_UP) : 0;
 
   // Teaching always throws to the marked read, or the first drawn receiver when no read
   // is marked. Simulation throws to the marked read PRIMARY_ODDS of the time and spreads

@@ -66,7 +66,7 @@ test("premium themes stay locked until a coach makes a playbook, then one redraw
   await seed(page, { plays: [SLANT_LEFT], team: OTTERS });
   await page.goto("/playbooks");
   const settings = page.getByRole("button", { name: /team, theme & backup settings/ });
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   // the first tap after a navigation can land before React has hydrated; tap again if it did
   await expect(async () => {
     await settings.click();

@@ -63,9 +63,9 @@ test("a preset is one tap, readable in both themes, kept across reload and share
   await page.goto("/playbooks");
   await expect(async () => {
     await page.getByRole("button", { name: /team, theme & backup settings/ }).click();
-    await expect(page.getByRole("dialog", { name: "Team, theme & backup" })).toBeVisible({ timeout: 1000 });
+    await expect(page.getByRole("dialog", { name: "Account, team, theme & backup" })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   const settingsPalette = dialog.getByRole("group", { name: "Team color", exact: true });
   const blue = settingsPalette.getByRole("radio", { name: "Blue", exact: true });
   await expect(blue).toBeChecked();
@@ -165,9 +165,9 @@ test("hex entry rejects invalid codes, accepts shorthand and uppercase, and pers
   await page.goto("/playbooks");
   await expect(async () => {
     await page.getByRole("button", { name: /team, theme & backup settings/ }).click();
-    await expect(page.getByRole("dialog", { name: "Team, theme & backup" })).toBeVisible({ timeout: 1000 });
+    await expect(page.getByRole("dialog", { name: "Account, team, theme & backup" })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   const settingsPalette = dialog.getByRole("group", { name: "Team color", exact: true });
   await settingsPalette.getByRole("button", { name: "Custom color…", exact: true }).click();
   const settingsHex = settingsPalette.getByRole("textbox", { name: "Hex color", exact: true });

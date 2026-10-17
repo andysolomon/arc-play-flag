@@ -238,6 +238,14 @@ jobs:
           path: test-results/jet-sweep-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the rollout and boot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qb-actions
+          path: test-results/qb-actions-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the demo tour
         if: always()
         uses: actions/upload-artifact@v4
@@ -260,6 +268,14 @@ jobs:
           path: test-results/blitz-target-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the contain blitzes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contain-blitz
+          path: test-results/contain-blitz-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the deep zones
         if: always()
         uses: actions/upload-artifact@v4
@@ -274,6 +290,14 @@ jobs:
         with:
           name: playbook-switch
           path: test-results/playbook-switch-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the coach accounts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: account
+          path: test-results/account-*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload the header save

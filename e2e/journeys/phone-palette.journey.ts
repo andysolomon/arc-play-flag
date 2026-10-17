@@ -13,8 +13,10 @@ import { Designer } from "../support/designer";
  *  - the palette squeezes the field into a strip instead of floating over it         → the field's box is the same with the palette open as closed
  *  - Play tools and the palette open side by side and push each other off screen     → opening one folds the other
  *  - a right-column choice looks fine but a real tap does not assign it              → tap Post (offense) and Zone flat (defense), then see it pressed (and Post drawn)
- * Checked for the offense palette (routes and runs) and the defense palette (coverages), at the
- * issue's 390×844 and the narrowest phone the app supports, 320×568, on every device project.
+ * Checked for the offense palette (routes and runs), the quarterback's (their own Rollout and Boot first,
+ * then the routes and runs: the longest offense palette, docs/adr/011-qb-rollout-and-boot.md) and the defense
+ * palette (coverages), at the issue's 390×844 and the narrowest phone the app supports, 320×568, on every
+ * device project.
  * Leaves `phone-palette-<device>-<width>.json` (the viewport, the field closed and open, the drawer,
  * and every tile's box and hit test) and a picture of each palette in test-results/.
  */
@@ -37,7 +39,7 @@ interface Layout {
 }
 interface FieldBox { x: number; y: number; width: number; height: number }
 interface Report {
-  palette: "offense" | "defense";
+  palette: "offense" | "quarterback" | "defense";
   fieldClosed: FieldBox | null;
   fieldOpen: FieldBox | null;
   layout: Layout;
@@ -147,6 +149,21 @@ for (const size of SIZES) {
     await d.palette();
     await expect(tile("Routes", "Post")).toHaveAttribute("aria-pressed", "true");
     reports.push({ palette: "offense", fieldClosed, fieldOpen, layout: offense, tapped: "Post" });
+
+    // the quarterback: their own Rollout and Boot come first, above the routes, and Boot is tapped for real
+    await d.select("QB");
+    await d.settle();
+    const quarterback = await layout(page);
+    const qbOpen = await d.field.boundingBox();
+    await page.screenshot({ path: shot("quarterback") });
+    expectFits(quarterback, ["Pre-snap motion", "Quarterback", "Routes", "Runs"]);
+    const qbTop = Math.min(...quarterback.tiles.filter((t) => t.group === "Quarterback").map((t) => t.top));
+    expect(qbTop, "the QB group sits above the passing tree").toBeLessThan(Math.min(...quarterback.tiles.filter((t) => t.group === "Routes").map((t) => t.top)));
+    await tile("Quarterback", "Boot").click();
+    await d.palette();
+    await expect(tile("Quarterback", "Boot")).toHaveAttribute("aria-pressed", "true");
+    expect(qbOpen, "the palette floats over the field instead of squeezing it").toEqual(fieldClosed);
+    reports.push({ palette: "quarterback", fieldClosed, fieldOpen: qbOpen, layout: quarterback, tapped: "Boot" });
 
     // defense: the coverages
     await d.newPlay("Defense");
