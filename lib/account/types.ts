@@ -10,10 +10,12 @@ export interface AccountUser {
   name: string;
   email: string | null;
   imageUrl: string | null;
+  /** every verified address, for the email invites of an organization (ADR 013, O6); the primary is first */
+  emails?: string[];
 }
 
 /**
- * Everything a team keeps in the account (ADR 012, ADR 013): what a device backup carries
+ * Everything a team keeps in the account (ADR 012, ADR 014): what a device backup carries
  * (lib/export/backup.ts), the draft on the chalkboard included, and the rest of the desk that goes
  * with the team: the playbook picked in the designer, where each book was last read, and the share
  * links made for its plays and books.
@@ -34,7 +36,7 @@ export interface TeamData {
 }
 
 /**
- * How the app looks to the coach, the same on every team (ADR 013): the choices Play tools and the
+ * How the app looks to the coach, the same on every team (ADR 014): the choices Play tools and the
  * playbooks' settings offer, the touchdowns that open the end zones, and whether the getting-started
  * guide has been seen.
  */

@@ -18,9 +18,9 @@ Accounts ([ADR 012](../adr/012-coach-accounts.md)) sign coaches in through [Cler
 
 ## What is stored, where
 
-- `ffpd:account:<user>:teams` (a list of team ids, at most 12), `ffpd:account:<user>:current`, `ffpd:account:<user>:prefs` (a hash: `rev`, `json`, `touchdowns`: the coach's look, [ADR 013](../adr/013-whole-desk-in-account.md)), and `ffpd:team:<id>` (a hash: `owner`, `rev`, `updated`, `name`, `color`, `plays`, `playbooks`, `data`). `data` is the team as JSON, at most 4 MB, 1,000 plays and 1,000 playbooks; since ADR 013 it also holds the team's desk (`draft`, `currentBook`, `reader`, `shares`), and a team written before then reads with an empty desk. Nothing expires.
+- `ffpd:account:<user>:teams` (a list of team ids, at most 12), `ffpd:account:<user>:current`, `ffpd:account:<user>:prefs` (a hash: `rev`, `json`, `touchdowns`: the coach's look, [ADR 014](../adr/014-whole-desk-in-account.md)), and `ffpd:team:<id>` (a hash: `owner`, `rev`, `updated`, `name`, `color`, `plays`, `playbooks`, `data`). `data` is the team as JSON, at most 4 MB, 1,000 plays and 1,000 playbooks; since ADR 014 it also holds the team's desk (`draft`, `currentBook`, `reader`, `shares`), and a team written before then reads with an empty desk. Nothing expires.
 - Writes are rate limited per account (1,200 writes and 1,200 reads an hour, keyed by a hash of the user id; the board goes up as it changes, after a 5-second quiet). 429 means the bucket is spent; the device keeps the write and tries again later.
-- The whole desk goes up: the draft on the chalkboard, the picked playbook, the reader's places and the share links' revoke keys with the team; the theme, field, end zone, Deep field, the ball's spot ([ADR 014](../adr/014-line-of-scrimmage-setting.md)), touchdowns and whether the getting-started guide was seen with the account. Signing out clears all of it from the device, the look included.
+- The whole desk goes up: the draft on the chalkboard, the picked playbook, the reader's places and the share links' revoke keys with the team; the theme, field, end zone, Deep field, the ball's spot ([ADR 015](../adr/015-line-of-scrimmage-setting.md)), touchdowns and whether the getting-started guide was seen with the account. Signing out clears all of it from the device, the look included.
 
 ## Failure and recovery
 

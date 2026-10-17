@@ -6,7 +6,7 @@ import { FIELD_KEY, THEME_KEY, getFieldChoice, getThemeChoice, setFieldChoice, s
 import type { CoachPrefs } from "./types";
 
 /**
- * The coach's look as this device holds it (ADR 013): read from each module's own key, and written
+ * The coach's look as this device holds it (ADR 014): read from each module's own key, and written
  * through each module's own setter, so every screen redraws the way it does for a tap. The account
  * engine (sync.ts) reads it to push, and writes it to bring the account's down.
  */

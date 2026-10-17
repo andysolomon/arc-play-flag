@@ -3,7 +3,7 @@
  * the draft on the chalkboard, the reader's place, a share link kept, a theme, field, end zone or
  * Deep field picked, a touchdown counted, the getting-started guide dismissed. The account engine
  * (lib/account/sync.ts) listens, so each of them goes up to the account like a save does
- * (docs/adr/013-whole-desk-in-account.md). Nothing here throws, and nothing here depends on
+ * (docs/adr/014-whole-desk-in-account.md). Nothing here throws, and nothing here depends on
  * anything, so any module can announce without a cycle.
  */
 const listeners = new Set<() => void>();

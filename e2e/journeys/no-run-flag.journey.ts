@@ -231,7 +231,7 @@ function flags(svg: string): { count: number; placed: boolean[] } {
 test("a flagged play carries its flag onto its card, the playbook, the share link and every printout, and no legal play ever does", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const out = `test-results/no-run-flag-${testInfo.project.name}`;
-  // the board on the 5, where the goal-line plays were stored from (the spot is the board's: ADR 014)
+  // the board on the 5, where the goal-line plays were stored from (the spot is the board's: ADR 015)
   await seed(page, { plays: PLAYS, playbooks: [BOOK], team: OTTERS, los: GOAL_LINE_STRETCH.los });
 
   // the gallery: the card says it in words, the thumbnail wears the stamp, and its name says both

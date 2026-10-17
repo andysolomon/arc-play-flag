@@ -1,6 +1,6 @@
 /**
  * Light or dark, chosen per device and, signed in, kept in the coach's account with the rest of
- * their look (docs/adr/013-whole-desk-in-account.md). "auto" follows the device's own setting
+ * their look (docs/adr/014-whole-desk-in-account.md). "auto" follows the device's own setting
  * (prefers-color-scheme) and is what a coach gets until they pick one.
  * Past those two sit the premium themes, after Omarchy's collection: each one
  * redraws every token in app/globals.css, and a coach earns them by making a playbook.

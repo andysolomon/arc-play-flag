@@ -1,6 +1,6 @@
 /**
  * The end zone's look, chosen per device, and the touchdowns that unlock the rest; signed in, both
- * are kept in the coach's account (docs/adr/013-whole-desk-in-account.md). Classic is
+ * are kept in the coach's account (docs/adr/014-whole-desk-in-account.md). Classic is
  * the green the field has always had; the others paint the band beyond the goal line with a
  * design of their own, after themes from Omarchy's community collection. A few are open from
  * the start and each touchdown pass thrown on ▶ opens the next. Screen only: printed pages,

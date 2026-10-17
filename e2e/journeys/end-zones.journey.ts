@@ -87,7 +87,7 @@ const GOAL = -20;
 const MIDFIELD_TOP = -30;
 /** A phone-shaped window: with the ball at midfield, the only shape deep enough to show the end zone (the desktop and iPad cards stop short of it). */
 const PHONE = { width: 412, height: 915 };
-/** A play stored from midfield; the board is spotted there too (`los: MIDFIELD` in each seed), since the spot is the board's (ADR 014). */
+/** A play stored from midfield; the board is spotted there too (`los: MIDFIELD` in each seed), since the spot is the board's (ADR 015). */
 const fromMidfield = (p: SavedPlay): SavedPlay => ({ ...p, los: MIDFIELD });
 const STANDARD_ENDZONE = "rgb(167, 229, 167)";
 

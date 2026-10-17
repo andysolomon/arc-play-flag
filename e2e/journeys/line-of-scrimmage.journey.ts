@@ -17,7 +17,7 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
  * Field yard n sits at y = los - n, in yards from the line of scrimmage. The coach reads the
  * other way, in yards to go: the own goal line is "the 40", their 10 (the 30) "the 10".
  *
- * The spot is the board's (docs/adr/014-line-of-scrimmage-setting.md): every play opened or started
+ * The spot is the board's (docs/adr/015-line-of-scrimmage-setting.md): every play opened or started
  * is drawn from it, a play is saved from it, and a play's stored spot stands until it is saved again.
  * How that could break, and the test that catches each:
  *  - a new play, an opened play or undo moves the ball                       → "the board's spot"
@@ -300,7 +300,7 @@ test("the board's spot: the ball on the 10 for a red-zone play, and every play o
 });
 
 test("the spot travels in the share link, and links without one open on the 40", async ({ page }, testInfo) => {
-  // the board on the 5, where the goal-line play was stored from (the spot is the board's: ADR 014)
+  // the board on the 5, where the goal-line play was stored from (the spot is the board's: ADR 015)
   await seed(page, { plays: [GOAL_LINE_FADE, SLANT_LEFT], team: OTTERS, los: GOAL_LINE_FADE.los });
   const d = new Designer(page);
   await d.goto(`?open=${GOAL_LINE_FADE.id}`);

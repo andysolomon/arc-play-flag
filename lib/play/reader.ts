@@ -33,7 +33,7 @@ export function findCalls(items: readonly Numbered[], query: string, limit = 8):
 
 /**
  * Where each book was last read on this device, so the reader opens there again; signed in, kept in
- * the account with the team, so another device opens there too (docs/adr/013-whole-desk-in-account.md).
+ * the account with the team, so another device opens there too (docs/adr/014-whole-desk-in-account.md).
  * A convenience: never a reason to fail.
  */
 export const READER_KEY = "ffpd.reader.v1";

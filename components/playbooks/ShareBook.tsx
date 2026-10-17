@@ -64,7 +64,7 @@ function SharePanel({ book, plays = [], team, play, menu, initialPreview = false
   const [includeTeam, setIncludeTeam] = useState(false);
   const [copied, setCopied] = useState(false);
   const account = useAccount();
-  // signed in, the revoke controls go up with the team (docs/adr/013-whole-desk-in-account.md); signed out they are this browser's alone
+  // signed in, the revoke controls go up with the team (docs/adr/014-whole-desk-in-account.md); signed out they are this browser's alone
   const kept = account.user && account.teamId ? "Revoke controls are saved in your account with the team, so any device signed in can revoke." : "Revoke controls are saved in this browser; clearing site data loses them.";
   useEffect(() => {
     if (!copied) return;

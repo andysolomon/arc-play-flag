@@ -58,7 +58,7 @@ export function teamDataFrom(raw: unknown): TeamData {
 
 /**
  * A team's data from a request body, as `teamDataFrom`, except that a body from a build before the desk
- * went up (ADR 013, A24) names none of the desk's keys, and the account's own desk is kept instead.
+ * went up (ADR 014, A24) names none of the desk's keys, and the account's own desk is kept instead.
  */
 export function teamDataOver(raw: unknown, stored: TeamData): TeamData {
   const data = teamDataFrom(raw);

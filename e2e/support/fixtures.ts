@@ -100,7 +100,7 @@ export interface Seed {
   team?: TeamSettings;
   lineups?: Lineups;
   draft?: DraftRecord;
-  /** where the board puts the ball (lib/los.ts, ADR 014): a play stored off the 40 is drawn there only when the board is */
+  /** where the board puts the ball (lib/los.ts, ADR 015): a play stored off the 40 is drawn there only when the board is */
   los?: number;
 }
 

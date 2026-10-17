@@ -66,7 +66,7 @@ export function readTeamData(raw: unknown): TeamData | null {
   };
 }
 
-/** True when a record was written by a build from before the desk went up (ADR 013): it names none of the desk's keys. */
+/** True when a record was written by a build from before the desk went up (ADR 014): it names none of the desk's keys. */
 export const lacksDesk = (raw: unknown): boolean => isRecord(raw) && !("draft" in raw) && !("currentBook" in raw) && !("reader" in raw) && !("shares" in raw);
 
 /** A team's data as stored by any version: one from before the desk reads with an empty desk. */

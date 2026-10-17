@@ -24,6 +24,8 @@ import {
   addPlayToPlaybook, currentBook, getCurrentBookId, getLineups, getPlays, getServerLineups, getServerTeam, getTeam, playById, playbookById,
   primaryPlay, savePlay, setCurrentBook, setLineups, setTeam, subscribe,
 } from "@/lib/play/library";
+import { getAccountState, subscribeAccount } from "@/lib/account/sync";
+import { clearNotice, setPresencePlay } from "@/lib/org/sync";
 import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
 import { isBallJob, isRun, mirrorRoute, mirrorable, routeDef } from "@/lib/play/routes";
@@ -88,6 +90,8 @@ export function App() {
   // who plays each position, in lineups (docs/adr/008-roster-depth-chart.md); the field shows the active one
   const lineups = useSyncExternalStore(subscribe, getLineups, getServerLineups);
   const lineup = useMemo(() => activeLineup(lineups), [lineups]);
+  // the organization's other coaches see which play is on this board, and this coach hears what they did (ADR 013, rule 8)
+  useEffect(() => { setPresencePlay(s.id); }, [s.id]);
   const [mode, setMode] = useState<Mode>("play");
   const rostering = mode === "roster";
   // roster mode shows one side of the roster, or both: the play's own side to start, never a faded shadow
@@ -131,6 +135,11 @@ export function App() {
   // the roster's picture or sheet being drawn, and what the roster panel says of it: kept here, so leaving roster
   // mode mid-export neither loses its word nor lets a second one start (docs/adr/010-roster-exports.md)
   const [rosterExport, setRosterExport] = useState({ busy: false, news: "" });
+  // what another coach did, said once as a toast: a listener on the account store, so nothing re-renders for it
+  useEffect(() => subscribeAccount(() => {
+    const n = getAccountState().notice;
+    if (n) { say(n, 4000); clearNotice(); }
+  }), [say]);
   const exportingRef = useRef(false);
   const onRosterExport = useCallback((label: string, job: () => Promise<void>) => {
     if (exportingRef.current) return;
@@ -180,7 +189,7 @@ export function App() {
   }, [openRight]);
   // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
   // short there, the toast says so once it is drawn, and the palette says by how much
-  // the account brought another device's desk down (docs/adr/013-whole-desk-in-account.md, A21): the board redraws from its
+  // the account brought another device's desk down (docs/adr/014-whole-desk-in-account.md, A21): the board redraws from its
   // draft. A team with a clear board leaves this board as it is: the next touch here is the board, and goes up.
   useEffect(() => subscribePulls(() => {
     const d = readDraft();
@@ -348,7 +357,11 @@ export function App() {
     const r = savePlay({
       id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players],
     });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return false; }
+    if (!r.ok) {
+      // a team the coach may only look at: the words say so, and there is nothing to retry (ADR 013, rule 9)
+      if (r.error.reason === "readonly") { say(failureMessage(r.error), 3200); return false; }
+      setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return false;
+    }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);

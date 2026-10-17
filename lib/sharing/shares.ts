@@ -6,7 +6,7 @@ import { TOKEN_PATTERN } from "./links";
  * what they share: a playbook's id, or `play:<id>` for a play. Each holds the link's token, the key
  * that revokes it and when it expires; a play's link also keeps the snapshot it was made from, so the
  * same play shares the same link again. Kept on the device and, signed in, in the account with the
- * team (docs/adr/013-whole-desk-in-account.md), so a link made on one device can be revoked from another.
+ * team (docs/adr/014-whole-desk-in-account.md), so a link made on one device can be revoked from another.
  */
 export interface Share {
   token: string;

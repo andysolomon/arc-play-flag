@@ -1,6 +1,6 @@
-# ADR 014: the line of scrimmage is the board's setting
+# ADR 015: the line of scrimmage is the board's setting
 
-Status: implemented. It changes what the **Line of scrimmage** picker in Play tools is: a setting of the coach's board, kept with their look ([ADR 013](013-whole-desk-in-account.md)), rather than a property of the play on it. What a saved play stores does not change.
+Status: implemented. It changes what the **Line of scrimmage** picker in Play tools is: a setting of the coach's board, kept with their look ([ADR 014](014-whole-desk-in-account.md)), rather than a property of the play on it. What a saved play stores does not change.
 
 ## Why
 

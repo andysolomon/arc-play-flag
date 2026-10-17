@@ -41,10 +41,19 @@ jobs:
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       SHARING_TEST_REDIS_URL: redis://127.0.0.1:6379/15
       UPSTASH_REDIS_REST_URL: http://127.0.0.1:3134
       UPSTASH_REDIS_REST_TOKEN: fixture-only
+      # the organization journey's disposable database (docs/runbook/organizations.md); migrated by the journeys' global setup
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
     # four browser projects (desktop, two phones, a tablet) share the two workers
     timeout-minutes: 45
     steps:
@@ -84,6 +93,14 @@ jobs:
         with:
           name: man-coverage-art
           path: test-results/man-coverage-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload man coverage LOS playback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: man-los
+          path: test-results/man-los-*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload the end zones
@@ -298,6 +315,14 @@ jobs:
         with:
           name: account
           path: test-results/account-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the organizations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: organization
+          path: test-results/organization-*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload the sends between teams

@@ -1,10 +1,10 @@
 /**
- * Where the board puts the ball (docs/adr/014-line-of-scrimmage-setting.md): one of the four spots
+ * Where the board puts the ball (docs/adr/015-line-of-scrimmage-setting.md): one of the four spots
  * of lib/play/field.ts, chosen in Play tools. It is the board's, not a play's: a new play, a play
  * opened from a book or a link, a switch of playbook and a restored draft are all drawn from here,
  * and a play is saved from here (its stored spot is where it was last drawn, so pictures and
  * printouts keep each play's own field). Kept on the device and, signed in, in the coach's account
- * with the rest of their look (ADR 013). Ways this could go wrong, written down before the code:
+ * with the rest of their look (ADR 014). Ways this could go wrong, written down before the code:
  *
  * - L1 junk in storage (a word, a yard line the picker no longer offers): read as the nearest of the
  *   four spots, as a stored play's spot is (readLos).

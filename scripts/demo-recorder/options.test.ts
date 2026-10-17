@@ -86,7 +86,7 @@ describe("Demo recorder chapters and fixtures", () => {
     expect(Object.values(STORAGE_KEYS).sort()).toEqual(["ffpd.draft.v1", "ffpd.first-use.v1", "ffpd.lineups.v1", "ffpd.los.v1", "ffpd.playbooks.v1", "ffpd.plays.v2", "ffpd.team.v1"]);
     for (const slug of CHAPTER_SLUGS) {
       const storage = storageFor(slug);
-      // the board's spot is seeded only for a chapter whose play is spotted off the 40 (ADR 014)
+      // the board's spot is seeded only for a chapter whose play is spotted off the 40 (ADR 015)
       const draftLos = (JSON.parse(storage[STORAGE_KEYS.draft] ?? "") as { los?: number }).los;
       const expectedKeys = Object.values(STORAGE_KEYS).filter((k) => k !== STORAGE_KEYS.los || draftLos !== undefined).sort();
       expect(Object.keys(storage).sort()).toEqual(expectedKeys);

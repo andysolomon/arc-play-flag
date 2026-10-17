@@ -5,7 +5,7 @@ import { MAX_TEAMS, completeTeamData, readPrefs, readTouchdowns, summarize, team
 import type { AccountPrefs, CoachPrefs, TeamData, TeamRecord, TeamSummary, TeamWritten } from "./types";
 
 /**
- * The accounts' store, server-only (docs/adr/012-coach-accounts.md, docs/adr/013-whole-desk-in-account.md):
+ * The accounts' store, server-only (docs/adr/012-coach-accounts.md, docs/adr/014-whole-desk-in-account.md):
  * each account a list of team ids, the team it last opened and the coach's look; each team a hash of
  * its owner, write count, data and the summary the list shows. Every write is one Lua script, so a
  * team is only ever written by its owner, against the rev the device read, and the list, the team and
@@ -142,7 +142,7 @@ export async function readTeam(user: string, id: string): Promise<TeamRecord> {
   if (f.owner !== user) throw new AccountError(404, "That team isn't in your account.");
   let data: unknown;
   try { data = JSON.parse(values[FIELDS.length] as string); } catch { throw new AccountError(503, UNAVAILABLE); }
-  // a team written before the desk went up (ADR 013) reads with an empty desk
+  // a team written before the desk went up (ADR 014) reads with an empty desk
   return { ...summaryOf(id, f), data: completeTeamData(data as TeamData), prefs: await readAccountPrefs(user) };
 }
 

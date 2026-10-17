@@ -269,7 +269,7 @@ export function storageFor(slug: ChapterSlug): Readonly<Record<string, string>> 
     [STORAGE_KEYS.draft]: JSON.stringify(draft),
     // the first-use guide is a separate story; it must never cover a recorded chapter
     [STORAGE_KEYS.firstUse]: "done",
-    // the spot is the board's, not the play's (ADR 014): a chapter drawn from their 10 sets the board there
+    // the spot is the board's, not the play's (ADR 015): a chapter drawn from their 10 sets the board there
     ...(draft.los === undefined ? {} : { [STORAGE_KEYS.los]: String(draft.los) }),
   };
 }
