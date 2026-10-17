@@ -1,10 +1,13 @@
 /**
- * The end zone's look, chosen per device, and the touchdowns that unlock the rest. Classic is
+ * The end zone's look, chosen per device, and the touchdowns that unlock the rest; signed in, both
+ * are kept in the coach's account (docs/adr/013-whole-desk-in-account.md). Classic is
  * the green the field has always had; the others paint the band beyond the goal line with a
  * design of their own, after themes from Omarchy's community collection. A few are open from
  * the start and each touchdown pass thrown on ▶ opens the next. Screen only: printed pages,
  * cards and exports keep the classic end zone (lib/render/play-svg.ts never reads this).
  */
+
+import { deviceWritten } from "@/lib/device-writes";
 
 /** How a celebration's pieces move: fall from the top, drift sideways, rain straight down, or burst from the end zone. */
 export type ConfettiMotion = "fall" | "drift" | "rain" | "burst";
@@ -125,6 +128,7 @@ export function setEndZone(id: EndZoneId): void {
     unsavedZone = id;
   }
   zoneListeners.forEach((l) => { l(); });
+  deviceWritten();
 }
 
 export function getTouchdowns(): number {
@@ -132,17 +136,25 @@ export function getTouchdowns(): number {
   try { return parseTouchdowns(localStorage.getItem(TOUCHDOWNS_KEY)); } catch { return 0; }
 }
 
+/** Keeps a count of touchdowns on this device: the account's, brought down (never fewer than counted here). */
+export function setTouchdowns(touchdowns: number): void {
+  const n = Math.max(0, Math.trunc(touchdowns));
+  try {
+    if (n === 0) localStorage.removeItem(TOUCHDOWNS_KEY);
+    else localStorage.setItem(TOUCHDOWNS_KEY, String(n));
+    unsavedTouchdowns = null;
+  } catch {
+    unsavedTouchdowns = n;
+  }
+  touchdownListeners.forEach((l) => { l(); });
+  deviceWritten();
+}
+
 /** Counts a touchdown pass on this device and says which end zone, if any, it just opened. */
 export function recordTouchdown(): { touchdowns: number; unlocked: EndZone | null } {
   const before = getTouchdowns();
   const touchdowns = before + 1;
-  try {
-    localStorage.setItem(TOUCHDOWNS_KEY, String(touchdowns));
-    unsavedTouchdowns = null;
-  } catch {
-    unsavedTouchdowns = touchdowns;
-  }
-  touchdownListeners.forEach((l) => { l(); });
+  setTouchdowns(touchdowns);
   const unlocked = END_ZONES.find((z) => !isUnlocked(z, before) && isUnlocked(z, touchdowns)) ?? null;
   return { touchdowns, unlocked };
 }

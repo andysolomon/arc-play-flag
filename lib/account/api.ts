@@ -1,4 +1,4 @@
-import type { AccountResponse, TeamData, TeamRecord, TeamSummary } from "./types";
+import type { AccountResponse, CoachPrefs, TeamData, TeamRecord, TeamWritten } from "./types";
 
 /** A request that didn't do what was asked: the status (0 for no answer at all), one line for the coach, and the account's copy on a 409. */
 export class ApiError extends Error {
@@ -32,8 +32,10 @@ const json = (method: string, body: unknown): RequestInit => ({ method, headers:
 
 export const account = (): Promise<AccountResponse> => call("/api/account");
 export const readTeam = (id: string): Promise<TeamRecord> => call(`/api/account/teams/${id}`);
-export const createTeam = (body: { data: TeamData } | { name: string; color?: string }): Promise<TeamRecord> => call("/api/account/teams", json("POST", body));
-export const writeTeam = (id: string, data: TeamData, rev: number): Promise<TeamSummary> => call(`/api/account/teams/${id}`, json("PUT", { data, rev }));
+export const createTeam = (body: ({ data: TeamData } | { name: string; color?: string }) & { prefs?: CoachPrefs }): Promise<TeamRecord> =>
+  call("/api/account/teams", json("POST", body));
+export const writeTeam = (id: string, data: TeamData, rev: number, prefs: CoachPrefs): Promise<TeamWritten> =>
+  call(`/api/account/teams/${id}`, json("PUT", { data, rev, prefs }));
 export const deleteTeam = (id: string): Promise<null> => call(`/api/account/teams/${id}`, { method: "DELETE" });
 export const setCurrent = (id: string): Promise<null> => call("/api/account/current", json("PUT", { id }));
 export const fixtureSignIn = (coach: string, run: string): Promise<null> => call("/api/account/fixture", json("POST", { coach, run }));

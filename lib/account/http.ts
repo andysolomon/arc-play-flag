@@ -1,7 +1,7 @@
-import { readTeamData, MAX_TEAM_BYTES } from "./data";
+import { MAX_TEAM_BYTES, lacksDesk, readPrefs, readTeamData } from "./data";
 import { AccountError } from "./store";
 import { signedIn } from "./session";
-import type { AccountUser, TeamData } from "./types";
+import type { AccountUser, CoachPrefs, TeamData } from "./types";
 
 export const accountHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" };
 
@@ -54,4 +54,19 @@ export function teamDataFrom(raw: unknown): TeamData {
   if (!data) throw new AccountError(400, "That isn't a team's data.");
   if (JSON.stringify(data).length > MAX_TEAM_BYTES) throw new AccountError(413, "That team is too big to keep in an account.");
   return data;
+}
+
+/**
+ * A team's data from a request body, as `teamDataFrom`, except that a body from a build before the desk
+ * went up (ADR 013, A24) names none of the desk's keys, and the account's own desk is kept instead.
+ */
+export function teamDataOver(raw: unknown, stored: TeamData): TeamData {
+  const data = teamDataFrom(raw);
+  if (!lacksDesk(raw)) return data;
+  return { ...data, draft: stored.draft, currentBook: stored.currentBook, reader: stored.reader, shares: stored.shares };
+}
+
+/** The coach's look from a request body, when it carries one; undefined leaves the account's alone. */
+export function prefsFrom(raw: unknown): CoachPrefs | undefined {
+  return raw === undefined || raw === null ? undefined : readPrefs(raw);
 }

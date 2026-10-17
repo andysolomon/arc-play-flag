@@ -57,7 +57,7 @@ export function AccountPanel({ heading = true }: { heading?: boolean }) {
         </span>
       ) : (
         <>
-          <span className="text-small leading-note">Sign in with Google or X to keep your plays, playbooks and lineups in an account and open them on any device.</span>
+          <span className="text-small leading-note">Sign in with Google or X to keep your plays, playbooks, lineups and the play on your board in an account, and pick up where you left off on any device.</span>
           <Link href={SIGN_IN_PATH} className={`${pillDark} inline-flex min-h-11 items-center self-start px-4 text-small !text-cream no-underline`}>Sign in</Link>
           {s.status === "checking" && <span role="status" aria-label="Account status" className="text-caption leading-note text-ink-muted">{statusWords(s)}</span>}
           {s.message && <span role="status" aria-label="Account status" className="text-caption leading-note text-ink-muted">{s.message}</span>}

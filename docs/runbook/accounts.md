@@ -18,14 +18,15 @@ Accounts ([ADR 012](../adr/012-coach-accounts.md)) sign coaches in through [Cler
 
 ## What is stored, where
 
-- `ffpd:account:<user>:teams` (a list of team ids, at most 12), `ffpd:account:<user>:current`, and `ffpd:team:<id>` (a hash: `owner`, `rev`, `updated`, `name`, `color`, `plays`, `playbooks`, `data`). `data` is the team as JSON, at most 4 MB, 1,000 plays and 1,000 playbooks. Nothing expires.
-- Writes are rate limited per account (600 writes and 1,200 reads an hour, keyed by a hash of the user id). 429 means the bucket is spent; the device keeps the write and tries again later.
-- The draft on the chalkboard and the designer's picked playbook never leave the device.
+- `ffpd:account:<user>:teams` (a list of team ids, at most 12), `ffpd:account:<user>:current`, `ffpd:account:<user>:prefs` (a hash: `rev`, `json`, `touchdowns`: the coach's look, [ADR 013](../adr/013-whole-desk-in-account.md)), and `ffpd:team:<id>` (a hash: `owner`, `rev`, `updated`, `name`, `color`, `plays`, `playbooks`, `data`). `data` is the team as JSON, at most 4 MB, 1,000 plays and 1,000 playbooks; since ADR 013 it also holds the team's desk (`draft`, `currentBook`, `reader`, `shares`), and a team written before then reads with an empty desk. Nothing expires.
+- Writes are rate limited per account (1,200 writes and 1,200 reads an hour, keyed by a hash of the user id; the board goes up as it changes, after a 5-second quiet). 429 means the bucket is spent; the device keeps the write and tries again later.
+- The whole desk goes up: the draft on the chalkboard, the picked playbook, the reader's places and the share links' revoke keys with the team; the theme, field, end zone, Deep field, touchdowns and whether the getting-started guide was seen with the account. Signing out clears all of it from the device, the look included.
 
 ## Failure and recovery
 
 - **503** is a missing or unreachable store; the panel says the account is unavailable and the device keeps working. Fix the store; the next write or visit pushes what the device holds.
-- **409** is two devices writing one team; the device merges and writes again by itself. If a coach reports a play missing after that, their own version of a play with the same id won on their device; the other device's version is in that device's local copy until it next pushes.
+- **409** is two devices writing one team; the device merges and writes again by itself. If a coach reports a play missing after that, their own version of a play with the same id won on their device; the other device's version is in that device's local copy until it next pushes. The board is one slot: the device whose push was refused keeps its own board when it has anything on it, and the other device's is gone.
+- **A look that won't stick** on one device while another is open: the device that wrote last wins, except touchdowns, which only ever go up (`touchdowns` in the prefs hash is the higher of the two).
 - **A team deleted by mistake** is gone from Redis; a device that still mirrors it makes a new team from its own copy on its next push, so the data survives on any device that had it open. Ask the coach not to sign out or switch on that device until it has.
 - **Clerk down**: `auth()` fails closed, so every account request is "signed out"; the device keeps its work and its marker, and the next successful sign-in pushes it.
 - **Rotating Clerk keys** signs everyone out; nothing in Redis changes, since teams are keyed by Clerk's stable user id.

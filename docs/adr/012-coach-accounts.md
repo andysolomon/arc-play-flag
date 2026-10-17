@@ -2,6 +2,8 @@
 
 Status: implemented. It adds an account over the on-device library of [ADR 001](001-short-playbook-links.md) and the backups that already describe it, without changing what the device stores or how any screen reads it.
 
+Amended by [ADR 013](013-whole-desk-in-account.md): the draft on the chalkboard and the playbook picked in the designer, which rule 2 below kept on the device, now go up with the team, along with the rest of the desk and the coach's look.
+
 ## Why
 
 A coach's plays, playbooks, team settings and lineups lived in one browser on one device. A new phone, a laptop at the field, or a cleared browser meant a backup file, or nothing. And a coach with two teams (the 10U side and the 12U side, an offense and a scout team) had one team name, one colour and one library per device.

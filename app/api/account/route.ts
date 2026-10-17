@@ -5,7 +5,7 @@ import type { AccountResponse } from "@/lib/account/types";
 
 export const runtime = "nodejs";
 
-/** Whether accounts are on here, who is signed in, and their teams. */
+/** Whether accounts are on here, who is signed in, their teams and their look. */
 export async function GET(request: Request) {
   try {
     const mode = accountMode();
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const user = await signedIn(request);
     if (!user) return Response.json({ mode, user: null } satisfies AccountResponse, { headers: accountHeaders });
     await limit(user.id, false);
-    const { teams, current } = await listTeams(user.id);
-    return Response.json({ mode, user, teams, current } satisfies AccountResponse, { headers: accountHeaders });
+    const { teams, current, prefs } = await listTeams(user.id);
+    return Response.json({ mode, user, teams, current, prefs } satisfies AccountResponse, { headers: accountHeaders });
   } catch (error) { return accountFailure(error); }
 }

@@ -1,5 +1,6 @@
-import { accountFailure, accountHeaders, readJson, requireUser, sameOrigin, teamDataFrom } from "@/lib/account/http";
+import { accountFailure, accountHeaders, prefsFrom, readJson, requireUser, sameOrigin, teamDataFrom, teamDataOver } from "@/lib/account/http";
 import { AccountError, TEAM_ID, deleteTeam, limit, readTeam, writeTeam } from "@/lib/account/store";
+import { lacksDesk } from "@/lib/account/data";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
@@ -20,7 +21,11 @@ export async function GET(request: Request, context: Context) {
   } catch (error) { return accountFailure(error); }
 }
 
-/** Writes the team over the rev the device read; 409 with the account's copy when another device wrote since. */
+/**
+ * Writes the team over the rev the device read, and the coach's look when the body carries one; 409 with
+ * the account's copy when another device wrote since. A body from a build before the desk went up (A24)
+ * keeps the account's desk: the stored team is read first, and the rev check still refuses a stale write.
+ */
 export async function PUT(request: Request, context: Context) {
   try {
     sameOrigin(request);
@@ -29,8 +34,9 @@ export async function PUT(request: Request, context: Context) {
     await limit(user.id, true);
     const body = await readJson(request);
     if (!isRecord(body) || typeof body.rev !== "number" || !Number.isInteger(body.rev)) throw new AccountError(400, "A write names the rev it read.");
-    const summary = await writeTeam(user.id, id, teamDataFrom(body.data), body.rev);
-    return Response.json(summary, { headers: accountHeaders });
+    const data = lacksDesk(body.data) ? teamDataOver(body.data, (await readTeam(user.id, id)).data) : teamDataFrom(body.data);
+    const written = await writeTeam(user.id, id, data, body.rev, prefsFrom(body.prefs));
+    return Response.json(written, { headers: accountHeaders });
   } catch (error) { return accountFailure(error); }
 }
 

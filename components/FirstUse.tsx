@@ -2,7 +2,7 @@
 
 import { pill } from "./ui";
 
-export const FIRST_USE_KEY = "ffpd.first-use.v1";
+export { FIRST_USE_KEY } from "@/lib/account/prefs";
 
 interface Props {
   onDismiss: () => void;
