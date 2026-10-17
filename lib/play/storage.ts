@@ -37,7 +37,8 @@ export interface StorageLike {
   removeItem?(key: string): void;
 }
 
-export type StorageFailure = "unavailable" | "quota" | "write";
+/** `readonly`: the team on this device is an organization's that the coach may look at, not change (docs/adr/013-organizations.md, rule 9); the key is the reason. */
+export type StorageFailure = "unavailable" | "quota" | "write" | "readonly";
 
 /** A write that did not land. Nothing is reported saved until the record reads back. */
 export class StorageError extends Error {
@@ -57,6 +58,7 @@ export function failureMessage(e: StorageError): string {
     case "quota": return "Couldn't save: this browser's storage is full.";
     case "unavailable": return "Couldn't save: this browser isn't keeping storage (private window?).";
     case "write": return "Couldn't save: the browser refused the write.";
+    case "readonly": return e.key;
   }
 }
 

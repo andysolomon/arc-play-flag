@@ -98,8 +98,26 @@ function setBooks(next: readonly Playbook[] | null): void {
   currentId = undefined;
 }
 
+/**
+ * Why writes are refused on this device, when they are: an organization's team the coach may only look
+ * at (`all`), or one whose settings and roster are its head coach's alone (`settings`). Set by the
+ * organization engine (lib/org/sync.ts) and read on every write, so every screen says why in the
+ * words it already has for a write that didn't land (docs/adr/013-organizations.md, rule 9).
+ */
+let guard: { all: string | null; settings: string | null } = { all: null, settings: null };
+export function setGuard(next: { all: string | null; settings: string | null }): void {
+  if (guard.all === next.all && guard.settings === next.settings) return;
+  guard = next;
+  emit();
+}
+export const getGuard = (): { all: string | null; settings: string | null } => guard;
+export const getServerGuard = (): { all: string | null; settings: string | null } => NO_GUARD;
+const NO_GUARD = { all: null, settings: null };
+
 /** Runs a write; a StorageError becomes a failed result, anything else is a bug and propagates. */
-function attempt<T>(fn: () => T): Written<T> {
+function attempt<T>(fn: () => T, what: "all" | "settings" = "all"): Written<T> {
+  const why = what === "settings" ? guard.settings ?? guard.all : guard.all;
+  if (why) return { ok: false, error: new StorageError("readonly", why) };
   try {
     return { ok: true, value: fn() };
   } catch (e) {
@@ -270,7 +288,7 @@ export function setTeam(next: TeamSettings): Written {
     team = readTeam();
     emit();
     return null;
-  });
+  }, "settings");
 }
 
 export function setLineups(next: Lineups): Written {
@@ -279,7 +297,7 @@ export function setLineups(next: Lineups): Written {
     lineups = readLineups();
     emit();
     return null;
-  });
+  }, "settings");
 }
 
 export function teamIsSet(): boolean {

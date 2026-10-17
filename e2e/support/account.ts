@@ -34,8 +34,8 @@ export async function reloadedBy(page: Page, action: () => Promise<void>): Promi
 }
 
 /** Signs in as a fixture coach from the sign-in page, as a coach would: a tap, then the designer. */
-export async function signIn(page: Page, coach: "Coach Otter" | "Coach Heron", run: string): Promise<void> {
-  await page.goto(`/sign-in?run=${run}`);
+export async function signIn(page: Page, coach: "Coach Otter" | "Coach Heron" | "Coach Ibis", run: string, invite: string | null = null): Promise<void> {
+  await page.goto(`/sign-in?run=${run}${invite ? `&invite=${encodeURIComponent(invite)}` : ""}`);
   await reloadedBy(page, () => page.getByRole("button", { name: `Continue as ${coach}` }).click());
 }
 

@@ -17,6 +17,9 @@ import type { Say } from "./PlaybooksScreen";
 import { SendToTeamItem, SendToTeamModal } from "./SendToTeam";
 import { SharePlayButton, useShareCount } from "./ShareBook";
 import { TwoStep } from "./TwoStep";
+import { ago, usePresenceOn } from "../account/Presence";
+import { useAccount } from "../account/AccountPanel";
+import { stampOf } from "@/lib/org/sync";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -28,6 +31,10 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
   const [sending, setSending] = useState(false);
   // the same flag its picture and printouts carry, in words beside the side it is for
   const flagged = runInNoRunZone(p, hasNoRunZones(useSyncExternalStore(subscribe, getTeam, getServerTeam)));
+  // an organization's play says who changed it last, and who is on it now (ADR 013, rule 7 and 8)
+  const org = useAccount().org;
+  const stamp = org ? stampOf("plays", p.id) : null;
+  const here = usePresenceOn(p.id);
   return (
     <div className={`${card} flex flex-col gap-2.5`}>
       <Link href={`/?open=${p.id}`} aria-label={`Open ${p.name} in the designer`} className="group flex flex-col gap-2 !text-ink no-underline">
@@ -39,7 +46,9 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
         <SideBadge side={p.side} />
         {flagged && <span className={flagChip}>{NO_RUN_FLAG}</span>}
         {links > 0 && <span className={chip}>Shared</span>}
+        {here.map((name) => <span key={name} className={chip} data-here>{name} is here</span>)}
       </div>
+      {stamp && <span className="text-caption text-ink-muted" data-stamp>changed by {stamp.name}, {ago(stamp.at)}</span>}
       {/* pinned to the bottom so every card in a row lines up */}
       <div className="mt-auto flex items-center gap-2">
         <Link href={`/?open=${p.id}`} className={`${pillDark} inline-flex min-h-11 flex-1 items-center justify-center px-3 text-small !text-cream no-underline`}>Open</Link>

@@ -6,6 +6,8 @@ export interface AccountUser {
   name: string;
   email: string | null;
   imageUrl: string | null;
+  /** every verified address, for the email invites of an organization (ADR 013, O6); the primary is first */
+  emails?: string[];
 }
 
 /**

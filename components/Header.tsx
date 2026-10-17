@@ -4,6 +4,7 @@ import { memo } from "react";
 import type { Vis } from "@/lib/play/types";
 import { pillMd, pillSm } from "./ui";
 import { Sticker } from "./Sticker";
+import { Presence } from "./account/Presence";
 
 export type Mode = "play" | "roster";
 
@@ -115,6 +116,7 @@ function HeaderImpl({
         </button>
       )}
       <div className="min-w-0 flex-1" />
+      <Presence className="mr-1" />
       <div className="flex gap-1.5 max-[399px]:gap-px">
         {rostering ? (
           // the roster has both sides and no play to save: the badge is the way between them, and to both at once
