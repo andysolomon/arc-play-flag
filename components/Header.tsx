@@ -25,6 +25,11 @@ interface Props {
   onSave: () => void;
   onToggleLeft: () => void;
   onToggleRight: () => void;
+  /**
+   * roster mode's way out at the top: back to the play, as the Roster tile in Play tools goes
+   * (docs/adr/008-roster-depth-chart.md); `keyboard` when Enter or Space pressed it, not a tap or a click
+   */
+  onBack: (keyboard: boolean) => void;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
@@ -60,6 +65,15 @@ function MenuIcon() {
   );
 }
 
+/** A drawn arrow with a shaft, so Back reads apart from the panel toggle's chevron and Undo's curl. */
+function BackIcon() {
+  return (
+    <svg aria-hidden="true" width="16" height="14" viewBox="0 0 16 14" className="block shrink-0">
+      <path d="M15 7H2M7 1.5 1.5 7 7 12.5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** A drawn chevron, so the Routes toggle centres exactly instead of sitting on the font's baseline. */
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
@@ -70,7 +84,7 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
 }
 
 function HeaderImpl({
-  mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, unsaved, onSave, onToggleLeft, onToggleRight, onUndo, onRedo, onClear,
+  mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, unsaved, onSave, onToggleLeft, onToggleRight, onBack, onUndo, onRedo, onClear,
 }: Props) {
   const rostering = mode === "roster";
   const showing = VIEW[view];
@@ -88,6 +102,14 @@ function HeaderImpl({
       >
         <MenuIcon /><span className={name}>Play</span>
       </button>
+      {rostering && (
+        // nothing in roster mode is the play's to undo or clear, so the way back to it has their room, where a back key goes
+        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${round}`}>
+          <BackIcon />
+          <span className={`${name} min-[479px]:hidden`}>Back</span>
+          <span className="max-[479px]:hidden">Back to play</span>
+        </button>
+      )}
       <div className="min-w-0 flex-1" />
       <div className="flex gap-1.5">
         {rostering ? (
@@ -119,25 +141,29 @@ function HeaderImpl({
             <span className={name}>Save</span>
           </button>
         )}
-        <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
-          <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
-          <span className={name}>Undo</span>
-        </button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${roundAfter}`}>
-          <span className={name}>Redo</span>
-          <Sticker icon="redo" size={24} className={`${glyph} ${canRedo ? "" : "opacity-40"}`} />
-        </button>
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={!canClear || rostering}
-          title="Clear routes (undoable)"
-          aria-label="Clear routes"
-          className={`${pillMd} ${round}`}
-        >
-          <Sticker icon="clear" size={22} className={`${glyph} ${canClear && !rostering ? "" : "opacity-40"}`} />
-          <span className={name}>Clear</span>
-        </button>
+        {!rostering && (
+          <>
+            <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
+              <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
+              <span className={name}>Undo</span>
+            </button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${roundAfter}`}>
+              <span className={name}>Redo</span>
+              <Sticker icon="redo" size={24} className={`${glyph} ${canRedo ? "" : "opacity-40"}`} />
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={!canClear}
+              title="Clear routes (undoable)"
+              aria-label="Clear routes"
+              className={`${pillMd} ${round}`}
+            >
+              <Sticker icon="clear" size={22} className={`${glyph} ${canClear ? "" : "opacity-40"}`} />
+              <span className={name}>Clear</span>
+            </button>
+          </>
+        )}
       </div>
       <button
         type="button"

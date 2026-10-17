@@ -11,7 +11,7 @@ import { latin, pdfWords } from "../support/pdf";
  * - A snapshot link carries the play's coaching notes, shows them on the share page and brings
  *   them back into the designer, as the playbook's short link always did.
  * - The toast sits under the play name, never over it.
- * - On a phone every header control shows its name, not just a glyph.
+ * - On a phone every header control shows its name, not just a glyph, on a play and in roster mode.
  * - The one-up and four-up binders download under different names.
  * - Every PDF keeps its words, invisibly, under the page pictures, so it can be searched.
  * - Playbook and play cards line up their titles whatever the first play's depth.
@@ -137,17 +137,35 @@ test.describe("phone header", () => {
     { name: "Clear routes", label: "Clear" },
     { name: "Route palette", label: "Routes" },
   ] as const;
+  // roster mode has nothing of the play's to undo or clear: Back to play takes their room, beside Play tools (ADR 008)
+  const ROSTER_CONTROLS = [
+    { name: "Play tools", label: "Play" },
+    { name: "Back to play", label: "Back" },
+    { name: "Showing offense", label: "Offense" },
+    { name: "Roster panel", label: "Roster" },
+  ] as const;
+  const MODES = [
+    { mode: "play", heading: "at", file: "header", controls: CONTROLS },
+    { mode: "roster", heading: "in roster mode at", file: "header-roster", controls: ROSTER_CONTROLS },
+  ] as const;
 
-  for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) {
-    test(`at ${String(size.width)}px every header control shows its name under its glyph`, async ({ page }, testInfo) => {
+  for (const { mode, heading, file, controls } of MODES) for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) {
+    test(`${heading} ${String(size.width)}px every header control shows its name under its glyph`, async ({ page }, testInfo) => {
       const device = testInfo.project.name;
       await page.setViewportSize(size);
       const d = new Designer(page);
       await d.goto();
+      if (mode === "roster") {
+        await d.roster();
+        await d.closeSidebars();
+      }
       await d.settle();
       const header = page.locator("header");
+      // only these keys, in this order: nothing hidden in the header pushes them off a narrow screen
+      expect(await header.getByRole("button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))))
+        .toEqual(controls.map((c) => c.name));
       const found: Record<string, unknown>[] = [];
-      for (const c of CONTROLS) {
+      for (const c of controls) {
         const control: Locator = header.getByRole("button", { name: c.name, exact: true });
         const name = control.getByText(c.label, { exact: true });
         await expect(name, `${c.name} shows "${c.label}"`).toBeVisible();
@@ -175,10 +193,33 @@ test.describe("phone header", () => {
       }
       const overflow = await header.evaluate((el) => el.scrollWidth - el.clientWidth);
       expect(overflow, "the header fits the screen").toBeLessThanOrEqual(0);
-      await header.screenshot({ path: out(device, `header-${String(size.width)}.png`) });
-      report(device, `header-${String(size.width)}`, { viewport: size, overflow, controls: found });
+      await header.screenshot({ path: out(device, `${file}-${String(size.width)}.png`) });
+      report(device, `${file}-${String(size.width)}`, { viewport: size, overflow, controls: found });
     });
   }
+
+  test("from 479px the roster header fits with Back to play spelled out beside its arrow", async ({ page }, testInfo) => {
+    const device = testInfo.project.name;
+    const size = { width: 479, height: 800 };
+    await page.setViewportSize(size);
+    const d = new Designer(page);
+    await d.goto();
+    await d.roster();
+    await d.closeSidebars();
+    const header = page.locator("header");
+    const name = d.back.getByText("Back to play", { exact: true });
+    await expect(name).toBeVisible();
+    await expect(d.back.getByText("Back", { exact: true })).toBeHidden();
+    const text = await name.boundingBox();
+    const glyph = await d.back.locator("svg").boundingBox();
+    expect(text && glyph).toBeTruthy();
+    if (!text || !glyph) return;
+    expect(text.x, "the name sits beside the arrow, not under it").toBeGreaterThanOrEqual(glyph.x + glyph.width - 1);
+    const overflow = await header.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow, "the roster header fits the screen").toBeLessThanOrEqual(0);
+    await header.screenshot({ path: out(device, "header-roster-479.png") });
+    report(device, "header-roster-479", { viewport: size, overflow, text, glyph });
+  });
 });
 
 test("the one-up and four-up binders download under their own names, and every PDF's words can be searched", async ({ page }, testInfo) => {

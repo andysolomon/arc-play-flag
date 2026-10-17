@@ -479,6 +479,35 @@ export function App() {
       openRight(true);
     }
   }, [formation, openRight, s]);
+  // the header's Back to play: out of roster mode as the Roster tile goes, except that on a phone or tablet, where
+  // the drawers cover the field, both fold so the play is in view. Back goes with the mode, so focus goes to the
+  // field's title once it reads the play's name again, never to the page; it is focusable only until focus moves on
+  // from it, so on a play it stays words. It is ringed only when the keyboard pressed Back: after a tap or a click it
+  // stays quiet until then, whatever a browser's own rule would do. The window losing focus blurs it too but leaves it
+  // the page's focus, so that blur changes nothing
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const backToPlay = useRef<"keyboard" | "pointer" | null>(null);
+  const onBack = useCallback((keyboard: boolean) => {
+    backToPlay.current = keyboard ? "keyboard" : "pointer";
+    if (compactRef.current) closePanels();
+    onMode("play");
+  }, [closePanels, onMode]);
+  useEffect(() => {
+    const title = titleRef.current;
+    if (!rostering && backToPlay.current && title) {
+      title.tabIndex = -1;
+      title.toggleAttribute("data-quiet-focus", backToPlay.current === "pointer");
+      const movedOn = () => {
+        if (document.activeElement === title) return;
+        title.removeAttribute("tabindex");
+        title.removeAttribute("data-quiet-focus");
+        title.removeEventListener("blur", movedOn);
+      };
+      title.addEventListener("blur", movedOn);
+      title.focus({ preventScroll: true });
+    }
+    backToPlay.current = null;
+  }, [rostering]);
   // a side taken off the field takes its picked position with it, as hiding the shadow does
   const pickedTeam = positions.find((p) => p.id === rosterPick)?.team ?? null;
   const onView = useCallback((next: Vis) => {
@@ -576,6 +605,7 @@ export function App() {
         onSave={onHeaderSave}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
+        onBack={onBack}
         onUndo={() => { dispatch({ type: "undo" }); }}
         onRedo={() => { dispatch({ type: "redo" }); }}
       />
@@ -636,6 +666,7 @@ export function App() {
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}
           showTitle
+          titleRef={titleRef}
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
           los={rostering ? ROSTER_LOS : s.los}
