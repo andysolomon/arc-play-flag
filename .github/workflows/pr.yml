@@ -206,6 +206,14 @@ jobs:
           path: test-results/roster-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the roster pictures and sheets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: depth-chart
+          path: test-results/depth-chart-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the lateral chains
         if: always()
         uses: actions/upload-artifact@v4
@@ -252,12 +260,28 @@ jobs:
           path: test-results/blitz-target-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the deep zones
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-zones
+          path: test-results/deep-zones-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the playbook switcher's menus
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playbook-switch
           path: test-results/playbook-switch-*
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Upload the header save
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: header-save
+          path: test-results/header-save-*
           retention-days: 7
           if-no-files-found: warn
       - name: Upload mobile usability evidence
