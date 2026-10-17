@@ -7,6 +7,7 @@ import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
+import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
@@ -114,6 +115,8 @@ export function App() {
   const [draftWrite, setDraftWrite] = useState<{ fingerprint: string; ok: boolean } | null>(null);
   const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const restoredDraft = useRef(false);
+  // the header's Save, for ⌘S / Ctrl+S: set once the save it makes is defined below
+  const saveRef = useRef<() => void>(() => {});
   const toastTimer = useRef(0);
   const say = useCallback((text: string, ms = 1600, flag = false) => {
     setToast({ text, flag });
@@ -209,6 +212,8 @@ export function App() {
   }, []);
   // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
   const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the DEEP pills: Auto splits the field with the other deep zones, Half and Third call it
+  const onDeepSplit = useCallback((split: DeepSplit | null) => { dispatch({ type: "deepSplit", split }); }, []);
   const onBlitzTarget = useCallback(() => {
     dispatch({ type: "blitzTarget" });
     if (compactRef.current) setRightOpen(false);
@@ -234,6 +239,14 @@ export function App() {
       if (e.key === "Escape") {
         if (rosteringRef.current) setRosterPick(null);
         else dispatch({ type: "select", id: null });
+        return;
+      }
+      // ⌘S / Ctrl+S is the header's Save, typing in the play name included, never the browser's "Save page as";
+      // a layout whose S key types no Latin letter is matched by the key's place. Roster mode has no play to save
+      const sKey = e.key === "s" || e.key === "S" || (e.code === "KeyS" && !/^[a-z]$/i.test(e.key));
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && sKey) {
+        e.preventDefault();
+        if (!e.repeat && !rosteringRef.current) saveRef.current();
         return;
       }
       if (isEditable(e.target)) return;
@@ -314,16 +327,24 @@ export function App() {
     };
   }, []);
 
-  const onSave = useCallback(() => {
+  // whether the save landed
+  const onSave = useCallback((): boolean => {
     const r = savePlay({
       id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players],
     });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
+    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return false; }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved");
+    return true;
   }, [say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
+  // Save from the header (or ⌘S) with Play tools shut: a save that doesn't land opens Play tools on its
+  // warning, where the play can still be downloaded or the save tried again
+  const onHeaderSave = useCallback(() => {
+    if (!onSave()) openLeft(true);
+  }, [onSave, openLeft]);
+  useEffect(() => { saveRef.current = onHeaderSave; }, [onHeaderSave]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
     const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] });
@@ -509,7 +530,6 @@ export function App() {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
-        side={s.side}
         mode={mode}
         view={view}
         onView={() => { onView(VIEW[view].next); }}
@@ -519,6 +539,8 @@ export function App() {
         canRedo={!rostering && s.future.length > 0}
         canClear={s.players.some((p) => (p.route || p.preSnap) && p.team === s.side)}
         onClear={onClear}
+        unsaved={dirty}
+        onSave={onHeaderSave}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
         onUndo={() => { dispatch({ type: "undo" }); }}
@@ -615,6 +637,8 @@ export function App() {
             blitz={blitz}
             onBlitzAim={onBlitzAim}
             onBlitzTarget={onBlitzTarget}
+            deep={sel?.team === "defense" && sel.route?.type === "zoneDeep" ? deepSplit(sel.route) ?? "auto" : null}
+            onDeepSplit={onDeepSplit}
             cut={selCut}
             jet={jetAble}
             hint={hint}
