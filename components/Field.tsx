@@ -142,6 +142,11 @@ const LANE_CLIP = "ffez-lane";
 const PLAY_BUTTON = { inset: 12, size: 48 };
 /** The field's border, in CSS pixels: the diagram's units start inside it. */
 const FIELD_BORDER = 3;
+/**
+ * How far, in yards, a dragged player's drop may land from where it is drawn before the token is drawn where
+ * it will land instead: past the half yard's own reach, so an ordinary drop is drawn where the finger is.
+ */
+const LANDS_NEAR = 0.75;
 
 /**
  * What goes under a token: the starter's name when the roster has one, and in roster mode "Unassigned"
@@ -164,9 +169,11 @@ function FieldImpl({
   const [liveWaypoint, setLiveWaypoint] = useState<{ id: string; index: number; x: number; y: number } | null>(null);
   const [selectedWaypoint, setSelectedWaypoint] = useState<{ id: string; index: number } | null>(null);
   const [boingId, setBoingId] = useState<string | null>(null);
-  // a player whose arrow step goes nowhere, past a teammate or the edge of the field, shakes
-  const [shakeId, setShakeId] = useState<string | null>(null);
+  // a player whose arrow step goes nowhere, past a teammate or the edge of the field, shakes, afresh each press
+  const [shakeOn, setShakeOn] = useState<{ id: string; n: number } | null>(null);
   const shakePlayerTimer = useRef(0);
+  // the player and teammate a held arrow key has stopped beside, which it says once a hold
+  const heldBeside = useRef<string | null>(null);
   const [liveCatch, setLiveCatch] = useState<{ hop: number; pt: Pair } | null>(null);
   const [liveRelease, setLiveRelease] = useState<{ hop: number; pt: Pair } | null>(null);
   const [shakeHop, setShakeHop] = useState<number | null>(null);
@@ -350,8 +357,11 @@ function FieldImpl({
     const f = freeSpot(c, dr.team, topRef.current, dr.gap, dr.mates, dr.at) ?? dr.at;
     dr.at = f;
     tellCrowded(dr, c);
-    setLive({ id: dr.id, x: f.x, y: f.y });
-  }, [tellCrowded, toYards]);
+    // held in a sliver no drop can land in (at a sideline between two teammates): shown where it will land
+    const s = freeSnap(f, dr.team, topRef.current, dr.gap, dr.mates, snapMode, { x: dr.x0, y: dr.y0 }) ?? f;
+    const shown = Math.hypot(s.x - f.x, s.y - f.y) > LANDS_NEAR ? s : f;
+    setLive({ id: dr.id, x: shown.x, y: shown.y });
+  }, [snapMode, tellCrowded, toYards]);
 
   const applyWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -377,6 +387,8 @@ function FieldImpl({
       setLive(null);
       if (!s) return;
       tellCrowded(dr, clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap));
+      // held back to where it started: nothing moved, so nothing to undo and Redo is kept
+      if (s.x === dr.x0 && s.y === dr.y0) return;
       dispatch({ type: "move", id: dr.id, x: s.x, y: s.y, commit: true });
       setBoingId(dr.id);
       window.setTimeout(() => { setBoingId((b) => (b === dr.id ? null : b)); }, 380);
@@ -417,10 +429,11 @@ function FieldImpl({
   useEffect(() => () => {
     window.clearTimeout(shakeTimer.current); window.clearTimeout(shakeReleaseTimer.current); window.clearTimeout(shakePlayerTimer.current);
   }, []);
-  const shakePlayer = useCallback((id: string) => {
-    setShakeId(id);
+  // a fresh press shakes again; a held key's repeats keep the one shake going
+  const shakePlayer = useCallback((id: string, again: boolean) => {
+    setShakeOn((k) => (again || k?.id !== id ? { id, n: (k?.n ?? 0) + 1 } : k));
     window.clearTimeout(shakePlayerTimer.current);
-    shakePlayerTimer.current = window.setTimeout(() => { setShakeId(null); }, 400);
+    shakePlayerTimer.current = window.setTimeout(() => { setShakeOn(null); }, 400);
   }, []);
   // a release dragged past the line shakes and says so, once as it starts
   const snapBackRelease = useCallback((hop: number) => {
@@ -588,9 +601,17 @@ function FieldImpl({
       // a press onto a teammate goes on past them, or, with the edge of the field first, nowhere; a key held
       // down stops beside them, and says nothing more as it repeats (lib/play/spacing.ts, C7)
       const r = stepPast(p, step, p.team, topRef.current, losGap(p.route), teammates(players, id), !e.repeat);
-      if (r.past && !e.repeat) onNote?.(crowdNote(p.label || p.id, r.past.label || r.past.id, r.to ? "past" : "stuck"));
+      const who = p.label || p.id, mate = r.past ? r.past.label || r.past.id : "";
+      if (!e.repeat) {
+        heldBeside.current = null;
+        if (r.past) onNote?.(crowdNote(who, mate, r.to ? "past" : "stuck"));
+      } else if (r.past && !r.to && heldBeside.current !== `${id}:${mate}`) {
+        // a held key stopped beside a teammate says so once, for whoever can't see it stop
+        heldBeside.current = `${id}:${mate}`;
+        onNote?.(crowdNote(who, mate, "kept"));
+      }
       if (r.to) dispatch({ type: "move", id, x: r.to.x, y: r.to.y, commit: true });
-      else if (r.past) shakePlayer(id);
+      else if (r.past) shakePlayer(id, !e.repeat);
       if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -969,7 +990,7 @@ function FieldImpl({
               target={targetOf(p)}
               focusOnTarget={targetOf(p) !== null && p.id === visible.find((q) => targetOf(q) !== null)?.id}
               boing={boingId === p.id}
-              shake={shakeId === p.id}
+              shake={shakeOn?.id === p.id ? shakeOn.n : 0}
               dragging={dragging}
               readOnly={readOnly || draft !== null}
               drawing={draft !== null}

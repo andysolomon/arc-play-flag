@@ -18,7 +18,10 @@ import { OTTERS, moved, play, seed, storedDraft, storedLineups, storedPlays } fr
  * in the way: the line of scrimmage keeps them apart already, so a defender steps to the line opposite the C.
  * A blitzer backed off to the blitz line onto a teammate standing there takes the nearest clear spot on it.
  * Roster mode's positions keep the same spacing, on the roster. A play stored with two players on top of
- * each other opens as stored, and either can still be stepped off. After every step each side's closest
+ * each other opens as stored, and either can still be stepped off. Dragged along a tight line onto the C,
+ * a player stays in the notch it was drawn in; dragged back onto a teammate from beside them it stays put
+ * and writes nothing, so Redo is kept. A step past a teammate that cuts the route short at the sideline
+ * says both in one note. After every step each side's closest
  * pair on the field is measured, never under 2 yards but where a stored play put them. Leaves
  * `collisions-<device>-<test>.json` (every step's spots, each side's closest pair and the note shown) and a
  * picture of the field after each test in `test-results/`.
@@ -162,6 +165,14 @@ test("a player dragged onto a teammate is held off them and lands 2 yards away, 
   await d.undo.click();
   await expectAt(d, "Y", "Offense", 27, 1);
 
+  // Z, beside the QB, dragged back onto his centre: held where he stands, so nothing moves, nothing is
+  // written and Redo is kept
+  await expect(d.redo).toBeEnabled();
+  await dragTo(d, "Z", "Offense", { x: 15, y: 5 });
+  await expectAt(d, "Z", "Offense", 13, 5);
+  await expect(d.redo).toBeEnabled();
+  await note("Z dragged onto the QB from beside him stays put, Redo kept", { note: "Kept Z 2 yards off QB." });
+
   // the arrow key held down walks Y in along the line and stops him beside the C, shaking as it repeats,
   // never carrying him on past; a fresh press then steps him past
   await d.player("Y").focus();
@@ -169,7 +180,7 @@ test("a player dragged onto a teammate is held off them and lands 2 yards away, 
   await expect(d.player("Y").locator(".animate-shake")).toHaveCount(1);
   await page.keyboard.up("ArrowLeft");
   await expectAt(d, "Y", "Offense", 17, 1);
-  await note("Y walked in by a held key, stopped beside the C");
+  await note("Y walked in by a held key, stopped beside the C", { note: "Players can't stand on top of each other. Kept Y 2 yards off C." });
   await page.keyboard.press("ArrowLeft");
   await expectAt(d, "Y", "Offense", 13, 1);
   await note("a fresh press steps Y past the C", { note: "Stepped Y past C." });
@@ -264,5 +275,47 @@ test("a play stored with two players on top of each other opens as stored, and e
   await note("Z stepped off the QB", { note: "Stepped Z past QB." });
   // the stored play is untouched until it is saved
   expect((await storedPlays(page))["fx-stacked"]?.players.find((p) => p.id === "o5")).toMatchObject({ x: 15, y: 5 });
+  await done();
+});
+
+test("let go on the C from a pocket beside him, a player stays in the pocket it was drawn in, the side it came from", async ({ page }, info) => {
+  const device = info.project.name;
+  // X, the C and Y shoulder to shoulder on the line, the QB three yards behind the C, Z out to the left
+  const line = moved(play("fx-line", "Otter Tight Line"), {
+    o1: { x: 15, y: 1 }, o2: { x: 15, y: 4 }, o3: { x: 13, y: 1 }, o4: { x: 17, y: 1 }, o5: { x: 9, y: 1 },
+  });
+  await seed(page, { team: OTTERS, plays: [line] });
+  const d = new Designer(page);
+  await d.goto();
+  await d.openSaved("Otter Tight Line");
+  const { note, done } = journal(d, device, "pocket");
+  await d.foldOverlays();
+  await note("the tight line");
+
+  // Z dragged along the line, past X and on to the C's centre: held behind X, then in the notch between X and
+  // the QB, and kept there while the finger is on the C, never swung across to his far side
+  await dragTo(d, "Z", "Offense", { x: 15, y: 1 }, async () => {
+    await expect.poll(async () => { const z = await spotOf(d, "Z", "Offense"); return z.x < 15; }).toBe(true);
+    await note("Z held in the notch between X and the QB, the button still down");
+  });
+  await expectAt(d, "Z", "Offense", 13, 3);
+  await note("Z let go on the C lands in the pocket, 2 yards off X", { note: "Players can't stand on top of each other." });
+  await done();
+});
+
+test("a step past a teammate that cuts the route short at the sideline says both in one note", async ({ page }, info) => {
+  const device = info.project.name;
+  // Z on an Out, Y 2 yards outside him: stepped right past Y, Z's Out no longer has room before the sideline
+  const wide = moved(play("fx-out-wide", "Otter Out Wide", { o5: { type: "out" } }), { o5: { x: 20, y: 5 }, o4: { x: 22, y: 5 } });
+  await seed(page, { team: OTTERS, plays: [wide] });
+  const d = new Designer(page);
+  await d.goto();
+  await d.openSaved("Otter Out Wide");
+  const { note, done } = journal(d, device, "cut");
+  await d.foldOverlays();
+  await d.player("Z").press("ArrowRight");
+  await expectAt(d, "Z", "Offense", 24, 5);
+  await expect(d.toast).toHaveText("Players can't stand on top of each other. Stepped Z past Y. Out · cut short at the sideline");
+  await note("Z stepped past Y, his Out cut short", { note: "Stepped Z past Y. Out · cut short at the sideline" });
   await done();
 });

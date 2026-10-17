@@ -25,7 +25,7 @@
  * - C7 an arrow step onto a teammate: the player goes on past them, a yard at a time the same way, to the
  *   first clear spot; with none before the sideline, the line or the card's top, it stays where it is. A key
  *   held down walks the player up to the teammate and stops there, so a held key never carries them on past
- *   someone they didn't mean to pass; a fresh press then steps past.
+ *   someone they didn't mean to pass, and says so once a hold; a fresh press then steps past.
  * - C8 nowhere clear at all (it can't happen with five a side on a field 27 yards wide, but): the player
  *   stays where it was.
  * - C9 dragging over a teammate: the token is held at the edge of the teammate's disc and slides round it,
@@ -40,6 +40,11 @@
  *   the one nearer where the player came from, then nearer the line of scrimmage, then further left, so the
  *   same move always lands in the same place.
  * - C12 a spot exactly PLAYER_SPACING from a teammate, or a hair under it from rounding: clear.
+ * - C13 a token held in a sliver no drop can land in (at a sideline between two teammates, no half-yard spot
+ *   in it clear): it is drawn where the drop will land, so what the coach sees is where it goes.
+ * - C14 a drop held back onto the spot it started from: nothing moved, so nothing is written; no undo step,
+ *   and Redo is kept.
+ * - C15 a step past a teammate that cuts the player's route short at the sideline: one note says both.
  */
 
 import { MAX_DEPTH, clamp, snap } from "./geometry";
@@ -93,8 +98,21 @@ function nearer(a: Pt, b: Pt | null, to: Pt, from: Pt | null): boolean {
 }
 
 /**
- * A spot within HOLD of a teammate's centre, read as on the edge of that core on the side `from` is (C9):
- * the spot the player is drawn at, so a finger jittering on the centre never swings it from side to side.
+ * Whether a finger within HOLD of a teammate's centre finds the player already drawn pressed against a
+ * teammate on the way to it (`from` clear, on that teammate's edge, the finger on their side of it): then
+ * the player stays where they are drawn, so the hold never swings them about, even out of a pocket (C9).
+ */
+function pressed(at: Pt, mates: readonly Pt[], from: Pt): boolean {
+  const m = crowding(at, mates);
+  if (!m || Math.hypot(at.x - m.x, at.y - m.y) >= HOLD || crowding(from, mates)) return false;
+  return mates.some((n) => Math.abs(Math.hypot(from.x - n.x, from.y - n.y) - PLAYER_SPACING) < EPS
+    && (from.x - n.x) * (at.x - from.x) + (from.y - n.y) * (at.y - from.y) < 0);
+}
+
+/**
+ * A spot within HOLD of a teammate's centre, read as on the edge of that core on the side `from` is (C9),
+ * for a player not yet drawn beside anyone (a quick flick straight onto a teammate): they come out on the
+ * side they came from.
  */
 function held(p: Pt, mates: readonly Pt[], from: Pt | null): Pt {
   const m = from ? crowding(p, mates) : null;
@@ -114,6 +132,7 @@ function held(p: Pt, mates: readonly Pt[], from: Pt | null): Pt {
 export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: readonly Pt[], from: Pt | null = null): Pt | null {
   const at = clamp(want.x, want.y, team, top, gap);
   if (!crowding(at, mates)) return at;
+  if (from && pressed(at, mates, from)) return from;
   const hold = held(at, mates, from);
   const p = clamp(hold.x, hold.y, team, top, gap);
   const b = fieldBox(team, top, gap);
@@ -167,10 +186,12 @@ export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: re
   const g = mode === "one" ? 1 : 0.5;
   const b = fieldBox(team, top, gap);
   let best: Pt | null = null;
-  // every snapped spot on the field, held to it as a drop is, so its edges are tried too
+  // every spot a drop can land on: each on the grid, held to the field, snapped and held again as a drop
+  // is, so the field's edges are tried and nothing a plain drop never gives (0.9 off the line) is
   for (let j = Math.floor(b.y0 / g); j <= Math.ceil(b.y1 / g); j++) {
     for (let i = Math.floor(b.x0 / g); i <= Math.ceil(b.x1 / g); i++) {
-      const c = clamp(i * g, j * g, team, top, gap);
+      const v = clamp(i * g, j * g, team, top, gap);
+      const c = clamp(snap(v.x, mode), snap(v.y, mode), team, top, gap);
       if (!crowding(c, mates) && nearer(c, best, at, from)) best = c;
     }
   }
