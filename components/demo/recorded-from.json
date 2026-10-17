@@ -6,12 +6,13 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "2d421ae099d55b734fc8e50de08ba605730ca4553ad4442f7fa44c435955bbfd",
+    "components/App.tsx": "d39ff58c6c562ca09d8dba0568fec180250c8ab310fc6dbcd2a1c5d2328445eb",
+    "components/EditablePlayTitle.tsx": "e950bae2fb571cb67cfa1d4f11364b85d155c9fe6038389956769cb86eef43d3",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "c66fa35645fc6a35e51d5684704297d456c37aca7619394a0374d5374ce24363",
+    "components/Field.tsx": "f46b3c7832c8635a5f5e9fd6af4ff5834513239d052a7513d3955d91f5c13487",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
-    "components/Header.tsx": "8c6bd773310a6f3ee62358c5eacf9b6ebc7cd2ad4dfc536c399f38d883ea4a96",
+    "components/Header.tsx": "482aa015c5b2a311cbe85558755ada055eec01c7ec0877d9a389b4f84b15fdec",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "ce9a71e7b78fa295090f67d2660cc54d1aaeffe8ec1d8e819f7d4bdcdf712636",
     "components/LateralLayer.tsx": "badafa29eb6563fedf5e17ef61e7aab244c7234377ecf6620a06c1d63e977ada",
@@ -75,15 +76,5 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
-  },
-  "restamped": {
-    "reason": "send to another team and the folded share-link box live on the playbooks home list (its cards and dialogs); no chapter opens that list, the two playbook chapters open one book",
-    "files": [
-      "components/playbooks/BookCard.tsx (changed)",
-      "components/playbooks/Home.tsx (changed)",
-      "components/playbooks/ImportLink.tsx (changed)",
-      "components/playbooks/PlayCard.tsx (changed)",
-      "components/playbooks/SendToTeam.tsx (added)"
-    ]
   }
 }

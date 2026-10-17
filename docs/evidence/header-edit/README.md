@@ -19,7 +19,15 @@ bun run test:e2e e2e/journeys/header-edit.journey.ts e2e/journeys/header-save.jo
 
 `header-edit` in CI retains screenshots and stored-play/geometry JSON manifests. These projects emulate devices in Chromium; they do not establish real Safari behavior.
 
+The tour was refreshed against the production build, with one isolated chapter and two successful complete captures. Each set passed coverage, duration, codec and resolution checks: 1,880,468 and 1,900,655 bytes, both below the unchanged 2 MB limit. The published files all come from the first complete set. A validation summary is alongside this note. Slightly longer reading pauses in the league rules and wristband chapters and CRF 53/38 keep the clips within their timing and size limits.
+
 ## Screenshots
+
+Dark phone layout and inline rename:
+
+![Duplicate in the dark phone header](iphone-dark.png)
+
+![Editing the play name above the field](iphone-rename.png)
 
 Phone at 320 CSS pixels, with a long name:
 
