@@ -32,6 +32,7 @@ import { isBallJob, isRun, mirrorRoute, mirrorable, routeDef } from "@/lib/play/
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
+import { EditablePlayTitle } from "./EditablePlayTitle";
 import { PlaySwitcher } from "./PlaySwitcher";
 import { FirstUse } from "./FirstUse";
 import { Header, VIEW, type Mode } from "./Header";
@@ -119,7 +120,7 @@ export function App() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [firstUse, setFirstUse] = useState(false);
   // the last Save or Duplicate that didn't land; cleared by the next one that does
-  const [saveFailure, setSaveFailure] = useState<StorageError | null>(null);
+  const [saveFailure, setSaveFailure] = useState<{ error: StorageError; duplicate: boolean } | null>(null);
   const draftBroken = useRef(false);
   const [draftWrite, setDraftWrite] = useState<{ fingerprint: string; ok: boolean } | null>(null);
   const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
@@ -360,7 +361,7 @@ export function App() {
     if (!r.ok) {
       // a team the coach may only look at: the words say so, and there is nothing to retry (ADR 013, rule 9)
       if (r.error.reason === "readonly") { say(failureMessage(r.error), 3200); return false; }
-      setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return false;
+      setSaveFailure({ error: r.error, duplicate: false }); say(failureMessage(r.error), 3200); record("storage", r.error); return false;
     }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
@@ -377,12 +378,15 @@ export function App() {
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
     const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
+    if (!r.ok) {
+      if (r.error.reason === "readonly") { say(failureMessage(r.error), 3200); return; }
+      setSaveFailure({ error: r.error, duplicate: true }); say(failureMessage(r.error), 3200); record("storage", r.error); openLeft(true); return;
+    }
     dispatch({ type: "setName", name: n });
     dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved a copy");
-  }, [say, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
+  }, [say, s.name, s.notes, s.side, s.artShadow, s.los, s.players, openLeft]);
   // the way out when the device won't keep the play: a one-play playbook file that "Import a file…" takes back
   const onDownload = useCallback(() => {
     const play = withLos({ id: s.id ?? newId(), name: s.name, notes: s.notes, side: s.side, ...artShadow(s.artShadow), players: [...s.players] }, s.los);
@@ -629,6 +633,7 @@ export function App() {
         onClear={onClear}
         unsaved={dirty}
         onSave={onHeaderSave}
+        onDuplicate={onDuplicate}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
         onBack={onBack}
@@ -656,7 +661,7 @@ export function App() {
             onDuplicate={onDuplicate}
             unsaved={dirty}
             saved={!dirty && s.id !== null}
-            savePanel={saveFailure ? <SaveFailure message={failureMessage(saveFailure)} onRetry={onSave} onDownload={onDownload} /> : null}
+            savePanel={saveFailure ? <SaveFailure message={failureMessage(saveFailure.error)} onRetry={saveFailure.duplicate ? onDuplicate : onSave} onDownload={onDownload} /> : null}
             onShare={openShare}
             onFlip={() => { dispatch({ type: "flip" }); }}
             onClear={(team) => { dispatch({ type: "clearRoutes", team }); }}
@@ -691,6 +696,7 @@ export function App() {
           lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}
+          titleControl={rostering ? undefined : <EditablePlayTitle name={s.name} onName={(name) => { dispatch({ type: "setName", name }); }} />}
           showTitle
           titleRef={titleRef}
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}

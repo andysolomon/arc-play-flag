@@ -637,7 +637,7 @@ async function leagueRules(d: ChapterDriver): Promise<void> {
   await d.say("A run from here is flagged");
   await d.expectState("The dive is stamped as a run in the no-run zone", async () => {
     await expect(stamp).toBeVisible({ timeout: ASSERT_TIMEOUT });
-  }, 1600, ["Running plays", "No-run zones"]);
+  }, 2100, ["Running plays", "No-run zones"]);
   await d.poster();
 
   await d.say("Make it a pass: flag gone");
@@ -781,11 +781,11 @@ async function wristbands(d: ChapterDriver): Promise<void> {
   });
   await d.expectState("X's insert is on screen", async () => {
     await expect(d.app.locator(`#${OVERLAY_ID} svg`).first()).toBeVisible({ timeout: ASSERT_TIMEOUT });
-  }, 1800);
+  }, 2400);
   await d.poster();
 
   await d.say("Z's card: Z's route in bold");
-  await d.overlay(insert("Z"), "Show Z's insert", 1800);
+  await d.overlay(insert("Z"), "Show Z's insert", 2400);
 
   await d.say("Binder pages and meeting slides too");
   await d.overlay(null, "Take the insert down", 0);

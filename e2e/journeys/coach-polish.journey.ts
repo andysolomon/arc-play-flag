@@ -132,6 +132,7 @@ test.describe("phone header", () => {
   const CONTROLS = [
     { name: "Play tools", label: "Play" },
     { name: "Save play", label: "Save" },
+    { name: "Duplicate play", label: "Duplicate" },
     { name: "Undo", label: "Undo" },
     { name: "Redo", label: "Redo" },
     { name: "Clear routes", label: "Clear" },

@@ -6,12 +6,13 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "249735fbfb22fe1f3fd6bbc344bde732ca7002df1200d9607a4e619c70a0477a",
+    "components/App.tsx": "d8a408a4d4731207f22003dc18cb4f2573e6413e228d0fa73971a41d30e6e77e",
+    "components/EditablePlayTitle.tsx": "e950bae2fb571cb67cfa1d4f11364b85d155c9fe6038389956769cb86eef43d3",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "afbb6cbe86387ee79a8b8bd36eae2568be60bb7f68283b079562986fa4dc243e",
+    "components/Field.tsx": "7f7513fe0dc73746a56c618a3bfeefd6620e80cc3af7389e1578ec51ded0f4fe",
     "components/FirstUse.tsx": "b2e974561b95cfcbf2462e13977a11430fab08b7efdb8ce015ddb6597a426303",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
-    "components/Header.tsx": "654785d4fc70a8db17042a29f45a876a2fb08dd440394dbd38b7de0a9e302ed0",
+    "components/Header.tsx": "17e4dd308f798a51c6f4d937e6f845676de2a896d670ebc09fb539e747451df8",
     "components/Hint.tsx": "4f914773ab26cc194fa13fd1c0742cfb2dd09aca487e351dd4344a2516df5be4",
     "components/IconTile.tsx": "ce9a71e7b78fa295090f67d2660cc54d1aaeffe8ec1d8e819f7d4bdcdf712636",
     "components/LateralLayer.tsx": "badafa29eb6563fedf5e17ef61e7aab244c7234377ecf6620a06c1d63e977ada",
@@ -77,22 +78,5 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
-  },
-  "restamped": {
-    "reason": "Organizations (ADR 013, merged from main) add avatars, an ORGANIZATION section, change stamps and organization send targets that render nothing without an organization; the tour runs without one, so no clip shows them",
-    "files": [
-      "components/App.tsx (changed)",
-      "components/Header.tsx (changed)",
-      "components/PlaysMenu.tsx (changed)",
-      "components/account/AccountPanel.tsx (changed)",
-      "components/account/OrgPanel.tsx (added)",
-      "components/account/Presence.tsx (added)",
-      "components/account/SignInScreen.tsx (changed)",
-      "components/playbooks/BookCard.tsx (changed)",
-      "components/playbooks/Home.tsx (changed)",
-      "components/playbooks/PlayCard.tsx (changed)",
-      "components/playbooks/SendToTeam.tsx (changed)",
-      "components/playbooks/ShareBook.tsx (changed)"
-    ]
   }
 }

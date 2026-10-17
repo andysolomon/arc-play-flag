@@ -12,7 +12,7 @@ Each chapter has one slug in `components/demo/demos.ts` and three matching files
 <slug>.webp  # poster shown before playback
 ```
 
-Every clip is 576×720, a phone's 4:5 shape: the app in its own phone layout (384 CSS pixels wide, zoomed 1.5× so it is crisp) under a 52-pixel caption band the recorder owns. Keep clips silent, 6–12 seconds long, readable at the width of a phone card, and focused on one task. The whole tour stays within 120 seconds. The complete poster-and-video set must remain below 2 MB; `components/demo/demos.test.ts` enforces the limit and missing files. The service worker precaches the whole set, so that budget is what an offline install costs: it was raised from 1.25 MB when the five original chapters were split into eight (paid for with a higher encoding CRF), and from 1.7 MB when the field, end zone and slides chapters made nine (issue #107). The phone frame carries ten chapters in the same budget at a higher CRF (52 for VP9, 37 for H.264).
+Every clip is 576×720, a phone's 4:5 shape: the app in its own phone layout (384 CSS pixels wide, zoomed 1.5× so it is crisp) under a 52-pixel caption band the recorder owns. Keep clips silent, 6–12 seconds long, readable at the width of a phone card, and focused on one task. The whole tour stays within 120 seconds. The complete poster-and-video set must remain below 2 MB; `components/demo/demos.test.ts` enforces the limit and missing files. The service worker precaches the whole set, so that budget is what an offline install costs: it was raised from 1.25 MB when the five original chapters were split into eight (paid for with a higher encoding CRF), and from 1.7 MB when the field, end zone and slides chapters made nine (issue #107). The phone frame carries ten chapters in the same budget at a higher CRF (53 for VP9, 38 for H.264).
 
 Each chapter's card also lists its captions, in order: the text alternative to a silent clip. The recorder checks that a chapter showed exactly those captions, so the list under a clip is never a paraphrase of it.
 
@@ -142,7 +142,7 @@ For every chapter the recorder:
 1. Opens the harness page, shows the chapter's first caption in the band, and opens the first screen behind the cover; the chapter's clock starts when that screen is on camera, and the clip starts there (the browser launching and the first load are cut from the front of the raw capture).
 2. Plays the chapter's beats, checking each expected state in the app (routes stored, toasts shown, downloads received with the right filename), drawing the touch where each one taps or drags.
 3. Fails if the beats ran past the length promised in `components/demo/demos.ts` (by more than a quarter second): encoding trims every clip to that length, so an overrun would silently cut the last beats, and with them things the card promises. Fails, too, if they ended more than 1.5 seconds short of it. Otherwise it holds the last frame until the promised length, then trims normalized source timestamps to that fixed manifest length (never variable wall-clock capture time).
-4. Encodes WebM (VP9, CRF 52) and MP4 (H.264, CRF 37) at the chapter's frame rate (12 fps where ▶ plays a ball in flight, 10 elsewhere), and the poster from a screenshot taken at the chapter's chosen moment.
+4. Encodes WebM (VP9, CRF 53) and MP4 (H.264, CRF 38) at the chapter's frame rate (12 fps where ▶ plays a ball in flight, 10 elsewhere), and the poster from a screenshot taken at the chapter's chosen moment.
 5. Probes each file: exactly one video stream, no audio, 576×720, the expected codec, 6–12 seconds, and more than 1 KB.
 6. Moves the three files into the output directory together, from a staging directory, only after every check passes.
 
@@ -247,10 +247,10 @@ The recorder runs the commands below after a successful capture. They remain her
 
 ```sh
 ffmpeg -y -i raw-capture.webm -an -vf "trim=start=LEAD:duration=SECONDS,setpts=PTS-STARTPTS,fps=FPS,scale=576:720:flags=lanczos" \
-  -c:v libvpx-vp9 -crf 52 -b:v 0 SLUG.webm
+  -c:v libvpx-vp9 -crf 53 -b:v 0 SLUG.webm
 
 ffmpeg -y -i raw-capture.webm -an -vf "trim=start=LEAD:duration=SECONDS,setpts=PTS-STARTPTS,fps=FPS,scale=576:720:flags=lanczos" \
-  -c:v libx264 -crf 37 -preset slow -pix_fmt yuv420p -movflags +faststart SLUG.mp4
+  -c:v libx264 -crf 38 -preset slow -pix_fmt yuv420p -movflags +faststart SLUG.mp4
 
 ffmpeg -y -i poster-frame.png -frames:v 1 -vf "scale=576:720:flags=lanczos" \
   -c:v libwebp -q:v 72 SLUG.webp
