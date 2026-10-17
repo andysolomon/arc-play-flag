@@ -18,7 +18,7 @@ import { isContext, shown } from "@/lib/play/reducer";
 import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import { atSnap, motionPoint } from "@/lib/play/pre-snap";
-import { crowdNote, crowding, freeSnap, freeSpot, stepPast, teammates } from "@/lib/play/spacing";
+import { crowdNote, crowding, freeSnap, freeSpot, stepPast, teammates, type Mate } from "@/lib/play/spacing";
 import { motionGeom } from "@/lib/play/geometry";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pair, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
@@ -89,7 +89,7 @@ interface Drag {
   last: { x: number; y: number } | null;
   /** the player's tag, and their teammates where they stand, whom they are held clear of (lib/play/spacing.ts) */
   name: string;
-  mates: Player[];
+  mates: Mate<Player>[];
   /** where the player is drawn now, which a finger on a teammate's centre keeps them beside */
   at: { x: number; y: number };
   /** the teammates the coach has been told the player is kept off: each once a drag */
