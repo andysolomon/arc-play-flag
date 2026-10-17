@@ -37,6 +37,8 @@ interface Props {
    * quarterback or the centre and does not carry the ball in a lateral chain. Nobody else is offered the tile.
    */
   jet: boolean;
+  /** the selected player is the quarterback: they hand the ball off, so the Handoff tile is not theirs */
+  quarterback: boolean;
   hint: string | null;
   onPick: (key: RouteType) => void;
   onMotion: () => void;
@@ -82,7 +84,7 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, quarterback, hint, onPick, onMotion, onRemoveMotion,
   onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
@@ -102,7 +104,10 @@ function RouteSidebarImpl({
   // offense splits into the passing tree and the run game; defense is one list. A carrier gets no pass route
   const keys: readonly RouteType[] = sel?.team === "offense" ? (hasBall ? [] : PASS_KEYS) : DEFENSE_KEYS;
   // the jet sweep is a handoff at the snap: only for a player who can take one, never a keep after a lateral
-  const runKeys: readonly RouteType[] = sel?.team === "offense" ? RUN_KEYS.filter((k) => k !== "jet" || (jet && !hasBall)) : [];
+  // and a handoff is to someone else: the quarterback keeps, sweeps or laterals, but never hands off to themself
+  const runKeys: readonly RouteType[] = sel?.team === "offense"
+    ? RUN_KEYS.filter((k) => (k !== "jet" || (jet && !hasBall)) && (k !== "handoff" || !quarterback))
+    : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
   // the read is someone the final throw goes to, never a player the ball is lateraled through
   const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));

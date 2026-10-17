@@ -28,7 +28,7 @@ export const ROUTES: Record<OffenseRouteType, RouteDef> = {
   drag:    { label: "Drag",    pts: [[0, 0], [0, -2], [-12, -3]],             end: "arrow" },
   wheel:   { label: "Wheel",   pts: [[0, 0], [5, -1], [7, -5], [7, -15]],     end: "arrow" },
   custom:  { label: "Custom",  pts: null,                                     end: "arrow" },
-  handoff: { label: "Handoff", pts: [[0, 0], [-3, 1.4], [-3.4, -1], [-2, -5]], end: "arrow", run: true },
+  handoff: { label: "Handoff", pts: null, end: "arrow", run: true },
   dive:    { label: "Dive",    pts: null, end: "arrow", run: true },
   stretch: { label: "Stretch", pts: null, end: "arrow", run: true },
   counter: { label: "Counter", pts: null, end: "arrow", run: true },
@@ -48,6 +48,8 @@ export function runLegs(type: RouteType, qx: number, qy: number, side: number): 
     case "stretch": return [[qx + side * 1, qy - 0.2], [qx + side * 8, qy - 2.5], [qx + side * 11, -5]];
     case "counter": return [[qx - side * 1.6, qy + 0.2], [qx + side * 3.5, qy - 2.5], [qx + side * 4.5, -5]];
     case "reverse": return [[qx + side * 0.4, qy + 1], [qx - side * 9, qy - 0.5], [qx - side * 12, -5]];
+    // the plain handoff bends off the quarterback's hip and out, so it reads apart from the dive
+    case "handoff": return [[qx + side * 1, qy - 0.2], [qx + side * 3.6, qy - 2.4], [qx + side * 5, -5]];
     default:        return [[qx + side * 1, qy - 0.3], [qx + side * 1.6, -5]];
   }
 }
