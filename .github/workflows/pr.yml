@@ -206,6 +206,14 @@ jobs:
           path: test-results/roster-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload the roster pictures and sheets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: depth-chart
+          path: test-results/depth-chart-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the lateral chains
         if: always()
         uses: actions/upload-artifact@v4
