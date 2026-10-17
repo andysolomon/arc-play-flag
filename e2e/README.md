@@ -28,6 +28,8 @@ First time only: `bunx playwright install chromium`.
 
 Pre-snap motion is covered by `pre-snap-motion.journey.ts`: draw and clamp the path, keep the route, undo/redo, save/reload, hold the ball and formation during motion, then snap and run, flip, snapshot sharing, redraw/cancel, transfer, removal, and play-file export/import on another device. Its per-test screenshots, manifest and exported JSON are uploaded as `pre-snap-motion`.
 
+`man-los.journey.ts` reads the rendered defender positions throughout playback: man coverage stays on the defensive side of the LOS while covering a stationary or retreating receiver, on a pass, a play-action fake and a QB keeper. A completed handoff or jet-sweep handoff lets the defenders cross; the exchange timing includes pre-snap motion and the play's chosen ball spot. Downfield man coverage and an assigned blitzer still run. Each case leaves a `man-los-<device>-<case>.json` position trace and screenshot, uploaded as `man-los`.
+
 | Journey | File |
 | --- | --- |
 | Name, draw, save, reload, reopen; failed save → warning, recovery file, retry | `save-and-reopen` |

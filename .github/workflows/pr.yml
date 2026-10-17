@@ -95,6 +95,14 @@ jobs:
           path: test-results/man-coverage-*
           retention-days: 7
           if-no-files-found: warn
+      - name: Upload man coverage LOS playback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: man-los
+          path: test-results/man-los-*
+          retention-days: 7
+          if-no-files-found: warn
       - name: Upload the end zones
         if: always()
         uses: actions/upload-artifact@v4

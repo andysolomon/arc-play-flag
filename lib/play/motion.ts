@@ -1,6 +1,6 @@
 import { fakeOf, quarterback, routeYards } from "./geometry";
 import { centre, chainLinks, runsBefore, type Link } from "./lateral";
-import { DELAY, SPEED, isBallJob, isQbAction, isRun } from "./routes";
+import { DELAY, LOS_GAP, SPEED, isBallJob, isQbAction, isRun } from "./routes";
 import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
@@ -541,6 +541,13 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
     const tr = m.tracks[p.id];
     if (p.team === "offense") pos[p.id] = tr ? along(tr, s) : { x: p.x, y: p.y };
   }
+  // Man coverage cannot enter the backfield until a real handoff is complete. A snap,
+  // keeper, fake or lateral is not that exchange. Times include any pre-snap motion.
+  const handoff = m.kind === "run" && m.runner !== null && m.runner !== m.qb && m.laterals.length === 0
+    ? m.handAt + m.handFor : Infinity;
+  // Leave the line at running speed after the exchange, rather than jumping to the
+  // receiver's backfield spot on the first released frame.
+  const manLimit = -LOS_GAP + Math.max(0, t - handoff) * SPEED;
   for (const p of players) {
     if (p.team === "offense") continue;
     const tr = m.tracks[p.id];
@@ -552,7 +559,8 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
       // close on the receiver's starting spot, then stick with them wherever they go
       const closing = tr.len > 0 ? cl((s * SPEED) / tr.len, 0, 1) : 1;
       // trailing a deep route, they stop where a drag would, short of the card's top (the end line near their goal)
-      pos[p.id] = { x: here.x + (now.x - target.x) * closing, y: Math.max(m.top + 1.2, here.y + (now.y - target.y) * closing) };
+      pos[p.id] = { x: here.x + (now.x - target.x) * closing,
+        y: Math.min(manLimit, Math.max(m.top + 1.2, here.y + (now.y - target.y) * closing)) };
     } else {
       pos[p.id] = here;
     }
