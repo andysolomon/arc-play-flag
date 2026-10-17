@@ -3,7 +3,7 @@ import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { LOS_YARD, readLos } from "@/lib/play/field";
 import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, lateralArcs, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
-import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
+import { INK as ROUTE_INK, routeDef, routeName } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 
@@ -236,8 +236,9 @@ function routeLabel(
   const rt = p.route;
   if (!rt || rt.type === "custom") return null;
   const def = routeDef(p.team, rt.type);
-  if (!def) return null;
-  if (zone) return { x: onField(zone.cx, "middle", def.label), y: zone.cy + zone.ry - 8, text: def.label, anchor: "middle" };
+  const name = routeName(p.team, rt);
+  if (!def || !name) return null;
+  if (zone) return { x: onField(zone.cx, "middle", name), y: zone.cy + zone.ry - 8, text: name, anchor: "middle" };
   const abs = routeYards(p, players, top);
   if (!abs || abs.length < 2) return null;
   const a = abs[abs.length - 2], b = abs[abs.length - 1];

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 /**
  * Clerk reads its session cookie on every request so `auth()` can answer in the account API
- * (docs/adr/010-coach-accounts.md). Without Clerk's keys (a fork, the browser journeys) every
+ * (docs/adr/011-coach-accounts.md). Without Clerk's keys (a fork, the browser journeys) every
  * request passes straight through and the fixture or nothing signs coaches in.
  */
 const clerk = !!process.env.CLERK_SECRET_KEY && !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

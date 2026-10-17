@@ -1,5 +1,5 @@
 /**
- * The device's side of a coach's account (docs/adr/010-coach-accounts.md): the plays, playbooks,
+ * The device's side of a coach's account (docs/adr/011-coach-accounts.md): the plays, playbooks,
  * team settings and lineups on this device mirror one of the account's teams, and every write to
  * them goes up to that team; another device signed in to the account brings them down. The library
  * (lib/play/library.ts) and storage are unchanged: this engine reads what they wrote and writes

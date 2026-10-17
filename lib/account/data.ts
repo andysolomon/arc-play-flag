@@ -63,7 +63,7 @@ export function hasWork(data: TeamData): boolean {
 }
 
 /**
- * Two devices' versions of one team as one (ADR 010, A8): every play and book from both, this device's
+ * Two devices' versions of one team as one (ADR 011, A8): every play and book from both, this device's
  * version of any it also has, in the account's order with this device's additions after; the team's
  * settings and lineups are this device's, since they are what the coach last touched here.
  */

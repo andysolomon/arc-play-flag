@@ -1,6 +1,6 @@
 # Coach accounts: Clerk setup
 
-Accounts ([ADR 010](../adr/010-coach-accounts.md)) sign coaches in through [Clerk](https://clerk.com) and keep each coach's teams in the same Upstash Redis the share links use ([sharing runbook](sharing.md)). Without Clerk's keys the app says sign-in isn't set up and works on the device as before, so a fork or a preview deploys fine without them.
+Accounts ([ADR 011](../adr/011-coach-accounts.md)) sign coaches in through [Clerk](https://clerk.com) and keep each coach's teams in the same Upstash Redis the share links use ([sharing runbook](sharing.md)). Without Clerk's keys the app says sign-in isn't set up and works on the device as before, so a fork or a preview deploys fine without them.
 
 ## Configure Clerk
 

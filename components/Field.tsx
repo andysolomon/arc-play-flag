@@ -7,8 +7,8 @@ import {
 import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from "@/lib/deepfield";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
-import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
-import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, rosterDepth, snap } from "@/lib/play/geometry";
+import { LOS_YARD } from "@/lib/play/field";
+import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, rosterDepth, snap } from "@/lib/play/geometry";
 import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
@@ -216,14 +216,17 @@ function FieldImpl({
     };
   }), [players, live, liveWaypoint, liveCatch, liveRelease]);
   // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
-  // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
+  // so drawing a custom route (a tap can't land past the card's top) opens the deepest card, 37 yards on;
+  // Deep field opens the field to the end line, further than a tall phone's card reaches from the drive start;
   // pre-snap motion stays in the backfield, so drawing it leaves the card as it is;
   // roster mode's formation stands still, so its card frames just the formation and Deep field is the plays' alone
+  const designing = !readOnly && !roster;
   const fit = roster ? rosterDepth(effective) : depth(effective, pane, MIN_DEPTH, los);
-  const deepest = depth(effective, pane, MAX_DEPTH, los);
-  const d = !readOnly && !roster && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
+  const endLine = depth(effective, pane, FULL_DEPTH, los, FULL_DEPTH);
+  const drawing = draft !== null && draft.kind !== "motion";
+  const d = !designing ? fit : deepField ? endLine : drawing ? depth(effective, pane, MAX_DEPTH, los) : fit;
   // offered only where it shows more field, and not while anything is being drawn
-  const offerDeep = !readOnly && !roster && draft === null && deepest > fit;
+  const offerDeep = designing && draft === null && endLine > fit;
   const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;
   const width = cardWidth(pane, d);
@@ -709,6 +712,7 @@ function FieldImpl({
         {title !== undefined && showTitle && (
           <div id={FIELD_TITLE_ID} className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
             <h1 className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
+            {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
             {status !== undefined && (
               <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
                 {status}
@@ -746,13 +750,7 @@ function FieldImpl({
             onClick={() => { setDeepField(!deepField); }}
             aria-pressed={deepField}
             data-active={deepField}
-            title={
-              deepField
-                ? "Fit the field to the play"
-                : deepest >= 8 + GOAL_YARD + END_ZONE_YARDS - los
-                  ? "Show the field to the end line"
-                  : `Show ${String(deepest - 8)} yards downfield`
-            }
+            title={deepField ? "Fit the field to the play" : "Show the field to the end line"}
             className={
               `${pillSm} absolute right-3 top-3 z-10 shadow-tile data-[active=true]:bg-yellow data-[active=true]:on-yellow ` +
               "data-[active=true]:hover:bg-yellow print:hidden"

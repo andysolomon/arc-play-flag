@@ -12,7 +12,7 @@ import { IconTile, LinkTile } from "./IconTile";
 import { PlaybookTile } from "./PlaybookTile";
 import { PlayNameField } from "./PlayNameField";
 import { Support } from "./Support";
-import { TeamFields } from "./TeamFields";
+import { TeamColorName, TeamColorPicker, TeamNameField } from "./TeamFields";
 import { AccountPanel, TeamNote } from "./account/AccountPanel";
 import { ThemeName, ThemePicker } from "./ThemePicker";
 import { divider, eyebrow, pill, select, tileGrid } from "./ui";
@@ -227,7 +227,7 @@ function PlaySidebarImpl({
         />
       </div>
       <span className="flex-none text-caption leading-note text-ink-muted">
-        Tap a position on the field and set who plays it, starter first. Kept on this device, never in a play, a link or a printout.
+        Tap a position on the field and set who plays it, starter first. Kept on this device, never in a play, a link or a play&apos;s printout.
       </span>
       <label className={`flex min-h-11 flex-none items-center gap-2 text-small ${rostered ? "cursor-pointer" : "text-ink-muted"}`}>
         <input
@@ -264,8 +264,12 @@ function PlaySidebarImpl({
       <AccountPanel />
       <span className={divider} />
       <span className={eyebrow}>TEAM</span>
-      <TeamFields team={team} onTeam={onTeam} />
+      <TeamNameField team={team} onTeam={onTeam} />
       <TeamNote />
+      <span className={divider} />
+      <Fold label="Team color" says={<TeamColorName color={team.color} />}>
+        <TeamColorPicker team={team} onTeam={onTeam} legend={false} />
+      </Fold>
       <span className={divider} />
       <Fold label="Theme" says={<ThemeName />}>
         <ThemePicker className="flex-none" unlockHref="/playbooks" />

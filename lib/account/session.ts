@@ -2,7 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import type { AccountMode, AccountUser } from "./types";
 
 /**
- * Who is signed in, on the server (docs/adr/010-coach-accounts.md). Clerk when its keys are set;
+ * Who is signed in, on the server (docs/adr/011-coach-accounts.md). Clerk when its keys are set;
  * else, for the browser journeys only, two fictional coaches picked on the sign-in page and
  * remembered in a cookie. The fixture never runs on Vercel, whatever the variables say.
  */

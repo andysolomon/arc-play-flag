@@ -10,7 +10,7 @@ export interface AccountUser {
 
 /**
  * Everything a team keeps in the account: what a device backup carries (lib/export/backup.ts), less
- * the draft and the playbook picked in the designer, which stay the device's (ADR 010, A16).
+ * the draft and the playbook picked in the designer, which stay the device's (ADR 011, A16).
  */
 export interface TeamData {
   plays: SavedPlay[];

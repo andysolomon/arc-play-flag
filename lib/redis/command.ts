@@ -1,6 +1,6 @@
 /**
  * The server's one connection to Redis: the REST adapter the share links use (docs/runbook/sharing.md),
- * now shared with the accounts (docs/adr/010-coach-accounts.md). Credentials are read on the server
+ * now shared with the accounts (docs/adr/011-coach-accounts.md). Credentials are read on the server
  * only and never reach a client component.
  */
 

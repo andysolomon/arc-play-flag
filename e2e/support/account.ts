@@ -4,7 +4,7 @@ import { MARKER_KEY, type Marker } from "../../lib/account/sync";
 import type { AccountResponse, TeamRecord } from "../../lib/account/types";
 
 /**
- * The account as a coach drives it (docs/adr/010-coach-accounts.md): the fixture coaches' sign-in
+ * The account as a coach drives it (docs/adr/011-coach-accounts.md): the fixture coaches' sign-in
  * page, the account panel in Play tools, and what the account API says. A run id keeps each test's
  * account apart from every other's, in the disposable Redis behind the test adapter.
  */
@@ -23,7 +23,7 @@ export async function openPanel(page: Page): Promise<void> {
 }
 
 /**
- * Runs an action that ends in a full page load (a sign-in, a switch of team, a sign-out: ADR 010, A17)
+ * Runs an action that ends in a full page load (a sign-in, a switch of team, a sign-out: ADR 011, A17)
  * and returns once the new document is there, so nothing is read off the old one.
  */
 export async function reloadedBy(page: Page, action: () => Promise<void>): Promise<void> {

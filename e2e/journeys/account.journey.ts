@@ -5,7 +5,7 @@ import { accountView, expectSaved, marker, openPanel, panel, reloadedBy, runId, 
 import { KEYS, OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed, storedPlays, storedTeam } from "../support/fixtures";
 
 /**
- * A coach's account (docs/adr/010-coach-accounts.md): sign in with the fixture coaches, the device's
+ * A coach's account (docs/adr/011-coach-accounts.md): sign in with the fixture coaches, the device's
  * work becomes a team, a second device signed in to the account gets it, a team is one of several,
  * two devices' changes merge instead of overwriting, and signing out clears the device. How this
  * could break, and the test that catches each:
