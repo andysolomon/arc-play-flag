@@ -67,6 +67,10 @@ export interface QbInfo {
     fake: string | null;
     /** the call is a run: they hand off and carry it out as a decoy */
     decoy: boolean;
+    /** someone has a route to throw to, so marking them as the read makes it a pass again */
+    receivers: boolean;
+    /** what turns a boot the other way: Flip play, ⇄ Mirror on the fake's run when flipping doesn't (Q11), or neither */
+    turn: "flip" | "mirror" | null;
   } | null;
 }
 
@@ -74,13 +78,19 @@ export interface QbInfo {
 function qbWords(name: string, act: NonNullable<QbInfo["act"]>): string {
   const way = act.side > 0 ? "right" : "left", other = act.side > 0 ? "left" : "right";
   const verb = act.type === "rollout" ? `rolls out ${way}` : `boots ${way}`;
-  if (act.decoy) return `${name} hands off to ${act.fake ?? "the runner"}, then ${verb} as a decoy. To throw instead, mark a receiver as the read.`;
+  if (act.decoy) {
+    const instead = act.receivers ? "mark a receiver as the read" : "give a receiver a route";
+    return `${name} hands off to ${act.fake ?? "the runner"}, then ${verb} as a decoy. To throw instead, ${instead}.`;
+  }
   if (act.type === "rollout") {
     const first = act.fake ? `fakes to ${act.fake} first, then rolls out ${way}` : `takes the snap and rolls out ${way}`;
     return `${name} ${first}, behind the line, to throw from the ring. ⇄ Mirror route rolls ${other}.`;
   }
   if (!act.fake) return `Nothing to fake yet: give a back a run, and ${name} fakes it first, then boots the other way. For now ${name} boots ${way}.`;
-  return `${name} fakes the handoff to ${act.fake}, then boots out the other way, to the ${way}, to throw from the ring. Flip the play to boot ${other}, or pick Rollout to go with the fake.`;
+  const turn = act.turn === "flip" ? `Flip the play to boot ${other}` : act.turn === "mirror" ? `⇄ Mirror ${act.fake}'s run to boot ${other}` : `Move ${act.fake} to boot ${other}`;
+  // a rollout goes right unless mirrored, so it goes with a fake to the right as it is, and mirrored with one to the left
+  const roll = act.side < 0 ? "pick Rollout to go with the fake" : "pick Rollout and ⇄ Mirror it to go with the fake";
+  return `${name} fakes the handoff to ${act.fake}, then boots out the other way, to the ${way}, to throw from the ring. ${turn}, or ${roll}.`;
 }
 
 export interface BlitzInfo {

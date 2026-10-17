@@ -86,6 +86,16 @@ async function ringAt(d: Designer): Promise<Pt> {
   return { x: Number(cx) / S, y: Number(cy) / S + (await topOf(d)) };
 }
 
+/** The tips of the arrowheads drawn on the field, in yards. */
+async function arrowTips(d: Designer): Promise<Pt[]> {
+  const top = await topOf(d);
+  const points = await d.field.locator("polygon").evaluateAll((els) => els.map((el) => el.getAttribute("points") ?? ""));
+  return points.flatMap((p) => {
+    const m = /^([-\d.]+),([-\d.]+)/.exec(p);
+    return m?.[1] && m[2] ? [{ x: Number(m[1]) / S, y: Number(m[2]) / S + top }] : [];
+  });
+}
+
 /** The drawn route that ends at the ring, in yards: the QB's. Its stroke starts a step out from the token. */
 async function qbPath(d: Designer): Promise<Pair[]> {
   const ring = await ringAt(d);
@@ -292,12 +302,12 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   await d.pick("Go");
   await expect.poll(() => offense(page)).toMatchObject({ QB: { type: "boot" }, Z: { type: "dive" }, Y: { type: "drag", primary: true } });
   await d.select("QB");
-  await expect(qbNote(page)).toContainText("fakes the handoff to Z");
-  await expect(qbNote(page)).toContainText("left");
+  await expect(qbNote(page)).toContainText("fakes the handoff to Z, then boots out the other way, to the left");
+  await expect(qbNote(page)).toContainText("Flip the play to boot right, or pick Rollout to go with the fake.");
   await d.closeSidebars();
   const drawn = await qbPath(d);
   expectLegs(drawn, BOOT_LEFT);
-  await expect(d.field.locator("desc")).toContainText("boots");
+  await expect(d.field.locator("desc")).toContainText("fakes the handoff to Z, then boots left");
   await page.screenshot({ path: `${out(info, "boot")}-drawn.png` });
 
   // ▶: the QB fakes from their spot while the ball dips to Z and back, then boots left with it and throws to Y
@@ -350,9 +360,14 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   await expect.poll(() => offense(page)).toMatchObject({ Z: { type: "dive", primary: true }, QB: { type: "boot" } });
   await expect(d.field.locator("[data-no-run-flag]")).toHaveCount(1);
   await d.closeSidebars();
-  // the QB throws nothing now: the decoy ends in an arrow, not the ring
+  // the QB throws nothing now: the decoy ends in an arrowhead where the ring was, not the ring
   await expect(d.field.locator("circle[data-set]")).toHaveCount(0);
-  await expect(d.field.locator("desc")).toContainText("as a decoy");
+  const decoyTip = (await arrowTips(d)).find((t) => dist(t, ring) < 0.15);
+  expect(decoyTip, "an arrowhead at the end of the decoy").toBeDefined();
+  await expect(d.field.locator("desc")).toContainText("hands off to Z, then boots left as a decoy");
+  await d.select("QB");
+  await expect(qbNote(page)).toContainText("hands off to Z, then boots left as a decoy. To throw instead, mark a receiver as the read.");
+  await d.closeSidebars();
   await page.screenshot({ path: `${out(info, "boot")}-decoy.png` });
 
   // a run now: Z takes the handoff at the mesh, then the QB carries out the boot without the ball
@@ -379,6 +394,13 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
   await expect(group(page, "Quarterback")).toHaveCount(0);
   await expect.poll(async () => (await offense(page)).QB).toBeNull();
   const afterLateral = await offense(page);
+  // and the QB taking it back (QB → X → QB) is a carrier: no QB group for their second time with the ball
+  await d.pick("Lateral");
+  await d.foldOverlays();
+  await d.field.getByRole("button", { name: "Offense QB, can take the lateral", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "QB has it again" })).toBeVisible();
+  await expect(group(page, "Quarterback")).toHaveCount(0);
+  await d.undo.click();
   await d.undo.click();
   await expect.poll(async () => (await offense(page)).QB).toEqual({ type: "boot" });
   await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o2")?.laterals).toBeUndefined();
@@ -387,7 +409,7 @@ test("a boot: the QB fakes the dive to Z, then boots out the other way to throw"
     project: info.project.name, naked, drawn, ring, flipped,
     plan: { snapAt: m.snapAt, handAt: m.handAt, throwAt: m.throwAt, catchAt: m.catchAt, dur: m.dur },
     fake, sold, launch, caught,
-    decoyPlan: { kind: r.kind, handAt: r.handAt, handFor: r.handFor, dur: r.dur }, handed, decoy,
+    decoyPlan: { kind: r.kind, handAt: r.handAt, handFor: r.handFor, dur: r.dur }, decoyTip, handed, decoy,
     coin, afterLateral, afterUndo: await offense(page),
   }, null, 2)}\n`);
 });
@@ -409,7 +431,7 @@ test("a boot fakes to the first runner to reach the QB, flips with the play, and
   await d.select("QB");
   await d.pick("Boot");
   await d.palette();
-  await expect(qbNote(page)).toContainText("fakes the handoff to Z");
+  await expect(qbNote(page)).toContainText("fakes the handoff to Z, then boots out the other way, to the left");
   await d.closeSidebars();
   const drawn = await qbPath(d);
   expectLegs(drawn, BOOT_LEFT);
@@ -419,8 +441,11 @@ test("a boot fakes to the first runner to reach the QB, flips with the play, and
   // flipped, X lines up on the right and Z on the left: still Z first, so the boot turns right and keeps its fake
   await d.clickTool("Flip play");
   await d.select("QB");
-  await expect(qbNote(page)).toContainText("fakes the handoff to Z");
+  // a Rollout goes right as it is, so with a fake to the left it has to be mirrored to go with it
+  await expect(qbNote(page)).toContainText("fakes the handoff to Z, then boots out the other way, to the right");
+  await expect(qbNote(page)).toContainText("Flip the play to boot left, or pick Rollout and ⇄ Mirror it to go with the fake.");
   await d.closeSidebars();
+  await expect(d.field.locator("desc")).toContainText("fakes the handoff to Z, then boots right");
   const flipped = await qbPath(d);
   expectLegs(flipped, BOOT_RIGHT);
   const after = await plan(d);
@@ -447,6 +472,13 @@ test("a boot fakes to the first runner to reach the QB, flips with the play, and
   expect(dist(launch.ball, launch.QB)).toBeLessThan(0.3);
   await page.screenshot({ path: `${out(info, "two-runners")}-under-centre.png` });
   await finish(d, m, clock);
+
+  // Z lined up straight behind the QB dives to the right flipped or not, so Flip play can't turn the boot: Mirror on the dive does
+  await dragToken(d, "Z", [15, 6]);
+  await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o5")).toMatchObject({ x: 15, y: 6 });
+  await d.select("QB");
+  await expect(qbNote(page)).toContainText("to the left");
+  await expect(qbNote(page)).toContainText("⇄ Mirror Z's run to boot right");
 
   writeFileSync(`${out(info, "two-runners")}.json`, `${JSON.stringify({
     project: info.project.name, drawn, flipped, under, ring,

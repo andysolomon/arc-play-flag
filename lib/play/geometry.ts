@@ -180,12 +180,16 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
 /** The card a fake is read on: the deepest, so a run's shape near the quarterback never depends on the card. */
 const FAR_TOP = Y_MIN - 2;
 
+/** How near a runner comes to the quarterback to take a handoff or a fake: every run's mesh is about a yard off them. */
+const MESH_REACH = 1.5;
+
 /**
- * How a run passes the quarterback standing at `q`: how long after the snap they are closest to them (a Delay
- * counting its wait), and how far across the field from the quarterback the rest of their path lies on
- * average, measured along it from there (+ is the quarterback's right).
+ * How a run passes the quarterback standing at `q`: how long after the snap they first come within reach of
+ * them (a Delay counting its wait; never, for one that only runs away or stands still), how near they come,
+ * and how far across the field from the quarterback the rest of their path lies on average, measured along it
+ * from their closest approach (+ is the quarterback's right).
  */
-function passOf(p: Player, players: readonly Player[], q: Pt): { at: number; lean: number } {
+function passOf(p: Player, players: readonly Player[], q: Pt): { at: number; gap: number; lean: number } {
   const path = routeYards(p, players, FAR_TOP) ?? [];
   const legs: { a: Pair; b: Pair; len: number }[] = [];
   for (let i = 1; i < path.length; i++) {
@@ -204,11 +208,12 @@ function passOf(p: Player, players: readonly Player[], q: Pt): { at: number; lea
     }
     return path[0] ?? [q.x, q.y];
   };
-  let closest = 0, gap = Infinity;
+  let closest = 0, gap = Infinity, reach = Infinity;
   for (let d = 0; d <= total + 0.05; d += 0.1) {
     const at = along(Math.min(d, total));
     const g = Math.hypot(at[0] - q.x, at[1] - q.y);
     if (g < gap) { gap = g; closest = Math.min(d, total); }
+    if (g <= MESH_REACH && reach === Infinity) reach = Math.min(d, total);
   }
   let sum = 0, n = 0;
   for (let d = closest; d <= total + 0.05; d += 0.1) {
@@ -216,14 +221,16 @@ function passOf(p: Player, players: readonly Player[], q: Pt): { at: number; lea
     n++;
   }
   const wait = p.route?.type === "delay" ? DELAY : 0;
-  return { at: wait + closest / SPEED, lean: (n ? sum / n : path[path.length - 1]?.[0] ?? q.x) - q.x };
+  return { at: wait + reach / SPEED, gap, lean: (n ? sum / n : path[path.length - 1]?.[0] ?? q.x) - q.x };
 }
 
 /**
  * The runner a rollout or boot fakes to, or hands off to when the call is a run (docs/adr/010-qb-rollout-and-boot.md,
- * rule 5): the read when it is a run, else whoever reaches the quarterback first after the snap (a jet sweep first
- * of all, since it is already crossing), ties to the play's own order. Read from where everyone stands at the
- * snap, so the field, the words and playback agree (Q5, Q14), and Flip play never changes who it is (Q19).
+ * rule 5): the read when it is a run, else whoever first comes within reach of the quarterback after the snap (a
+ * jet sweep first of all, since it is already crossing), then any who never do, nearest first (one standing
+ * still or running away is never ahead of a back who meshes, Q21), ties to the play's own order. Read from where
+ * everyone stands at the snap, so the field, the words and playback agree (Q5, Q14), and Flip play never changes
+ * who it is (Q19).
  */
 export function fakeOf(players: readonly Player[]): Player | undefined {
   const qb0 = quarterback(players);
@@ -232,10 +239,12 @@ export function fakeOf(players: readonly Player[]): Player | undefined {
   const read = runners.find((p) => p.route?.primary);
   if (read) return read;
   const q = atSnap(qb0);
-  let best: Player | undefined, first = Infinity;
+  let best: Player | undefined, first = Infinity, nearest = Infinity;
   for (const r of runners) {
-    const at = r.route?.type === "jet" ? -Infinity : passOf(r, players, q).at;
-    if (!best || at < first) { best = r; first = at; }
+    const pass = r.route?.type === "jet" ? { at: -Infinity, gap: 0 } : passOf(r, players, q);
+    if (!best || pass.at < first || (pass.at === Infinity && first === Infinity && pass.gap < nearest)) {
+      best = r; first = pass.at; nearest = pass.gap;
+    }
   }
   return best;
 }

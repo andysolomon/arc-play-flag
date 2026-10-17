@@ -467,17 +467,7 @@ function reduce(s: PlayState, a: Action): PlayState {
     }
     case "flip": {
       const c = commit(s);
-      return {
-        ...c,
-        players: c.players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
-          ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
-          // every lateral's catch, and the run before a pitch, flip with the field (R13, P7)
-          ...(p.laterals ? { laterals: p.laterals.map((h): Hop => ({
-            ...h,
-            ...(h.catch ? { catch: [30 - h.catch[0], h.catch[1]] as const } : {}),
-            ...(h.release ? { release: [30 - h.release[0], h.release[1]] as const } : {}),
-          })) } : {}) })),
-      };
+      return { ...c, players: flipped(c.players) };
     }
     case "clearRoutes": {
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
@@ -557,6 +547,22 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (a.on) return { ...s, artShadow: true, shadowForArt: s.vis !== "both", vis: "both" };
       return withVis({ ...s, artShadow: false, shadowForArt: false }, s.shadowForArt ? s.side : s.vis);
   }
+}
+
+/**
+ * The players as Flip play leaves them, mirrored across the field (x → 30 - x): every spot, route, pre-snap
+ * motion, lateral catch and run before a pitch (R13, P7). The palette asks it too, to say whether flipping
+ * turns a boot (docs/adr/010-qb-rollout-and-boot.md, Q11).
+ */
+export function flipped(players: readonly Player[]): Player[] {
+  return players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
+    ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
+    // every lateral's catch, and the run before a pitch, flip with the field (R13, P7)
+    ...(p.laterals ? { laterals: p.laterals.map((h): Hop => ({
+      ...h,
+      ...(h.catch ? { catch: [30 - h.catch[0], h.catch[1]] as const } : {}),
+      ...(h.release ? { release: [30 - h.release[0], h.release[1]] as const } : {}),
+    })) } : {}) }));
 }
 
 /** Route definition for the selected player's current route, if any. */

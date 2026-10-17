@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { editedVisit, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
+import { editedVisit, flipped, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
@@ -21,7 +21,7 @@ import {
 } from "@/lib/play/library";
 import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { mirrorRoute, routeDef } from "@/lib/play/routes";
+import { isBallJob, isRun, mirrorRoute, mirrorable, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
@@ -487,7 +487,16 @@ export function App() {
     const act = qbAction(s.players);
     if (!act) return { act: null };
     const who = names({ players: s.players });
-    return { act: { type: act.type, side: act.side, fake: act.fake ? who.get(act.fake.id) ?? null : null, decoy: act.decoy } };
+    const receivers = s.players.some((p) => p.team === "offense" && p.id !== act.qb.id && p.route && !isRun(p.route.type) && !isBallJob(p.route.type));
+    // what turns a boot: Flip play, unless the fake goes the same way flipped (a runner lined up on the QB's x), then
+    // ⇄ Mirror on the fake's run, each tried on the play as it would be (docs/adr/010-qb-rollout-and-boot.md, Q11)
+    const turns = (players: readonly Player[]): boolean => qbAction(players)?.side === -act.side;
+    const fake = act.fake;
+    const turn = act.type !== "boot" || !fake ? null
+      : turns(flipped(s.players)) ? "flip"
+      : mirrorable(fake) && turns(s.players.map((p) => (p.id === fake.id && p.route ? { ...p, route: mirrorRoute(p.route, atSnap(p).x).route } : p))) ? "mirror"
+      : null;
+    return { act: { type: act.type, side: act.side, fake: fake ? who.get(fake.id) ?? null : null, decoy: act.decoy, receivers, turn } };
   }, [sel, s.players]);
   // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
   const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);

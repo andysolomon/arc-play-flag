@@ -349,7 +349,8 @@ function planAfterSnap(players: readonly Player[], top: number, mode: PlaybackMo
     // the quarterback fakes, or hands off, from where they took the snap, and goes once it is done (Q4); the
     // play then lasts until their rollout or boot does, a decoy's included (Q18)
     if (runner && Number.isFinite(m.handAt)) own.holds = [{ d: 0, until: m.handAt + (isRunPlay ? m.handFor : FAKE) }];
-    run = cl(Object.values(tracks).reduce((n, t) => Math.max(n, endOf(t)), 0), 1, 5);
+    // the quarterback's own track is never cut by the cap, so a decoy behind a late fake reaches its end
+    run = Math.max(cl(Object.values(tracks).reduce((n, t) => Math.max(n, endOf(t)), 0), 1, 5), endOf(own));
     m.dur = run + HOLD;
   }
   if (isRunPlay) {
