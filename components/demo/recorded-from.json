@@ -8,7 +8,7 @@
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
     "components/App.tsx": "2d421ae099d55b734fc8e50de08ba605730ca4553ad4442f7fa44c435955bbfd",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "c66fa35645fc6a35e51d5684704297d456c37aca7619394a0374d5374ce24363",
+    "components/Field.tsx": "afbb6cbe86387ee79a8b8bd36eae2568be60bb7f68283b079562986fa4dc243e",
     "components/FirstUse.tsx": "4964d6e1e2bb4358fc8c09e3041b857b635f64584fbe86e65fe64d4797307b81",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "8c6bd773310a6f3ee62358c5eacf9b6ebc7cd2ad4dfc536c399f38d883ea4a96",
@@ -24,7 +24,7 @@
     "components/PlayThumb.tsx": "41ae4604fbef77e5eb15331141c4eeb293712b5af08b009707a309d86fada0eb",
     "components/Playback.tsx": "1734cea35fadf46e9e5de0a353f821d3b33e5149b19f617de916b000dcd2d116",
     "components/PlaybookTile.tsx": "8e089dcfa65b4cc2ac8747be8af168e5ae1ca2b73bec35c4ce09d4b8f0ee9e37",
-    "components/PlayerToken.tsx": "f5bf11b75532a2cda761c7086c5be439133a68dc1f1ab5c9650930437cf39d49",
+    "components/PlayerToken.tsx": "53b4edafa6c018b9a6f23efb40012846f653a8cf2e862f0ed27dd97f55e32924",
     "components/PlaysMenu.tsx": "86c44717adf9489f343a655a9cc2b10da766a96c98043d9301e7aa870131f65d",
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "19f61a3ac6c4675e5f47318ed9c145dc6684b24a4765c5b291b777c2c60e22ff",
@@ -74,5 +74,12 @@
     "components/playbooks/TwoStep.tsx": "f1d0a7e74811970a9698427d0326deb62b07bbd2212c788b28384f4a742818a2",
     "components/playbooks/TypeFilter.tsx": "a724645016e547988d076fdc1a65563a6003fff810b44b6886e900eaf4c474e0",
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
+  },
+  "restamped": {
+    "reason": "QB under centre: the spot, the C's name above him, the snug tap circles and the held-key note show only with a QB within 1.5 yards of the C, which no chapter's formation has (the closest, the pistol QB, stands 3 yards back); the token's rings ignoring the pointer changes nothing drawn",
+    "files": [
+      "components/Field.tsx (changed)",
+      "components/PlayerToken.tsx (changed)"
+    ]
   }
 }

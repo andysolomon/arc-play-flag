@@ -18,6 +18,11 @@ interface Props {
   /** an arrow step that went nowhere, a teammate in the way (lib/play/spacing.ts): a count, so each press shakes afresh */
   shake?: number;
   dragging: boolean;
+  /**
+   * another player's centre is inside this token's tap circle (a quarterback under centre): the tap circle
+   * shrinks to the disc, so a tap on either label picks that player (lib/play/spacing.ts, U2)
+   */
+  snug?: boolean;
   /** read-only rendering (share page): no handlers, not focusable */
   readOnly?: boolean;
   /** While drawing, taps over a token add path points rather than changing selection. */
@@ -34,6 +39,9 @@ interface Props {
 }
 
 const centred = { transformBox: "fill-box", transformOrigin: "center" } as const;
+/** The token's disc and its tap circle, in the field's units (S a yard). */
+export const DISC_R = 23;
+export const TAP_R = 34;
 
 /** A name's size in the field's units: about 14px on a phone-wide field, so it reads at arm's length on the sideline. */
 const CAPTION_SIZE = 24;
@@ -50,7 +58,7 @@ function captionX(x: number, text: string): number {
 }
 
 function PlayerTokenImpl({
-  player: p, x, y, selected, target, focusOnTarget, boing, shake = 0, dragging, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
+  player: p, x, y, selected, target, focusOnTarget, boing, shake = 0, dragging, snug = false, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
 }: Props) {
   const tokenRef = useRef<SVGGElement>(null);
   useEffect(() => {
@@ -79,13 +87,15 @@ function PlayerTokenImpl({
       <g style={{ ...centred, transform: selected ? "scale(1.1)" : "none" }}>
         <g key={shake} style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : shake ? "animate-shake motion-reduce:animate-none" : undefined}>
           {/* 68 SVG units gives the token an approximately 44px target at the common phone field width. */}
-          <circle r={34} fill="transparent" stroke="none" />
-          {/* keyboard focus shows the same yellow ring as selection */}
-          <circle r={33} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={5} className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
+          <circle r={snug ? DISC_R : TAP_R} fill="transparent" stroke="none" />
+          {/* keyboard focus shows the same yellow ring as selection. Neither ring takes a tap, invisible or not: the
+              tap circle above decides, and a ring reaches a QB-under-centre's C's label (lib/play/spacing.ts, U2) */}
+          <circle r={33} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={5} pointerEvents="none" className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
           {ringR > 0 && (
             <circle
               r={ringR}
               fill="none"
+              pointerEvents="none"
               stroke="#f2b705"
               strokeWidth={5}
               strokeDasharray={target && !selected ? "6 6" : undefined}
@@ -93,7 +103,7 @@ function PlayerTokenImpl({
               className={selected ? "motion-loop animate-pulse-ring" : undefined}
             />
           )}
-          <circle r={23} fill={teamFill(p.team)} stroke="#1b1a17" style={{ fill: teamPaint(p.team), stroke: FIELD.outline }} strokeWidth={2.5} />
+          <circle r={DISC_R} fill={teamFill(p.team)} stroke="#1b1a17" style={{ fill: teamPaint(p.team), stroke: FIELD.outline }} strokeWidth={2.5} />
           {p.label && (
             <text
               y={1}
