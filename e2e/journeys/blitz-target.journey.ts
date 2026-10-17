@@ -66,8 +66,8 @@ async function lineTo(svg: Locator, blitzer: string, target: string): Promise<nu
 
 interface Step {
   step: string;
-  /** which pill was pressed, and what the third one said */
-  pills?: { qb: boolean; backfield: boolean; player: boolean; playerText: string };
+  /** which pill was pressed, and what the last one (Pick a player) said */
+  pills?: { qb: boolean; backfield: boolean; contain: boolean; player: boolean; playerText: string };
   caption?: string;
   arrow: { blitzer: string; target: string; heading: number; toTarget: number; apart: number };
   stored?: Route | null;
@@ -88,7 +88,7 @@ test("a blitz comes for the quarterback, the backfield or the player the coach p
     const pressed = async (l: Locator) => (await l.getAttribute("aria-pressed")) === "true";
     const player = pill(/^(Pick a player|On )/);
     return {
-      qb: await pressed(pill("QB")), backfield: await pressed(pill("Backfield")), player: await pressed(player),
+      qb: await pressed(pill("QB")), backfield: await pressed(pill("Backfield")), contain: await pressed(pill("Contain")), player: await pressed(player),
       playerText: (await player.textContent()) ?? "",
     };
   }
@@ -127,14 +127,14 @@ test("a blitz comes for the quarterback, the backfield or the player the coach p
   await d.select("R", "Defense");
   await d.pick("Blitz");
   let read = await pills();
-  expect(read).toEqual({ qb: true, backfield: false, player: false, playerText: "Pick a player" });
+  expect(read).toEqual({ qb: true, backfield: false, contain: false, player: false, playerText: "Pick a player" });
   await expect(caption).toHaveText(/Comes for the quarterback/);
   await aimedAt(d.field, "R", "Offense QB", "picked Blitz: the quarterback by default", { pills: read, caption: await caption.textContent() ?? "" });
 
   // aimed at the backfield: Z lines up 4 yards off the quarterback, so it comes for Z
   await pill("Backfield").click();
   read = await pills();
-  expect(read).toEqual({ qb: false, backfield: true, player: false, playerText: "Pick a player" });
+  expect(read).toEqual({ qb: false, backfield: true, contain: false, player: false, playerText: "Pick a player" });
   await expect(caption).toHaveText(/nearest back lined up near the ball: Z now/);
   await aimedAt(d.field, "R", "Offense Z", "Backfield: comes for Z, the back beside the quarterback", { pills: read, caption: await caption.textContent() ?? "" });
   await page.locator("#route-sidebar").screenshot({ path: `test-results/blitz-target-${device}-palette.png` });
@@ -163,7 +163,7 @@ test("a blitz comes for the quarterback, the backfield or the player the coach p
   await x.click();
   await expect(d.toast).toBeHidden();
   read = await pills();
-  expect(read).toEqual({ qb: false, backfield: false, player: true, playerText: "On X" });
+  expect(read).toEqual({ qb: false, backfield: false, contain: false, player: true, playerText: "On X" });
   await expect(caption).toHaveText("Comes for X, wherever they line up.");
   await aimedAt(d.field, "R", "Offense X", "Pick a player, X tapped: comes for X", { pills: read, caption: await caption.textContent() ?? "" });
   await d.closeSidebars();
@@ -184,7 +184,7 @@ test("a blitz comes for the quarterback, the backfield or the player the coach p
   await expect(page.getByRole("button", { name: "Offense C, blitz target", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   read = await pills();
-  expect(read).toEqual({ qb: false, backfield: false, player: true, playerText: "On C" });
+  expect(read).toEqual({ qb: false, backfield: false, contain: false, player: true, playerText: "On C" });
   await aimedAt(d.field, "LB", "Offense C", "Pick a player, Enter on C: LB comes for C", { pills: read });
   await pill("On C").click();
   await expect(d.toast).toHaveText("Blitz who? Tap a red player.");
@@ -234,7 +234,7 @@ test("a blitz comes for the quarterback, the backfield or the player the coach p
   await aimedAt(d.field, "LB", "Offense C", "reopened: LB comes for C", { stored: routes.LB });
   await d.select("R", "Defense");
   read = await pills();
-  expect(read).toEqual({ qb: false, backfield: false, player: true, playerText: "On X" });
+  expect(read).toEqual({ qb: false, backfield: false, contain: false, player: true, playerText: "On X" });
 
   // the share link: the snapshot draws the defense and its blitzes still turn to the players they come for
   await d.clickTool("Copy share link");

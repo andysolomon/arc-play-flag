@@ -37,8 +37,8 @@ export type Action =
   | { type: "drawMotion" }
   | { type: "removeMotion" }
   | { type: "target"; id: string }
-  /** the selected blitzer comes for the quarterback or the backfield (lib/play/blitz.ts) */
-  | { type: "blitzAim"; aim: "qb" | "backfield" }
+  /** the selected blitzer comes for the quarterback or the backfield, or contains the quarterback (lib/play/blitz.ts) */
+  | { type: "blitzAim"; aim: "qb" | "backfield" | "contain" }
   /** the selected deep zone called Auto, as a deep half or as a deep third (lib/play/deep.ts) */
   | { type: "deepSplit"; split: DeepSplit | null }
   /** the selected blitzer's Pick a player: like Man, ask who they come for */
@@ -348,7 +348,9 @@ function reduce(s: PlayState, a: Action): PlayState {
     }
     case "blitzAim": {
       const p = selected(s);
-      if (p?.team !== "defense" || p.route?.type !== "blitz" || blitzAim(p.route) === a.aim) return s;
+      if (p?.team !== "defense" || p.route?.type !== "blitz") return s;
+      // the lit pill pressed again changes nothing, but still calls off a Pick a player waiting for a tap
+      if (blitzAim(p.route) === a.aim) return s.targeting === "blitz" ? { ...s, targeting: null } : s;
       return { ...setRoute(s, p.id, aimedBlitz(a.aim)), targeting: null };
     }
     case "deepSplit": {
