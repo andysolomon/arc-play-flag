@@ -9,7 +9,7 @@ import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZ
 import { qbActionLine } from "@/lib/play/assignments";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { LOS_YARD } from "@/lib/play/field";
-import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, quarterback, rosterDepth, snap } from "@/lib/play/geometry";
+import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, S, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, quarterback, rosterDepth, snap } from "@/lib/play/geometry";
 import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
@@ -18,7 +18,7 @@ import { isContext, shown } from "@/lib/play/reducer";
 import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import { atSnap, motionPoint } from "@/lib/play/pre-snap";
-import { crowdNote, crowding, freeSnap, freeSpot, stepPast, teammates } from "@/lib/play/spacing";
+import { crowdNote, crowding, freeSnap, freeSpot, inSlot, stepPast, teammates, underCentre, underCentreOf } from "@/lib/play/spacing";
 import { motionGeom } from "@/lib/play/geometry";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pair, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
@@ -26,7 +26,7 @@ import { zoneLayout } from "@/lib/play/zones";
 import { CELEBRATION_MS, Celebration } from "./endzone/Celebration";
 import { EndZoneArt } from "./endzone/EndZoneArt";
 import { Football, PlayButton } from "./Playback";
-import { PlayerToken } from "./PlayerToken";
+import { PlayerToken, TAP_R } from "./PlayerToken";
 import { FIELD } from "./fieldPaint";
 import { LateralLayer } from "./LateralLayer";
 import { ManTagLayer } from "./ManTagLayer";
@@ -95,9 +95,12 @@ interface Drag {
   y0: number;
   moved: boolean;
   last: { x: number; y: number } | null;
-  /** the player's tag, and their teammates where they stand, whom they are held clear of (lib/play/spacing.ts) */
+  /**
+   * the player's tag, and their teammates where they stand, whom they are held clear of, the QB's centre with
+   * the spot under centre (lib/play/spacing.ts)
+   */
   name: string;
-  mates: Player[];
+  mates: ReturnType<typeof teammates>;
   /** where the player is drawn now, which a finger on a teammate's centre keeps them beside */
   at: { x: number; y: number };
   /** the teammates the coach has been told the player is kept off: each once a drag */
@@ -161,8 +164,11 @@ const LANDS_NEAR = 0.75;
  * What goes under a token: the starter's name when the roster has one, and in roster mode "Unassigned"
  * for a position nobody is down for yet. A player lined up against the bottom edge wears it above.
  */
-function captionFor(p: Player, starters: Readonly<Record<string, string>> | undefined, roster: boolean): { text: string; muted?: boolean; above?: boolean } | null {
-  const above = p.team === "offense" && p.y > 6;
+function captionFor(
+  p: Player, starters: Readonly<Record<string, string>> | undefined, roster: boolean, overQb = false,
+): { text: string; muted?: boolean; above?: boolean } | null {
+  // a centre with the quarterback under him wears his name above, where the QB's disc doesn't cover it
+  const above = overQb || (p.team === "offense" && p.y > 6);
   const name = starters?.[p.id];
   if (name) return { text: name, above };
   return roster ? { text: p.label ? "Unassigned" : "No tag", muted: true, above } : null;
@@ -286,6 +292,10 @@ function FieldImpl({
   );
   // a man defender whose receiver is off the field wears a name tag instead of an arrow to nobody
   const onField = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
+  // the quarterback under centre (lib/play/spacing.ts, U2): the C's name goes above him, and every token with
+  // another's centre inside its tap circle keeps its taps to its own disc, so each label picks its own player
+  const under = useMemo(() => underCentre(players), [players]);
+  const snug = useMemo(() => new Set(visible.filter((p) => visible.some((q) => q.id !== p.id && Math.hypot(p.x - q.x, p.y - q.y) * S < TAP_R)).map((p) => p.id)), [visible]);
   const tags = useMemo(() => (roster ? [] : manTags(visible, effective, top, layout.vh, zones)), [roster, visible, effective, top, layout.vh, zones]);
   // a run called from a no-run zone is flagged in the backfield corner every picture of it uses,
   // kept clear of the ▶ button on screen; a screen reader hears it with the diagram
@@ -354,12 +364,15 @@ function FieldImpl({
     return { x: ((cx - r.left) / r.width) * 30, y: topRef.current + ((cy - r.top) / r.height) * dep };
   }, [svgRef]);
 
-  // a player dragged onto a teammate is kept off them, and the coach is told why, once a teammate a drag
-  const tellCrowded = useCallback((dr: Drag, at: { x: number; y: number }) => {
+  // a player dragged onto a teammate is kept off them, and the coach is told why, once a teammate a drag. The
+  // QB's centre is told of only at the drop, and not at all when the QB lands under centre: a finger on its way
+  // there crosses the C's disc (lib/play/spacing.ts, U8)
+  const tellCrowded = useCallback((dr: Drag, at: { x: number; y: number }, landed?: { x: number; y: number }) => {
     const mate = crowding(at, dr.mates);
     if (!mate || dr.told.has(mate.id)) return;
+    if (mate.slot && (!landed || inSlot(landed, dr.mates))) return;
     dr.told.add(mate.id);
-    onNote?.(crowdNote(dr.name, mate.label || mate.id, "kept"));
+    onNote?.(crowdNote(dr.name, mate.label || mate.id, "kept", underCentreOf(mate)));
   }, [onNote]);
 
   const applyDrag = useCallback(() => {
@@ -403,7 +416,7 @@ function FieldImpl({
       const s = f && freeSnap(f, dr.team, topRef.current, dr.gap, dr.mates, snapMode, { x: dr.x0, y: dr.y0 });
       setLive(null);
       if (!s) return;
-      tellCrowded(dr, clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap));
+      tellCrowded(dr, clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap), s);
       // held back to where it started: nothing moved, so nothing to undo and Redo is kept
       if (s.x === dr.x0 && s.y === dr.y0) return;
       dispatch({ type: "move", id: dr.id, x: s.x, y: s.y, commit: true });
@@ -617,7 +630,8 @@ function FieldImpl({
       e.preventDefault();
       // a press onto a teammate goes on past them, or, with the edge of the field first, nowhere; a key held
       // down stops beside them, and says nothing more as it repeats (lib/play/spacing.ts, C7)
-      const r = stepPast(p, step, p.team, topRef.current, losGap(p.route), teammates(players, id), !e.repeat);
+      const mates = teammates(players, id);
+      const r = stepPast(p, step, p.team, topRef.current, losGap(p.route), mates, !e.repeat);
       const who = p.label || p.id, mate = r.past ? r.past.label || r.past.id : "";
       if (!e.repeat) {
         heldBeside.current = null;
@@ -625,7 +639,8 @@ function FieldImpl({
       } else if (r.past && !r.to && heldBeside.current !== `${id}:${mate}`) {
         // a held key stopped beside a teammate says so once, for whoever can't see it stop
         heldBeside.current = `${id}:${mate}`;
-        onNote?.(crowdNote(who, mate, "kept"));
+        // a QB already under centre is not 2 yards off the C: there is just no room past him (spacing.ts, U4)
+        onNote?.(crowdNote(who, mate, inSlot(p, mates) ? "stuck" : "kept"));
       }
       if (r.to) dispatch({ type: "move", id, x: r.to.x, y: r.to.y, commit: true });
       else if (r.past) shakePlayer(id, !e.repeat);
@@ -1012,11 +1027,12 @@ function FieldImpl({
               boing={boingId === p.id}
               shake={shakeOn?.id === p.id ? shakeOn.n : 0}
               dragging={dragging}
+              snug={snug.has(p.id)}
               readOnly={readOnly || draft !== null}
               drawing={draft !== null}
               // the roster is both sides of one team, so neither side is a shadow of the other there
               faded={!roster && isContext(p, side)}
-              caption={captionFor(p, starters, roster)}
+              caption={captionFor(p, starters, roster, under?.c === p.id)}
               onPointerDown={onDown}
               onKeyDown={onKey}
             />
