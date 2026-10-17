@@ -1,5 +1,5 @@
 import { atSnap } from "./pre-snap";
-import { LOS_GAP, PITCH_SET, X_MAX, X_MIN, Y_MAX, isBallJob, isRun } from "./routes";
+import { LOS_GAP, PITCH_SET, X_MAX, X_MIN, Y_MAX, isBallJob, isQbAction, isRun } from "./routes";
 import type { Hop, Pair, Player, Route } from "./types";
 
 /**
@@ -44,7 +44,10 @@ import type { Hop, Pair, Player, Route } from "./types";
  * - S2 a carrier marked as the primary read: the read is someone the final throw goes to.
  * - S3 a throw left on a player the chain doesn't reach: taken off.
  * - S4 settling a settled play hands back the very same array, so nothing reads as an edit.
- * - S5 a quarterback with no lateral keeps whatever route, and read, they had.
+ * - S5 a quarterback with no lateral keeps whatever route, and read, they had, but for a rollout or boot's read.
+ * - Q1, Q2 a rollout or boot (docs/adr/011-qb-rollout-and-boot.md) on anyone but the quarterback, or on a
+ *   quarterback whose chain has a lateral, is taken off ahead of the carrier rules, which would keep a ball job
+ *   on the last carrier; Q12 one on the quarterback is never the read.
  * - P1 a release past the line of scrimmage: snapped back behind it, so no lateral is ever let go past it.
  * - P2 a release off the field: pulled back inside the sidelines and the backfield.
  * - P3 a release where the carrier already has the ball: no run, the toss leaves from there as with none.
@@ -273,6 +276,9 @@ export function settleChain<T extends readonly Player[]>(players: T): T {
       let route: Route | null = r;
       // J8: a jet sweep is a handoff at the snap, so neither the quarterback, the centre nor a carrier can take one
       if (r.type === "jet" && (p.id === qb?.id || p.id === centre(players)?.id || (links.length && inChain.has(p.id)))) route = null;
+      // Q1, Q2: a rollout or boot is the quarterback's job at the snap, so not a carrier's, and Q12 never the read
+      else if (isQbAction(r.type) && (p.id !== qb?.id || links.length)) route = null;
+      else if (isQbAction(r.type) && r.primary) route = withoutPrimary(r);
       else if (!inChain.has(p.id)) {
         // S3: a throw only a carrier has, on someone who doesn't carry
         if (isBallJob(r.type)) route = null;

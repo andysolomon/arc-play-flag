@@ -7,6 +7,7 @@ import {
   getCurrentBookId, getPlaybooks, getPlays, getServerCurrentBookId, getServerPlaybooks, getServerPlays, primaryPlay, subscribe,
 } from "@/lib/play/library";
 import { Chevron, Menu, MenuHeading, MenuNote } from "./Menu";
+import { SideBadge } from "./SideBadge";
 import { chip, input, menuChoice, menuItem } from "./ui";
 
 interface Props {
@@ -22,8 +23,9 @@ interface Props {
 
 /**
  * The play name, with the current playbook's plays dropped down beside it: each numbered as the
- * book numbers it, the primary marked, the play on the board checked. Picking one opens it. A saved
- * play that isn't in the book can be added from here (docs/adr/009-playbook-switcher.md).
+ * book numbers it, each marked Offense or Defense, the primary marked, the play on the board checked.
+ * Picking one opens it. A saved play that isn't in the book can be added from here
+ * (docs/adr/009-playbook-switcher.md).
  */
 export function PlayNameField({ name, playId, onName, onOpenPlay, onAddToBook }: Props) {
   const plays = useSyncExternalStore(subscribe, getPlays, getServerPlays);
@@ -77,12 +79,15 @@ export function PlayNameField({ name, playId, onName, onOpenPlay, onAddToBook }:
                   role="menuitemradio"
                   aria-checked={it.play.id === playId}
                   aria-label={it.play.name}
-                  title={it.play.id === playId ? `${it.play.name} is on the board` : `Open ${it.play.name}`}
+                  title={`${it.play.id === playId ? `${it.play.name} is on the board` : `Open ${it.play.name}`}, ${it.play.side === "defense" ? "a defensive call" : "an offensive play"}`}
                   onClick={() => { pick(it.play.id); }}
-                  className={menuChoice}
+                  className={`${menuChoice} py-1.5`}
                 >
                   <span className="w-6 flex-none text-caption text-ink-muted">{it.n}.</span>
-                  <span className="min-w-0 flex-1 truncate">{it.play.name}</span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{it.play.name}</span>
+                    <SideBadge side={it.play.side} />
+                  </span>
                   {it.play.id === primaryId && <span className={chip}>Primary</span>}
                 </button>
               ))}

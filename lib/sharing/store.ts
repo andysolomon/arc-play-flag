@@ -1,40 +1,37 @@
 import { createHash, randomBytes } from "node:crypto";
+import { RedisError, command as redis, countHit, credentials } from "@/lib/redis/command";
 import { SHARE_TTL_SECONDS } from "./links";
 
 export class ShareError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
-/**
- * Server-only Redis REST credentials. Accepts the documented `UPSTASH_REDIS_REST_*` names and,
- * as a fallback, the `KV_REST_API_*` names that the Vercel Marketplace "Upstash for Redis"
- * store injects when connected to the project. Never exposed to client components.
- */
-export function credentials(env: Record<string, string | undefined> = process.env): { url: string; token: string } | null {
-  const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN;
-  return url && token ? { url, token } : null;
-}
+export { credentials };
 
-/** Server-only REST adapter; credentials never reach a client component. */
+/** Server-only REST adapter; a store that is missing or down becomes a ShareError a coach can read. */
 async function command(...args: (string | number)[]): Promise<unknown> {
-  const config = credentials();
-  if (!config) throw new ShareError(503, "Link sharing is not configured yet. You can still export a file.");
-  const { url, token } = config;
-  const response = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(args), cache: "no-store", signal: AbortSignal.timeout(10_000) });
-  const data = await response.json() as { result?: unknown; error?: unknown };
-  if (!response.ok || data.error) throw new ShareError(503, "Link sharing is temporarily unavailable. Try again.");
-  return data.result;
+  try {
+    return await redis(...args);
+  } catch (e) {
+    if (e instanceof RedisError && e.reason === "unconfigured") throw new ShareError(503, "Link sharing is not configured yet. You can still export a file.");
+    throw new ShareError(503, "Link sharing is temporarily unavailable. Try again.");
+  }
 }
 
 // Atomic rate limiting. No client IPs or bearer tokens are stored verbatim.
-const LIMIT = `local n = redis.call('INCR', KEYS[1]); if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return n`;
 export async function limit(request: Request, write: boolean): Promise<void> {
   // Vercel overwrites this header; elsewhere use a shared bucket instead of trusting X-Forwarded-For.
   const ip = process.env.VERCEL ? request.headers.get("x-vercel-forwarded-for") ?? "unknown" : "local";
   const digest = createHash("sha256").update(`${credentials()?.token ?? ""}:${ip}`).digest("hex");
-  const result = await command("EVAL", LIMIT, 1, `ffpd:limit:${write ? "write" : "read"}:${digest}`, 3600);
-  if (typeof result !== "number" || result > (write ? 20 : 600)) throw new ShareError(429, "Too many sharing requests. Try again later.");
+  let hits: number;
+  try {
+    hits = await countHit(`ffpd:limit:${write ? "write" : "read"}:${digest}`, 3600);
+  } catch (e) {
+    throw e instanceof RedisError && e.reason === "unconfigured"
+      ? new ShareError(503, "Link sharing is not configured yet. You can still export a file.")
+      : new ShareError(503, "Link sharing is temporarily unavailable. Try again.");
+  }
+  if (hits > (write ? 20 : 600)) throw new ShareError(429, "Too many sharing requests. Try again later.");
 }
 
 // Global active-snapshot cap + NX insertion in one operation. Expired entries are swept on writes.

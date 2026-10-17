@@ -1,5 +1,5 @@
 import { inNoRunZone, losOf } from "./field";
-import { chainOf } from "./lateral";
+import { chainOf, quarterback } from "./lateral";
 import { isBallJob, isRun } from "./routes";
 import type { Player, Team } from "./types";
 
@@ -28,7 +28,9 @@ export function callOf(players: readonly Player[]): Call | null {
   const offense = players.filter((p) => p.team === "offense" && p.route);
   if (!offense.length) return null;
   const runners = offense.filter((p) => p.route && isRun(p.route.type));
-  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.label !== "QB");
+  // the quarterback throws it, so is never a receiver: found as playback finds them, not by any player's tag
+  const qb = quarterback(players);
+  const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.id !== qb?.id);
   const primary = offense.find((p) => p.route?.primary);
   const primaryRun = primary?.route ? isRun(primary.route.type) : false;
   if (runners.length && (primaryRun || receivers.length === 0)) return "run";

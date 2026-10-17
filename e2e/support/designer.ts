@@ -78,8 +78,8 @@ export class Designer {
   async tools(): Promise<void> {
     await this.open("Play tools", "play-sidebar");
   }
-  /** Theme and End zone are folded away in Play tools; opens Play tools and that section unless they already are. */
-  async unfold(label: "Theme" | "End zone"): Promise<void> {
+  /** Team color, Theme and End zone are folded away in Play tools; opens Play tools and that section unless they already are. */
+  async unfold(label: "Team color" | "Theme" | "End zone"): Promise<void> {
     await this.tools();
     const fold = this.page.locator("#play-sidebar").getByRole("button", { name: new RegExp(`^${label}\\b`, "i") });
     if ((await fold.getAttribute("aria-expanded")) !== "true") await fold.click();
@@ -96,9 +96,14 @@ export class Designer {
   async rightPanel(): Promise<void> {
     await this.open(Designer.RIGHT, "route-sidebar");
   }
+  /** The header's way out of roster mode, right of Play tools and only there (docs/adr/008-roster-depth-chart.md). */
+  get back(): Locator {
+    return this.page.getByRole("banner").getByRole("button", { name: "Back to play", exact: true });
+  }
   /**
-   * Into roster mode from Play tools, or back out of it; the header's right toggle says which it is. On a
-   * phone or tablet entering it opens the roster drawer over Play tools, so the tile is not read back.
+   * Into roster mode from Play tools, or back out of it by the same tile (the header's `back` is the other way
+   * out); the header's right toggle says which it is. On a phone or tablet entering it opens the roster drawer
+   * over Play tools, so the tile is not read back.
    */
   async roster(on = true): Promise<void> {
     const toggle = this.page.getByRole("button", { name: on ? "Roster panel" : "Route palette" });

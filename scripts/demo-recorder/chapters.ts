@@ -376,29 +376,38 @@ export class ChapterDriver {
   }
 
   /** Drags from one point of the page to another, in steps, the touch following, so the move reads as a move on camera. */
-  private async drag(from: Point, to: Point, steps = 16): Promise<void> {
+  /** The finger goes from `from` through each of `via` to `to`, in straight legs of `steps` moves each. */
+  private async drag(from: Point, to: Point, steps = 16, via: readonly Point[] = []): Promise<void> {
     await this.harness("touch", "down", from.x, from.y);
     await this.page.mouse.move(from.x, from.y);
     await this.page.waitForTimeout(TOUCH_LEAD);
     await this.page.mouse.down();
-    for (let step = 1; step <= steps; step += 1) {
-      const x = from.x + ((to.x - from.x) * step) / steps;
-      const y = from.y + ((to.y - from.y) * step) / steps;
-      await this.page.mouse.move(x, y);
-      await this.harness("touch", "move", x, y);
-      await this.page.waitForTimeout(24);
+    let at = from;
+    for (const next of [...via, to]) {
+      for (let step = 1; step <= steps; step += 1) {
+        const x = at.x + ((next.x - at.x) * step) / steps;
+        const y = at.y + ((next.y - at.y) * step) / steps;
+        await this.page.mouse.move(x, y);
+        await this.harness("touch", "move", x, y);
+        await this.page.waitForTimeout(24);
+      }
+      at = next;
     }
     await this.page.waitForTimeout(120);
     await this.page.mouse.up();
     await this.harness("touch", "up", to.x, to.y);
   }
 
-  /** Drags a player to a yard spot. */
-  async dragPlayer(label: string, team: Team, x: number, y: number, description: string, hold = 260): Promise<void> {
+  /**
+   * Drags a player to a yard spot, by way of any `via` spots: a finger goes round a teammate, since the
+   * app keeps a dragged player off one and says so (lib/play/spacing.ts), which is not this beat's story.
+   */
+  async dragPlayer(label: string, team: Team, x: number, y: number, description: string, hold = 260, via: readonly (readonly [number, number])[] = []): Promise<void> {
     await this.closePanels();
     await this.beat("selector", description, async () => {
       const from = await this.centre(await this.visible(this.player(label, team), description), description);
-      await this.drag(from, await this.yardPoint(x, y));
+      const through = await Promise.all(via.map(([vx, vy]) => this.yardPoint(vx, vy)));
+      await this.drag(from, await this.yardPoint(x, y), 10, through);
     }, hold);
   }
 
@@ -545,7 +554,8 @@ async function firstPlay(d: ChapterDriver): Promise<void> {
   }, 240, ["Create plays"]);
 
   await d.say("Drag Z over: Twins Left");
-  await d.dragPlayer("Z", "Offense", 9, 1.5, "Drag Z into the left slot", 200);
+  // Z starts behind the QB's right hip (lib/play/routes.ts defaults): the finger goes under the QB, not through them
+  await d.dragPlayer("Z", "Offense", 9, 1.5, "Drag Z into the left slot", 200, [[19, 7.4], [11, 7.4]]);
   await d.expectState("Z lines up in the slot beside X", async () => {
     await expect.poll(() => d.draft().then((draft) => draft?.players.find((p) => p.id === "o5")?.x)).toBeLessThan(11);
   }, 300, ["Moving players"]);
@@ -790,13 +800,20 @@ async function wristbands(d: ChapterDriver): Promise<void> {
 async function share(d: ChapterDriver): Promise<void> {
   await d.say("Save the play");
   await d.goto("/");
-  await d.openPanel("Play tools");
-  await d.click(tools(d).getByRole("button", { name: "Save", exact: true }), "Save", 120);
+  // Save is in the header; the first tap after the page opens can land before React has attached its handler
+  await d.clickUntilState(
+    d.app.getByRole("banner").getByRole("button", { name: "Save play", exact: true }),
+    "Save",
+    // read without waiting, as hasAttributeNow does: no toast yet is simply not saved yet
+    async () => d.toast.evaluateAll((els) => els.some((el) => el.textContent === "Saved")),
+    120,
+  );
   await d.expectState("The app confirms the save", async () => {
     await expect(d.toast).toHaveText("Saved", { timeout: ASSERT_TIMEOUT });
   }, 800, ["Saving"]);
 
   await d.say("Add the coaching points");
+  await d.openPanel("Play tools");
   await d.click(tools(d).getByRole("button", { name: "Notes", exact: true }), "Notes", 120);
   await d.type(d.app.getByRole("textbox", { name: "Coaching points" }), "Coaching points", "X wins inside off Z's seam.", 700, ["Notes"]);
 

@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { install, record } from "@/lib/diagnostics";
-import { editedVisit, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
+import { editedVisit, flipped, initialState, reducer, selected, unsaved, type Action } from "@/lib/play/reducer";
 import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
-import { blitzAim, blitzTarget, nearestBack } from "@/lib/play/blitz";
+import { blitzAim, blitzTarget, containEdge, edgePath, nearestBack } from "@/lib/play/blitz";
+import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
-import { sidelineCut } from "@/lib/play/geometry";
-import { canJet, chainLinks, chainOf, quarterback, runsBefore } from "@/lib/play/lateral";
-import { activeLineup, formationOf, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
-import { offFieldId, offFieldPositions, starters } from "@/lib/play/roster";
+import { qbAction, quarterback, sidelineCut } from "@/lib/play/geometry";
+import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
+import { activeLineup, formationOf, rosterPositions, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
+import { offFieldId, starters } from "@/lib/play/roster";
 import type { Lineups, Player, Roster, RouteType, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import {
@@ -21,7 +22,7 @@ import {
 } from "@/lib/play/library";
 import type { SavedPlay } from "@/lib/play/types";
 import { decodeShare, encodeShare } from "@/lib/play/share";
-import { mirrorRoute, routeDef } from "@/lib/play/routes";
+import { isBallJob, isRun, mirrorRoute, mirrorable, routeDef } from "@/lib/play/routes";
 import { atSnap } from "@/lib/play/pre-snap";
 import { StorageError, artShadow, failureMessage, hasNoRunZones, newId, readDraft, writeDraft } from "@/lib/play/storage";
 import { FIELD_TITLE_ID, Field } from "./Field";
@@ -30,7 +31,7 @@ import { Header, VIEW, type Mode } from "./Header";
 import { Hint } from "./Hint";
 import { PlaySidebar } from "./PlaySidebar";
 import { RosterSidebar } from "./RosterSidebar";
-import { RouteSidebar } from "./RouteSidebar";
+import { RouteSidebar, type BlitzInfo, type QbInfo } from "./RouteSidebar";
 import { SaveFailure } from "./SaveFailure";
 import { Sidebar } from "./Sidebar";
 import { pillSm } from "./ui";
@@ -95,12 +96,10 @@ export function App() {
   const [rosterPick, setRosterPick] = useState<string | null>(null);
   // a depth chart kept for a tag the formation has no token for (FS, H) stays in reach from the panel: every
   // tag a lineup keeps a chart for, the open play wears or a saved play wears (lib/play/roster.ts, R9)
-  const positions = useMemo(() => {
-    if (!rostering) return formation;
-    const tagged = [...s.players, ...getPlays().flatMap((p) => p.players)].filter((p) => p.label).map((p) => ({ team: p.team, tag: p.label }));
-    const kept = lineups.lineups.flatMap((l) => l.slots.map((slot) => ({ team: slot.team, tag: slot.tag })));
-    return [...formation, ...offFieldPositions(formation, [...kept, ...tagged])];
-  }, [rostering, formation, lineups, s.players]);
+  const positions = useMemo(
+    () => (rostering ? rosterPositions(lineups, [...s.players, ...getPlays().flatMap((p) => p.players)]) : formation),
+    [rostering, formation, lineups, s.players],
+  );
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -116,11 +115,25 @@ export function App() {
   const [draftWrite, setDraftWrite] = useState<{ fingerprint: string; ok: boolean } | null>(null);
   const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const restoredDraft = useRef(false);
+  // the header's Save, for ⌘S / Ctrl+S: set once the save it makes is defined below
+  const saveRef = useRef<() => void>(() => {});
   const toastTimer = useRef(0);
   const say = useCallback((text: string, ms = 1600, flag = false) => {
     setToast({ text, flag });
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => { setToast(null); }, ms);
+  }, []);
+  // the roster's picture or sheet being drawn, and what the roster panel says of it: kept here, so leaving roster
+  // mode mid-export neither loses its word nor lets a second one start (docs/adr/010-roster-exports.md)
+  const [rosterExport, setRosterExport] = useState({ busy: false, news: "" });
+  const exportingRef = useRef(false);
+  const onRosterExport = useCallback((label: string, job: () => Promise<void>) => {
+    if (exportingRef.current) return;
+    exportingRef.current = true;
+    setRosterExport({ busy: true, news: `${label}…` });
+    Promise.resolve().then(job)
+      .then(() => "Saved", (e: unknown) => { record("export", e); return "That export failed. Try again on a bigger screen."; })
+      .then((news) => { exportingRef.current = false; setRosterExport({ busy: false, news }); }, () => undefined);
   }, []);
   // phones + iPads: drawers overlay the field; only one open at a time
   const compact = useMedia("(max-width: 1023px)");
@@ -163,9 +176,11 @@ export function App() {
   // a preset route keeps its depth and stops at the sideline; when a pick, a mirror or a move cuts it
   // short there, the toast says so once it is drawn, and the palette says by how much
   const playersRef = useRef(s.players);
-  const cutWatch = useRef<{ id: string; was: Player | undefined; what?: string } | null>(null);
+  // a note the field says with the move itself (a teammate stepped past) leads the cut's toast, never lost under it
+  const fieldNote = useRef<string | null>(null);
+  const cutWatch = useRef<{ id: string; was: Player | undefined; what?: string; note: string | null } | null>(null);
   const watchCut = useCallback((id: string, what?: string) => {
-    cutWatch.current = { id, was: playersRef.current.find((p) => p.id === id), what };
+    cutWatch.current = { id, was: playersRef.current.find((p) => p.id === id), what, note: fieldNote.current };
   }, []);
   useEffect(() => {
     playersRef.current = s.players;
@@ -173,7 +188,9 @@ export function App() {
     if (!w) return;
     cutWatch.current = null;
     const news = cutNews(w.was, s.players.find((p) => p.id === w.id));
-    if (news) say(`${w.what ?? news} · cut short at the sideline`, 2200);
+    const cut = news ? `${w.what ?? news} · cut short at the sideline` : null;
+    if (cut && w.note) say(`${w.note} ${cut}`, 2600, true);
+    else if (cut) say(cut, 2200);
   }, [s.players, say]);
   // a player dragged or stepped with the arrow keys can take their route to the sideline
   const fieldDispatch = useCallback((a: Action) => {
@@ -197,8 +214,10 @@ export function App() {
     dispatch({ type: "runBefore" });
     if (compactRef.current) setRightOpen(false);
   }, []);
-  // the BLITZ pills: QB and Backfield aim it; Pick a player asks for a red player on the field, like Man
-  const onBlitzAim = useCallback((aim: "qb" | "backfield") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the BLITZ pills: QB, Backfield and Contain aim it; Pick a player asks for a red player on the field, like Man
+  const onBlitzAim = useCallback((aim: "qb" | "backfield" | "contain") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the DEEP pills: Auto splits the field with the other deep zones, Half and Third call it
+  const onDeepSplit = useCallback((split: DeepSplit | null) => { dispatch({ type: "deepSplit", split }); }, []);
   const onBlitzTarget = useCallback(() => {
     dispatch({ type: "blitzTarget" });
     if (compactRef.current) setRightOpen(false);
@@ -224,6 +243,14 @@ export function App() {
       if (e.key === "Escape") {
         if (rosteringRef.current) setRosterPick(null);
         else dispatch({ type: "select", id: null });
+        return;
+      }
+      // ⌘S / Ctrl+S is the header's Save, typing in the play name included, never the browser's "Save page as";
+      // a layout whose S key types no Latin letter is matched by the key's place. Roster mode has no play to save
+      const sKey = e.key === "s" || e.key === "S" || (e.code === "KeyS" && !/^[a-z]$/i.test(e.key));
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && sKey) {
+        e.preventDefault();
+        if (!e.repeat && !rosteringRef.current) saveRef.current();
         return;
       }
       if (isEditable(e.target)) return;
@@ -304,16 +331,24 @@ export function App() {
     };
   }, []);
 
-  const onSave = useCallback(() => {
+  // whether the save landed
+  const onSave = useCallback((): boolean => {
     const r = savePlay({
       id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players],
     });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
+    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return false; }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved");
+    return true;
   }, [say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
+  // Save from the header (or ⌘S) with Play tools shut: a save that doesn't land opens Play tools on its
+  // warning, where the play can still be downloaded or the save tried again
+  const onHeaderSave = useCallback(() => {
+    if (!onSave()) openLeft(true);
+  }, [onSave, openLeft]);
+  useEffect(() => { saveRef.current = onHeaderSave; }, [onHeaderSave]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
     const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] });
@@ -444,6 +479,35 @@ export function App() {
       openRight(true);
     }
   }, [formation, openRight, s]);
+  // the header's Back to play: out of roster mode as the Roster tile goes, except that on a phone or tablet, where
+  // the drawers cover the field, both fold so the play is in view. Back goes with the mode, so focus goes to the
+  // field's title once it reads the play's name again, never to the page; it is focusable only until focus moves on
+  // from it, so on a play it stays words. It is ringed only when the keyboard pressed Back: after a tap or a click it
+  // stays quiet until then, whatever a browser's own rule would do. The window losing focus blurs it too but leaves it
+  // the page's focus, so that blur changes nothing
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const backToPlay = useRef<"keyboard" | "pointer" | null>(null);
+  const onBack = useCallback((keyboard: boolean) => {
+    backToPlay.current = keyboard ? "keyboard" : "pointer";
+    if (compactRef.current) closePanels();
+    onMode("play");
+  }, [closePanels, onMode]);
+  useEffect(() => {
+    const title = titleRef.current;
+    if (!rostering && backToPlay.current && title) {
+      title.tabIndex = -1;
+      title.toggleAttribute("data-quiet-focus", backToPlay.current === "pointer");
+      const movedOn = () => {
+        if (document.activeElement === title) return;
+        title.removeAttribute("tabindex");
+        title.removeAttribute("data-quiet-focus");
+        title.removeEventListener("blur", movedOn);
+      };
+      title.addEventListener("blur", movedOn);
+      title.focus({ preventScroll: true });
+    }
+    backToPlay.current = null;
+  }, [rostering]);
   // a side taken off the field takes its picked position with it, as hiding the shadow does
   const pickedTeam = positions.find((p) => p.id === rosterPick)?.team ?? null;
   const onView = useCallback((next: Vis) => {
@@ -481,17 +545,44 @@ export function App() {
   }, [s.players, visit]);
   // who can take a jet sweep: not the quarterback, the centre or a carrier (docs/adr/006-jet-sweep.md)
   const jetAble = useMemo(() => (sel ? canJet(sel, s.players) : false), [sel, s.players]);
-  // a handoff goes to someone else: the quarterback, who hands it off, is never offered one
-  const isQb = !!sel && sel.id === quarterback(s.players)?.id;
-  // a lateral's catch dragged somewhere illegal is snapped back, and the coach is told why, on a flag's yellow
-  const onCatchNote = useCallback((text: string) => { say(text, 2600, true); }, [say]);
+  // the quarterback's rollout and boot, and what the one they have does (docs/adr/011-qb-rollout-and-boot.md)
+  const qbInfo = useMemo((): QbInfo | null => {
+    if (sel?.team !== "offense" || sel.id !== quarterback(s.players)?.id) return null;
+    const act = qbAction(s.players);
+    if (!act) return { act: null };
+    const who = names({ players: s.players });
+    const receivers = s.players.some((p) => p.team === "offense" && p.id !== act.qb.id && p.route && !isRun(p.route.type) && !isBallJob(p.route.type));
+    // what turns a boot: Flip play, unless the fake goes the same way flipped (a runner lined up on the QB's x), then
+    // ⇄ Mirror on the fake's run, each tried on the play as it would be (docs/adr/011-qb-rollout-and-boot.md, Q11)
+    const turns = (players: readonly Player[]): boolean => qbAction(players)?.side === -act.side;
+    const fake = act.fake;
+    const turn = act.type !== "boot" || !fake ? null
+      : turns(flipped(s.players)) ? "flip"
+      : mirrorable(fake) && turns(s.players.map((p) => (p.id === fake.id && p.route ? { ...p, route: mirrorRoute(p.route, atSnap(p).x).route } : p))) ? "mirror"
+      : null;
+    return { act: { type: act.type, side: act.side, fake: fake ? who.get(fake.id) ?? null : null, decoy: act.decoy, receivers, turn } };
+  }, [sel, s.players]);
+  // a lateral's catch dragged somewhere illegal is snapped back, or a player kept off a teammate, and the
+  // coach is told why, on a flag's yellow
+  const onFieldNote = useCallback((text: string) => {
+    say(text, 2600, true);
+    // kept only while the press or drop that said it is still being handled, for its move's cut (above)
+    fieldNote.current = text;
+    queueMicrotask(() => { fieldNote.current = null; });
+  }, [say]);
   // who the selected blitzer comes for, for the palette's BLITZ pills (lib/play/blitz.ts)
   const blitz = useMemo(() => {
     if (sel?.team !== "defense" || sel.route?.type !== "blitz") return null;
     const who = names({ players: s.players });
     const t = blitzTarget(sel.route, s.players);
     const back = nearestBack(s.players);
-    return { aim: blitzAim(sel.route), who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null };
+    const aim = blitzAim(sel.route);
+    // a contain blitz's edge, and whether the sideline leaves room on it and on the other (lib/play/blitz.ts, C2, C4)
+    const edge = containEdge(sel, s.players);
+    const contain: BlitzInfo["contain"] = aim === "contain"
+      ? { edge: edge < 0 ? "left" : "right", room: edgePath(edge, s.players) !== null, other: edgePath(edge < 0 ? 1 : -1, s.players) !== null }
+      : null;
+    return { aim, who: t ? who.get(t.id) ?? null : null, back: back ? who.get(back.id) ?? null : null, contain };
   }, [sel, s.players]);
   const hint = rostering ? null : s.targeting === "lateral" ? "Lateral to who? Tap a red player." : s.targeting === "blitz" ? "Blitz who? Tap a red player."
     : s.targeting ? "Cover who? Tap a red player." : s.draft ? s.draft.kind === "motion"
@@ -501,7 +592,6 @@ export function App() {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
-        side={s.side}
         mode={mode}
         view={view}
         onView={() => { onView(VIEW[view].next); }}
@@ -511,8 +601,11 @@ export function App() {
         canRedo={!rostering && s.future.length > 0}
         canClear={s.players.some((p) => (p.route || p.preSnap) && p.team === s.side)}
         onClear={onClear}
+        unsaved={dirty}
+        onSave={onHeaderSave}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
+        onBack={onBack}
         onUndo={() => { dispatch({ type: "undo" }); }}
         onRedo={() => { dispatch({ type: "redo" }); }}
       />
@@ -568,11 +661,12 @@ export function App() {
           draft={rostering ? null : s.draft}
           dispatch={rostering ? rosterDispatch : fieldDispatch}
           onSelect={rostering ? onRosterSelect : onSelect}
-          onCatchNote={onCatchNote}
+          onNote={onFieldNote}
           lateralFrom={s.targeting === "lateral" && visit !== null ? chain[visit]?.id ?? null : null}
           svgRef={svgRef}
           title={rostering ? "Roster" : s.name || "Untitled play"}
           showTitle
+          titleRef={titleRef}
           status={rostering ? lineup.name.trim() || "Untitled lineup" : persistenceLabel[persistence]}
           noRunZones={noRunZones}
           los={rostering ? ROSTER_LOS : s.los}
@@ -591,6 +685,9 @@ export function App() {
               view={view}
               onView={onView}
               onSelect={onRosterSelect}
+              team={team}
+              exporting={rosterExport}
+              onExport={onRosterExport}
             />
           ) : (
           <RouteSidebar
@@ -604,9 +701,11 @@ export function App() {
             blitz={blitz}
             onBlitzAim={onBlitzAim}
             onBlitzTarget={onBlitzTarget}
+            deep={sel?.team === "defense" && sel.route?.type === "zoneDeep" ? deepSplit(sel.route) ?? "auto" : null}
+            onDeepSplit={onDeepSplit}
             cut={selCut}
             jet={jetAble}
-            quarterback={isQb}
+            qb={qbInfo}
             hint={hint}
             onPick={onPick}
             onMotion={() => { dispatch({ type: "drawMotion" }); if (compactRef.current) setRightOpen(false); }}

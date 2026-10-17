@@ -23,7 +23,7 @@ test("a preset is one tap, readable in both themes, kept across reload and share
   await seed(page, { team: { ...OTTERS, noRunZones: false } });
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Team color");
   const palette = page.locator("#play-sidebar").getByRole("group", { name: "Team color", exact: true });
   await expect(palette.getByRole("radio", { name: "Teal", exact: true })).toBeChecked();
   await expect(palette.getByRole("radio")).toHaveCount(12);
@@ -55,7 +55,7 @@ test("a preset is one tap, readable in both themes, kept across reload and share
   }
 
   await page.reload();
-  await d.tools();
+  await d.unfold("Team color");
   await expect(palette.getByRole("radio", { name: "Blue", exact: true })).toBeChecked();
   await expect(page.getByRole("textbox", { name: "Team name" })).toHaveValue(OTTERS.name);
   await expect(page.getByRole("checkbox", { name: "No-run zones", exact: true })).not.toBeChecked();
@@ -63,9 +63,9 @@ test("a preset is one tap, readable in both themes, kept across reload and share
   await page.goto("/playbooks");
   await expect(async () => {
     await page.getByRole("button", { name: /team, theme & backup settings/ }).click();
-    await expect(page.getByRole("dialog", { name: "Team, theme & backup" })).toBeVisible({ timeout: 1000 });
+    await expect(page.getByRole("dialog", { name: "Account, team, theme & backup" })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   const settingsPalette = dialog.getByRole("group", { name: "Team color", exact: true });
   const blue = settingsPalette.getByRole("radio", { name: "Blue", exact: true });
   await expect(blue).toBeChecked();
@@ -80,7 +80,7 @@ test("a preset is one tap, readable in both themes, kept across reload and share
   expect(stored).toEqual({ ...OTTERS, color: "#183153", noRunZones: false });
   await writeFile(info.outputPath("team-colors.json"), JSON.stringify({ boxes, smallBoxes, stored }, null, 2));
   await d.goto();
-  await d.tools();
+  await d.unfold("Team color");
   await expect(palette.getByRole("radio", { name: "Navy", exact: true })).toBeChecked();
 });
 
@@ -88,7 +88,7 @@ test("an existing custom color stays selected and the optional color wheel can s
   await seed(page, { team: { ...OTTERS, color: "#123456" } });
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Team color");
   const palette = page.locator("#play-sidebar").getByRole("group", { name: "Team color", exact: true });
   await expect(palette).toContainText("Custom · #123456");
   await expect(palette.locator("input[type='radio']:checked")).toHaveCount(0);
@@ -112,7 +112,7 @@ test("an existing custom color stays selected and the optional color wheel can s
   await expect(palette).toContainText("Custom · #654321");
   await expect(hex).toHaveValue("#654321");
   await page.reload();
-  await d.tools();
+  await d.unfold("Team color");
   await palette.getByRole("button", { name: "Custom color…", exact: true }).click();
   await expect(wheel).toHaveValue("#654321");
   await expect(hex).toHaveValue("#654321");
@@ -131,7 +131,7 @@ test("hex entry rejects invalid codes, accepts shorthand and uppercase, and pers
   await seed(page, { team });
   const d = new Designer(page);
   await d.goto();
-  await d.tools();
+  await d.unfold("Team color");
   const palette = page.locator("#play-sidebar").getByRole("group", { name: "Team color", exact: true });
   await palette.getByRole("button", { name: "Custom color…", exact: true }).click();
   const hex = palette.getByRole("textbox", { name: "Hex color", exact: true });
@@ -165,9 +165,9 @@ test("hex entry rejects invalid codes, accepts shorthand and uppercase, and pers
   await page.goto("/playbooks");
   await expect(async () => {
     await page.getByRole("button", { name: /team, theme & backup settings/ }).click();
-    await expect(page.getByRole("dialog", { name: "Team, theme & backup" })).toBeVisible({ timeout: 1000 });
+    await expect(page.getByRole("dialog", { name: "Account, team, theme & backup" })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   const settingsPalette = dialog.getByRole("group", { name: "Team color", exact: true });
   await settingsPalette.getByRole("button", { name: "Custom color…", exact: true }).click();
   const settingsHex = settingsPalette.getByRole("textbox", { name: "Hex color", exact: true });
@@ -183,7 +183,7 @@ test("hex entry rejects invalid codes, accepts shorthand and uppercase, and pers
   const stored = await storedTeam();
   expect(stored).toEqual({ ...team, color: "#00ff88" });
   await d.goto();
-  await d.tools();
+  await d.unfold("Team color");
   await palette.getByRole("button", { name: "Custom color…", exact: true }).click();
   await expect(hex).toHaveValue("#00ff88");
   await writeFile(info.outputPath("team-colors-hex.json"), JSON.stringify({ invalid: ["12GG44", "#12"], accepted: ["#ABC", "1A73E8", "#00FF88"], stored }, null, 2));

@@ -21,8 +21,15 @@
  * - L7 a read marked on a carrier in a chain is not the read: the final throw goes to someone else.
  * - L8 a blitz aimed at a player reads "Blitz Z", at the backfield "Blitz the backfield", and at the
  *   quarterback plain "Blitz", as every blitz did; one aimed at a player who is gone reads "Blitz" too.
+ *   A contain blitz reads "Contain blitz", the same when the sideline leaves no edge and it comes
+ *   straight: the call is still contain, and the picture shows the path.
  * - L9 a lateral let go on the run (ADR 007) is a pitch: "QB runs and pitches to Z", and the job "Run
  *   and pitch to Z", so the words say the carrier moves with the ball first.
+ * - L10 a deep zone called as a half or a third says so, "Deep half" or "Deep third"; Auto reads
+ *   "Zone deep", as every deep zone did.
+ * - L11 a quarterback's rollout or boot (ADR 011) says which way they go and who they fake to, by the same
+ *   fake the field and playback use: "QB boots left", "Fake to Z, boot left, throw, look to Y first", and
+ *   on a run "Hand off to Z, then boot left as a decoy", never the bare "Rollout" or "Boot".
  *
  * Text is used as given; the caller cleans it first (T1–T5).
  */
@@ -31,8 +38,9 @@ import type { Numbered } from "@/lib/export/numbered";
 import { blitzAim, blitzTarget } from "./blitz";
 import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
+import { qbAction, type QbAction } from "./geometry";
 import { carriers, chainLinks, chainOf, runsBefore, visits } from "./lateral";
-import { isRun, routeDef } from "./routes";
+import { isQbAction, isRun, routeName } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
 export interface Assignment {
@@ -65,11 +73,16 @@ export function names(play: { readonly players: readonly Player[] }): Map<string
   return out;
 }
 
-/** The ball carrier: the last carrier of a lateral chain that keeps it, else the primary read on a run route, else the first runner. */
+/**
+ * The ball carrier: the last carrier of a lateral chain that keeps it, the runner a quarterback's rollout or
+ * boot fakes or hands off to (L11), else the primary read on a run route, else the first runner.
+ */
 export function runnerOf(play: SavedPlay): Player | null {
   const chain = chainOf(play.players);
   const last = chain[chain.length - 1];
   if (chain.length > 1) return last?.route && isRun(last.route.type) ? last : null;
+  const act = qbAction(play.players);
+  if (act) return act.fake;
   const routed = play.players.filter((p) => p.team === "offense" && p.route).sort(byLine);
   const primary = primaryOf(play);
   if (primary?.route && isRun(primary.route.type)) return primary;
@@ -103,10 +116,32 @@ function routeJob(p: Player, play: SavedPlay, who: Who): string | null {
     // the quarterback's blitz reads as it always did; one aimed elsewhere says where (L8)
     const aim = blitzAim(rt);
     if (aim === "backfield") return "Blitz the backfield";
+    if (aim === "contain") return "Contain blitz";
     const target = aim === "player" ? blitzTarget(rt, play.players) : undefined;
     return target ? `Blitz ${who(target)}` : "Blitz";
   }
-  return routeDef(p.team, rt.type)?.label ?? "Custom route";
+  return routeName(p.team, rt) ?? "Custom route";
+}
+
+/** Which way a rollout or boot goes, as a job says it ("roll out right", "boot left") or a sentence does ("rolls out right"). */
+export function qbMove(act: Pick<QbAction, "type" | "side">, says = false): string {
+  const way = act.side > 0 ? "right" : "left";
+  if (act.type === "rollout") return `${says ? "rolls" : "roll"} out ${way}`;
+  return `${says ? "boots" : "boot"} ${way}`;
+}
+
+/** The quarterback's rollout or boot in a sentence, for the field's description: what they do, in the call's words. Null without one. */
+export function qbActionLine(play: { readonly players: readonly Player[] }): string | null {
+  const act = qbAction(play.players);
+  if (!act) return null;
+  const all = names(play);
+  const who = (p: Player | null): string => (p ? all.get(p.id) ?? "" : "the runner");
+  const qb = who(act.qb), move = qbMove(act, true);
+  if (act.decoy) return `${qb} hands off to ${who(act.fake)}, then ${move} as a decoy.`;
+  const fake = act.fake ? `fakes ${act.type === "boot" ? "the handoff " : ""}to ${who(act.fake)}, then ` : "";
+  return callOf(play.players)
+    ? `${qb} ${fake}${move} behind the line and throws from the ring.`
+    : `${qb} ${fake}${move} behind the line with the ball.`;
 }
 
 /** "Pass", "Run", "Play-action", "Double pass", "Lateral pass", "Lateral run", "Lateral · unfinished", or "Defense" for a defensive call; null when nobody has a route. */
@@ -131,12 +166,16 @@ export function callLine(play: SavedPlay): string | null {
   const chain = chainOf(play.players);
   const last = chain[chain.length - 1] ?? null;
   const hops = chainLinks(play.players).map((l) => `${who(l.from)} ${runsBefore(l) ? "runs and pitches" : "laterals"} to ${who(l.to)}`).join(", ");
+  // the quarterback's rollout or boot, said in the call (L11)
+  const act = qbAction(play.players);
+  const qb = act ? `${who(act.qb)} ${qbMove(act, true)}` : "";
   switch (call) {
-    case "pass": return `Pass.${read}`;
-    case "play-action": return `Play-action: fake to ${who(r)}, then throw.${read}`;
+    case "pass": return act ? `Pass: ${qb} and throws.${read}` : `Pass.${read}`;
+    case "play-action": return act ? `Play-action: fake to ${who(r)}, ${qb}, then throws.${read}` : `Play-action: fake to ${who(r)}, then throw.${read}`;
     case "run": {
       const job = r ? routeJob(r, play, who) : null;
-      return `Run: ${who(r)} takes it${job ? ` (${job})` : ""}.`;
+      const decoy = act ? ` ${who(act.qb)} hands off, then ${qbMove(act, true)} as a decoy.` : "";
+      return `Run: ${who(r)} takes it${job ? ` (${job})` : ""}.${decoy}`;
     }
     case "double-pass":
     case "lateral-pass":
@@ -192,10 +231,28 @@ function qbJob(play: SavedPlay, who: Who): string | null {
 }
 
 /**
+ * The quarterback's job on a rollout or boot (L11): it follows the call, the way the field draws it. Null
+ * when they have none.
+ */
+function qbActionJob(play: SavedPlay, who: Who, look: string): string | null {
+  const act = qbAction(play.players);
+  if (!act) return null;
+  const move = qbMove(act);
+  const Move = move.charAt(0).toUpperCase() + move.slice(1);
+  if (act.decoy) return `Hand off to ${who(act.fake)}, then ${move} as a decoy`;
+  switch (callOf(play.players)) {
+    case "play-action": return `Fake to ${who(act.fake)}, ${move}, throw${look}`;
+    case "pass": return `${Move}, throw${look}`;
+    default: return Move;
+  }
+}
+
+/**
  * A carrier's job in a lateral chain (L6), said for every time they have it, in order: they toss it on
  * ("Lateral to X"), or, the last time, throw, keep it or, with nothing yet, say so. A player who has it
  * more than once gets each in turn: "Lateral to Z, then lateral to X". Null off the chain, and for a
- * quarterback with no lateral, whose own route says their job, but for their rollout's "Throw".
+ * quarterback with no lateral, whose own route says their job, but for a throw (a Pitch saved before ADR 004)
+ * and a rollout or boot, said by the call (L11).
  */
 function carrierJob(p: Player, chain: readonly Player[], play: SavedPlay, who: Who): { job: string; missing: boolean } | null {
   const at = visits(chain, p.id);
@@ -204,7 +261,10 @@ function carrierJob(p: Player, chain: readonly Player[], play: SavedPlay, who: W
   const look = pr ? `, look to ${who(pr)} first` : "";
   const last = chain.length - 1;
   if (!at.length) return null;
-  if (last === 0) return rt?.type === "throw" ? { job: `Throw${look}`, missing: false } : null;
+  if (last === 0) {
+    if (rt && isQbAction(rt.type)) return { job: qbActionJob(play, who, look) ?? routeJob(p, play, who) ?? "", missing: false };
+    return rt?.type === "throw" ? { job: `Throw${look}`, missing: false } : null;
+  }
   const links = chainLinks(play.players);
   const one = (i: number): string => {
     // the toss that leaves them this time is hop i: on the run it is a pitch (L9)

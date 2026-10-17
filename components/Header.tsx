@@ -1,15 +1,13 @@
 "use client";
 
 import { memo } from "react";
-import type { Team, Vis } from "@/lib/play/types";
+import type { Vis } from "@/lib/play/types";
 import { pillMd, pillSm } from "./ui";
 import { Sticker } from "./Sticker";
 
 export type Mode = "play" | "roster";
 
 interface Props {
-  /** offensive play or defensive call */
-  side: Team;
   /** drawing the play, or laying out the roster (docs/adr/008-roster-depth-chart.md) */
   mode: Mode;
   /** roster mode: which side of the roster is on the field, or both */
@@ -22,17 +20,20 @@ interface Props {
   canRedo: boolean;
   /** something is drawn on this play's team */
   canClear: boolean;
+  /** the play differs from its last Save, so the Save key wears a dot */
+  unsaved: boolean;
+  onSave: () => void;
   onToggleLeft: () => void;
   onToggleRight: () => void;
+  /**
+   * roster mode's way out at the top: back to the play, as the Roster tile in Play tools goes
+   * (docs/adr/008-roster-depth-chart.md); `keyboard` when Enter or Space pressed it, not a tap or a click
+   */
+  onBack: (keyboard: boolean) => void;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
 }
-
-const SIDE: Record<Team, { label: string; title: string }> = {
-  offense: { label: "Offense", title: "This is an offensive play" },
-  defense: { label: "Defense", title: "This is a defensive call" },
-};
 
 /** The roster view the badge shows and the one a tap goes to next: offense, defense, both and round again. */
 export const VIEW: Record<Vis, { label: string; icon: string; next: Vis; title: string }> = {
@@ -64,6 +65,15 @@ function MenuIcon() {
   );
 }
 
+/** A drawn arrow with a shaft, so Back reads apart from the panel toggle's chevron and Undo's curl. */
+function BackIcon() {
+  return (
+    <svg aria-hidden="true" width="16" height="14" viewBox="0 0 16 14" className="block shrink-0">
+      <path d="M15 7H2M7 1.5 1.5 7 7 12.5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** A drawn chevron, so the Routes toggle centres exactly instead of sitting on the font's baseline. */
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
@@ -73,8 +83,9 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function HeaderImpl({ side, mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, onToggleLeft, onToggleRight, onUndo, onRedo, onClear }: Props) {
-  const kind = SIDE[side];
+function HeaderImpl({
+  mode, view, onView, leftOpen, rightOpen, canUndo, canRedo, canClear, unsaved, onSave, onToggleLeft, onToggleRight, onBack, onUndo, onRedo, onClear,
+}: Props) {
   const rostering = mode === "roster";
   const showing = VIEW[view];
   return (
@@ -91,10 +102,18 @@ function HeaderImpl({ side, mode, view, onView, leftOpen, rightOpen, canUndo, ca
       >
         <MenuIcon /><span className={name}>Play</span>
       </button>
+      {rostering && (
+        // nothing in roster mode is the play's to undo or clear, so the way back to it has their room, where a back key goes
+        <button type="button" onClick={(e) => { onBack(e.detail === 0); }} title="Back to play" aria-label="Back to play" className={`${pillSm} ${round}`}>
+          <BackIcon />
+          <span className={`${name} min-[479px]:hidden`}>Back</span>
+          <span className="max-[479px]:hidden">Back to play</span>
+        </button>
+      )}
       <div className="min-w-0 flex-1" />
       <div className="flex gap-1.5">
         {rostering ? (
-          // the roster has both sides: the badge is the way between them, and to both at once
+          // the roster has both sides and no play to save: the badge is the way between them, and to both at once
           <button
             type="button"
             onClick={onView}
@@ -106,35 +125,45 @@ function HeaderImpl({ side, mode, view, onView, leftOpen, rightOpen, canUndo, ca
             <span className={name}>{showing.label}</span>
           </button>
         ) : (
-          <span
-            role="img"
-            aria-label={`${kind.label} play`}
-            title={kind.title}
-            className={`${pillSm} ${round} pointer-events-none inline-flex bg-white`}
+          // Save, one tap from the field: the play's own colours already say whose play it is
+          <button
+            type="button"
+            onClick={onSave}
+            title={unsaved ? "Save changes to this play (⌘S)" : "Save this play (⌘S)"}
+            aria-label="Save play"
+            aria-keyshortcuts="Control+S Meta+S"
+            className={`${pillMd} ${round}`}
           >
-            <Sticker icon={side} size={22} className={glyph} />
-            <span className={name}>{kind.label}</span>
-          </span>
+            <span className="relative inline-flex shrink-0">
+              <Sticker icon="save" size={22} className={glyph} />
+              {unsaved && <span aria-hidden className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-ink bg-yellow" />}
+            </span>
+            <span className={name}>Save</span>
+          </button>
         )}
-        <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
-          <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
-          <span className={name}>Undo</span>
-        </button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${roundAfter}`}>
-          <span className={name}>Redo</span>
-          <Sticker icon="redo" size={24} className={`${glyph} ${canRedo ? "" : "opacity-40"}`} />
-        </button>
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={!canClear || rostering}
-          title="Clear routes (undoable)"
-          aria-label="Clear routes"
-          className={`${pillMd} ${round}`}
-        >
-          <Sticker icon="clear" size={22} className={`${glyph} ${canClear && !rostering ? "" : "opacity-40"}`} />
-          <span className={name}>Clear</span>
-        </button>
+        {!rostering && (
+          <>
+            <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo" className={`${pillMd} ${round}`}>
+              <Sticker icon="undo" size={24} className={`${glyph} ${canUndo ? "" : "opacity-40"}`} />
+              <span className={name}>Undo</span>
+            </button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo" className={`${pillMd} ${roundAfter}`}>
+              <span className={name}>Redo</span>
+              <Sticker icon="redo" size={24} className={`${glyph} ${canRedo ? "" : "opacity-40"}`} />
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={!canClear}
+              title="Clear routes (undoable)"
+              aria-label="Clear routes"
+              className={`${pillMd} ${round}`}
+            >
+              <Sticker icon="clear" size={22} className={`${glyph} ${canClear ? "" : "opacity-40"}`} />
+              <span className={name}>Clear</span>
+            </button>
+          </>
+        )}
       </div>
       <button
         type="button"

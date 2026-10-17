@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Designer, downloadBytes } from "../support/designer";
 import { COVER_TWO_D, OTTERS, SLANT_LEFT, ZONE_D, play, playbook, seed } from "../support/fixtures";
+import { latin, pdfWords } from "../support/pdf";
 
 /**
  * Issue #108, the coach-workflow polish: what a coach relies on once a staff shares and prints
@@ -10,7 +11,7 @@ import { COVER_TWO_D, OTTERS, SLANT_LEFT, ZONE_D, play, playbook, seed } from ".
  * - A snapshot link carries the play's coaching notes, shows them on the share page and brings
  *   them back into the designer, as the playbook's short link always did.
  * - The toast sits under the play name, never over it.
- * - On a phone every header control shows its name, not just a glyph.
+ * - On a phone every header control shows its name, not just a glyph, on a play and in roster mode.
  * - The one-up and four-up binders download under different names.
  * - Every PDF keeps its words, invisibly, under the page pictures, so it can be searched.
  * - Playbook and play cards line up their titles whatever the first play's depth.
@@ -130,24 +131,42 @@ test("the Saved toast sits under the play name, never over it", async ({ page },
 test.describe("phone header", () => {
   const CONTROLS = [
     { name: "Play tools", label: "Play" },
-    { name: "Offense play", label: "Offense" },
+    { name: "Save play", label: "Save" },
     { name: "Undo", label: "Undo" },
     { name: "Redo", label: "Redo" },
     { name: "Clear routes", label: "Clear" },
     { name: "Route palette", label: "Routes" },
   ] as const;
+  // roster mode has nothing of the play's to undo or clear: Back to play takes their room, beside Play tools (ADR 008)
+  const ROSTER_CONTROLS = [
+    { name: "Play tools", label: "Play" },
+    { name: "Back to play", label: "Back" },
+    { name: "Showing offense", label: "Offense" },
+    { name: "Roster panel", label: "Roster" },
+  ] as const;
+  const MODES = [
+    { mode: "play", heading: "at", file: "header", controls: CONTROLS },
+    { mode: "roster", heading: "in roster mode at", file: "header-roster", controls: ROSTER_CONTROLS },
+  ] as const;
 
-  for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) {
-    test(`at ${String(size.width)}px every header control shows its name under its glyph`, async ({ page }, testInfo) => {
+  for (const { mode, heading, file, controls } of MODES) for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) {
+    test(`${heading} ${String(size.width)}px every header control shows its name under its glyph`, async ({ page }, testInfo) => {
       const device = testInfo.project.name;
       await page.setViewportSize(size);
       const d = new Designer(page);
       await d.goto();
+      if (mode === "roster") {
+        await d.roster();
+        await d.closeSidebars();
+      }
       await d.settle();
       const header = page.locator("header");
+      // only these keys, in this order: nothing hidden in the header pushes them off a narrow screen
+      expect(await header.getByRole("button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))))
+        .toEqual(controls.map((c) => c.name));
       const found: Record<string, unknown>[] = [];
-      for (const c of CONTROLS) {
-        const control: Locator = header.getByRole(c.name === "Offense play" ? "img" : "button", { name: c.name, exact: true });
+      for (const c of controls) {
+        const control: Locator = header.getByRole("button", { name: c.name, exact: true });
         const name = control.getByText(c.label, { exact: true });
         await expect(name, `${c.name} shows "${c.label}"`).toBeVisible();
         const box = await control.boundingBox();
@@ -170,50 +189,38 @@ test.describe("phone header", () => {
         expect(text.x).toBeGreaterThanOrEqual(box.x);
         expect(text.x + text.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
         expect(text.y + text.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
-        if (c.name !== "Offense play") expect(hit, `a tap at the centre of ${c.name} lands on it`).toBe(true);
+        expect(hit, `a tap at the centre of ${c.name} lands on it`).toBe(true);
       }
       const overflow = await header.evaluate((el) => el.scrollWidth - el.clientWidth);
       expect(overflow, "the header fits the screen").toBeLessThanOrEqual(0);
-      await header.screenshot({ path: out(device, `header-${String(size.width)}.png`) });
-      report(device, `header-${String(size.width)}`, { viewport: size, overflow, controls: found });
+      await header.screenshot({ path: out(device, `${file}-${String(size.width)}.png`) });
+      report(device, `${file}-${String(size.width)}`, { viewport: size, overflow, controls: found });
     });
   }
+
+  test("from 479px the roster header fits with Back to play spelled out beside its arrow", async ({ page }, testInfo) => {
+    const device = testInfo.project.name;
+    const size = { width: 479, height: 800 };
+    await page.setViewportSize(size);
+    const d = new Designer(page);
+    await d.goto();
+    await d.roster();
+    await d.closeSidebars();
+    const header = page.locator("header");
+    const name = d.back.getByText("Back to play", { exact: true });
+    await expect(name).toBeVisible();
+    await expect(d.back.getByText("Back", { exact: true })).toBeHidden();
+    const text = await name.boundingBox();
+    const glyph = await d.back.locator("svg").boundingBox();
+    expect(text && glyph).toBeTruthy();
+    if (!text || !glyph) return;
+    expect(text.x, "the name sits beside the arrow, not under it").toBeGreaterThanOrEqual(glyph.x + glyph.width - 1);
+    const overflow = await header.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow, "the roster header fits the screen").toBeLessThanOrEqual(0);
+    await header.screenshot({ path: out(device, "header-roster-479.png") });
+    report(device, "header-roster-479", { viewport: size, overflow, text, glyph });
+  });
 });
-
-/** Latin-1 view of the file, byte for byte. */
-const latin = (b: Buffer): string => b.toString("latin1");
-
-const CP1252 = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
-
-/**
- * The words under each page's picture, read out of the PDF's content streams: every `<hex> Tj`
- * run between BT and ET, decoded from WinAnsi, with where the run sits. The page boxes come from
- * each page object's MediaBox, so a run can be checked against the page it is on.
- */
-function pdfWords(pdf: Buffer): { pages: { box: number[]; runs: { s: string; x: number; y: number; size: number; invisible: boolean }[] }[] } {
-  const s = latin(pdf);
-  const objects = new Map<number, string>();
-  for (const m of s.matchAll(/(\d+) 0 obj\n([\s\S]*?)\nendobj\n/g)) objects.set(Number(m[1]), m[2] ?? "");
-  const pages: { box: number[]; runs: { s: string; x: number; y: number; size: number; invisible: boolean }[] }[] = [];
-  for (const body of objects.values()) {
-    if (!body.startsWith("<< /Type /Page ")) continue;
-    const box = (/\/MediaBox \[([^\]]+)\]/.exec(body)?.[1] ?? "").split(" ").map(Number);
-    const contents = Number(/\/Contents (\d+) 0 R/.exec(body)?.[1]);
-    const stream = /stream\n([\s\S]*)\nendstream/.exec(objects.get(contents) ?? "")?.[1] ?? "";
-    const runs: { s: string; x: number; y: number; size: number; invisible: boolean }[] = [];
-    for (const block of stream.matchAll(/BT([\s\S]*?)ET/g)) {
-      const text = block[1] ?? "";
-      const invisible = /(^|\s)3 Tr(\s|$)/.test(text);
-      for (const r of text.matchAll(/\/F1 ([\d.]+) Tf [\d.]+ Tz 1 0 0 1 ([\d.-]+) ([\d.-]+) Tm <([0-9a-f]*)> Tj/g)) {
-        const bytes = Buffer.from(r[4] ?? "", "hex");
-        const word = Array.from(bytes, (b) => (b >= 0x80 && b <= 0x9f ? CP1252[b - 0x80] ?? "" : String.fromCharCode(b))).join("");
-        runs.push({ s: word, size: Number(r[1]), x: Number(r[2]), y: Number(r[3]), invisible });
-      }
-    }
-    pages.push({ box, runs });
-  }
-  return { pages };
-}
 
 test("the one-up and four-up binders download under their own names, and every PDF's words can be searched", async ({ page }, testInfo) => {
   test.setTimeout(180_000);

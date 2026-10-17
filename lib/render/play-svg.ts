@@ -1,9 +1,10 @@
+import { blitzAim } from "@/lib/play/blitz";
 import { NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { LOS_YARD, readLos } from "@/lib/play/field";
 import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, lateralArcs, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
-import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
+import { INK as ROUTE_INK, routeDef, routeName } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 
@@ -228,7 +229,10 @@ export function playArt(players: readonly Player[], opts: ArtOptions = {}): Art 
 
 interface Label { x: number; y: number; text: string; anchor: "start" | "middle" | "end" }
 
-/** Where a route's name goes: beside the last leg, pushed towards the nearest sideline, or in the zone bubble. */
+/**
+ * Where a route's name goes: beside the last leg, pushed towards the nearest sideline, or in the zone bubble.
+ * A contain blitz's goes beside its rush up the edge, not its short turn in among the offense's backfield.
+ */
 function routeLabel(
   p: Player, players: readonly Player[], top: number,
   zone: { cx: number; cy: number; ry: number } | null,
@@ -236,11 +240,15 @@ function routeLabel(
   const rt = p.route;
   if (!rt || rt.type === "custom") return null;
   const def = routeDef(p.team, rt.type);
-  if (!def) return null;
-  if (zone) return { x: onField(zone.cx, "middle", def.label), y: zone.cy + zone.ry - 8, text: def.label, anchor: "middle" };
+  // a contain blitz is named for its job, so a printed card says which rush it is (lib/play/blitz.ts)
+  const contain = rt.type === "blitz" && blitzAim(rt) === "contain";
+  const name = contain ? "Contain" : routeName(p.team, rt);
+  if (!def || !name) return null;
+  if (zone) return { x: onField(zone.cx, "middle", name), y: zone.cy + zone.ry - 8, text: name, anchor: "middle" };
   const abs = routeYards(p, players, top);
   if (!abs || abs.length < 2) return null;
-  const a = abs[abs.length - 2], b = abs[abs.length - 1];
+  const leg = contain ? 1 : abs.length - 1;
+  const a = abs[leg - 1], b = abs[leg];
   if (!a || !b) return null;
   const ax = px(a[0]), ay = py(a[1], top), bx = px(b[0]), by = py(b[1], top);
   const mx = (ax + bx) / 2, my = (ay + by) / 2;
@@ -251,7 +259,7 @@ function routeLabel(
   else if (ny > 0) { nx = -nx; ny = -ny; }
   const x = mx + nx * 16, y = my + ny * 16 + 5;
   const anchor: Label["anchor"] = Math.abs(nx) < 0.3 ? "middle" : nx < 0 ? "end" : "start";
-  return { x: onField(x, anchor, def.label), y: Math.max(16, y), text: def.label, anchor };
+  return { x: onField(x, anchor, name), y: Math.max(16, y), text: name, anchor };
 }
 
 /** The label's x, pulled in so the whole word stays inside the field, 4 units clear of each sideline. */

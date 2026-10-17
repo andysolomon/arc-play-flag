@@ -6,9 +6,10 @@ import {
 } from "react";
 import { getDeepField, serverDeepField, setDeepField, subscribeDeepField } from "@/lib/deepfield";
 import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZone } from "@/lib/endzone";
+import { qbActionLine } from "@/lib/play/assignments";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
-import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD } from "@/lib/play/field";
-import { MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, rosterDepth, snap } from "@/lib/play/geometry";
+import { LOS_YARD } from "@/lib/play/field";
+import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, quarterback, rosterDepth, snap } from "@/lib/play/geometry";
 import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";
@@ -17,6 +18,7 @@ import { isContext, shown } from "@/lib/play/reducer";
 import { STAMP_FONT, STAMP_SPACING, manTags, stampBox, tagged } from "@/lib/play/marks";
 import { MAX_ROUTE_POINTS, losGap } from "@/lib/play/routes";
 import { atSnap, motionPoint } from "@/lib/play/pre-snap";
+import { crowdNote, crowding, freeSnap, freeSpot, stepPast, teammates } from "@/lib/play/spacing";
 import { motionGeom } from "@/lib/play/geometry";
 import { touchdownAt } from "@/lib/play/touchdown";
 import type { Draft, Pair, Pane, Player, SnapMode, Team, Vis } from "@/lib/play/types";
@@ -42,8 +44,11 @@ interface Props {
   draft: Draft | null;
   dispatch: (a: Action) => void;
   onSelect: (id: string) => void;
-  /** a lateral's catch, or a pitch's release, was dragged or nudged somewhere illegal and snapped back: say why */
-  onCatchNote?: (text: string) => void;
+  /**
+   * something dragged or nudged somewhere it can't go was held back: a lateral's catch or a pitch's release
+   * snapped back, or a player kept off a teammate (lib/play/spacing.ts). Say why
+   */
+  onNote?: (text: string) => void;
   /** while Lateral asks who takes it: the carrier tossing it, who can't take it from themself */
   lateralFrom?: string | null;
   svgRef: RefObject<SVGSVGElement | null>;
@@ -61,6 +66,12 @@ interface Props {
   showTitle?: boolean;
   /** Saved / Unsaved / Draft autosaved caption under the on-screen play name */
   status?: string;
+  /**
+   * the on-screen title, for focus handed to it (the header's Back to play, which makes it focusable until focus moves
+   * on). Its ring is drawn over the field's frame, whose top edge would hide the ring's foot, never under
+   * `data-quiet-focus`, and never on paper
+   */
+  titleRef?: RefObject<HTMLHeadingElement | null>;
   /** who starts at each position, by player id, from the roster (docs/adr/008-roster-depth-chart.md) */
   starters?: Readonly<Record<string, string>>;
   /**
@@ -82,6 +93,13 @@ interface Drag {
   y0: number;
   moved: boolean;
   last: { x: number; y: number } | null;
+  /** the player's tag, and their teammates where they stand, whom they are held clear of (lib/play/spacing.ts) */
+  name: string;
+  mates: Player[];
+  /** where the player is drawn now, which a finger on a teammate's centre keeps them beside */
+  at: { x: number; y: number };
+  /** the teammates the coach has been told the player is kept off: each once a drag */
+  told: Set<string>;
 }
 
 interface Live {
@@ -131,6 +149,11 @@ const LANE_CLIP = "ffez-lane";
 const PLAY_BUTTON = { inset: 12, size: 48 };
 /** The field's border, in CSS pixels: the diagram's units start inside it. */
 const FIELD_BORDER = 3;
+/**
+ * How far, in yards, a dragged player's drop may land from where it is drawn before the token is drawn where
+ * it will land instead: past the half yard's own reach, so an ordinary drop is drawn where the finger is.
+ */
+const LANDS_NEAR = 0.75;
 
 /**
  * What goes under a token: the starter's name when the roster has one, and in roster mode "Unassigned"
@@ -144,8 +167,8 @@ function captionFor(p: Player, starters: Readonly<Record<string, string>> | unde
 }
 
 function FieldImpl({
-  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onCatchNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
-  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, starters, roster = false,
+  players, vis, side, selectedId, targeting, draft, dispatch, onSelect, onNote, lateralFrom = null, svgRef, snapMode = "half", showYardNumbers = true,
+  noRunZones = true, los = LOS_YARD, readOnly = false, title, showTitle = false, status, titleRef, starters, roster = false,
 }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const [pane, setPane] = useState<Pane | null>(null);
@@ -153,6 +176,11 @@ function FieldImpl({
   const [liveWaypoint, setLiveWaypoint] = useState<{ id: string; index: number; x: number; y: number } | null>(null);
   const [selectedWaypoint, setSelectedWaypoint] = useState<{ id: string; index: number } | null>(null);
   const [boingId, setBoingId] = useState<string | null>(null);
+  // a player whose arrow step goes nowhere, past a teammate or the edge of the field, shakes, afresh each press
+  const [shakeOn, setShakeOn] = useState<{ id: string; n: number } | null>(null);
+  const shakePlayerTimer = useRef(0);
+  // the player and teammate a held arrow key has stopped beside, which it says once a hold
+  const heldBeside = useRef<string | null>(null);
   const [liveCatch, setLiveCatch] = useState<{ hop: number; pt: Pair } | null>(null);
   const [liveRelease, setLiveRelease] = useState<{ hop: number; pt: Pair } | null>(null);
   const [shakeHop, setShakeHop] = useState<number | null>(null);
@@ -216,14 +244,17 @@ function FieldImpl({
     };
   }), [players, live, liveWaypoint, liveCatch, liveRelease]);
   // the card fits the pane and the play; on a wide pane that is 16 yards past the line of scrimmage,
-  // so drawing a custom route (a tap can't land past the card's top) and Deep field open the deepest card;
+  // so drawing a custom route (a tap can't land past the card's top) opens the deepest card, 37 yards on;
+  // Deep field opens the field to the end line, further than a tall phone's card reaches from the drive start;
   // pre-snap motion stays in the backfield, so drawing it leaves the card as it is;
   // roster mode's formation stands still, so its card frames just the formation and Deep field is the plays' alone
+  const designing = !readOnly && !roster;
   const fit = roster ? rosterDepth(effective) : depth(effective, pane, MIN_DEPTH, los);
-  const deepest = depth(effective, pane, MAX_DEPTH, los);
-  const d = !readOnly && !roster && (deepField || (draft !== null && draft.kind !== "motion")) ? deepest : fit;
+  const endLine = depth(effective, pane, FULL_DEPTH, los, FULL_DEPTH);
+  const drawing = draft !== null && draft.kind !== "motion";
+  const d = !designing ? fit : deepField ? endLine : drawing ? depth(effective, pane, MAX_DEPTH, los) : fit;
   // offered only where it shows more field, and not while anything is being drawn
-  const offerDeep = !readOnly && !roster && draft === null && deepest > fit;
+  const offerDeep = designing && draft === null && endLine > fit;
   const layout = useMemo(() => fieldLayout(d, showYardNumbers, noRunZones, los), [d, showYardNumbers, noRunZones, los]);
   const top = layout.top;
   const width = cardWidth(pane, d);
@@ -276,6 +307,11 @@ function FieldImpl({
   const arcs = useMemo(() => (roster ? [] : lateralArcs(effective, top).filter((a) => onField.has(a.from))), [roster, effective, top, onField]);
   const arcsFaded = arcs.length > 0 && side === "defense";
   const names = useMemo(() => Object.fromEntries(effective.map((p) => [p.id, p.label || p.id])), [effective]);
+  // the quarterback's rollout or boot, in the call's words (docs/adr/011-qb-rollout-and-boot.md)
+  const qbWords = useMemo(() => {
+    const qb = quarterback(effective);
+    return roster || !qb || !onField.has(qb.id) ? null : qbActionLine({ players: effective });
+  }, [roster, effective, onField]);
   const routes = useMemo(
     () => {
       if (roster) return [];
@@ -316,6 +352,14 @@ function FieldImpl({
     return { x: ((cx - r.left) / r.width) * 30, y: topRef.current + ((cy - r.top) / r.height) * dep };
   }, [svgRef]);
 
+  // a player dragged onto a teammate is kept off them, and the coach is told why, once a teammate a drag
+  const tellCrowded = useCallback((dr: Drag, at: { x: number; y: number }) => {
+    const mate = crowding(at, dr.mates);
+    if (!mate || dr.told.has(mate.id)) return;
+    dr.told.add(mate.id);
+    onNote?.(crowdNote(dr.name, mate.label || mate.id, "kept"));
+  }, [onNote]);
+
   const applyDrag = useCallback(() => {
     rafRef.current = 0;
     const dr = dragRef.current;
@@ -323,8 +367,16 @@ function FieldImpl({
     const y = toYards(dr.last.x, dr.last.y);
     const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
     if (Math.abs(c.x - dr.x0) > 0.25 || Math.abs(c.y - dr.y0) > 0.25) dr.moved = true;
-    if (dr.moved) setLive({ id: dr.id, x: c.x, y: c.y });
-  }, [toYards]);
+    if (!dr.moved) return;
+    // held clear of every teammate: it slides round one in the way, and past them once the pointer is
+    const f = freeSpot(c, dr.team, topRef.current, dr.gap, dr.mates, dr.at) ?? dr.at;
+    dr.at = f;
+    tellCrowded(dr, c);
+    // held in a sliver no drop can land in (at a sideline between two teammates): shown where it will land
+    const s = freeSnap(f, dr.team, topRef.current, dr.gap, dr.mates, snapMode, { x: dr.x0, y: dr.y0 }) ?? f;
+    const shown = Math.hypot(s.x - f.x, s.y - f.y) > LANDS_NEAR ? s : f;
+    setLive({ id: dr.id, x: shown.x, y: shown.y });
+  }, [snapMode, tellCrowded, toYards]);
 
   const applyWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -343,8 +395,15 @@ function FieldImpl({
     if (dr.moved && dr.last) {
       const y = toYards(dr.last.x, dr.last.y);
       const c = clamp(y.x + dr.ox, y.y + dr.oy, dr.team, topRef.current, dr.gap);
-      const s = clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap);
+      // where it was held clear of every teammate, snapped as every drop is and still clear of them; with
+      // nowhere clear it stays where it was (lib/play/spacing.ts)
+      const f = freeSpot(c, dr.team, topRef.current, dr.gap, dr.mates, dr.at);
+      const s = f && freeSnap(f, dr.team, topRef.current, dr.gap, dr.mates, snapMode, { x: dr.x0, y: dr.y0 });
       setLive(null);
+      if (!s) return;
+      tellCrowded(dr, clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap));
+      // held back to where it started: nothing moved, so nothing to undo and Redo is kept
+      if (s.x === dr.x0 && s.y === dr.y0) return;
       dispatch({ type: "move", id: dr.id, x: s.x, y: s.y, commit: true });
       setBoingId(dr.id);
       window.setTimeout(() => { setBoingId((b) => (b === dr.id ? null : b)); }, 380);
@@ -360,7 +419,7 @@ function FieldImpl({
     }
     if (targeting && p.team === "offense") { dispatch({ type: "target", id: p.id }); return; }
     onSelect(p.id);
-  }, [canTake, dispatch, onSelect, players, snapMode, targeting, toYards]);
+  }, [canTake, dispatch, onSelect, players, snapMode, targeting, tellCrowded, toYards]);
 
   const endWaypointDrag = useCallback(() => {
     const dr = waypointDragRef.current;
@@ -380,17 +439,25 @@ function FieldImpl({
     window.clearTimeout(shakeTimer.current);
     shakeTimer.current = window.setTimeout(() => { setShakeHop(null); }, 400);
     const from = arcs.find((a) => a.hop === hop)?.from;
-    onCatchNote?.(catchNote(rule, from ? names[from] ?? "" : ""));
-  }, [arcs, names, onCatchNote]);
-  useEffect(() => () => { window.clearTimeout(shakeTimer.current); window.clearTimeout(shakeReleaseTimer.current); }, []);
+    onNote?.(catchNote(rule, from ? names[from] ?? "" : ""));
+  }, [arcs, names, onNote]);
+  useEffect(() => () => {
+    window.clearTimeout(shakeTimer.current); window.clearTimeout(shakeReleaseTimer.current); window.clearTimeout(shakePlayerTimer.current);
+  }, []);
+  // a fresh press shakes again; a held key's repeats keep the one shake going
+  const shakePlayer = useCallback((id: string, again: boolean) => {
+    setShakeOn((k) => (again || k?.id !== id ? { id, n: (k?.n ?? 0) + 1 } : k));
+    window.clearTimeout(shakePlayerTimer.current);
+    shakePlayerTimer.current = window.setTimeout(() => { setShakeOn(null); }, 400);
+  }, []);
   // a release dragged past the line shakes and says so, once as it starts
   const snapBackRelease = useCallback((hop: number) => {
     setShakeRelease(hop);
     window.clearTimeout(shakeReleaseTimer.current);
     shakeReleaseTimer.current = window.setTimeout(() => { setShakeRelease(null); }, 400);
     const from = arcs.find((a) => a.hop === hop)?.from;
-    onCatchNote?.(releaseNote(from ? names[from] ?? "" : ""));
-  }, [arcs, names, onCatchNote]);
+    onNote?.(releaseNote(from ? names[from] ?? "" : ""));
+  }, [arcs, names, onNote]);
 
   /** The release a pointer is over, in yards: snapped like a waypoint, then kept behind the line and on the field. */
   const releaseAt = useCallback((cx: number, cy: number) => {
@@ -524,7 +591,10 @@ function FieldImpl({
     const p = players.find((q) => q.id === id);
     if (!p) return;
     const pt = toYards(e.clientX, e.clientY);
-    dragRef.current = { id, team: p.team, gap: losGap(p.route), ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null };
+    dragRef.current = {
+      id, team: p.team, gap: losGap(p.route), ox: p.x - pt.x, oy: p.y - pt.y, x0: p.x, y0: p.y, moved: false, last: null,
+      name: p.label || p.id, mates: teammates(players, id), at: { x: p.x, y: p.y }, told: new Set(),
+    };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   }, [players, toYards]);
 
@@ -543,8 +613,20 @@ function FieldImpl({
     const step = STEP[e.key];
     if (step && !playRef.current) {
       e.preventDefault();
-      const c = clamp(p.x + step[0], p.y + step[1], p.team, topRef.current, losGap(p.route));
-      dispatch({ type: "move", id, x: c.x, y: c.y, commit: true });
+      // a press onto a teammate goes on past them, or, with the edge of the field first, nowhere; a key held
+      // down stops beside them, and says nothing more as it repeats (lib/play/spacing.ts, C7)
+      const r = stepPast(p, step, p.team, topRef.current, losGap(p.route), teammates(players, id), !e.repeat);
+      const who = p.label || p.id, mate = r.past ? r.past.label || r.past.id : "";
+      if (!e.repeat) {
+        heldBeside.current = null;
+        if (r.past) onNote?.(crowdNote(who, mate, r.to ? "past" : "stuck"));
+      } else if (r.past && !r.to && heldBeside.current !== `${id}:${mate}`) {
+        // a held key stopped beside a teammate says so once, for whoever can't see it stop
+        heldBeside.current = `${id}:${mate}`;
+        onNote?.(crowdNote(who, mate, "kept"));
+      }
+      if (r.to) dispatch({ type: "move", id, x: r.to.x, y: r.to.y, commit: true });
+      else if (r.past) shakePlayer(id, !e.repeat);
       if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -553,7 +635,7 @@ function FieldImpl({
       } else if (targeting && p.team === "offense") dispatch({ type: "target", id });
       else onSelect(id);
     }
-  }, [canTake, dispatch, onSelect, players, selectedId, targeting]);
+  }, [canTake, dispatch, onNote, onSelect, players, selectedId, shakePlayer, targeting]);
 
   const onWaypointKey = useCallback((id: string, index: number, e: KeyboardEvent<SVGGElement>) => {
     const p = players.find((q) => q.id === id);
@@ -708,7 +790,14 @@ function FieldImpl({
       <div className="flex-none print:!w-full" style={{ width: width !== null ? `${width.toFixed(1)}px` : "min(100%, 430px)" }}>
         {title !== undefined && showTitle && (
           <div id={FIELD_TITLE_ID} className="mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
-            <h1 className="min-w-0 truncate text-header font-normal text-ink" title={title}>{title}</h1>
+            <h1
+              ref={titleRef}
+              className="min-w-0 truncate text-header font-normal text-ink focus-visible:relative focus-visible:z-[1] data-quiet-focus:outline-none print:outline-none"
+              title={title}
+            >
+              {title}
+            </h1>
+            {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
             {status !== undefined && (
               <span className={`shrink-0 text-caption ${status === "Saving failed" ? "text-offense" : "text-ink-muted"}`} aria-live="polite">
                 {status}
@@ -746,13 +835,7 @@ function FieldImpl({
             onClick={() => { setDeepField(!deepField); }}
             aria-pressed={deepField}
             data-active={deepField}
-            title={
-              deepField
-                ? "Fit the field to the play"
-                : deepest >= 8 + GOAL_YARD + END_ZONE_YARDS - los
-                  ? "Show the field to the end line"
-                  : `Show ${String(deepest - 8)} yards downfield`
-            }
+            title={deepField ? "Fit the field to the play" : "Show the field to the end line"}
             className={
               `${pillSm} absolute right-3 top-3 z-10 shadow-tile data-[active=true]:bg-yellow data-[active=true]:on-yellow ` +
               "data-[active=true]:hover:bg-yellow print:hidden"
@@ -817,6 +900,7 @@ function FieldImpl({
             {tagWords}
             {visible.some(p => p.preSnap) ? " Dashed pre-snap motion runs before the snap; the route begins at its endpoint." : ""}
             {visible.some((p) => p.route?.type === "jet") ? " A jet sweep is already crossing behind the line when the ball is snapped and takes the handoff from the quarterback as it passes." : ""}
+            {qbWords ? ` ${qbWords}` : ""}
             {arcs.length ? ` Laterals, as dashed arcs behind the line: ${arcs.map((a) => `${names[a.from] ?? ""}${a.run ? " runs with it and pitches" : ""} to ${names[a.target] ?? ""}`).join(", then ")}.` : ""}
             {flagged ? ` ${NO_RUN_FLAG}: the ball is in a no-run zone and this play is a run.` : ""}
           </desc>
@@ -923,6 +1007,7 @@ function FieldImpl({
               target={targetOf(p)}
               focusOnTarget={targetOf(p) !== null && p.id === visible.find((q) => targetOf(q) !== null)?.id}
               boing={boingId === p.id}
+              shake={shakeOn?.id === p.id ? shakeOn.n : 0}
               dragging={dragging}
               readOnly={readOnly || draft !== null}
               drawing={draft !== null}

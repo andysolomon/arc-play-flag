@@ -2,7 +2,8 @@
 
 import { memo, useId, useRef, type ChangeEvent } from "react";
 import type { BlitzAim } from "@/lib/play/blitz";
-import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, isRun, mirrorable, tableFor } from "@/lib/play/routes";
+import type { DeepSplit } from "@/lib/play/deep";
+import { DEFENSE_KEYS, PASS_KEYS, QB_KEYS, RUN_KEYS, isQbAction, isRun, mirrorable, tableFor } from "@/lib/play/routes";
 import { teamFill, type SidelineCut } from "@/lib/play/geometry";
 import type { Player, RouteType } from "@/lib/play/types";
 import { Note } from "./Hint";
@@ -26,10 +27,14 @@ interface Props {
   onRunBefore: () => void;
   /** the selected blitzer: how their blitz is aimed, who it comes for now, and the back a backfield blitz would come for (lib/play/blitz.ts) */
   blitz: BlitzInfo | null;
-  /** the QB and Backfield pills */
-  onBlitzAim: (aim: "qb" | "backfield") => void;
+  /** the QB, Backfield and Contain pills */
+  onBlitzAim: (aim: "qb" | "backfield" | "contain") => void;
   /** Pick a player: like Man, ask for a red player on the field */
   onBlitzTarget: () => void;
+  /** the selected deep zone: Auto (split with the other deep zones), a deep half or a deep third; null for anything else */
+  deep: DeepSplit | "auto" | null;
+  /** the Auto, Half and Third pills */
+  onDeepSplit: (split: DeepSplit | null) => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
   cut: SidelineCut | null;
   /**
@@ -37,8 +42,11 @@ interface Props {
    * quarterback or the centre and does not carry the ball in a lateral chain. Nobody else is offered the tile.
    */
   jet: boolean;
-  /** the selected player is the quarterback: they hand the ball off, so the Handoff tile is not theirs */
-  quarterback: boolean;
+  /**
+   * the selected player is the quarterback, who is offered a rollout and a boot at the snap
+   * (docs/adr/011-qb-rollout-and-boot.md), and what the one they have does; null for anyone else
+   */
+  qb: QbInfo | null;
   hint: string | null;
   onPick: (key: RouteType) => void;
   onMotion: () => void;
@@ -54,12 +62,50 @@ interface Props {
   noRunZone: boolean;
 }
 
+export interface QbInfo {
+  /** the quarterback's rollout or boot as the play has it; null without one */
+  act: {
+    type: "rollout" | "boot";
+    /** +1 to the quarterback's right */
+    side: 1 | -1;
+    /** who they fake or hand off to, by name; null with no runner on the play */
+    fake: string | null;
+    /** the call is a run: they hand off and carry it out as a decoy */
+    decoy: boolean;
+    /** someone has a route to throw to, so marking them as the read makes it a pass again */
+    receivers: boolean;
+    /** what turns a boot the other way: Flip play, ⇄ Mirror on the fake's run when flipping doesn't (Q11), or neither */
+    turn: "flip" | "mirror" | null;
+  } | null;
+}
+
+/** What the quarterback's rollout or boot does, under the QB tiles. */
+function qbWords(name: string, act: NonNullable<QbInfo["act"]>): string {
+  const way = act.side > 0 ? "right" : "left", other = act.side > 0 ? "left" : "right";
+  const verb = act.type === "rollout" ? `rolls out ${way}` : `boots ${way}`;
+  if (act.decoy) {
+    const instead = act.receivers ? "mark a receiver as the read" : "give a receiver a route";
+    return `${name} hands off to ${act.fake ?? "the runner"}, then ${verb} as a decoy. To throw instead, ${instead}.`;
+  }
+  if (act.type === "rollout") {
+    const first = act.fake ? `fakes to ${act.fake} first, then rolls out ${way}` : `takes the snap and rolls out ${way}`;
+    return `${name} ${first}, behind the line, to throw from the ring. ⇄ Mirror route rolls ${other}.`;
+  }
+  if (!act.fake) return `Nothing to fake yet: give a back a run, and ${name} fakes it first, then boots the other way. For now ${name} boots ${way}.`;
+  const turn = act.turn === "flip" ? `Flip the play to boot ${other}` : act.turn === "mirror" ? `⇄ Mirror ${act.fake}'s run to boot ${other}` : `Move ${act.fake} to boot ${other}`;
+  // a rollout goes right unless mirrored, so it goes with a fake to the right as it is, and mirrored with one to the left
+  const roll = act.side < 0 ? "pick Rollout to go with the fake" : "pick Rollout and ⇄ Mirror it to go with the fake";
+  return `${name} fakes the handoff to ${act.fake}, then boots out the other way, to the ${way}, to throw from the ring. ${turn}, or ${roll}.`;
+}
+
 export interface BlitzInfo {
   aim: BlitzAim;
   /** who the blitz comes for now, by name; null with no quarterback on the field */
   who: string | null;
   /** the back a backfield blitz comes for, by name; null with nobody lined up back there */
   back: string | null;
+  /** a contain blitz: the edge on the rusher's side, as the picture shows it, and whether the sideline leaves room to contain it, or the other one */
+  contain: { edge: "left" | "right"; room: boolean; other: boolean } | null;
 }
 
 /** What the blitz does, under the pills. */
@@ -70,8 +116,24 @@ function blitzWords(b: BlitzInfo): string {
       ? `Comes for the nearest back lined up near the ball: ${b.back} now. With nobody back there, the quarterback.`
       : "Comes for the nearest back lined up near the ball. Nobody is back there now, so it comes for the quarterback.";
   }
-  return "Comes for the quarterback. Aim it at the backfield, or pick any red player.";
+  if (b.aim === "contain" && b.contain) {
+    const { edge, room, other } = b.contain;
+    const far = edge === "left" ? "right" : "left";
+    const here = room
+      ? `Rushes the ${edge} edge outside the quarterback, then turns in, so they can't escape that way.`
+      : `The sideline leaves no room outside the quarterback on the ${edge}, so it comes straight for them.`;
+    if (other) return `${here} To contain the ${far} edge, line up ${far} of the quarterback.`;
+    return room ? `${here} The sideline leaves no room to contain the ${far} edge.` : here;
+  }
+  return "Comes for the quarterback. Aim it at the backfield, contain an edge, or pick any red player.";
 }
+
+/** The DEEP pills, and what each says the zone does. */
+const DEEP_PILLS: readonly { split: DeepSplit | null; label: string; title: string; words: string }[] = [
+  { split: null, label: "Auto", title: "Split the deep field with the other deep zones", words: "Splits the deep field with the other deep zones: one owns it all, two take halves, three take thirds." },
+  { split: "half", label: "Half", title: "Play the deep half nearest this defender", words: "Owns the deep half of the field on this side, however many others play deep." },
+  { split: "third", label: "Third", title: "Play the deep third nearest this defender", words: "Owns the deep third of the field nearest them, however many others play deep." },
+];
 
 /** Yards as a coach reads them off the field, to the half yard. */
 const yards = (v: number): string => String(Math.round(v * 2) / 2);
@@ -84,7 +146,7 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, quarterback, hint, onPick, onMotion, onRemoveMotion,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, deep, onDeepSplit, cut, jet, qb, hint, onPick, onMotion, onRemoveMotion,
   onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
@@ -106,11 +168,12 @@ function RouteSidebarImpl({
   // the jet sweep is a handoff at the snap: only for a player who can take one, never a keep after a lateral
   // and a handoff is to someone else: the quarterback keeps, sweeps or laterals, but never hands off to themself
   const runKeys: readonly RouteType[] = sel?.team === "offense"
-    ? RUN_KEYS.filter((k) => (k !== "jet" || (jet && !hasBall)) && (k !== "handoff" || !quarterback))
+    ? RUN_KEYS.filter((k) => (k !== "jet" || (jet && !hasBall)) && (k !== "handoff" || !qb))
     : [];
   const suffix = sel?.team === "offense" ? "Off" : "Def";
-  // the read is someone the final throw goes to, never a player the ball is lateraled through
-  const canPrimary = !!(sel && sel.team === "offense" && sel.route && !(laterals && chain.some((p) => p.id === sel.id)));
+  // the read is someone the final throw goes to, never a player the ball is lateraled through, nor a
+  // quarterback on a rollout or boot, who throws it
+  const canPrimary = !!(sel && sel.team === "offense" && sel.route && !isQbAction(sel.route.type) && !(laterals && chain.some((p) => p.id === sel.id)));
   const canMirror = mirrorable(sel);
   const primaryOn = !!sel?.route?.primary;
   const runNote = goesOn
@@ -216,7 +279,7 @@ function RouteSidebarImpl({
               text={`The sideline cuts this ${tableFor(sel.team)[sel.route.type]?.label ?? "route"}: ${yards(cut.room)} of its ${yards(cut.reach)} yards across fit. Move ${sel.label || "this player"} inside to run all of it.`}
             />
           )}
-          {/* who the blitz comes for: the quarterback unless aimed at the backfield or at a player the coach picks */}
+          {/* who the blitz comes for: the quarterback unless aimed at the backfield, containing the quarterback, or at a player the coach picks */}
           {blitz && sel.team === "defense" && (
             <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Blitz target">
               <span className={eyebrow}>BLITZ</span>
@@ -236,6 +299,13 @@ function RouteSidebarImpl({
                   Backfield
                 </button>
                 <button
+                  type="button" onClick={() => { onBlitzAim("contain"); }} title="Contain the quarterback: rush the edge outside them, then turn in"
+                  aria-pressed={blitz.aim === "contain"} data-active={blitz.aim === "contain"}
+                  className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                >
+                  Contain
+                </button>
+                <button
                   type="button" onClick={onBlitzTarget} title="Blitz one player: tap them on the field"
                   aria-pressed={blitz.aim === "player"} data-active={blitz.aim === "player"}
                   className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
@@ -244,6 +314,27 @@ function RouteSidebarImpl({
                 </button>
               </div>
               <span className="text-caption leading-note text-ink-muted">{blitzWords(blitz)}</span>
+            </div>
+          )}
+          {/* how much of the deep field the zone owns: split with the other deep zones, or called as a half or a third */}
+          {deep && sel.team === "defense" && (
+            <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Deep zone">
+              <span className={eyebrow}>DEEP</span>
+              <div className="flex flex-wrap gap-1.5">
+                {DEEP_PILLS.map((d) => {
+                  const on = deep === (d.split ?? "auto");
+                  return (
+                    <button
+                      key={d.label} type="button" onClick={() => { onDeepSplit(d.split); }} title={d.title}
+                      aria-pressed={on} data-active={on}
+                      className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-caption leading-note text-ink-muted">{DEEP_PILLS.find((d) => deep === (d.split ?? "auto"))?.words}</span>
             </div>
           )}
           {sel.team === "offense" && (
@@ -257,6 +348,20 @@ function RouteSidebarImpl({
               </div>
               <span className="text-caption leading-note text-ink-muted">Draw a dashed path behind the line. The route starts where motion ends. One player motions per play; choosing another transfers motion.</span>
             </div>
+          )}
+          {/* the quarterback's own jobs at the snap come first: carry the ball out behind the line and throw */}
+          {qb && at === 0 && (
+            <>
+              <span className={eyebrow}>QB</span>
+              <div className={tileGrid} role="group" aria-label="Quarterback">
+                {QB_KEYS.map((k) => (
+                  <IconTile key={k} icon={k} label={tableFor("offense")[k]?.label ?? k} active={isJob(k)} onClick={() => { onPick(k); }} />
+                ))}
+              </div>
+              {qb.act && isJob(qb.act.type) && (
+                <span data-qb-note className="flex-none text-caption leading-note text-ink-muted">{qbWords(sel.label || "The QB", qb.act)}</span>
+              )}
+            </>
           )}
           {hasBall && (
             <>
