@@ -33,12 +33,34 @@ interface Props {
   onTeam: (next: TeamSettings) => void;
 }
 
+/** The team colour by name, or "Custom" and its code: what a folded Team color section says. */
+export function TeamColorName({ color }: { color: string }) {
+  const preset = TEAM_COLORS.find(c => c.color === color.toLowerCase());
+  return (
+    <>
+      <span aria-hidden className="mr-2 inline-block h-4 w-4 rounded-full border-2 border-ink align-[-0.15em]" style={{ background: color }} />
+      {preset?.name ?? `Custom · ${color}`}
+    </>
+  );
+}
+
+/** The team's name, painted across a styled end zone and put on cards, slides and printed pages. */
+export function TeamNameField({ team, onTeam }: Props) {
+  return (
+    <input
+      value={team.name} maxLength={40} placeholder="Team name" aria-label="Team name"
+      onChange={(e: ChangeEvent<HTMLInputElement>) => { onTeam({ ...team, name: e.target.value }); }}
+      className={`${input} flex-none`}
+    />
+  );
+}
+
 /**
- * The team's name and colour: the one thing a coach gives the whole app. The name is painted
- * across a styled end zone and goes on cards, slides and printed pages; the colour paints the
- * Home Team end zone, the touchdown banner and the exports' accents. Kept on this device.
+ * The team's colour: a preset, or a custom hex code or wheel pick. It paints the Home Team end
+ * zone, the touchdown banner and the exports' accents. `legend` false keeps the heading for
+ * screen readers only, for when a Fold above already says what is picked.
  */
-export function TeamFields({ team, onTeam }: Props) {
+export function TeamColorPicker({ team, onTeam, legend = true }: Props & { legend?: boolean }) {
   const colorName = useId();
   const customId = useId(), hexId = useId(), hexNoteId = useId();
   const [customOpen, setCustomOpen] = useState(false);
@@ -56,59 +78,62 @@ export function TeamFields({ team, onTeam }: Props) {
     else setHexError(true);
   };
   return (
-    <div className="flex flex-none flex-col gap-2">
-      <input
-        value={team.name} maxLength={40} placeholder="Team name" aria-label="Team name"
-        onChange={(e: ChangeEvent<HTMLInputElement>) => { onTeam({ ...team, name: e.target.value }); }}
-        className={input}
-      />
-      <fieldset aria-label="Team color" className="w-full min-w-0 max-w-[320px]">
-        <legend className="mb-2 text-small">
-          Team color <span className="text-ink-muted">· {selected?.name ?? `Custom · ${team.color}`}</span>
-        </legend>
-        <div className="grid grid-cols-4 gap-2">
-          {TEAM_COLORS.map(c => (
-            <label key={c.color} title={c.name} data-active={selected?.color === c.color}
-              className={`${tile} relative min-w-0 justify-center py-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink`}>
-              <input type="radio" name={colorName} value={c.color} checked={selected?.color === c.color}
-                onChange={() => { setCustomOpen(false); chooseColor(c.color); }} className={segmentInput} />
-              <span aria-hidden className="h-5 w-5 rounded-full border-2 border-ink" style={{ background: c.color }} />
-              <span className="text-caption leading-tight">{c.name}</span>
-              {selected?.color === c.color && <span aria-hidden className="absolute right-1 top-0.5 text-caption leading-tight">✓</span>}
-            </label>
-          ))}
-        </div>
-        <button type="button" data-active={!selected} aria-expanded={customOpen} aria-controls={customId}
-          onClick={() => { setHexDraft(null); setHexError(false); setCustomOpen(!customOpen); }}
-          className={`${pill} mt-2 flex min-h-12 w-full items-center gap-2 px-3 text-left text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow data-[active=true]:hover:bg-yellow`}>
-          <span className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} aria-hidden />
-          Custom color…
-          {!selected && <span aria-hidden className="ml-auto">✓</span>}
-        </button>
-        {customOpen && (
-          <div id={customId} className="mt-2 flex flex-col gap-2 rounded-tile border-2 border-ink bg-white p-3">
-            <label htmlFor={hexId} className="text-small">Hex color</label>
-            <div className="flex items-center gap-2">
-              <input id={hexId} type="text" value={hexDraft ?? team.color} placeholder="#RRGGBB" maxLength={7}
-                autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                aria-invalid={hexError} aria-describedby={hexNoteId}
-                onChange={e => { setHexDraft(e.target.value); setHexError(false); }}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyHex(); } }}
-                className={`${input} min-w-0 flex-1`} style={{ fontFamily: "ui-monospace, monospace" }} />
-              <button type="button" onClick={applyHex} className={`${pill} min-h-11 px-3 text-small`}>Apply</button>
-            </div>
-            {hexError
-              ? <p id={hexNoteId} role="alert" className="m-0 text-caption leading-note">Use 3 or 6 hex digits, e.g. #1A73E8.</p>
-              : <p id={hexNoteId} className="m-0 text-caption leading-note text-ink-muted">3 or 6 digits; # is optional.</p>}
-            <label className={`${pill} relative flex min-h-12 cursor-pointer items-center gap-2 px-3 text-small has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink`}>
-              <span className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} aria-hidden />
-              Color wheel…
-              <input type="color" value={team.color} aria-label="Custom color wheel"
-                onChange={(e: ChangeEvent<HTMLInputElement>) => { chooseColor(e.target.value); }} className={segmentInput} />
-            </label>
+    <fieldset aria-label="Team color" className="w-full min-w-0 max-w-[320px] flex-none">
+      <legend className={legend ? "mb-2 text-small" : "sr-only"}>
+        Team color <span className="text-ink-muted">· {selected?.name ?? `Custom · ${team.color}`}</span>
+      </legend>
+      <div className="grid grid-cols-4 gap-2">
+        {TEAM_COLORS.map(c => (
+          <label key={c.color} title={c.name} data-active={selected?.color === c.color}
+            className={`${tile} relative min-w-0 justify-center py-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink`}>
+            <input type="radio" name={colorName} value={c.color} checked={selected?.color === c.color}
+              onChange={() => { setCustomOpen(false); chooseColor(c.color); }} className={segmentInput} />
+            <span aria-hidden className="h-5 w-5 rounded-full border-2 border-ink" style={{ background: c.color }} />
+            <span className="text-caption leading-tight">{c.name}</span>
+            {selected?.color === c.color && <span aria-hidden className="absolute right-1 top-0.5 text-caption leading-tight">✓</span>}
+          </label>
+        ))}
+      </div>
+      <button type="button" data-active={!selected} aria-expanded={customOpen} aria-controls={customId}
+        onClick={() => { setHexDraft(null); setHexError(false); setCustomOpen(!customOpen); }}
+        className={`${pill} mt-2 flex min-h-12 w-full items-center gap-2 px-3 text-left text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow data-[active=true]:hover:bg-yellow`}>
+        <span className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} aria-hidden />
+        Custom color…
+        {!selected && <span aria-hidden className="ml-auto">✓</span>}
+      </button>
+      {customOpen && (
+        <div id={customId} className="mt-2 flex flex-col gap-2 rounded-tile border-2 border-ink bg-white p-3">
+          <label htmlFor={hexId} className="text-small">Hex color</label>
+          <div className="flex items-center gap-2">
+            <input id={hexId} type="text" value={hexDraft ?? team.color} placeholder="#RRGGBB" maxLength={7}
+              autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+              aria-invalid={hexError} aria-describedby={hexNoteId}
+              onChange={e => { setHexDraft(e.target.value); setHexError(false); }}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyHex(); } }}
+              className={`${input} min-w-0 flex-1`} style={{ fontFamily: "ui-monospace, monospace" }} />
+            <button type="button" onClick={applyHex} className={`${pill} min-h-11 px-3 text-small`}>Apply</button>
           </div>
-        )}
-      </fieldset>
+          {hexError
+            ? <p id={hexNoteId} role="alert" className="m-0 text-caption leading-note">Use 3 or 6 hex digits, e.g. #1A73E8.</p>
+            : <p id={hexNoteId} className="m-0 text-caption leading-note text-ink-muted">3 or 6 digits; # is optional.</p>}
+          <label className={`${pill} relative flex min-h-12 cursor-pointer items-center gap-2 px-3 text-small has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink`}>
+            <span className="h-5 w-5 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} aria-hidden />
+            Color wheel…
+            <input type="color" value={team.color} aria-label="Custom color wheel"
+              onChange={(e: ChangeEvent<HTMLInputElement>) => { chooseColor(e.target.value); }} className={segmentInput} />
+          </label>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** The team's name and colour together, for where the colour isn't folded away. Kept on this device. */
+export function TeamFields({ team, onTeam }: Props) {
+  return (
+    <div className="flex flex-none flex-col gap-2">
+      <TeamNameField team={team} onTeam={onTeam} />
+      <TeamColorPicker team={team} onTeam={onTeam} />
     </div>
   );
 }

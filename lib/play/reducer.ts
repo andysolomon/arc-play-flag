@@ -1,4 +1,5 @@
 import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
+import { deepSplit, splitDeep, type DeepSplit } from "./deep";
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
@@ -39,6 +40,8 @@ export type Action =
   | { type: "target"; id: string }
   /** the selected blitzer comes for the quarterback or the backfield (lib/play/blitz.ts) */
   | { type: "blitzAim"; aim: "qb" | "backfield" }
+  /** the selected deep zone called Auto, as a deep half or as a deep third (lib/play/deep.ts) */
+  | { type: "deepSplit"; split: DeepSplit | null }
   /** the selected blitzer's Pick a player: like Man, ask who they come for */
   | { type: "blitzTarget" }
   /**
@@ -118,8 +121,9 @@ export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
     return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
       || s.los !== losOf(saved) || JSON.stringify(s.players) !== JSON.stringify(saved.players);
   }
+  // a restored draft or an opened share link has no history yet, so its players are compared as well
   return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow || s.los !== LOS_YARD
-    || (s.name !== "New play" && s.name !== "");
+    || (s.name !== "New play" && s.name !== "") || JSON.stringify(s.players) !== JSON.stringify(defaults());
 }
 
 /** Whether a player is drawn under the current Show filter. */
@@ -353,6 +357,11 @@ function reduce(s: PlayState, a: Action): PlayState {
       const p = selected(s);
       if (p?.team !== "defense" || p.route?.type !== "blitz" || blitzAim(p.route) === a.aim) return s;
       return { ...setRoute(s, p.id, aimedBlitz(a.aim)), targeting: null };
+    }
+    case "deepSplit": {
+      const p = selected(s);
+      if (p?.team !== "defense" || p.route?.type !== "zoneDeep" || deepSplit(p.route) === a.split) return s;
+      return setRoute(s, p.id, splitDeep(a.split));
     }
     case "blitzTarget": {
       const p = selected(s);

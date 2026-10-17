@@ -10,10 +10,14 @@ export interface RunOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
-/** Rasterises each page in turn, reads where its words are, wraps them in a PDF and saves it. */
-export async function exportPdf(pages: readonly SvgPage[], filename: string, title: string, o: RunOptions = {}): Promise<void> {
+/**
+ * Rasterises each page in turn, reads where its words are, wraps them in a PDF and saves it. Pages that
+ * measure their text come as a thunk, laid out only once the hand face has loaded (as a deck's are).
+ */
+export async function exportPdf(plan: readonly SvgPage[] | (() => readonly SvgPage[]), filename: string, title: string, o: RunOptions = {}): Promise<void> {
   const dpi = o.dpi ?? 300;
   await ensureFont();
+  const pages = typeof plan === "function" ? plan() : plan;
   const out: PdfPage[] = [];
   let i = 0;
   for (const pg of pages) {
@@ -35,7 +39,7 @@ export async function exportPdf(pages: readonly SvgPage[], filename: string, tit
  * Anything that goes wrong throws before `download()`, so a failed deck never saves:
  *
  * - R1 no 2D context (a phone's canvas budget, low memory): `rasterise` throws "No canvas.".
- * - R2 `toBlob` gives null: `toPng` throws "The slide could not be encoded.".
+ * - R2 `toBlob` gives null: `toPng` throws "The picture could not be encoded.".
  * - R3 the face will not load as an image: `rasterise` throws "The page could not be drawn.".
  * - R4 canvases piling up: one 1920 × 1080 canvas at a time, released in `finally`, with a
  *   yield between slides.
@@ -60,4 +64,22 @@ export async function exportSlides(plan: () => DeckPlan, filename: string, o: Pi
   }
   o.onProgress?.(n, n);
   download(buildPptx({ title: deck.title, band: deck.band, slides }, when), filename);
+}
+
+/**
+ * Draws one page as a picture, `scale` pixels to each of its units, seals it as a PNG and saves it: the
+ * roster's shareable picture (docs/adr/010-roster-exports.md). The page is a thunk because it measures
+ * text, so it is laid out only once the hand face has loaded. It goes wrong as a deck does, and the same
+ * way throws before `download()`, so a failed picture never saves: no canvas (R1), no PNG (R2), a face
+ * that will not load (R3); one canvas alive, released in `finally` (R4); the bytes held once (R5); typed
+ * image/png, which iOS needs to save it as a picture (R6); the caller's `busy` guard (R7); offline (R8).
+ */
+export async function exportPng(plan: () => SvgPage, filename: string, o: { scale?: number; background?: string } = {}): Promise<void> {
+  await ensureFont();
+  const pg = plan();
+  const scale = o.scale ?? 1;
+  const c = await rasterise(pg.svg, pg.w * scale, pg.h * scale, o.background);
+  let png: Uint8Array;
+  try { png = await toPng(c); } finally { c.width = 0; }
+  download(new Blob([png as BlobPart], { type: "image/png" }), filename);
 }

@@ -17,21 +17,28 @@ import { OTTERS, play, playbook, seed, storedDraft } from "../support/fixtures";
  *  - the card stops so close to a waypoint that a nudge pulls it back            → the deepest waypoint sits at least 1.2 yards under the top, and an arrow key moves it the way it points
  *  - the deeper card runs off the screen, or the page has to scroll to reach it  → the card sits inside the pane and the window, and the page does not scroll
  *  - a short play loses its big field on a laptop                                 → the default play, and a short route once drawn, keep the 16-yard card
- *  - Deep field does nothing, or does it without saying so                        → pressed, the card shows 37 yards and the button says aria-pressed="true"
- *  - with Deep field on a waypoint still can't go past the short card's top      → a waypoint moves by keyboard to 32 yards on
+ *  - Deep field does nothing, or does it without saying so                        → pressed, the card ends at the end line, 50 yards on, and the button says aria-pressed="true"
+ *  - with Deep field on a waypoint still can't go past the short card's top      → a waypoint moves by keyboard into the end zone, 45 yards on
  *  - Deep field is forgotten on reload, or leaks into the play                    → a reload keeps it, from its own key, and the stored draft never mentions it
- *  - turning Deep field off hides the deep route                                 → the card fits the route again, every route on it
+ *  - turning Deep field off hides the deep route, or cuts off its end zone end   → the card fits the route again past the waypoint 45 yards on, every route on it
  *  - from the 10 the end line is still off the card                               → with Deep field on the card ends at the end line, the end zone whole
- *  - the button offers a change that changes nothing, or sits in the way         → hidden while a route is drawn, on a screen already as deep as the card goes and from the 5; a 44px target over no player
- *  - a route drawn deep on a phone is cut off on a laptop or in its pictures     → a play with a waypoint 30 yards on is whole in the designer, the gallery thumbnail, the printout preview and the share page
- * The laptop sizes are the issue's (1280×720, 1440×900, 1920×1080), run on the desktop project; the
- * drawing and the pictures are also checked on every device's own screen. Leaves
- * `deep-field-<device>[-<size>].json` (each step's card, pane, yards shown, stored waypoints, route
- * boxes and the button) and a picture of each step in test-results/, uploaded as `deep-field`.
+ *  - the button offers a change that changes nothing, or sits in the way         → hidden while a route is drawn and from the 5; a 44px target over no player, in the card's top right corner
+ *  - a route drawn deep on a phone is cut off on a laptop or in its pictures     → a play with a waypoint in the end zone, 45 yards on, is whole in the designer, the gallery thumbnail, the printout preview and the share page
+ * A tall phone's card already shows 37 yards on, the deepest card, so Deep field (then that card) was never
+ * offered there: on an iPhone in Safari (390×664) a coach had no button. How that could break again:
+ *  - a tall phone offers no Deep field                                            → on 390×664, 393×760, 412×839 and 320×568, whose cards show 37 yards on, and on every device's own screen, it is offered from the drive start
+ *  - it is offered, but for a change too small to see (44.5 yards to 45)          → pressed, the card ends at the end line, 50 yards on, the whole end zone on it
+ *  - the field to the end line runs off a phone, or the page scrolls to reach it → the card sits inside the pane and the window, and nothing scrolls
+ * The laptop sizes are the issue's (1280×720, 1440×900, 1920×1080), run on the desktop project, and the tall
+ * phones on the iPhone project; the drawing and the pictures are also checked on every device's own screen.
+ * Leaves `deep-field-<device>[-<size>|-phones].json` (each step's card, pane, yards shown, stored waypoints,
+ * route boxes and the button) and a picture of each step in test-results/, uploaded as `deep-field`.
  */
 
 /** The deepest card, 45 yards: 8 behind the line of scrimmage and 37 on. */
 const DEEPEST = 37;
+/** Deep field's card from the drive start: to the end line, 50 yards on (the goal line 40 on, then the end zone). */
+const END_LINE = 50;
 /** The laptop card for a play that fits: the 24-yard card, 16 yards on. */
 const SHORT = 16;
 /** Where a player (and so a waypoint) may stand under the card's top edge. */
@@ -114,13 +121,25 @@ function expectWhole(m: Reading, step: string): void {
   expect(m.routes.filter((r) => !r.inside), `${step}: every route is on the card`).toEqual([]);
 }
 
-/** The Deep field button, when offered: a 44px target over no player. */
+/** The Deep field button, when offered: a 44px target over no player, in the card's top right corner. */
 function expectToggle(m: Reading, pressed: boolean, step: string): void {
   expect(m.toggle, `${step}: Deep field is offered`).not.toBeNull();
   expect(m.toggle?.pressed, step).toBe(String(pressed));
   expect(m.toggle?.box.height ?? 0, `${step}: a 44px target`).toBeGreaterThanOrEqual(44);
   expect(m.toggle?.over, `${step}: the button covers no player`).toEqual([]);
+  const box = m.toggle?.box ?? { x: 0, y: 0, width: 0, height: 0 };
+  const right = m.card.x + m.card.width;
+  expect(box.x + box.width, `${step}: the button's right edge is on the card, by its right edge`).toBeLessThanOrEqual(right + 0.5);
+  expect(box.x + box.width, `${step}: the button's right edge is on the card, by its right edge`).toBeGreaterThanOrEqual(right - 20);
+  expect(box.y, `${step}: the button's top is on the card, by its top`).toBeGreaterThanOrEqual(m.card.y - 0.5);
+  expect(box.y, `${step}: the button's top is on the card, by its top`).toBeLessThanOrEqual(m.card.y + 20);
 }
+
+/** Where the end zone sits on the card, in yards from the card's top. */
+const endZoneOf = (d: Designer) => d.field.locator('rect[fill="#a7e5a7"]').evaluate((r) => {
+  const y = Number(r.getAttribute("y")), h = Number(r.getAttribute("height"));
+  return { top: y / 22, bottom: (y + h) / 22 };
+});
 
 const deepToggle = (page: Page): Locator => page.getByRole("button", { name: "Deep field", exact: true });
 const finish = (page: Page): Locator => page.getByRole("button", { name: "Finish", exact: true });
@@ -173,7 +192,7 @@ for (const size of LAPTOPS) {
     const short = await showing(page, d, SHORT);
     expectFits(short, "short");
     expectToggle(short, false, "short");
-    await expect(deepToggle(page)).toHaveAttribute("title", `Show ${String(DEEPEST)} yards downfield`);
+    await expect(deepToggle(page)).toHaveAttribute("title", "Show the field to the end line");
     await shot("short");
 
     // pre-snap motion stays behind the line of scrimmage: drawing it leaves the short card as it is
@@ -211,28 +230,29 @@ for (const size of LAPTOPS) {
     await second.press("ArrowLeft");
     await expect.poll(() => routeOf(page)).toEqual({ type: "custom", pts: [[3, -8], [9, -24]] });
 
-    // Deep field shows the deepest card, and says so
+    // Deep field shows the field to the end line, the end zone whole, and says so
     await deepToggle(page).click();
     await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "true");
-    const deep = await showing(page, d, DEEPEST);
+    const deep = await showing(page, d, END_LINE);
     expectFits(deep, "deep");
     expectWhole(deep, "deep");
     expectToggle(deep, true, "deep");
+    expect(await endZoneOf(d), "the end zone runs from the top of the card, 10 yards down to the goal line").toEqual({ top: 0, bottom: 10 });
     await expect(deepToggle(page)).toHaveAttribute("title", "Fit the field to the play");
     await shot("deep");
 
-    // with it on, the break goes deeper than the short card's top allowed, by keyboard
+    // with it on, the break goes past the deepest card's top into the end zone, by keyboard
     await d.select("X");
     await second.focus();
-    for (let i = 0; i < 8; i++) await second.press("Shift+ArrowUp");
-    await expect.poll(() => routeOf(page)).toEqual({ type: "custom", pts: [[3, -8], [9, -32]] });
+    for (let i = 0; i < 21; i++) await second.press("Shift+ArrowUp");
+    await expect.poll(() => routeOf(page)).toEqual({ type: "custom", pts: [[3, -8], [9, -45]] });
 
     // a reload keeps Deep field, from its own key; the play never carries it
     await page.reload();
     await expect(d.field).toBeVisible();
     await d.closeSidebars();
     await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "true");
-    const reloaded = await showing(page, d, DEEPEST);
+    const reloaded = await showing(page, d, END_LINE);
     expectWhole(reloaded, "reloaded");
     expect(await page.evaluate((k) => localStorage.getItem(k), DEEP_FIELD_KEY)).toBe("on");
     expect(JSON.stringify(await storedDraft(page))).not.toMatch(/deep/i);
@@ -240,10 +260,11 @@ for (const size of LAPTOPS) {
     // off again, the card fits the route: past the break, and every route whole
     await deepToggle(page).click();
     await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "false");
-    await expect.poll(async () => (await read(page)).downfield).toBeLessThan(DEEPEST);
+    await expect.poll(async () => (await read(page)).downfield).toBeLessThan(END_LINE);
     await d.settle();
     const fitted = await read(page);
-    expect(fitted.downfield, "the card reaches past the moved break").toBeGreaterThanOrEqual(32 + MARGIN);
+    // the break stands in the end zone, deeper than the deepest card: the card still reaches past it
+    expect(fitted.downfield, "the card reaches past the moved break").toBeGreaterThanOrEqual(45 + MARGIN);
     expectFits(fitted, "fitted");
     expectWhole(fitted, "fitted");
     expect(await page.evaluate((k) => localStorage.getItem(k), DEEP_FIELD_KEY)).toBeNull();
@@ -260,12 +281,8 @@ for (const size of LAPTOPS) {
     const tenDeep = await showing(page, d, 20);
     expectFits(tenDeep, "from the 10");
     expectToggle(tenDeep, true, "from the 10");
-    const endZone = await d.field.locator('rect[fill="#a7e5a7"]').evaluate((r) => {
-      const y = Number(r.getAttribute("y")), h = Number(r.getAttribute("height"));
-      return { top: y / 22, bottom: (y + h) / 22 };
-    });
     // the card's top edge is the end line: the whole 10-yard end zone is on it
-    expect(endZone, "the end zone runs from the top of the card, 10 yards down to the goal line").toEqual({ top: 0, bottom: 10 });
+    expect(await endZoneOf(d), "the end zone runs from the top of the card, 10 yards down to the goal line").toEqual({ top: 0, bottom: 10 });
     await shot("from-the-10");
 
     // from the 5 the card already ends at the end line: nothing to offer
@@ -298,17 +315,23 @@ test("on this device's own screen a coach draws a 25-yard post and sees it whole
   await d.settle();
   const before = await read(page);
   expectFits(before, "before");
-  // Deep field is offered only where it would show more
-  if (before.downfield < DEEPEST) expectToggle(before, false, "before");
-  else expect(before.toggle, "the screen already shows the deepest card").toBeNull();
+  // from the drive start no screen shows the end line, so every one offers Deep field, and it opens the end zone
+  expectToggle(before, false, "before");
+  await deepToggle(page).click();
+  const deep = await showing(page, d, END_LINE);
+  expectFits(deep, "deep");
+  expectToggle(deep, true, "deep");
+  expect(await endZoneOf(d), "the end zone runs from the top of the card, 10 yards down to the goal line").toEqual({ top: 0, bottom: 10 });
+  await page.screenshot({ path: `test-results/deep-field-${project}-deep.png` });
+  await deepToggle(page).click();
+  await showing(page, d, before.downfield);
 
   const { drawing, drawn } = await drawPost(page, d);
   expectFits(drawing, "drawing");
   expect(drawn.downfield, "the card reaches past the break").toBeGreaterThanOrEqual(24 + MARGIN);
   expectFits(drawn, "drawn");
   expectWhole(drawn, "drawn");
-  if (drawn.downfield < DEEPEST) expectToggle(drawn, false, "drawn");
-  else expect(drawn.toggle).toBeNull();
+  expectToggle(drawn, false, "drawn");
   await page.screenshot({ path: `test-results/deep-field-${project}-drawn.png` });
 
   // a short route leaves the card as it was before
@@ -323,11 +346,57 @@ test("on this device's own screen a coach draws a 25-yard post and sees it whole
   const back = await showing(page, d, before.downfield);
   expectWhole(back, "back");
 
-  await keep(testInfo, `deep-field-${project}`, { project, viewport: page.viewportSize(), steps: { before, drawing, drawn, back } });
+  await keep(testInfo, `deep-field-${project}`, { project, viewport: page.viewportSize(), steps: { before, deep, drawing, drawn, back } });
 });
 
-/** X's post as a coach drew it on a phone, where the card reaches 37 yards: the break 30 yards on. */
-const DEEP_SHOT: SavedPlay = play("fx-deep-shot", "Otter Deep Shot", { o3: { type: "custom", primary: true, pts: [[3, -10], [12, -30]] }, o4: { type: "out" } });
+/** Tall phones, the user's iPhone in Safari among them, whose card already shows the deepest card, 37 yards on. */
+const PHONES = [
+  { width: 390, height: 664 },
+  { width: 393, height: 760 },
+  { width: 412, height: 839 },
+  { width: 320, height: 568 },
+] as const;
+
+test("on a tall phone, already 37 yards deep, Deep field is in the top right corner and opens the end zone", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "iphone-15", "a phone's touch screen at each tall phone's size");
+  const project = testInfo.project.name;
+  const d = new Designer(page);
+  const seen: Record<string, { before: Reading; deep: Reading; off: Reading }> = {};
+  for (const size of PHONES) {
+    const at = `${String(size.width)}x${String(size.height)}`;
+    await page.setViewportSize(size);
+    await d.goto();
+    await d.closeSidebars();
+    // the screen's own shape already gives the deepest card: what hid Deep field before
+    const before = await showing(page, d, DEEPEST);
+    expectFits(before, `${at} before`);
+    expectToggle(before, false, `${at} before`);
+    await expect(deepToggle(page)).toHaveAttribute("title", "Show the field to the end line");
+
+    // a tap opens the field to the end line: a change a coach sees, the whole end zone on the card
+    await deepToggle(page).tap();
+    await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "true");
+    const deep = await showing(page, d, END_LINE);
+    expectFits(deep, `${at} deep`);
+    expectToggle(deep, true, `${at} deep`);
+    expect(await endZoneOf(d), `${at}: the end zone runs from the top of the card, 10 yards down to the goal line`).toEqual({ top: 0, bottom: 10 });
+    await page.screenshot({ path: `test-results/deep-field-${project}-${at}-deep.png` });
+
+    // and a tap back fits the field to the play again
+    await deepToggle(page).tap();
+    await expect(deepToggle(page)).toHaveAttribute("aria-pressed", "false");
+    const off = await showing(page, d, DEEPEST);
+    expectToggle(off, false, `${at} off`);
+    seen[at] = { before, deep, off };
+  }
+  await keep(testInfo, `deep-field-${project}-phones`, { project, seen });
+});
+
+/**
+ * X's post as a coach drew it on a phone with Deep field on: the break 30 yards on, past a laptop's card,
+ * and on to the back of the end zone, 45 yards on, past the deepest card a phone shows without it.
+ */
+const DEEP_SHOT: SavedPlay = play("fx-deep-shot", "Otter Deep Shot", { o3: { type: "custom", primary: true, pts: [[3, -10], [12, -30], [10, -45]] }, o4: { type: "out" } });
 
 /** A picture of a play, read back in yards: where its card's top is and whether every route lies on it. */
 async function readArt(target: Locator): Promise<{ viewBox: string; downfield: number; routes: Drawn[] }> {
@@ -351,17 +420,17 @@ async function readArt(target: Locator): Promise<{ viewBox: string; downfield: n
   });
 }
 
-test("a route drawn deep on a phone is whole in the designer, the gallery, the printout preview and the share page", async ({ page }, testInfo) => {
+test("a route drawn into the end zone on a phone is whole in the designer, the gallery, the printout preview and the share page", async ({ page }, testInfo) => {
   const project = testInfo.project.name;
   const book = playbook("fx-deep-book", "Otter Deep Book", [DEEP_SHOT]);
   await seed(page, { plays: [DEEP_SHOT], playbooks: [book], team: OTTERS });
   const d = new Designer(page);
   const seen: Record<string, { downfield: number; routes: Drawn[] }> = {};
   const expectArt = (a: { downfield: number; routes: Drawn[] }, where: string) => {
-    expect(a.downfield, `${where}: the card reaches past the break`).toBeGreaterThanOrEqual(30 + MARGIN);
+    expect(a.downfield, `${where}: the card reaches past the route's end`).toBeGreaterThanOrEqual(45 + MARGIN);
     expect(a.routes.length, `${where}: routes are drawn`).toBeGreaterThan(0);
     expect(a.routes.filter((r) => !r.inside), `${where}: every route is on the card`).toEqual([]);
-    expect(Math.min(...a.routes.map((r) => r.top)), `${where}: the arrow reaches the break`).toBeLessThanOrEqual(-29.9);
+    expect(Math.min(...a.routes.map((r) => r.top)), `${where}: the arrow reaches the end zone`).toBeLessThanOrEqual(-44.9);
   };
 
   await d.goto(`?open=${DEEP_SHOT.id}`);
