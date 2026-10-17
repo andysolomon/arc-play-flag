@@ -45,13 +45,54 @@
  * - C14 a drop held back onto the spot it started from: nothing moved, so nothing is written; no undo step,
  *   and Redo is kept.
  * - C15 a step past a teammate that cuts the player's route short at the sideline: one note says both.
+ *
+ * Under centre: the quarterback may line up right behind the centre, UNDER_CENTRE back, closer than any other
+ * two teammates stand. Ways that could go wrong, written down before the code:
+ *
+ * - U1 the quarterback dropped right behind the centre lands kept 2 yards off them, as anyone else would,
+ *   so a QB can't line up under centre at all: dropped on or near the spot UNDER_CENTRE behind the C (or
+ *   anywhere in the back of the C's disc that is nearer that spot than the disc's edge), they land on it.
+ * - U2 the spot too close: the discs on top of each other, the C's label hidden under the QB's. At
+ *   UNDER_CENTRE the discs overlap as a QB under centre is drawn, and both labels stay in sight. Each is
+ *   still pressed by its own label (a token's tap circle is wider than UNDER_CENTRE, so the QB's would take
+ *   a tap on the C's), and the C's name, shown under him, is not hidden by the QB standing there.
+ * - U3 the spot off the grid a drop snaps to (snapping by the whole yard, or the C off the half yard):
+ *   the spot itself, never the grid point beside it, which is inside the C's disc or 2 yards off.
+ * - U4 the arrow keys walk past it: a step back toward the C that would end inside their disc, with the
+ *   spot on the way, stops on it, a held key too; a further step on says there is no room past the C, and
+ *   a step back or aside leaves it as from anywhere.
+ * - U5 anyone else gets in: only the quarterback and only straight behind the centre. Any other player,
+ *   or the QB beside or in front of the C, is kept PLAYER_SPACING off as before; a spot elsewhere in the
+ *   C's disc is never clear.
+ * - U6 a crowd: the spot is clear only of the C. A third teammate within PLAYER_SPACING of it keeps the
+ *   quarterback out, as any spot.
+ * - U7 the centre can't come back: the pair holds both ways, so the C dragged or stepped in front of a QB
+ *   who stands where the spot would put them lands UNDER_CENTRE in front of them.
+ * - U8 a misleading note: a QB going under centre is not told they were kept 2 yards off the C. A drop
+ *   kept off the C is told so at the drop, with where to go to line up under centre, not while the
+ *   finger passes over the C's disc on its way to the spot.
+ * - U9 no centre or no quarterback (a relabelled side, the defense, roster positions without one), or the
+ *   two the same player: no spot, and spacing as before. The quarterback and the centre are who
+ *   lib/play/lateral.ts says they are, labels first.
+ * - U10 the spot off the field (a centre lined up deep in the backfield): only where the field lets the
+ *   quarterback stand, as every spot is held to it (C4).
+ * - U11 a play stored with the quarterback anywhere near the centre opens as stored (C5), under centre
+ *   or not.
  */
 
 import { MAX_DEPTH, clamp, snap } from "./geometry";
+import { centre, quarterback } from "./lateral";
 import type { Player, Pt, SnapMode, Team } from "./types";
 
 /** How far apart two teammates stand at the closest, centre to centre, in yards: about a token's width. */
 export const PLAYER_SPACING = 2;
+/**
+ * How far behind the centre a quarterback stands under centre, centre to centre, in yards: their discs overlap
+ * as a QB under centre is drawn, and both labels stay in sight (U1, U2).
+ */
+export const UNDER_CENTRE = 1.5;
+/** A teammate to keep clear of, and the one spot inside their disc this player may still take, if any (U1, U7). */
+export type Mate = Pt & { readonly slot?: Pt };
 /** A rounding error's worth of yards, so a spot exactly PLAYER_SPACING off is clear (C12). */
 const EPS = 1e-6;
 /** How far past a teammate's centre a finger goes before the player it drags is held on the far side (C9). */
@@ -59,16 +100,38 @@ export const HOLD = 0.5;
 /** The deepest card's top (MAX_DEPTH), for the blitz line, which the reducer moves to without a card. */
 const DEEPEST_TOP = 8 - MAX_DEPTH;
 
-/** The players a player must keep clear of: their own side but themself (C5, C6). */
-export function teammates(players: readonly Player[], id: string): Player[] {
+/**
+ * The players a player must keep clear of: their own side but themself (C5, C6). The quarterback's centre,
+ * and the centre's quarterback, carry the one spot the pair may stand closer than that: the QB UNDER_CENTRE
+ * straight behind the C (U1, U5, U7, U9).
+ */
+export function teammates(players: readonly Player[], id: string): (Player & { slot?: Pt })[] {
   const me = players.find((p) => p.id === id);
-  return me ? players.filter((p) => p.team === me.team && p.id !== id) : [];
+  if (!me) return [];
+  const mates = players.filter((p) => p.team === me.team && p.id !== id);
+  const qb = quarterback(players), c = centre(players);
+  if (me.team !== "offense" || !qb || !c || qb.id === c.id || qb.team !== "offense") return mates;
+  if (me.id === qb.id) return mates.map((m) => (m.id === c.id ? { ...m, slot: { x: m.x, y: m.y + UNDER_CENTRE } } : m));
+  if (me.id === c.id) return mates.map((m) => (m.id === qb.id ? { ...m, slot: { x: m.x, y: m.y - UNDER_CENTRE } } : m));
+  return mates;
+}
+
+/** Whether a spot is exactly where one of these teammates lets this player stand inside their disc (U1, U3). */
+function onSlot(pt: Pt, slot: Pt | undefined): boolean {
+  return !!slot && Math.hypot(pt.x - slot.x, pt.y - slot.y) < EPS;
+}
+
+/** Whether a spot is a teammate's slot: the quarterback under centre, or the centre in front of them (U8). */
+export function inSlot(pt: Pt, mates: readonly Mate[]): boolean {
+  return mates.some((m) => onSlot(pt, m.slot));
 }
 
 /** The nearest teammate a spot is on top of, or null when it is clear of them all. */
-export function crowding<T extends Pt>(pt: Pt, mates: readonly T[]): T | null {
+export function crowding<T extends Mate>(pt: Pt, mates: readonly T[]): T | null {
   let near: T | null = null, best = PLAYER_SPACING - EPS;
   for (const m of mates) {
+    // the one spot inside their disc this player may take is clear of them, and of nobody else (U5, U6)
+    if (onSlot(pt, m.slot)) continue;
     const d = Math.hypot(pt.x - m.x, pt.y - m.y);
     if (d < best) { near = m; best = d; }
   }
@@ -129,7 +192,7 @@ function held(p: Pt, mates: readonly Pt[], from: Pt | null): Pt {
  * tried and the nearest clear one wins. `from` is where the player is drawn now, which a finger on a
  * teammate's centre keeps them beside (C9) and which breaks a tie (C11). Null only when nowhere is clear (C8).
  */
-export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: readonly Pt[], from: Pt | null = null): Pt | null {
+export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: readonly Mate[], from: Pt | null = null): Pt | null {
   const at = clamp(want.x, want.y, team, top, gap);
   if (!crowding(at, mates)) return at;
   if (from && pressed(at, mates, from)) return from;
@@ -142,6 +205,8 @@ export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: 
     { x: b.x0, y: b.y0 }, { x: b.x1, y: b.y0 }, { x: b.x0, y: b.y1 }, { x: b.x1, y: b.y1 },
   ];
   mates.forEach((m, i) => {
+    // the spot under centre, when the back of the C's disc is nearer it than the disc's edge (U1)
+    if (m.slot) tries.push({ x: m.slot.x, y: m.slot.y });
     const dx = p.x - m.x, dy = p.y - m.y, L = Math.hypot(dx, dy);
     // straight out from the teammate; from exactly on their spot there is no way out, so every way is tried (C11)
     if (L > EPS) tries.push({ x: m.x + (dx / L) * R, y: m.y + (dy / L) * R });
@@ -167,7 +232,8 @@ export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: 
   let best: Pt | null = null;
   for (const t of tries) {
     if (t.x < b.x0 - 1e-9 || t.x > b.x1 + 1e-9 || t.y < b.y0 - 1e-9 || t.y > b.y1 + 1e-9) continue;
-    const c = { x: Math.max(b.x0, Math.min(b.x1, t.x)), y: Math.max(b.y0, Math.min(b.y1, t.y)) };
+    // a slot is taken as it is, never moved onto the box's edge by a rounding hair (U10)
+    const c = inSlot(t, mates) ? t : { x: Math.max(b.x0, Math.min(b.x1, t.x)), y: Math.max(b.y0, Math.min(b.y1, t.y)) };
     if (!crowding(c, mates) && nearer(c, best, p, from)) best = c;
   }
   return best;
@@ -179,7 +245,9 @@ export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: 
  * spot. A tie goes to the spot nearer `from`, where the player came from (C11). Null only when nowhere is
  * clear (C8).
  */
-export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: readonly Pt[], mode: SnapMode, from: Pt | null = null): Pt | null {
+export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: readonly Mate[], mode: SnapMode, from: Pt | null = null): Pt | null {
+  // the spot under centre is where it is, on the grid or off it, so a drop on it stays on it (U3)
+  if (inSlot(at, mates) && !crowding(at, mates)) return { x: at.x, y: at.y };
   if (mode === "free") return freeSpot(at, team, top, gap, mates, from);
   const first = clamp(snap(at.x, mode), snap(at.y, mode), team, top, gap);
   if (!crowding(first, mates)) return first;
@@ -195,6 +263,12 @@ export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: re
       if (!crowding(c, mates) && nearer(c, best, at, from)) best = c;
     }
   }
+  // and the spot under centre, if it is nearer than any spot on the grid (U3)
+  for (const m of mates) {
+    const t = m.slot;
+    if (!t || t.x < b.x0 - 1e-9 || t.x > b.x1 + 1e-9 || t.y < b.y0 - 1e-9 || t.y > b.y1 + 1e-9) continue;
+    if (!crowding(t, mates) && nearer(t, best, at, from)) best = { x: t.x, y: t.y };
+  }
   return best;
 }
 
@@ -204,31 +278,61 @@ export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: re
  * of the field comes first, or a held key (`pass` false) meets a teammate; `past` is the first teammate in
  * the way, if one was.
  */
-export function stepPast<T extends Pt>(from: Pt, step: readonly [number, number], team: Team, top: number, gap: number, mates: readonly T[], pass = true): { to: Pt | null; past: T | null } {
+export function stepPast<T extends Mate>(from: Pt, step: readonly [number, number], team: Team, top: number, gap: number, mates: readonly T[], pass = true): { to: Pt | null; past: T | null } {
   let past: T | null = null;
   let prev: Pt | null = null;
+  let last: Pt = from;
   // the field is 30 yards across and at most 45 deep, so a yard at a time this always reaches an edge
   for (let k = 1; k <= 60; k++) {
     const c = clamp(from.x + step[0] * k, from.y + step[1] * k, team, top, gap);
     if (prev && Math.abs(c.x - prev.x) < 1e-9 && Math.abs(c.y - prev.y) < 1e-9) break;
     const who = crowding(c, mates);
     if (!who) return { to: c, past };
+    // a step that would end inside the C's disc, with the spot under centre on the way, stops on it (U4)
+    const under = mates.find((m) => m.slot && passes(m.slot, last, c) && !crowding(m.slot, mates))?.slot;
+    if (under) return { to: { x: under.x, y: under.y }, past };
     past ??= who;
     if (!pass) break;
     prev = c;
+    last = c;
   }
   return { to: null, past };
+}
+
+/** Whether a step from `a` to `b` goes through `s` on the way, `a` itself aside (U4). */
+function passes(s: Pt, a: Pt, b: Pt): boolean {
+  const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+  if (L2 < EPS) return false;
+  const t = ((s.x - a.x) * dx + (s.y - a.y) * dy) / L2;
+  return t > EPS && t <= 1 + EPS && Math.hypot(a.x + t * dx - s.x, a.y + t * dy - s.y) < EPS;
 }
 
 /**
  * What the coach is told when a player is kept off a teammate: dragged and kept beside them, stepped on past
  * them, or held where they are with no room past them before the edge of the field.
  */
-export function crowdNote(who: string, mate: string, how: "kept" | "past" | "stuck"): string {
+export function crowdNote(who: string, mate: string, how: "kept" | "past" | "stuck", under = false): string {
   const said = "Players can't stand on top of each other.";
   if (how === "past") return `${said} Stepped ${who} past ${mate}.`;
   if (how === "stuck") return `${said} No room for ${who} past ${mate}.`;
-  return `${said} Kept ${who} ${String(PLAYER_SPACING)} yards off ${mate}.`;
+  // the quarterback kept off the centre is told where they may stand closer: right behind them (U8)
+  const hint = under ? ` Drop ${who} right behind ${mate} to line up under centre.` : "";
+  return `${said} Kept ${who} ${String(PLAYER_SPACING)} yards off ${mate}.${hint}`;
+}
+
+/**
+ * The quarterback and the centre, when the QB stands under centre (UNDER_CENTRE straight behind the C), else
+ * null: their discs overlap, so the field puts the C's name above them, clear of the QB (U2).
+ */
+export function underCentre(players: readonly Player[]): { qb: string; c: string } | null {
+  const qb = quarterback(players), c = centre(players);
+  if (!qb || !c || qb.id === c.id || qb.team !== "offense") return null;
+  return Math.hypot(qb.x - c.x, qb.y - (c.y + UNDER_CENTRE)) < EPS ? { qb: qb.id, c: c.id } : null;
+}
+
+/** Whether a teammate kept this player off is the centre, and this player the quarterback who may stand under them (U8). */
+export function underCentreOf(mate: Mate): boolean {
+  return !!mate.slot && mate.slot.y > mate.y;
 }
 
 /**

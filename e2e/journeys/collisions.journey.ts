@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { S } from "../../lib/play/geometry";
-import { PLAYER_SPACING } from "../../lib/play/spacing";
+import { PLAYER_SPACING, UNDER_CENTRE } from "../../lib/play/spacing";
 import type { Spot } from "../../lib/play/types";
 import { Designer } from "../support/designer";
 import { OTTERS, moved, play, seed, storedDraft, storedLineups, storedPlays } from "../support/fixtures";
@@ -21,14 +21,17 @@ import { OTTERS, moved, play, seed, storedDraft, storedLineups, storedPlays } fr
  * each other opens as stored, and either can still be stepped off. Dragged along a tight line onto the C,
  * a player stays in the notch it was drawn in; dragged back onto a teammate from beside them it stays put
  * and writes nothing, so Redo is kept. A step past a teammate that cuts the route short at the sideline
- * says both in one note. After every step each side's closest
- * pair on the field is measured, never under 2 yards but where a stored play put them. Leaves
+ * says both in one note. The quarterback alone may stand closer, under centre: UNDER_CENTRE straight behind
+ * the C, stepped or dropped there (a drop beside the C is told how), the C coming back in front of him, a
+ * centre off the half yard included, each still picked by a tap on his own label. After every step each
+ * side's closest pair on the field is measured, never under 2 yards but where a stored play put them, or the
+ * quarterback under centre. Leaves
  * `collisions-<device>-<test>.json` (every step's spots, each side's closest pair and the note shown) and a
  * picture of the field after each test in `test-results/`.
  */
 
 interface Spotted { team: "offense" | "defense"; label: string; x: number; y: number }
-interface Step { step: string; spots: Spotted[]; closest: { offense: number | null; defense: number | null }; note: string | null }
+interface Step { step: string; spots: Spotted[]; closest: { offense: number | null; defense: number | null }; underCentre: boolean; note: string | null }
 
 /** Where each player on the field is drawn, in yards, read from its token's transform and the field's viewBox. */
 async function spots(d: Designer): Promise<Spotted[]> {
@@ -48,18 +51,30 @@ async function spotOf(d: Designer, label: string, team: "Offense" | "Defense" = 
   if (!p) throw new Error(`${team} ${label} is not on the field`);
   return p;
 }
-/** Each side's closest pair of teammates on the field, centre to centre, in yards. */
+/** The token's drawn spot is rounded to a tenth of a unit, a 220th of a yard. */
+const DRAWN = 0.01;
+/** The quarterback and the C when the QB stands under centre, UNDER_CENTRE straight behind him, else null. */
+function underCentre(all: readonly Spotted[]): readonly [Spotted, Spotted] | null {
+  const qb = all.find((p) => p.team === "offense" && p.label === "QB"), c = all.find((p) => p.team === "offense" && p.label === "C");
+  return qb && c && Math.abs(qb.x - c.x) < DRAWN && Math.abs(qb.y - c.y - UNDER_CENTRE) < DRAWN ? [qb, c] : null;
+}
+/** Each side's closest pair of teammates on the field, centre to centre, in yards, but the quarterback under centre. */
 function closest(all: readonly Spotted[]): Step["closest"] {
+  const under = underCentre(all);
   const side = (team: Spotted["team"]): number | null => {
     const mates = all.filter((p) => p.team === team);
     let near: number | null = null;
-    mates.forEach((a, i) => { for (const b of mates.slice(i + 1)) { const g = Math.hypot(a.x - b.x, a.y - b.y); if (near === null || g < near) near = g; } });
+    mates.forEach((a, i) => {
+      for (const b of mates.slice(i + 1)) {
+        if (under?.includes(a) && under.includes(b)) continue;
+        const g = Math.hypot(a.x - b.x, a.y - b.y);
+        if (near === null || g < near) near = g;
+      }
+    });
     return near;
   };
   return { offense: side("offense"), defense: side("defense") };
 }
-/** The token's drawn spot is rounded to a tenth of a unit, a 220th of a yard. */
-const DRAWN = 0.01;
 
 /** Waits for a player to be drawn at a spot (to the half yard's tenth). */
 async function expectAt(d: Designer, label: string, team: "Offense" | "Defense", x: number, y: number): Promise<void> {
@@ -94,20 +109,22 @@ const storedSpots = async (page: Page): Promise<Spot[]> => (await storedLineups(
 /** A note-taker for one test: each step's spots, measured and kept, then written out as `collisions-<device>-<name>.json`. */
 function journal(d: Designer, device: string, name: string) {
   const steps: Step[] = [];
-  const note = async (step: string, opts: { note?: string; spaced?: boolean } = {}): Promise<void> => {
+  const note = async (step: string, opts: { note?: string; spaced?: boolean; underCentre?: boolean } = {}): Promise<void> => {
     if (opts.note) await expect(d.toast).toContainText(opts.note);
     const all = await spots(d);
     const near = closest(all);
+    const under = underCentre(all) !== null;
+    if (opts.underCentre !== undefined) expect(under, `${step}: the QB under centre`).toBe(opts.underCentre);
     // never two teammates on top of each other, but where a stored play put them
     if (opts.spaced !== false) {
       for (const g of [near.offense, near.defense]) if (g !== null) expect(g).toBeGreaterThanOrEqual(PLAYER_SPACING - DRAWN);
     }
-    steps.push({ step, spots: all, closest: near, note: opts.note ?? null });
+    steps.push({ step, spots: all, closest: near, underCentre: under, note: opts.note ?? null });
   };
   const done = async (): Promise<void> => {
     await d.foldOverlays();
     await d.field.screenshot({ path: `test-results/collisions-${device}-${name}.png` });
-    writeFileSync(`test-results/collisions-${device}-${name}.json`, `${JSON.stringify({ spacing: PLAYER_SPACING, steps }, null, 2)}\n`);
+    writeFileSync(`test-results/collisions-${device}-${name}.json`, `${JSON.stringify({ spacing: PLAYER_SPACING, underCentre: UNDER_CENTRE, steps }, null, 2)}\n`);
   };
   return { note, done };
 }
@@ -317,5 +334,108 @@ test("a step past a teammate that cuts the route short at the sideline says both
   await expectAt(d, "Z", "Offense", 24, 5);
   await expect(d.toast).toHaveText("Players can't stand on top of each other. Stepped Z past Y. Out · cut short at the sideline");
   await note("Z stepped past Y, his Out cut short", { note: "Stepped Z past Y. Out · cut short at the sideline" });
+  await done();
+});
+
+test("the quarterback lines up under centre, a yard and a half behind the C, stepped or dropped there, and nobody else does", async ({ page }, info) => {
+  const device = info.project.name;
+  await seed(page, { team: OTTERS });
+  const d = new Designer(page);
+  await d.goto();
+  await d.newPlay("Offense");
+  const { note, done } = journal(d, device, "under-centre");
+  await d.foldOverlays();
+  await note("a fresh play: the C on the 1, the QB 5 behind the line", { underCentre: false });
+  const keptQb = page.getByText(/Kept QB/);
+  const qbStored = async () => (await storedDraft(page))?.players.find((p) => p.id === "o2");
+
+  // U5: the spot is the quarterback's alone: Z let go there is kept 2 yards off the C, as anyone is
+  await dragTo(d, "Z", "Offense", { x: 15, y: 2.5 });
+  await expectAt(d, "Z", "Offense", 15, 3);
+  await note("Z let go right behind the C is kept 2 yards off him", { note: "Kept Z 2 yards off C.", underCentre: false });
+  await expect(d.toast).not.toContainText("under centre");
+  await dragTo(d, "Z", "Offense", { x: 19, y: 5 });
+  await expectAt(d, "Z", "Offense", 19, 5);
+
+  // U4: the QB stepped up a yard at a time: 4, 3, then the step that would end inside the C's disc stops under centre
+  for (const y of [4, 3, 2.5]) {
+    await d.player("QB").press("ArrowUp");
+    await expectAt(d, "QB", "Offense", 15, y);
+  }
+  await expect(keptQb).toHaveCount(0);
+  await expect.poll(qbStored).toMatchObject({ x: 15, y: 2.5 });
+  await note("the QB stepped up under centre", { underCentre: true });
+  await d.player("QB").press("ArrowUp");
+  await expect(d.toast).toContainText("No room for QB past C.");
+  await expectAt(d, "QB", "Offense", 15, 2.5);
+  await note("a step on from under centre: no room past the C", { note: "No room for QB past C.", underCentre: true });
+  // held down, the key says the same, never that he was kept 2 yards off the C
+  await d.player("QB").focus();
+  await page.keyboard.down("ArrowUp");
+  await page.keyboard.down("ArrowUp");
+  await page.keyboard.up("ArrowUp");
+  await expectAt(d, "QB", "Offense", 15, 2.5);
+  await expect(keptQb).toHaveCount(0);
+  await note("the key held down under centre: no room past the C", { note: "No room for QB past C.", underCentre: true });
+  await d.player("QB").press("ArrowDown");
+  await expectAt(d, "QB", "Offense", 15, 3.5);
+  await note("a step back leaves it", { underCentre: false });
+
+  // U1, U8: let go in the back of the C's disc, short of the spot, the QB lines up under centre, and is told nothing
+  await dragTo(d, "QB", "Offense", { x: 15, y: 2.1 });
+  await expectAt(d, "QB", "Offense", 15, 2.5);
+  await expect(keptQb).toHaveCount(0);
+  await note("the QB let go in the back of the C's disc lines up under centre", { underCentre: true });
+
+  // U5, U8: let go beside the C, the QB is kept 2 yards off him, and told where to go to line up under centre
+  await dragTo(d, "QB", "Offense", { x: 16.5, y: 1.5 });
+  await expectAt(d, "QB", "Offense", 17, 1.5);
+  await note("the QB let go beside the C is kept off him, and told how to line up under centre", {
+    note: "Kept QB 2 yards off C. Drop QB right behind C to line up under centre.", underCentre: false,
+  });
+  await dragTo(d, "QB", "Offense", { x: 15, y: 2.4 });
+  await expectAt(d, "QB", "Offense", 15, 2.5);
+  await note("the QB dragged back under centre from beside the C", { underCentre: true });
+
+  // U2: the discs overlap, and each player is still picked by a tap on his own label
+  await d.select("C");
+  await d.select("QB");
+  await d.closeSidebars();
+
+  // U7: the C dragged out from in front of the QB, and back: he stands in front of him again
+  await dragTo(d, "C", "Offense", { x: 11, y: 1 });
+  await expectAt(d, "C", "Offense", 11, 1);
+  await note("the C dragged out from in front of the QB", { underCentre: false });
+  await dragTo(d, "C", "Offense", { x: 15, y: 1 });
+  await expectAt(d, "C", "Offense", 15, 1);
+  await expect(page.getByText(/Kept C/)).toHaveCount(0);
+  await note("the C dragged back in front of the QB", { underCentre: true });
+
+  // U11: the draft keeps him there
+  await page.reload();
+  await d.foldOverlays();
+  await expectAt(d, "QB", "Offense", 15, 2.5);
+  await expectAt(d, "C", "Offense", 15, 1);
+  await note("reloaded: still under centre", { underCentre: true });
+  await done();
+});
+
+test("a centre lined up off the half yard still has the quarterback right behind him, off the grid with him", async ({ page }, info) => {
+  const device = info.project.name;
+  // U3: the C a little left and deep of the half-yard grid, as a play from a file or written by hand may have him
+  const odd = moved(play("fx-odd-centre", "Otter Odd Centre"), { o1: { x: 14.3, y: 1.2 } });
+  await seed(page, { team: OTTERS, plays: [odd] });
+  const d = new Designer(page);
+  await d.goto();
+  await d.openSaved("Otter Odd Centre");
+  const { note, done } = journal(d, device, "under-centre-off-grid");
+  await d.foldOverlays();
+  await note("the C off the half yard", { underCentre: false });
+  await dragTo(d, "QB", "Offense", { x: 14.3, y: 2.6 });
+  await expectAt(d, "QB", "Offense", 14.3, 2.7);
+  const qb = (await storedDraft(page))?.players.find((p) => p.id === "o2");
+  expect(qb?.x).toBeCloseTo(14.3, 6);
+  expect(qb?.y).toBeCloseTo(1.2 + UNDER_CENTRE, 6);
+  await note("the QB lines up under the C, off the grid with him", { underCentre: true });
   await done();
 });
