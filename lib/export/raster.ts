@@ -142,7 +142,7 @@ export async function toPdfImage(c: HTMLCanvasElement): Promise<PdfImage> {
 /** A canvas as PNG bytes, read once. */
 export async function toPng(c: HTMLCanvasElement): Promise<Uint8Array> {
   const blob = await new Promise<Blob | null>((resolve) => { c.toBlob(resolve, "image/png"); });
-  if (!blob) throw new Error("The slide could not be encoded.");
+  if (!blob) throw new Error("The picture could not be encoded.");
   return new Uint8Array(await new Response(blob).arrayBuffer());
 }
 
@@ -187,7 +187,8 @@ export function wrap(text: string, maxWidth: number, size: number, maxLines = In
 
 export function download(bytes: Uint8Array | Blob, filename: string): void {
   // iOS 13+ will not sniff octet-stream, so every format we write names its type
-  const type = filename.endsWith(".pdf") ? "application/pdf" : filename.endsWith(".json") ? "application/json" : filename.endsWith(".pptx") ? PPTX_TYPE : "application/octet-stream";
+  const type = filename.endsWith(".pdf") ? "application/pdf" : filename.endsWith(".png") ? "image/png" : filename.endsWith(".json") ? "application/json"
+    : filename.endsWith(".pptx") ? PPTX_TYPE : "application/octet-stream";
   const blob = bytes instanceof Blob ? bytes : new Blob([bytes as BlobPart], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

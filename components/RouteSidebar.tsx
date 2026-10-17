@@ -2,6 +2,7 @@
 
 import { memo, useId, useRef, type ChangeEvent } from "react";
 import type { BlitzAim } from "@/lib/play/blitz";
+import type { DeepSplit } from "@/lib/play/deep";
 import { DEFENSE_KEYS, PASS_KEYS, RUN_KEYS, isRun, mirrorable, tableFor } from "@/lib/play/routes";
 import { teamFill, type SidelineCut } from "@/lib/play/geometry";
 import type { Player, RouteType } from "@/lib/play/types";
@@ -30,6 +31,10 @@ interface Props {
   onBlitzAim: (aim: "qb" | "backfield" | "contain") => void;
   /** Pick a player: like Man, ask for a red player on the field */
   onBlitzTarget: () => void;
+  /** the selected deep zone: Auto (split with the other deep zones), a deep half or a deep third; null for anything else */
+  deep: DeepSplit | "auto" | null;
+  /** the Auto, Half and Third pills */
+  onDeepSplit: (split: DeepSplit | null) => void;
   /** what the sideline cuts off the selected player's route, which is drawn to it with its depth intact */
   cut: SidelineCut | null;
   /**
@@ -82,6 +87,13 @@ function blitzWords(b: BlitzInfo): string {
   return "Comes for the quarterback. Aim it at the backfield, contain an edge, or pick any red player.";
 }
 
+/** The DEEP pills, and what each says the zone does. */
+const DEEP_PILLS: readonly { split: DeepSplit | null; label: string; title: string; words: string }[] = [
+  { split: null, label: "Auto", title: "Split the deep field with the other deep zones", words: "Splits the deep field with the other deep zones: one owns it all, two take halves, three take thirds." },
+  { split: "half", label: "Half", title: "Play the deep half nearest this defender", words: "Owns the deep half of the field on this side, however many others play deep." },
+  { split: "third", label: "Third", title: "Play the deep third nearest this defender", words: "Owns the deep third of the field nearest them, however many others play deep." },
+];
+
 /** Yards as a coach reads them off the field, to the half yard. */
 const yards = (v: number): string => String(Math.round(v * 2) / 2);
 
@@ -93,7 +105,7 @@ function chainEnd(last: Player | undefined): string {
 }
 
 function RouteSidebarImpl({
-  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, cut, jet, hint, onPick, onMotion, onRemoveMotion,
+  selected: sel, chain, visit, onLateral, onVisit, onTheRun, onRunBefore, blitz, onBlitzAim, onBlitzTarget, deep, onDeepSplit, cut, jet, hint, onPick, onMotion, onRemoveMotion,
   onDone, onPrimary, onMirror, onRename, noRunZone,
 }: Props) {
   // one history entry per rename session, not per keystroke
@@ -257,6 +269,27 @@ function RouteSidebarImpl({
                 </button>
               </div>
               <span className="text-caption leading-note text-ink-muted">{blitzWords(blitz)}</span>
+            </div>
+          )}
+          {/* how much of the deep field the zone owns: split with the other deep zones, or called as a half or a third */}
+          {deep && sel.team === "defense" && (
+            <div className="flex flex-none flex-col gap-1.5" role="group" aria-label="Deep zone">
+              <span className={eyebrow}>DEEP</span>
+              <div className="flex flex-wrap gap-1.5">
+                {DEEP_PILLS.map((d) => {
+                  const on = deep === (d.split ?? "auto");
+                  return (
+                    <button
+                      key={d.label} type="button" onClick={() => { onDeepSplit(d.split); }} title={d.title}
+                      aria-pressed={on} data-active={on}
+                      className={`${pill} min-h-11 px-3 py-1 text-small data-[active=true]:bg-yellow data-[active=true]:on-yellow`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-caption leading-note text-ink-muted">{DEEP_PILLS.find((d) => deep === (d.split ?? "auto"))?.words}</span>
             </div>
           )}
           {sel.team === "offense" && (

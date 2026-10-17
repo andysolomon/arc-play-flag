@@ -7,12 +7,13 @@ import { encodeRecoveryFile } from "@/lib/export/playbook-file";
 import { download } from "@/lib/export/raster";
 import { names } from "@/lib/play/assignments";
 import { blitzAim, blitzTarget, containEdge, edgePath, nearestBack } from "@/lib/play/blitz";
+import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
 import { sidelineCut } from "@/lib/play/geometry";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
-import { activeLineup, formationOf, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
-import { offFieldId, offFieldPositions, starters } from "@/lib/play/roster";
+import { activeLineup, formationOf, rosterPositions, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
+import { offFieldId, starters } from "@/lib/play/roster";
 import type { Lineups, Player, Roster, RouteType, Team, TeamSettings, Vis } from "@/lib/play/types";
 import { playSvg } from "@/lib/render/play-svg";
 import {
@@ -95,12 +96,10 @@ export function App() {
   const [rosterPick, setRosterPick] = useState<string | null>(null);
   // a depth chart kept for a tag the formation has no token for (FS, H) stays in reach from the panel: every
   // tag a lineup keeps a chart for, the open play wears or a saved play wears (lib/play/roster.ts, R9)
-  const positions = useMemo(() => {
-    if (!rostering) return formation;
-    const tagged = [...s.players, ...getPlays().flatMap((p) => p.players)].filter((p) => p.label).map((p) => ({ team: p.team, tag: p.label }));
-    const kept = lineups.lineups.flatMap((l) => l.slots.map((slot) => ({ team: slot.team, tag: slot.tag })));
-    return [...formation, ...offFieldPositions(formation, [...kept, ...tagged])];
-  }, [rostering, formation, lineups, s.players]);
+  const positions = useMemo(
+    () => (rostering ? rosterPositions(lineups, [...s.players, ...getPlays().flatMap((p) => p.players)]) : formation),
+    [rostering, formation, lineups, s.players],
+  );
   // both sidebars start closed: the app opens on a clear field
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -116,11 +115,25 @@ export function App() {
   const [draftWrite, setDraftWrite] = useState<{ fingerprint: string; ok: boolean } | null>(null);
   const draftFingerprint = JSON.stringify([s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
   const restoredDraft = useRef(false);
+  // the header's Save, for ⌘S / Ctrl+S: set once the save it makes is defined below
+  const saveRef = useRef<() => void>(() => {});
   const toastTimer = useRef(0);
   const say = useCallback((text: string, ms = 1600, flag = false) => {
     setToast({ text, flag });
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => { setToast(null); }, ms);
+  }, []);
+  // the roster's picture or sheet being drawn, and what the roster panel says of it: kept here, so leaving roster
+  // mode mid-export neither loses its word nor lets a second one start (docs/adr/010-roster-exports.md)
+  const [rosterExport, setRosterExport] = useState({ busy: false, news: "" });
+  const exportingRef = useRef(false);
+  const onRosterExport = useCallback((label: string, job: () => Promise<void>) => {
+    if (exportingRef.current) return;
+    exportingRef.current = true;
+    setRosterExport({ busy: true, news: `${label}…` });
+    Promise.resolve().then(job)
+      .then(() => "Saved", (e: unknown) => { record("export", e); return "That export failed. Try again on a bigger screen."; })
+      .then((news) => { exportingRef.current = false; setRosterExport({ busy: false, news }); }, () => undefined);
   }, []);
   // phones + iPads: drawers overlay the field; only one open at a time
   const compact = useMedia("(max-width: 1023px)");
@@ -199,6 +212,8 @@ export function App() {
   }, []);
   // the BLITZ pills: QB, Backfield and Contain aim it; Pick a player asks for a red player on the field, like Man
   const onBlitzAim = useCallback((aim: "qb" | "backfield" | "contain") => { dispatch({ type: "blitzAim", aim }); }, []);
+  // the DEEP pills: Auto splits the field with the other deep zones, Half and Third call it
+  const onDeepSplit = useCallback((split: DeepSplit | null) => { dispatch({ type: "deepSplit", split }); }, []);
   const onBlitzTarget = useCallback(() => {
     dispatch({ type: "blitzTarget" });
     if (compactRef.current) setRightOpen(false);
@@ -224,6 +239,14 @@ export function App() {
       if (e.key === "Escape") {
         if (rosteringRef.current) setRosterPick(null);
         else dispatch({ type: "select", id: null });
+        return;
+      }
+      // ⌘S / Ctrl+S is the header's Save, typing in the play name included, never the browser's "Save page as";
+      // a layout whose S key types no Latin letter is matched by the key's place. Roster mode has no play to save
+      const sKey = e.key === "s" || e.key === "S" || (e.code === "KeyS" && !/^[a-z]$/i.test(e.key));
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && sKey) {
+        e.preventDefault();
+        if (!e.repeat && !rosteringRef.current) saveRef.current();
         return;
       }
       if (isEditable(e.target)) return;
@@ -304,16 +327,24 @@ export function App() {
     };
   }, []);
 
-  const onSave = useCallback(() => {
+  // whether the save landed
+  const onSave = useCallback((): boolean => {
     const r = savePlay({
       id: s.id, name: s.name || "Untitled play", notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players],
     });
-    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return; }
+    if (!r.ok) { setSaveFailure(r.error); say(failureMessage(r.error), 3200); record("storage", r.error); return false; }
     // only a write that landed gets to name this document
     if (!s.id) dispatch({ type: "saved", id: r.value.id });
     setSaveFailure(null);
     say("Saved");
+    return true;
   }, [say, s.id, s.name, s.notes, s.side, s.artShadow, s.los, s.players]);
+  // Save from the header (or ⌘S) with Play tools shut: a save that doesn't land opens Play tools on its
+  // warning, where the play can still be downloaded or the save tried again
+  const onHeaderSave = useCallback(() => {
+    if (!onSave()) openLeft(true);
+  }, [onSave, openLeft]);
+  useEffect(() => { saveRef.current = onHeaderSave; }, [onHeaderSave]);
   const onDuplicate = useCallback(() => {
     const n = (s.name || "Untitled play") + " copy";
     const r = savePlay({ id: null, name: n, notes: s.notes, side: s.side, ...artShadow(s.artShadow), los: s.los, players: [...s.players] });
@@ -505,7 +536,6 @@ export function App() {
   return (
     <div className="app-root flex h-full flex-col overflow-hidden">
       <Header
-        side={s.side}
         mode={mode}
         view={view}
         onView={() => { onView(VIEW[view].next); }}
@@ -515,6 +545,8 @@ export function App() {
         canRedo={!rostering && s.future.length > 0}
         canClear={s.players.some((p) => (p.route || p.preSnap) && p.team === s.side)}
         onClear={onClear}
+        unsaved={dirty}
+        onSave={onHeaderSave}
         onToggleLeft={() => { openLeft(!leftOpen); }}
         onToggleRight={() => { openRight(!rightOpen); }}
         onUndo={() => { dispatch({ type: "undo" }); }}
@@ -595,6 +627,9 @@ export function App() {
               view={view}
               onView={onView}
               onSelect={onRosterSelect}
+              team={team}
+              exporting={rosterExport}
+              onExport={onRosterExport}
             />
           ) : (
           <RouteSidebar
@@ -608,6 +643,8 @@ export function App() {
             blitz={blitz}
             onBlitzAim={onBlitzAim}
             onBlitzTarget={onBlitzTarget}
+            deep={sel?.team === "defense" && sel.route?.type === "zoneDeep" ? deepSplit(sel.route) ?? "auto" : null}
+            onDeepSplit={onDeepSplit}
             cut={selCut}
             jet={jetAble}
             hint={hint}

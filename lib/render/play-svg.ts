@@ -4,7 +4,7 @@ import { COVERAGE_TAG, coverageOf } from "@/lib/play/coverage";
 import { LOS_YARD, readLos } from "@/lib/play/field";
 import { MIN_DEPTH, S, VW, depth, fieldLayout, geom, lateralArcs, motionGeom, px, py, routeYards, teamFill } from "@/lib/play/geometry";
 import { STAMP_FONT, STAMP_SPACING, TAG_FONT, manTags, stampBox, tagged } from "@/lib/play/marks";
-import { INK as ROUTE_INK, routeDef } from "@/lib/play/routes";
+import { INK as ROUTE_INK, routeDef, routeName } from "@/lib/play/routes";
 import type { Level, Pane, Player, Pt, Team, Vis } from "@/lib/play/types";
 import { zoneLayout } from "@/lib/play/zones";
 
@@ -240,11 +240,11 @@ function routeLabel(
   const rt = p.route;
   if (!rt || rt.type === "custom") return null;
   const def = routeDef(p.team, rt.type);
-  if (!def) return null;
   // a contain blitz is named for its job, so a printed card says which rush it is (lib/play/blitz.ts)
   const contain = rt.type === "blitz" && blitzAim(rt) === "contain";
-  const text = contain ? "Contain" : def.label;
-  if (zone) return { x: onField(zone.cx, "middle", text), y: zone.cy + zone.ry - 8, text, anchor: "middle" };
+  const name = contain ? "Contain" : routeName(p.team, rt);
+  if (!def || !name) return null;
+  if (zone) return { x: onField(zone.cx, "middle", name), y: zone.cy + zone.ry - 8, text: name, anchor: "middle" };
   const abs = routeYards(p, players, top);
   if (!abs || abs.length < 2) return null;
   const leg = contain ? 1 : abs.length - 1;
@@ -259,7 +259,7 @@ function routeLabel(
   else if (ny > 0) { nx = -nx; ny = -ny; }
   const x = mx + nx * 16, y = my + ny * 16 + 5;
   const anchor: Label["anchor"] = Math.abs(nx) < 0.3 ? "middle" : nx < 0 ? "end" : "start";
-  return { x: onField(x, anchor, text), y: Math.max(16, y), text, anchor };
+  return { x: onField(x, anchor, name), y: Math.max(16, y), text: name, anchor };
 }
 
 /** The label's x, pulled in so the whole word stays inside the field, 4 units clear of each sideline. */
