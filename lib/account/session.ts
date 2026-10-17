@@ -13,7 +13,7 @@ export function accountMode(env: Record<string, string | undefined> = process.en
 }
 
 /** The journeys' coaches: a run id keeps each test's account apart from every other's. */
-export const FIXTURE_COACHES: ReadonlyMap<string, string> = new Map([["otter", "Coach Otter"], ["heron", "Coach Heron"]]);
+export const FIXTURE_COACHES: ReadonlyMap<string, string> = new Map([["otter", "Coach Otter"], ["heron", "Coach Heron"], ["ibis", "Coach Ibis"]]);
 export const FIXTURE_COOKIE = "ffpd_fixture_account";
 const RUN = /^[a-z0-9]{1,24}$/;
 
@@ -29,7 +29,8 @@ function fixtureUser(request: Request): AccountUser | null {
   const [coach, run] = match?.[1]?.split(".") ?? [];
   const name = coach ? FIXTURE_COACHES.get(coach) : undefined;
   if (!coach || !run || !name || !RUN.test(run)) return null;
-  return { id: `fx_${coach}_${run}`, name, email: `${coach}.${run}@example.test`, imageUrl: null };
+  const email = `${coach}.${run}@example.test`;
+  return { id: `fx_${coach}_${run}`, name, email, imageUrl: null, emails: [email] };
 }
 
 async function clerkUser(): Promise<AccountUser | null> {
@@ -37,7 +38,10 @@ async function clerkUser(): Promise<AccountUser | null> {
   if (!userId) return null;
   const user = await currentUser();
   const name = user?.fullName ?? user?.username ?? user?.primaryEmailAddress?.emailAddress ?? "Coach";
-  return { id: userId, name, email: user?.primaryEmailAddress?.emailAddress ?? null, imageUrl: user?.imageUrl ?? null };
+  const primary = user?.primaryEmailAddress?.emailAddress ?? null;
+  const verified = (user?.emailAddresses ?? []).filter((e) => e.verification?.status === "verified").map((e) => e.emailAddress);
+  const emails = [...new Set([...(primary ? [primary] : []), ...verified])];
+  return { id: userId, name, email: primary, imageUrl: user?.imageUrl ?? null, emails };
 }
 
 /** The signed-in coach, or null. Never throws: a session that can't be read is nobody. */

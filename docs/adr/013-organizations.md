@@ -1,6 +1,6 @@
 # ADR 013: organizations, with coaches who share teams
 
-Status: proposed. It adds an organization over the coach accounts of [ADR 012](012-coach-accounts.md) without changing what a signed-out device stores, how any screen reads it, or how a coach's own teams are kept.
+Status: the server side is implemented (the store, the routes and the journey); the app's side is next. It adds an organization over the coach accounts of [ADR 012](012-coach-accounts.md) without changing what a signed-out device stores, how any screen reads it, or how a coach's own teams are kept.
 
 ## Why
 
@@ -33,21 +33,25 @@ A coach moves between tiers by moving a team, never by changing how they sign in
 
 ## Data model
 
+Organizations live in **Postgres** (`DATABASE_URL`; [the runbook](../runbook/organizations.md)), since memberships, roles, invites, per-record revs and cascading deletes are relations and transactions, which Redis would mean hand-writing as Lua. A coach's own teams and the share links stay in Redis untouched, and so does presence, which expires in seconds. Without a database the API says organizations are off and nothing else changes.
+
 ```ts
 interface Organization { id: string; name: string; owner: string; created: string }
 type OrgRole = "owner" | "admin" | "member";
-interface Membership { role: OrgRole; teams: "all" | string[]; heads: string[]; assists: string[]; joined: string }
-interface Invite { token: string; org: string; by: string; email?: string; grants: Omit<Membership, "joined" | "role">; expires: string }
-interface Stamp { by: string; at: string }
-interface OrgPlay extends SavedPlay { rev: number; made: Stamp; changed: Stamp; from?: { team: string; play: string }; deleted?: string }
-interface OrgPlaybook extends Playbook { rev: number; made: Stamp; changed: Stamp; deleted?: string }
+interface Grants { teams: string[] | null; heads: string[]; assists: string[] }   // null: every team
+interface Membership extends Grants { coach: string; name: string; role: OrgRole; joined: string }
+interface Invite extends Grants { token: string; org: string; by: string; email: string | null; created: string; expires: string }
+interface Stamp { by: string; name: string; at: string }   // `at` is the coach's own time of the change
+interface OrgPlay extends SavedPlay { rev: number; made: Stamp; changed: Stamp; from?: { team: string; play: string } }
+interface OrgPlaybook extends Playbook { rev: number; made: Stamp; changed: Stamp; from?: { team: string; book: string } }
 interface Presence { coach: string; name: string; play: string | null; at: string }
 ```
 
-- Keys: `ffpd:org:<id>` (hash: name, owner, created), `ffpd:org:<id>:members` (hash coach → membership JSON), `ffpd:org:<id>:teams` (list), `ffpd:org:<id>:invites` (hash token → invite JSON), `ffpd:coach:<user>:orgs` (set), `ffpd:invite:<token>` → org id (with the invite's expiry).
-- A team of the organization is `ffpd:team:<id>` as today, with `owner` = `org:<id>` and `data` holding only settings and lineups; its plays are `ffpd:team:<id>:plays` (hash id → OrgPlay JSON), its books `ffpd:team:<id>:books`, its rev a counter every write bumps, and `ffpd:team:<id>:log` (a sorted set of record ids by the rev that last changed them) is what "since rev N" reads. Presence is `ffpd:team:<id>:presence` (hash coach → Presence), entries older than 30 seconds ignored.
-- Every write is one Lua script that checks membership and role, applies the last-write-wins rule, bumps the team rev and logs the record, as the account's writes do today.
-- Reads for the "since" poll are not counted against the account's read limit (1,200 an hour would be spent by two tabs in forty minutes); they are limited per team instead, 1 a second.
+- Tables (`db/migrations/001-organizations.sql`): `orgs`, `memberships` (keyed by organization and coach, with the role and grants), `invites`, `org_teams` (settings and lineups as JSON, the team's write count `rev` and the `settings_rev` they last changed at), `org_plays` and `org_books` (one row per record: the record as JSON, or null with `deleted` set for a tombstone, the `rev` it last changed at, who made and changed it and when). Deleting an organization cascades to all of it.
+- Every write is one transaction that reads the caller's membership and locks the team row, so a coach removed a moment ago is refused and two writes to one team never collide on a rev. "What changed since rev N" is the rows whose rev is above N, tombstones included, plus the settings when theirs is.
+- Rule 5 in the data: a change carries the coach's own time; a record changed since by **another** coach and later than that time outranks it, and the change becomes a sideline version (an edit) or is ignored (a delete). A coach's own records never outrank their own change, so their two devices and a slow clock cost nothing.
+- Presence is `ffpd:presence:<team>` in Redis, a hash coach → Presence written by the poll, entries older than 30 seconds ignored. The poll is limited per coach per team (90 a minute), not against the account's reads, which two tabs would spend in forty minutes.
+- The routes are `app/api/orgs/`: the coach's organizations and a new one; join by token and its preview; an organization's detail, name and deletion; invites; members' grants and roles; the owner's hand-over; leaving; teams made or moved in; a team whole; the poll; a play, a book, the settings; a copy in. Every write checks the request came from the app's own origin, as the account's do.
 
 ## In the app
 
@@ -76,4 +80,6 @@ interface Presence { coach: string; name: string; play: string | null; at: strin
 
 ## Verification
 
-`e2e/journeys/organization.journey.ts` signs in as three fixture coaches (Otter, Heron and a new Ibis) against the disposable Redis: Otter makes an organization and moves a team in, invites Heron by link as head coach and Ibis by email with visibility narrowed to that team, as a viewer; Heron's device opens the team and its roster; both draw different plays at once and both land; both save the same play and the later wins with the other told; Heron goes offline, edits, comes back after Otter changed the same play and finds a sideline version; Ibis can print but not save; Otter copies a play to their own team; Otter removes Ibis and their device goes read-only, then deletes the organization and Heron's own teams are untouched. Each test leaves `test-results/organization-<coach>-<test>.json` and pictures of the members panel, the avatars and the read-only designer, uploaded as `organization`.
+Until the screens exist, `e2e/journeys/organization.journey.ts` drives the API as the three fixture coaches (Otter, Heron and Ibis) against the disposable Redis and database: Otter makes an organization and moves a team in, invites Heron by link as head coach and Ibis by email narrowed to that team as a viewer, Ibis is in on their first visit and refused every write, Otter sees everyone; the two coaches save different plays and both land, three changes to one play leave the later coach's standing and the earlier one as a sideline version, a delete and a change resolve to the later, and a poll brings the changes with their tombstones and the other coach on their play; a viewer's every write is refused, an assistant draws and copies a play in, a removed coach gets nothing, the owner can't leave with others in, and deleting the organization spares a coach's own team. Each test leaves `test-results/organization-<test>.json` (each step: who did what, what the server answered), uploaded as `organization`.
+
+With the screens, the journey will sign in as three fixture coaches (Otter, Heron and a new Ibis) against the disposable Redis: Otter makes an organization and moves a team in, invites Heron by link as head coach and Ibis by email with visibility narrowed to that team, as a viewer; Heron's device opens the team and its roster; both draw different plays at once and both land; both save the same play and the later wins with the other told; Heron goes offline, edits, comes back after Otter changed the same play and finds a sideline version; Ibis can print but not save; Otter copies a play to their own team; Otter removes Ibis and their device goes read-only, then deletes the organization and Heron's own teams are untouched. Each test leaves `test-results/organization-<coach>-<test>.json` and pictures of the members panel, the avatars and the read-only designer, uploaded as `organization`.
