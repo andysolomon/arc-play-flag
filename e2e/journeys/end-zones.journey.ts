@@ -528,8 +528,8 @@ test("the team's name is painted across every design and none says END ZONE; it 
   await expect(art(d.field)).toHaveAttribute("data-ez-art", "event-horizon");
   await expect(lettering(art(d.field))).toHaveAttribute("data-ez-name", "DELTA FORCE 7");
   await page.goto("/playbooks");
-  const settings = page.getByRole("button", { name: /Delta Force 7 · team, theme & backup settings/ });
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const settings = page.getByRole("button", { name: /Delta Force 7 · account, team, theme & backup settings/ });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   await expect(async () => {
     await settings.click();
     await expect(dialog).toBeVisible({ timeout: 1_000 });
@@ -847,7 +847,7 @@ test("playbook settings have the same picker, and pictures made from plays never
   await expect(lanes(thumb)).toHaveCount(0);
 
   const settings = page.getByRole("button", { name: /team, theme & backup settings/ });
-  const dialog = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const dialog = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   // the first tap after a navigation can land before React has hydrated; tap again if it did
   await expect(async () => {
     await settings.click();
