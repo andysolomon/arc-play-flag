@@ -23,18 +23,22 @@
  *   off it, so their discs can never be more than a hair over each other across it), and a shadow side
  *   hidden from the field must never stop a move the coach can't see the reason for.
  * - C7 an arrow step onto a teammate: the player goes on past them, a yard at a time the same way, to the
- *   first clear spot; with none before the sideline, the line or the card's top, it stays where it is.
+ *   first clear spot; with none before the sideline, the line or the card's top, it stays where it is. A key
+ *   held down walks the player up to the teammate and stops there, so a held key never carries them on past
+ *   someone they didn't mean to pass; a fresh press then steps past.
  * - C8 nowhere clear at all (it can't happen with five a side on a field 27 yards wide, but): the player
  *   stays where it was.
  * - C9 dragging over a teammate: the token is held at the edge of the teammate's disc and slides round it,
  *   and once the pointer is past the teammate's centre it is held on the far side, so a teammate never walls
- *   a player in.
+ *   a player in. A finger resting on the teammate's centre, where a hair's jitter would swing it from side to
+ *   side, keeps it on the side it is drawn on until the finger is HOLD past the centre, so a player let go
+ *   right on a teammate lands on the side it came from.
  * - C10 a blitzer backed off to the blitz line onto a teammate standing there: the nearest clear half-yard
  *   spot at or behind the line. A route that moves nobody moves nobody, even a player stored on top of
  *   another (C5).
  * - C11 two clear spots equally near (a pointer exactly on a teammate's spot, or a blitzer backed onto one):
- *   the one nearer the line of scrimmage, then the one further left, so the same move always lands in the
- *   same place.
+ *   the one nearer where the player came from, then nearer the line of scrimmage, then further left, so the
+ *   same move always lands in the same place.
  * - C12 a spot exactly PLAYER_SPACING from a teammate, or a hair under it from rounding: clear.
  */
 
@@ -45,6 +49,8 @@ import type { Player, Pt, SnapMode, Team } from "./types";
 export const PLAYER_SPACING = 2;
 /** A rounding error's worth of yards, so a spot exactly PLAYER_SPACING off is clear (C12). */
 const EPS = 1e-6;
+/** How far past a teammate's centre a finger goes before the player it drags is held on the far side (C9). */
+export const HOLD = 0.5;
 /** The deepest card's top (MAX_DEPTH), for the blitz line, which the reducer moves to without a card. */
 const DEEPEST_TOP = 8 - MAX_DEPTH;
 
@@ -70,13 +76,31 @@ function fieldBox(team: Team, top: number, gap: number) {
   return { x0: lo.x, y0: lo.y, x1: hi.x, y1: hi.y };
 }
 
-/** Whether `a` lands nearer `to` than `b`; equally near, nearer the line of scrimmage, then further left (C11). */
-function nearer(a: Pt, b: Pt | null, to: Pt): boolean {
+/**
+ * Whether `a` lands nearer `to` than `b`; equally near, nearer `from` (where the player came from), then
+ * nearer the line of scrimmage, then further left (C11).
+ */
+function nearer(a: Pt, b: Pt | null, to: Pt, from: Pt | null): boolean {
   if (!b) return true;
   const da = Math.hypot(a.x - to.x, a.y - to.y), db = Math.hypot(b.x - to.x, b.y - to.y);
   if (Math.abs(da - db) > 1e-9) return da < db;
+  if (from) {
+    const fa = Math.hypot(a.x - from.x, a.y - from.y), fb = Math.hypot(b.x - from.x, b.y - from.y);
+    if (Math.abs(fa - fb) > 1e-9) return fa < fb;
+  }
   if (Math.abs(Math.abs(a.y) - Math.abs(b.y)) > 1e-9) return Math.abs(a.y) < Math.abs(b.y);
   return a.x < b.x;
+}
+
+/**
+ * A spot within HOLD of a teammate's centre, read as on the edge of that core on the side `from` is (C9):
+ * the spot the player is drawn at, so a finger jittering on the centre never swings it from side to side.
+ */
+function held(p: Pt, mates: readonly Pt[], from: Pt | null): Pt {
+  const m = from ? crowding(p, mates) : null;
+  if (!m || !from || Math.hypot(p.x - m.x, p.y - m.y) >= HOLD) return p;
+  const dx = from.x - m.x, dy = from.y - m.y, L = Math.hypot(dx, dy);
+  return L > EPS ? { x: m.x + (dx / L) * HOLD, y: m.y + (dy / L) * HOLD } : p;
 }
 
 /**
@@ -84,11 +108,14 @@ function nearer(a: Pt, b: Pt | null, to: Pt): boolean {
  * field, if that is clear, else the nearest point of the field outside every teammate's disc (C1, C3, C4,
  * C9). That point is the spot itself held to an edge of the field, or on one teammate's circle (straight
  * out from them, where it crosses another's, or where it crosses an edge), or a corner; every one of them is
- * tried and the nearest clear one wins. Null only when nowhere is clear (C8).
+ * tried and the nearest clear one wins. `from` is where the player is drawn now, which a finger on a
+ * teammate's centre keeps them beside (C9) and which breaks a tie (C11). Null only when nowhere is clear (C8).
  */
-export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: readonly Pt[]): Pt | null {
-  const p = clamp(want.x, want.y, team, top, gap);
-  if (!crowding(p, mates)) return p;
+export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: readonly Pt[], from: Pt | null = null): Pt | null {
+  const at = clamp(want.x, want.y, team, top, gap);
+  if (!crowding(at, mates)) return at;
+  const hold = held(at, mates, from);
+  const p = clamp(hold.x, hold.y, team, top, gap);
   const b = fieldBox(team, top, gap);
   const R = PLAYER_SPACING;
   const tries: Pt[] = [
@@ -122,7 +149,7 @@ export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: 
   for (const t of tries) {
     if (t.x < b.x0 - 1e-9 || t.x > b.x1 + 1e-9 || t.y < b.y0 - 1e-9 || t.y > b.y1 + 1e-9) continue;
     const c = { x: Math.max(b.x0, Math.min(b.x1, t.x)), y: Math.max(b.y0, Math.min(b.y1, t.y)) };
-    if (!crowding(c, mates) && nearer(c, best, p)) best = c;
+    if (!crowding(c, mates) && nearer(c, best, p, from)) best = c;
   }
   return best;
 }
@@ -130,10 +157,11 @@ export function freeSpot(want: Pt, team: Team, top: number, gap: number, mates: 
 /**
  * Where a drop lands: the live spot (already clear, see freeSpot) snapped as every drop is and held to the
  * field, if that is clear; else the nearest snapped spot that is (C2, C3). With snapping off it is the live
- * spot. Null only when nowhere is clear (C8).
+ * spot. A tie goes to the spot nearer `from`, where the player came from (C11). Null only when nowhere is
+ * clear (C8).
  */
-export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: readonly Pt[], mode: SnapMode): Pt | null {
-  if (mode === "free") return freeSpot(at, team, top, gap, mates);
+export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: readonly Pt[], mode: SnapMode, from: Pt | null = null): Pt | null {
+  if (mode === "free") return freeSpot(at, team, top, gap, mates, from);
   const first = clamp(snap(at.x, mode), snap(at.y, mode), team, top, gap);
   if (!crowding(first, mates)) return first;
   const g = mode === "one" ? 1 : 0.5;
@@ -143,18 +171,19 @@ export function freeSnap(at: Pt, team: Team, top: number, gap: number, mates: re
   for (let j = Math.floor(b.y0 / g); j <= Math.ceil(b.y1 / g); j++) {
     for (let i = Math.floor(b.x0 / g); i <= Math.ceil(b.x1 / g); i++) {
       const c = clamp(i * g, j * g, team, top, gap);
-      if (!crowding(c, mates) && nearer(c, best, at)) best = c;
+      if (!crowding(c, mates) && nearer(c, best, at, from)) best = c;
     }
   }
   return best;
 }
 
 /**
- * An arrow step: a yard (or `step`) the way pressed, held to the field, and on past any teammate in the way,
- * a step at a time, to the first clear spot (C7). `to` is null when the edge of the field comes first;
- * `past` is the first teammate in the way, if one was.
+ * An arrow step: a yard (or `step`) the way pressed, held to the field, and, on a fresh press (`pass`), on
+ * past any teammate in the way, a step at a time, to the first clear spot (C7). `to` is null when the edge
+ * of the field comes first, or a held key (`pass` false) meets a teammate; `past` is the first teammate in
+ * the way, if one was.
  */
-export function stepPast<T extends Pt>(from: Pt, step: readonly [number, number], team: Team, top: number, gap: number, mates: readonly T[]): { to: Pt | null; past: T | null } {
+export function stepPast<T extends Pt>(from: Pt, step: readonly [number, number], team: Team, top: number, gap: number, mates: readonly T[], pass = true): { to: Pt | null; past: T | null } {
   let past: T | null = null;
   let prev: Pt | null = null;
   // the field is 30 yards across and at most 45 deep, so a yard at a time this always reaches an edge
@@ -164,6 +193,7 @@ export function stepPast<T extends Pt>(from: Pt, step: readonly [number, number]
     const who = crowding(c, mates);
     if (!who) return { to: c, past };
     past ??= who;
+    if (!pass) break;
     prev = c;
   }
   return { to: null, past };
@@ -189,6 +219,6 @@ export function spaced(players: readonly Player[], before: Player, moved: Player
   if (moved === before || (moved.x === before.x && moved.y === before.y)) return moved;
   const mates = teammates(players, before.id);
   if (!crowding(moved, mates)) return moved;
-  const at = freeSnap(moved, moved.team, DEEPEST_TOP, gap, mates, "half");
+  const at = freeSnap(moved, moved.team, DEEPEST_TOP, gap, mates, "half", before);
   return at ? { ...moved, x: at.x, y: at.y } : moved;
 }

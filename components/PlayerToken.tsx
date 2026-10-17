@@ -15,6 +15,8 @@ interface Props {
   /** move focus to the first eligible player when target selection begins */
   focusOnTarget: boolean;
   boing: boolean;
+  /** an arrow step that went nowhere, a teammate in the way (lib/play/spacing.ts) */
+  shake?: boolean;
   dragging: boolean;
   /** read-only rendering (share page): no handlers, not focusable */
   readOnly?: boolean;
@@ -48,7 +50,7 @@ function captionX(x: number, text: string): number {
 }
 
 function PlayerTokenImpl({
-  player: p, x, y, selected, target, focusOnTarget, boing, dragging, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
+  player: p, x, y, selected, target, focusOnTarget, boing, shake = false, dragging, readOnly = false, drawing = false, faded = false, caption = null, onPointerDown, onKeyDown,
 }: Props) {
   const tokenRef = useRef<SVGGElement>(null);
   useEffect(() => {
@@ -75,7 +77,7 @@ function PlayerTokenImpl({
       ].filter(Boolean).join(" ") || undefined}
     >
       <g style={{ ...centred, transform: selected ? "scale(1.1)" : "none" }}>
-        <g style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : undefined}>
+        <g style={centred} className={boing ? "animate-boing motion-reduce:animate-none" : shake ? "animate-shake motion-reduce:animate-none" : undefined}>
           {/* 68 SVG units gives the token an approximately 44px target at the common phone field width. */}
           <circle r={34} fill="transparent" stroke="none" />
           {/* keyboard focus shows the same yellow ring as selection */}

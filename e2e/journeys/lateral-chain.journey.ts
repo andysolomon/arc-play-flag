@@ -287,9 +287,11 @@ test("a catch never goes forward or past the line, and follows its release when 
   // a QB on the line lets it go on the line: a catch dragged past it lands on the line
   const onLine = await page.evaluate(() => JSON.parse(localStorage.getItem("ffpd.draft.v1") ?? "null") as { players: Player[] });
   expect(onLine.players.find((p) => p.id === "o2")?.y).toBe(5);
-  // a drag snaps to the half yard, so the QB steps up to the line by keyboard, a yard a press
+  // a drag snaps to the half yard, so the QB steps up to the line by keyboard, a yard a press: two yards
+  // off the C first, since he can't stand on top of him (lib/play/spacing.ts), then up beside him
   await d.closeSidebars();
   await d.player("QB").focus();
+  for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowLeft");
   for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowUp");
   await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o2")?.y).toBe(0.9);
   await dragCatch(d, 0, [20, -3]);

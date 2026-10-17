@@ -10,9 +10,11 @@ import { OTTERS, moved, play, seed, storedDraft, storedLineups, storedPlays } fr
  * Spacing (lib/play/spacing.ts): a player is never put on top of a teammate. Dragged onto one, the token is
  * held at the edge of the teammate's disc while the pointer is over it, slides round it, and jumps to the far
  * side once the pointer is past the teammate's centre; let go, it lands 2 yards off (PLAYER_SPACING, centre
- * to centre, where two discs just touch), on the half yard, and a note says why. Let go in a pocket between
- * two teammates, it lands on the one spot clear of both. An arrow step onto a teammate goes on past them to
- * the first clear spot, or, with the edge of the field first, nowhere, and says which. The other side is never
+ * to centre, where two discs just touch), on the half yard, and a note says why. Let go right on the
+ * teammate's centre, it lands on the side it came from. Let go in a pocket between two teammates, it lands on
+ * the one spot clear of both. An arrow press onto a teammate goes on past them to the first clear spot, or,
+ * with the edge of the field first, nowhere, and says which; a key held down walks the player up beside a
+ * teammate and stops, shaking, until a fresh press steps past. The other side is never
  * in the way: the line of scrimmage keeps them apart already, so a defender steps to the line opposite the C.
  * A blitzer backed off to the blitz line onto a teammate standing there takes the nearest clear spot on it.
  * Roster mode's positions keep the same spacing, on the roster. A play stored with two players on top of
@@ -61,14 +63,23 @@ async function expectAt(d: Designer, label: string, team: "Offense" | "Defense",
   await expect.poll(async () => { const p = await spotOf(d, label, team); return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]; }).toEqual([x, y]);
 }
 
-/** Presses a player where it stands and drags it to a yard point, as a coach's finger or mouse does; `held` runs with the button still down. */
-async function dragTo(d: Designer, label: string, team: "Offense" | "Defense", to: { x: number; y: number }, held?: () => Promise<void>): Promise<void> {
+/**
+ * Presses a player where it stands and drags it to a yard point, by way of another if given, as a coach's
+ * finger or mouse does; `held` runs with the button still down.
+ */
+async function dragTo(
+  d: Designer, label: string, team: "Offense" | "Defense", to: { x: number; y: number }, held?: () => Promise<void>, via?: { x: number; y: number },
+): Promise<void> {
   await d.foldOverlays();
   await d.settle();
   const from = await spotOf(d, label, team);
   const a = await d.yardPoint(from.x, from.y), b = await d.yardPoint(to.x, to.y);
   await d.page.mouse.move(a.x, a.y);
   await d.page.mouse.down();
+  if (via) {
+    const v = await d.yardPoint(via.x, via.y);
+    await d.page.mouse.move(v.x, v.y, { steps: 12 });
+  }
   await d.page.mouse.move(b.x, b.y, { steps: 12 });
   if (held) await held();
   await d.page.mouse.up();
@@ -108,8 +119,9 @@ test("a player dragged onto a teammate is held off them and lands 2 yards away, 
   await d.foldOverlays();
   await note("the default formation");
 
-  // Z dragged onto the QB: held at the edge of the QB's disc while the button is down, landed 2 yards off
-  await dragTo(d, "Z", "Offense", { x: 15.6, y: 5 }, async () => {
+  // Z dragged right onto the QB's centre: held at the edge of his disc while the button is down, on the side Z
+  // came from, however the finger jitters there, and landed 2 yards off
+  await dragTo(d, "Z", "Offense", { x: 15, y: 5 }, async () => {
     await expect.poll(async () => { const z = await spotOf(d, "Z", "Offense"); return Math.hypot(z.x - 15, z.y - 5); }).toBeGreaterThanOrEqual(PLAYER_SPACING - DRAWN);
     await note("Z held off the QB, the button still down", { note: "Players can't stand on top of each other. Kept Z 2 yards off QB." });
   });
@@ -149,6 +161,18 @@ test("a player dragged onto a teammate is held off them and lands 2 yards away, 
   await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o5")).toMatchObject({ x: 13, y: 5 });
   await d.undo.click();
   await expectAt(d, "Y", "Offense", 27, 1);
+
+  // the arrow key held down walks Y in along the line and stops him beside the C, shaking as it repeats,
+  // never carrying him on past; a fresh press then steps him past
+  await d.player("Y").focus();
+  for (let i = 0; i < 14; i++) await page.keyboard.down("ArrowLeft");
+  await expect(d.player("Y").locator(".animate-shake")).toHaveCount(1);
+  await page.keyboard.up("ArrowLeft");
+  await expectAt(d, "Y", "Offense", 17, 1);
+  await note("Y walked in by a held key, stopped beside the C");
+  await page.keyboard.press("ArrowLeft");
+  await expectAt(d, "Y", "Offense", 13, 1);
+  await note("a fresh press steps Y past the C", { note: "Stepped Y past C." });
   await done();
 });
 
@@ -208,12 +232,13 @@ test("roster mode's positions keep the same spacing, and where they land is the 
   await expect.poll(() => storedSpots(page)).toEqual([{ team: "offense", tag: "Z", x: 17, y: 5 }, { team: "offense", tag: "QB", x: 19, y: 5 }]);
   await note("the QB stepped past Z in roster mode", { note: "Stepped QB past Z." });
 
-  // on the defense, the S dragged onto the LB stands beside him
+  // on the defense, the S brought up from behind the LB and let go right on his centre stands behind him,
+  // the side he came from
   await d.rosterView.click();
   await expect(d.rosterView).toHaveAccessibleName("Showing defense");
-  await dragTo(d, "S", "Defense", { x: 11.4, y: -4 });
-  await expectAt(d, "S", "Defense", 13, -4);
-  await expect.poll(async () => (await storedSpots(page)).find((s) => s.tag === "S")).toEqual({ team: "defense", tag: "S", x: 13, y: -4 });
+  await dragTo(d, "S", "Defense", { x: 11, y: -4 }, undefined, { x: 11, y: -8 });
+  await expectAt(d, "S", "Defense", 11, -6);
+  await expect.poll(async () => (await storedSpots(page)).find((s) => s.tag === "S")).toEqual({ team: "defense", tag: "S", x: 11, y: -6 });
   await note("S let go on the LB in roster mode", { note: "Kept S 2 yards off LB." });
   await done();
 });
