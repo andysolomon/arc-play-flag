@@ -184,3 +184,8 @@ export function jsonUpload(name: string, text: string): { name: string; mimeType
 
 /** Local storage keys the app uses, for tests that break a write on purpose. */
 export const KEYS = { plays: PLAYS_KEY, books: PLAYBOOKS_KEY, team: TEAM_KEY, lineups: LINEUPS_KEY, draft: DRAFT_KEY } as const;
+
+/** The team settings as the app stored them, or null when none were set. */
+export async function storedTeam(page: Page): Promise<TeamSettings | null> {
+  return page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as TeamSettings | null, TEAM_KEY);
+}

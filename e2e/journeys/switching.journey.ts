@@ -183,7 +183,7 @@ test("arrow keys along the picker while it is up: the last pick lands, and focus
 
 test("playbook settings: the interstitial is drawn over the dialog, not under it", async ({ page }, testInfo) => {
   await page.goto("/playbooks");
-  const settings = page.getByRole("dialog", { name: "Team, theme & backup" });
+  const settings = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   await expect(async () => {
     await page.getByRole("button", { name: /team, theme & backup settings/ }).click();
     await expect(settings).toBeVisible({ timeout: 1_000 });

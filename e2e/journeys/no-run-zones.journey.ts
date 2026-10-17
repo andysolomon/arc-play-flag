@@ -77,8 +77,8 @@ test("playbook settings turn them off for every picture and printout preview on 
   await expect(thumb).toBeVisible();
   await expect(bands(thumb)).not.toHaveCount(0);
 
-  await page.getByRole("button", { name: /Riverside Otters · team, theme & backup settings/ }).click();
-  const settings = page.getByRole("dialog", { name: "Team, theme & backup" });
+  await page.getByRole("button", { name: /Riverside Otters · account, team, theme & backup settings/ }).click();
+  const settings = page.getByRole("dialog", { name: "Account, team, theme & backup" });
   const toggle = settings.getByRole("checkbox", { name: "No-run zones" });
   await expect(toggle).toBeChecked();
   await toggle.uncheck();

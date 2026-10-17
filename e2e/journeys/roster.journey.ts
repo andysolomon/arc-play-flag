@@ -356,7 +356,7 @@ test("roster mode is the team's standard formation, never the open play: its tag
   await openSettings(page);
   await page.getByLabel("Restore a device backup").setInputFiles(jsonUpload("device-backup.json", backup));
   await page.getByRole("region", { name: "Restore preview" }).getByRole("button", { name: "Replace device data" }).click();
-  await expect(page.getByRole("dialog", { name: "Team, theme & backup" }).getByRole("status")).toContainText("Replaced with backup");
+  await expect(page.getByRole("dialog", { name: "Account, team, theme & backup" }).getByRole("status")).toContainText("Replaced with backup");
   await expect.poll(() => storedLineups(page)).toEqual(backedUp);
   await d.goto();
   await d.newPlay("Defense");
