@@ -1,0 +1,29 @@
+{
+  "steps": [
+    {
+      "step": "picked the automatically current book from New play",
+      "board": "Otter Cover TwoOtter Cover TwoOffensive playSaved",
+      "current": "fx-road"
+    },
+    {
+      "step": "picked the current primary again without losing edits",
+      "board": "My edited primaryMy edited primaryOffensive playDraft autosaved",
+      "current": "fx-road"
+    },
+    {
+      "step": "picked the current book from a non-primary play",
+      "board": "Otter Cover TwoOtter Cover TwoOffensive playSaved",
+      "current": "fx-road"
+    },
+    {
+      "step": "opened the first available play in Otter Game Plan",
+      "board": "Otter Slant LeftOtter Slant LeftOffensive playSaved",
+      "current": "fx-game"
+    },
+    {
+      "step": "opened the first available play in Missing primary",
+      "board": "Otter Wheel RightOtter Wheel RightOffensive playSaved",
+      "current": "fx-missing"
+    }
+  ]
+}

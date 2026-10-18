@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "step": "returned from Otter Road Book",
+      "board": "Otter Cover TwoOtter Cover TwoOffensive playSaved",
+      "current": "fx-road"
+    },
+    {
+      "step": "returned from Otter Game Plan",
+      "board": "Otter Slant LeftOtter Slant LeftOffensive playSaved",
+      "current": "fx-game"
+    },
+    {
+      "step": "returned from Otter Scout Book",
+      "board": "New playNew playOffensive playDraft autosaved",
+      "current": "fx-scout"
+    },
+    {
+      "step": "explicit Open in designer takes precedence",
+      "board": "Otter Wheel RightOtter Wheel RightOffensive playSaved",
+      "current": "fx-road"
+    }
+  ]
+}

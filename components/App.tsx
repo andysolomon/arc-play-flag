@@ -336,16 +336,18 @@ export function App() {
       openToolsTimer = window.setTimeout(() => { setLeftOpen(true); }, 0);
       window.history.replaceState(null, "", "/");
     }
-    // "Open in designer" from inside a book: /?open=<play id>&book=<book id> makes that book the current one
-    const book = params.get("book");
-    if (book && setCurrentBook(book)) window.history.replaceState(null, "", "/");
-    // "Open" from the playbook gallery: /?open=<play id>
-    const saved = playById(params.get("open"));
+    // Returning from a book opens its primary (or first available play). An explicit play or
+    // shared formation still takes precedence; an invalid book leaves the restored draft alone.
+    const book = playbookById(params.get("book"));
+    if (book && setCurrentBook(book.id)) window.history.replaceState(null, "", "/");
+    const saved = playById(params.get("open")) ?? (!rec && book ? primaryPlay(book) : null);
     if (saved) {
       dispatch({
         type: "load", id: saved.id, name: saved.name, notes: saved.notes, side: saved.side, artShadow: saved.artShadow, los: saved.los, players: saved.players,
       });
       window.history.replaceState(null, "", "/");
+    } else if (book && !rec) {
+      dispatch({ type: "newPlay", side: d?.side ?? "offense" });
     }
     return () => {
       window.clearTimeout(firstUseTimer);
@@ -444,13 +446,14 @@ export function App() {
     say(`Added to “${book.name}”`);
   }, [s.id, say]);
   // the Playbooks tile's menu: switching books opens the new book's primary play, or clears the board
-  // when it has none (docs/adr/009-playbook-switcher.md); the book already current is left as it is
+  // when it has none (docs/adr/009-playbook-switcher.md). A current book still opens its primary
+  // from New play or another play; the primary already on the board keeps its edits and history.
   const onSwitchBook = useCallback((id: string) => {
     const book = playbookById(id);
     if (!book) return;
-    if (id === getCurrentBookId()) { say(`Already in “${book.name}”`); return; }
-    setCurrentBook(id);
     const primary = primaryPlay(book);
+    if (id === getCurrentBookId() && (!primary || primary.id === s.id)) { say(`Already in “${book.name}”`); return; }
+    setCurrentBook(id);
     if (!primary) {
       setMode("play");
       dispatch({ type: "newPlay", side: s.side });
