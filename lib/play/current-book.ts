@@ -24,7 +24,8 @@
  *   copy under a new id, follows the copy (lib/export/playbook-file.ts, planImport). A file whose
  *   book differs here only in its primary is not taken as already here and dropped: it lands as a copy.
  * - C10 a switch to the book whose primary is already open leaves the board as it is, its undo
- *   history included; a switch back to the book already current changes nothing.
+ *   history included; picking the current nonempty book from another play opens its primary.
+ *   Picking the current empty book leaves its draft alone.
  */
 const KEY = "ffpd.current-book.v1";
 const UNSAFE = new Set(["__proto__", "constructor", "prototype"]);

@@ -18,7 +18,7 @@ import {
  *  - a play picked in roster mode opens hidden behind the roster, routes and name out of sight    → "the play name"
  *  - a switch opens the wrong play (the first instead of the primary), or leaves the old board   → "switching"
  *  - a switch to an empty book leaves the old play on the board instead of clearing it           → "switching"
- *  - a switch to the book already current clears the board, or the switch doesn't outlast reload → "switching"
+ *  - a switch to the current empty book clears its draft, or the switch doesn't outlast reload → "switching"
  *  - "Open in designer" from inside a book leaves the designer in another book                   → "switching", "primary"
  *  - the first play added isn't the primary, a reorder moves it, or a removal leaves none        → "primary"
  *  - the primary doesn't reach the playbook file, or another device after an import              → "primary"
@@ -73,6 +73,73 @@ async function read(d: Designer, step: string, menu?: Locator): Promise<Step> {
 function save(name: string, steps: Step[]): void {
   writeFileSync(`test-results/playbook-switch-${name}.json`, `${JSON.stringify({ steps }, null, 2)}\n`);
 }
+
+test("picking the current book from New play opens its primary or first available play", async ({ page }, testInfo) => {
+  const missing = { ...GAME, id: "fx-missing", name: "Missing primary", plays: ["gone", WHEEL_RIGHT.id], primary: "gone" };
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [ROAD, GAME, missing], team: OTTERS });
+  const d = new Designer(page);
+  const steps: Step[] = [];
+  await d.goto();
+  await d.tools();
+  await expect(d.nameInput).toHaveValue("New play");
+  await booksTile(page).click();
+  await expect(booksMenu(page).getByRole("menuitemradio", { name: ROAD.name })).toHaveAttribute("aria-checked", "true");
+  await booksMenu(page).getByRole("menuitemradio", { name: ROAD.name }).click();
+  await expect(d.nameInput).toHaveValue(COVER_TWO.name);
+  steps.push(await read(d, "picked the automatically current book from New play"));
+
+  // A repeated selection of the primary keeps its edits intact.
+  await d.nameInput.fill("My edited primary");
+  await booksTile(page).click();
+  await booksMenu(page).getByRole("menuitemradio", { name: ROAD.name }).click();
+  await expect(d.nameInput).toHaveValue("My edited primary");
+  steps.push(await read(d, "picked the current primary again without losing edits"));
+
+  await playsButton(page).click();
+  await playsMenu(page).getByRole("menuitemradio", { name: WHEEL_RIGHT.name }).click();
+  await expect(d.nameInput).toHaveValue(WHEEL_RIGHT.name);
+  await booksTile(page).click();
+  await booksMenu(page).getByRole("menuitemradio", { name: ROAD.name }).click();
+  await expect(d.nameInput).toHaveValue(COVER_TWO.name);
+  steps.push(await read(d, "picked the current book from a non-primary play"));
+
+  for (const [book, play] of [[GAME, SLANT_LEFT], [missing, WHEEL_RIGHT]] as const) {
+    await booksTile(page).click();
+    await booksMenu(page).getByRole("menuitemradio", { name: book.name }).click();
+    await expect(d.nameInput).toHaveValue(play.name);
+    await expect(d.routes).toHaveCount(2);
+    steps.push(await read(d, `opened the first available play in ${book.name}`));
+  }
+  await page.screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-landing.png` });
+  save(`${testInfo.project.name}-landing`, steps);
+});
+
+test("returning from a playbook editor opens its primary, first play or an empty board", async ({ page }, testInfo) => {
+  await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [GAME, ROAD, SCOUT], team: OTTERS });
+  const d = new Designer(page);
+  const steps: Step[] = [];
+  for (const [book, name] of [[ROAD, COVER_TWO.name], [GAME, SLANT_LEFT.name], [SCOUT, "New play"]] as const) {
+    await page.goto(`/playbooks?book=${book.id}`);
+    await expect(page.getByRole("textbox", { name: "Playbook name" })).toHaveValue(book.name);
+    await page.getByRole("link", { name: "‹ Designer", exact: true }).click();
+    await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    expect(await storedCurrentBook(page)).toBe(book.id);
+    if (book === SCOUT) await expect(d.routes).toHaveCount(0);
+    steps.push(await read(d, `returned from ${book.name}`));
+    await page.reload();
+    await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();
+  }
+  // An explicit play selection still takes precedence over the book's primary.
+  await d.goto(`?book=${ROAD.id}&open=${WHEEL_RIGHT.id}`);
+  await expect(page.getByRole("heading", { name: WHEEL_RIGHT.name, exact: true, level: 1 })).toBeVisible();
+  steps.push(await read(d, "explicit Open in designer takes precedence"));
+  // An invalid book link must not clear the restored draft.
+  await d.goto("?book=missing-book");
+  await expect(page.getByRole("heading", { name: WHEEL_RIGHT.name, exact: true, level: 1 })).toBeVisible();
+  await page.screenshot({ path: `test-results/playbook-switch-${testInfo.project.name}-editor-return.png` });
+  save(`${testInfo.project.name}-editor-return`, steps);
+});
 
 test("the play name drops the playbook's plays down, numbered as the book is, and picking one opens it", async ({ page }, testInfo) => {
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT, COVER_TWO], playbooks: [GAME, ROAD, SCOUT], team: OTTERS });
@@ -527,6 +594,8 @@ test("a saved play is added to the current playbook from the play name, and a de
   const page2 = await bare.newPage();
   const d2 = new Designer(page2);
   await d2.goto();
+  // Finish the first-use prompt before reaching the field's play menu on a narrow screen.
+  await page2.getByRole("button", { name: "Dismiss getting started" }).click();
   await d2.tools();
   await playsButton(page2).click();
   await expect(playsMenu(page2)).toContainText("No playbook on this device yet.");
