@@ -4,6 +4,8 @@ Organizations ([ADR 013](../adr/013-organizations.md)) keep their teams, members
 
 ## Configure the database
 
+Production and preview now have separate managed Neon databases; see [the infrastructure record](../../infra/README.md). For local development and disposable organization journeys, use [Docker Compose and the local launcher](local-services.md).
+
 1. Make a Postgres database. On Vercel, **Neon** from the Marketplace is the natural pick; any Postgres 14+ works. Use the **pooled** connection string when there is one: the app opens few connections and never prepares statements, which a transaction pooler needs.
 2. Add it to the Vercel environment, production and preview each with a database of their own:
 
@@ -37,6 +39,8 @@ Organizations ([ADR 013](../adr/013-organizations.md)) keep their teams, members
 - **Rotating Clerk keys** signs everyone out and changes nothing here: memberships are keyed by Clerk's stable user id.
 
 ## Local and CI verification
+
+The reproducible local command is `bun run test:e2e:local` (Docker required). It builds the app, runs the organization journeys and cleans up its own disposable services, preserving the JSON and screenshot evidence. To run just desktop, use `bun run test:e2e:local e2e/journeys/organization.journey.ts --project=chromium`.
 
 The organization journey drives the API as the fixture coaches (`ACCOUNT_FIXTURE=1`, never on Vercel) against the disposable Redis adapter of the sharing journeys and a disposable Postgres on the loopback; `playwright.config.ts` migrates it in its global setup when `DATABASE_URL` is set.
 

@@ -7,6 +7,7 @@ const release = resolveRelease();
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: ["*.ts.net"],
   env: {
     NEXT_PUBLIC_RELEASE: release,
     NEXT_PUBLIC_RELEASE_ENV: process.env.VERCEL_ENV ?? "development",

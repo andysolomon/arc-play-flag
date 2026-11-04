@@ -12,6 +12,8 @@ bun run test:e2e:report  # open the last HTML report (traces for failures)
 
 First time only: `bunx playwright install chromium`.
 
+For organization journeys with real PostgreSQL and Redis, run `bun run test:e2e:local`. It starts disposable Docker Compose services, builds the app, runs the organization journey on every device project, and removes its test volumes afterward. Pass a file and Playwright options to narrow the run. See [local services](../docs/runbook/local-services.md) for ports, development mode, cleanup and evidence.
+
 ## Rules
 
 - **Fictional fixtures, per test.** Everything comes from `support/fixtures.ts` (the Riverside Otters, a team that does not exist). Each test gets a fresh browser context, so no test can see another's storage, and none of them can ever read or write a real browser profile.

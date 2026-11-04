@@ -39,6 +39,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Terraform working files and state (provider lockfiles should be committed when adopted)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
