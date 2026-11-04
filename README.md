@@ -39,6 +39,8 @@ Requires [Bun](https://bun.sh) 1.4+.
 ```sh
 bun install
 bun dev          # http://localhost:3000
+bun run dev:local # local organizations: Docker PostgreSQL + Redis, fixture sign-in
+bun run test:e2e:local # disposable services, production build, organization journeys
 bun test         # unit tests for lib/play
 bun run build && bun run test:e2e   # browser journeys against the production build (Playwright; see e2e/README.md)
 bun run lint     # eslint (typescript-eslint strict)
@@ -46,6 +48,8 @@ bun run typecheck
 bun run build
 bun run icons    # re-encode design/assets/icons → public/icons (already committed)
 ```
+
+See [local services](docs/runbook/local-services.md) for Docker setup, data persistence, and Tailscale access. Hosted resources and the Terraform adoption boundary are recorded in [infra](infra/README.md).
 
 ## Deploy
 

@@ -77,7 +77,7 @@ async function pickAndWatch(page: Page, pick: string, picked: Locator, act: () =
 
 test.beforeEach(async ({ page }) => {
   await page.clock.install();
-  await seed(page, { plays: [GOAL_LINE_FADE], playbooks: [BOOK], team: OTTERS });
+  await seed(page, { plays: [GOAL_LINE_FADE], playbooks: [BOOK], team: OTTERS, los: GOAL_LINE_FADE.los });
 });
 
 test("a theme pick puts up the interstitial before the page redraws, and takes it down once the new theme is drawn", async ({ page }, testInfo) => {
