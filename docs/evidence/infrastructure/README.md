@@ -12,6 +12,8 @@ Verified against PostgreSQL 18 and Redis 7 in disposable Docker Compose containe
 
 The journeys cover organization ownership and invitations, head/assistant/viewer permissions, two coaches changing different plays, conflicting edits preserved as sideline versions, polling and presence, removal of access, and deletion that leaves personal teams intact.
 
+The full PR suite exposed two end zone journeys whose setup still relied on a saved play moving the board's ball spot. Updated both to seed the board setting explicitly, as ADR 015 requires. Both complete journey files then passed across all four device projects: **32 passed** (51.9 seconds), with the assertions unchanged. Repeat with `bunx playwright test e2e/journeys/offline.journey.ts e2e/journeys/switching.journey.ts --workers=2` after a production build. `test-results/offline-end-zones-*.json` records the board spot, every design drawn offline, cached chunks and failed requests; screenshots accompany it. CI uploads this evidence as `offline-end-zones`, alongside the existing `switching` evidence.
+
 `bun run lint`, `bun run typecheck`, the production build, `docker compose config --quiet`, `terraform fmt -check infra`, and backend-free Terraform initialization/validation also passed. A local development smoke check reached `/sign-in` and the Redis adapter; terminating the launcher stopped both processes. Development containers were stopped afterward while retaining their volumes.
 
 ## Hosted verification

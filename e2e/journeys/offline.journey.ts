@@ -1,9 +1,10 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { Designer, downloadBytes, downloadText } from "../support/designer";
 import { encodeShare } from "../../lib/play/share";
 import { END_ZONES, ENDZONE_KEY, TOUCHDOWNS_KEY } from "../../lib/endzone";
 import { MIDFIELD_YARD } from "../../lib/play/field";
+import { LOS_KEY } from "../../lib/los";
 import { KEYS, SLANT_LEFT, WHEEL_RIGHT, jsonUpload, playbook } from "../support/fixtures";
 import { readZip } from "../support/pptx";
 
@@ -88,16 +89,18 @@ test("a direct playbooks mount keeps critical imports and exports usable after r
   expect(failedChunks).toEqual([]);
 });
 
-test("every end zone design is in the shell: with the network off, one picked for the first time still draws, and the picker shows them all", async ({ context, page }) => {
+test("every end zone design is in the shell: with the network off, one picked for the first time still draws, and the picker shows them all", async ({ context, page }, testInfo) => {
   // a phone's window, and a play from midfield: the shape and spot that bring the end zone into view
   await page.setViewportSize({ width: 412, height: 915 });
   await page.goto("/");
   await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await page.evaluate(([keys, savedPlay, touchdownsKey, midfield]) => {
+  await page.evaluate(([keys, savedPlay, touchdownsKey, midfield, losKey]) => {
     localStorage.setItem(keys.plays, JSON.stringify({ [savedPlay.id]: { ...savedPlay, los: midfield } }));
+    // The board owns its spot (ADR 015); a stored play's spot does not move it.
+    localStorage.setItem(losKey, String(midfield));
     // enough touchdowns to open every one
     localStorage.setItem(touchdownsKey, "9");
-  }, [KEYS, SLANT_LEFT, TOUCHDOWNS_KEY, MIDFIELD_YARD] as const);
+  }, [KEYS, SLANT_LEFT, TOUCHDOWNS_KEY, MIDFIELD_YARD, LOS_KEY] as const);
   // the shell itself holds every chunk its scripts import on demand, the designs among them
   const shell = await page.evaluate(async () => {
     const [name] = (await caches.keys()).filter((n) => n.startsWith("ffpd-shell-"));
@@ -124,6 +127,7 @@ test("every end zone design is in the shell: with the network off, one picked fo
 
   // each design is a chunk of its own, fetched the first time it is drawn: here, from the shell
   const art = page.locator("[data-ez-backdrop] [data-ez-art]");
+  const drawn: string[] = [];
   for (const zone of END_ZONES) {
     if (zone.id === "classic") continue;
     await page.evaluate(([key, id]) => { localStorage.setItem(key, id); }, [ENDZONE_KEY, zone.id] as const);
@@ -131,6 +135,7 @@ test("every end zone design is in the shell: with the network off, one picked fo
     await expect(art).toHaveAttribute("data-ez-art", zone.id);
     // an empty box is not visible: the design itself has to have drawn
     await expect(art).toBeVisible();
+    drawn.push(zone.id);
   }
   const designer = new Designer(page);
   await designer.unfold("End zone");
@@ -141,6 +146,10 @@ test("every end zone design is in the shell: with the network off, one picked fo
     await expect(swatches.nth(i)).toBeVisible();
   }
   expect(failedChunks).toEqual([]);
+  const boardLos = await page.evaluate((key) => Number(localStorage.getItem(key)), LOS_KEY);
+  expect(boardLos).toBe(MIDFIELD_YARD);
+  await writeFile(`test-results/offline-end-zones-${testInfo.project.name}.json`, `${JSON.stringify({ boardLos, drawn, swatches: END_ZONES.map((zone) => zone.id), shell, failedChunks }, null, 2)}\n`);
+  await page.screenshot({ path: `test-results/offline-end-zones-${testInfo.project.name}.png` });
 });
 
 /**
