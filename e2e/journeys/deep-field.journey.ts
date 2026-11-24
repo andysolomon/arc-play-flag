@@ -32,7 +32,7 @@ import { OTTERS, play, playbook, seed, storedDraft } from "../support/fixtures";
  * The laptop sizes are the issue's (1280×720, 1440×900, 1920×1080), run on the desktop project, and the tall
  * phones on the iPhone project; the drawing and the pictures are also checked on every device's own screen.
  * Leaves `deep-field-<device>[-<size>|-phones].json` (each step's card, pane, yards shown, stored waypoints,
- * route boxes and the button) and a picture of each step in test-results/, uploaded as `deep-field`.
+ * route boxes and the button) and a picture of each step in test-results/, uploaded in the `journeys` artifact.
  */
 
 /** The deepest card, 45 yards: 8 behind the line of scrimmage and 37 on. */

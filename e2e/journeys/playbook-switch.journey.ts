@@ -32,7 +32,7 @@ import {
  *    small to tap; a pick there doesn't open the play, Escape or a tap elsewhere doesn't close
  *    the list, or focus is lost; roster mode offers it with no play open; a bare device says nothing → "over the field"
  * Leaves `playbook-switch-<device>-<test>.json` (each step's rows, what was on the board and what the
- * device stored) and a picture of each menu in test-results/, uploaded as `playbook-switch`.
+ * device stored) and a picture of each menu in test-results/, uploaded in the `journeys` artifact.
  */
 
 const GAME = playbook("fx-game", "Otter Game Plan", [SLANT_LEFT, WHEEL_RIGHT]);

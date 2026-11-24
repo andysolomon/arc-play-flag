@@ -12,7 +12,7 @@ import { storedDraft, storedPlays } from "../support/fixtures";
  * The jet sweep (docs/adr/006-jet-sweep.md): a receiver is already crossing the formation behind the line
  * when the ball is snapped, and the quarterback hands it off as they pass. In flag football a forward pass
  * to a player behind the line isn't allowed, so it is always a handoff. Each test leaves what it saw as
- * `test-results/jet-sweep-<device>-<test>.json` with pictures beside it, uploaded as `jet-sweep`.
+ * `test-results/jet-sweep-<device>-<test>.json` with pictures beside it, uploaded in the `journeys` artifact.
  */
 
 const out = (info: TestInfo, name: string): string => `test-results/jet-sweep-${info.project.name}-${name}`;
