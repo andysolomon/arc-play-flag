@@ -81,7 +81,7 @@
  */
 
 import { MAX_DEPTH, clamp, snap } from "./geometry";
-import { centre, quarterback } from "./lateral";
+import { centre, quarterback } from "./roles";
 import type { Player, Pt, SnapMode, Team } from "./types";
 
 /** How far apart two teammates stand at the closest, centre to centre, in yards: about a token's width. */

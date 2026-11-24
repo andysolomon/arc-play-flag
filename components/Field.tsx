@@ -9,7 +9,8 @@ import { getEndZone, recordTouchdown, serverEndZone, subscribeEndZone, type EndZ
 import { qbActionLine } from "@/lib/play/assignments";
 import { NO_RUN_FLAG, NO_RUN_STAMP, runInNoRunZone } from "@/lib/play/call";
 import { LOS_YARD } from "@/lib/play/field";
-import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, S, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, quarterback, rosterDepth, snap } from "@/lib/play/geometry";
+import { FULL_DEPTH, MAX_DEPTH, MIN_DEPTH, S, VW, cardWidth, clamp, depth, draftPath, fieldLayout, geom, lateralArcs, px, py, rosterDepth, snap } from "@/lib/play/geometry";
+import { quarterback } from "@/lib/play/roles";
 import { catchClamp, catchNote, clampCatch, clampRelease, releaseClamp, releaseNote, releasePoint } from "@/lib/play/lateral";
 import { getServerTeam, getTeam, subscribe as subscribeLibrary } from "@/lib/play/library";
 import { ballAt, buildMotion, positionsAt, simulationPlayback, type Motion } from "@/lib/play/motion";

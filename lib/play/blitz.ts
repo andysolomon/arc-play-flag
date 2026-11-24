@@ -1,4 +1,4 @@
-import { quarterback } from "./lateral";
+import { centre, quarterback } from "./roles";
 import { atSnap } from "./pre-snap";
 import { X_MAX, X_MIN } from "./routes";
 import type { Pair, Player, Route } from "./types";
@@ -77,11 +77,6 @@ export const CONTAIN_TURN = 1;
 export const CONTAIN_LINE = 0.5;
 /** Where the quarterback slot is when nobody is on it (B1, C1). */
 const QB_SLOT = { x: 15, y: 5 } as const;
-
-/** The centre: the offensive player labelled C, else the default centre slot. */
-export function centre(players: readonly Player[]): Player | undefined {
-  return players.find((q) => q.team === "offense" && q.label === "C") ?? players.find((q) => q.id === "o1");
-}
 
 /** How a blitz route is aimed. Anything but a blitz, or a blitz with nothing stored, reads as the quarterback. */
 export function blitzAim(route: Route | null | undefined): BlitzAim {

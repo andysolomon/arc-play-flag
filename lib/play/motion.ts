@@ -1,5 +1,6 @@
-import { fakeOf, quarterback, routeYards } from "./geometry";
-import { centre, chainLinks, runsBefore, type Link } from "./lateral";
+import { fakeOf, routeYards } from "./geometry";
+import { chainLinks, runsBefore, type Link } from "./lateral";
+import { centre, quarterback } from "./roles";
 import { DELAY, LOS_GAP, SPEED, isBallJob, isQbAction, isRun } from "./routes";
 import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";

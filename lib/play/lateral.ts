@@ -1,4 +1,5 @@
 import { atSnap } from "./pre-snap";
+import { centre, quarterback } from "./roles";
 import { LOS_GAP, PITCH_SET, X_MAX, X_MIN, Y_MAX, isBallJob, isQbAction, isRun } from "./routes";
 import type { Hop, Pair, Player, Route } from "./types";
 
@@ -64,16 +65,6 @@ import type { Hop, Pair, Player, Route } from "./types";
 
 /** As many laterals as a play keeps: a bound on what storage reads, far past any play. */
 export const MAX_LATERALS = 60;
-
-/** The quarterback: the offensive player labelled QB, else the default QB slot. */
-export function quarterback(players: readonly Player[]): Player | undefined {
-  return players.find((q) => q.team === "offense" && q.label === "QB") ?? players.find((q) => q.id === "o2");
-}
-
-/** The centre, who snaps the ball: the offensive player labelled C, else the default centre slot. */
-export function centre(players: readonly Player[]): Player | undefined {
-  return players.find((q) => q.team === "offense" && q.label === "C") ?? players.find((q) => q.id === "o1" && q.team === "offense");
-}
 
 /**
  * Whether this player can be given a jet sweep (docs/adr/006-jet-sweep.md, rule 5): an offensive

@@ -1,5 +1,6 @@
 import { inNoRunZone, losOf } from "./field";
-import { chainOf, quarterback } from "./lateral";
+import { chainOf } from "./lateral";
+import { quarterback } from "./roles";
 import { isBallJob, isRun } from "./routes";
 import type { Player, Team } from "./types";
 
