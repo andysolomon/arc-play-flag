@@ -1,5 +1,9 @@
+import { LOS_GAP, clampPoint, clampX, sideY } from "./bounds";
 import { DEEP_NAME, deepSplit } from "./deep";
 import type { DefenseRouteType, Hop, OffenseRouteType, Pair, Player, Route, RouteDef, RouteType, Team } from "./types";
+
+// the journeys in e2e/journeys still import these from here
+export { LOS_GAP, X_MIN } from "./bounds";
 
 export const OFF = "#e5675e";
 export const DEF = "#4a8fe0";
@@ -63,6 +67,7 @@ export function runLegs(type: RouteType, qx: number, qy: number, side: number): 
 }
 
 /** How far in front of (or behind) the quarterback the jet-sweep runner crosses, in yards. */
+// eslint-disable-next-line no-restricted-syntax -- a lane offset from the quarterback, not a field bound
 export const JET_GAP = 1.2;
 
 /**
@@ -96,7 +101,7 @@ export const ROLL_DEPTH = 4;
 export const ROLL_ACROSS = 8;
 
 /** A point of the quarterback's path, held on the field and behind the line (rule 6, Q8, Q9). */
-const qbPoint = (x: number, y: number): Pair => [Math.max(X_MIN, Math.min(X_MAX, x)), Math.max(LOS_GAP, Math.min(Y_MAX, y))];
+const qbPoint = (x: number, y: number): Pair => [clampX(x), sideY("offense", y)];
 /** The launch point: as a path's point, and at least PITCH_SET behind the line, so the throw is always legal. */
 const launchPoint = (x: number, y: number): Pair => qbPoint(x, Math.max(PITCH_SET, y));
 
@@ -106,6 +111,7 @@ const launchPoint = (x: number, y: number): Pair => qbPoint(x, Math.max(PITCH_SE
  */
 export function rolloutLegs(qx: number, qy: number, side: number): Pair[] {
   const base = Math.max(qy, ROLL_DEPTH);
+  // eslint-disable-next-line no-restricted-syntax -- the rollout's depth gain, like the boot's, not a field bound
   return [qbPoint(qx + side * 2, base + 1.2), qbPoint(qx + side * 5.5, base + 1.2), launchPoint(qx + side * ROLL_ACROSS, base - 0.8)];
 }
 
@@ -162,8 +168,6 @@ export const DEFENSE_KEYS = Object.keys(DROUTES) as DefenseRouteType[];
 
 /** A blitzer must line up at least this many yards off the line of scrimmage. */
 export const BLITZ_DEPTH = 7;
-/** The closest anyone may sit to the line of scrimmage, and the shallowest a lateral may be caught, in yards. */
-export const LOS_GAP = 0.9;
 
 /** The closest a player may sit to the line of scrimmage, in yards, given their route. */
 export function losGap(route: Route | null | undefined): number {
@@ -220,17 +224,8 @@ export function inkFor(p: Player, type: RouteType): string {
   return DEF_INK[type] ?? DEF;
 }
 
-/**
- * Where a custom waypoint may sit: the box the field lets you draw in (x across the
- * 30-yard width, y from the deepest defender the card can show to the backfield). The deepest
- * card is Deep field's from the drive start, to the end line 50 yards on, and a player keeps
- * 1.2 yards under its top (see clamp in geometry.ts), so Y_MIN is 48.8 yards on; defenders keep to it too.
- */
-export const X_MIN = 1.2, X_MAX = 28.8, Y_MIN = -48.8, Y_MAX = 7.4;
 /** Waypoints a custom route may carry: more than a coach could tap out in one drawing. */
 export const MAX_ROUTE_POINTS = 60;
-
-export const clampPoint = (q: Pair): Pair => [Math.max(X_MIN, Math.min(X_MAX, q[0])), Math.max(Y_MIN, Math.min(Y_MAX, q[1]))];
 
 /** A finite waypoint pulled back onto the field; anything else (a string, 1e400, a lone number) is dropped. */
 export function toPair(v: unknown): Pair | null {

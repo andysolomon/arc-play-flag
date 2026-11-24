@@ -32,6 +32,7 @@ import { FIELD } from "./fieldPaint";
 import { LateralLayer } from "./LateralLayer";
 import { ManTagLayer } from "./ManTagLayer";
 import { RouteLayer } from "./RouteLayer";
+import { ScreenOnly } from "./ScreenOnly";
 import { pillMd, pillSm } from "./ui";
 
 interface Props {
@@ -997,34 +998,37 @@ function FieldImpl({
           })}
           <RouteLayer routes={routes} draftD={draftD} lane={designed && layout.endZone ? LANE_CLIP : null} />
           {arcs.length > 0 && <LateralLayer arcs={arcs} part="arcs" faded={arcsFaded} />}
-          {editableCustom && !draft && customPoints.map((point, index) => {
-            const active = activeWaypoint === index;
-            return (
-              <g
-                key={`${editableCustom.id}-${String(index)}`}
-                ref={(node) => {
-                  if (node) waypointRefs.current.set(index, node);
-                  else waypointRefs.current.delete(index);
-                }}
-                transform={`translate(${px(point[0]).toFixed(1)},${py(point[1], top).toFixed(1)})`}
-                role="button"
-                tabIndex={0}
-                aria-pressed={active}
-                aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Delete Backspace"
-                aria-label={`Waypoint ${String(index + 1)} of ${String(customPoints.length)} for ${editableCustom.team === "offense" ? "Offense" : "Defense"} ${editableCustom.label || editableCustom.id}. Arrow keys move; Delete removes.`}
-                onFocus={() => { setSelectedWaypoint({ id: editableCustom.id, index }); }}
-                onPointerDown={(e) => { onWaypointDown(editableCustom.id, index, point, e); }}
-                onClick={(e) => { e.stopPropagation(); setSelectedWaypoint({ id: editableCustom.id, index }); }}
-                onKeyDown={(e) => { onWaypointKey(editableCustom.id, index, e); }}
-                className="group cursor-grab touch-none outline-none"
-                data-export="skip"
-              >
-                <circle r={34} fill="transparent" />
-                <circle r={active ? 11 : 9} fill="#fffdf6" stroke="#1b1a17" style={{ fill: FIELD.waypoint, stroke: FIELD.outline }} strokeWidth={3} />
-                <circle r={15} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={4} className="opacity-0 group-focus-visible:opacity-100" />
-              </g>
-            );
-          })}
+          {editableCustom && !draft && (
+            <ScreenOnly>
+              {customPoints.map((point, index) => {
+                const active = activeWaypoint === index;
+                return (
+                  <g
+                    key={`${editableCustom.id}-${String(index)}`}
+                    ref={(node) => {
+                      if (node) waypointRefs.current.set(index, node);
+                      else waypointRefs.current.delete(index);
+                    }}
+                    transform={`translate(${px(point[0]).toFixed(1)},${py(point[1], top).toFixed(1)})`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={active}
+                    aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Delete Backspace"
+                    aria-label={`Waypoint ${String(index + 1)} of ${String(customPoints.length)} for ${editableCustom.team === "offense" ? "Offense" : "Defense"} ${editableCustom.label || editableCustom.id}. Arrow keys move; Delete removes.`}
+                    onFocus={() => { setSelectedWaypoint({ id: editableCustom.id, index }); }}
+                    onPointerDown={(e) => { onWaypointDown(editableCustom.id, index, point, e); }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedWaypoint({ id: editableCustom.id, index }); }}
+                    onKeyDown={(e) => { onWaypointKey(editableCustom.id, index, e); }}
+                    className="group cursor-grab touch-none outline-none"
+                  >
+                    <circle r={34} fill="transparent" />
+                    <circle r={active ? 11 : 9} fill="#fffdf6" stroke="#1b1a17" style={{ fill: FIELD.waypoint, stroke: FIELD.outline }} strokeWidth={3} />
+                    <circle r={15} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={4} className="opacity-0 group-focus-visible:opacity-100" />
+                  </g>
+                );
+              })}
+            </ScreenOnly>
+          )}
           {visible.map((p) => (
             <PlayerToken
               key={p.id}

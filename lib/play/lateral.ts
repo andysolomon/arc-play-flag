@@ -1,6 +1,7 @@
 import { atSnap } from "./pre-snap";
 import { centre, quarterback } from "./roles";
-import { LOS_GAP, PITCH_SET, X_MAX, X_MIN, Y_MAX, isBallJob, isQbAction, isRun } from "./routes";
+import { LOS_GAP, Y_MAX, clampX, sideY } from "./bounds";
+import { PITCH_SET, isBallJob, isQbAction, isRun } from "./routes";
 import type { Hop, Pair, Player, Route } from "./types";
 
 /**
@@ -155,7 +156,7 @@ export function visits(chain: readonly Player[], id: string): number[] {
  * behind the line of scrimmage (K2), and on the field (K3). It never moves a catch forward (K5).
  */
 export function clampCatch(c: Pair, release: Pair): Pair {
-  return [Math.max(X_MIN, Math.min(X_MAX, c[0])), Math.min(Y_MAX, Math.max(LOS_GAP, release[1], c[1]))];
+  return [clampX(c[0]), Math.min(Y_MAX, Math.max(LOS_GAP, release[1], c[1]))];
 }
 
 /**
@@ -163,7 +164,7 @@ export function clampCatch(c: Pair, release: Pair): Pair {
  * catch rules, clamped against it, hold as ever.
  */
 export function clampRelease(r: Pair): Pair {
-  return [Math.max(X_MIN, Math.min(X_MAX, r[0])), Math.min(Y_MAX, Math.max(LOS_GAP, r[1]))];
+  return [clampX(r[0]), sideY("offense", r[1])];
 }
 
 /** Which rule snapped a raw release back, for the note the coach is shown: the line, or nothing. */

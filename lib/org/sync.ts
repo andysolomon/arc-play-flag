@@ -228,9 +228,10 @@ export function push(): Promise<boolean> {
       }
       if (d.pending.settings) {
         try {
-          const w = await api.writeSettings(d.org, d.teamId, readTeam(), readLineups());
+          const sent = { team: readTeam(), lineups: readLineups() };
+          const w = await api.writeSettings(d.org, d.teamId, sent.team, sent.lineups);
           d.rev = Math.max(d.rev, w.rev);
-          d.hashes.settings = hashRecord({ team: readTeam(), lineups: readLineups() });
+          d.hashes.settings = hashRecord(sent);
         } catch (e) {
           if (!(e instanceof ApiError) || e.status !== 403) throw e;
           // D5: the settings are the head coach's; the organization's come back
@@ -240,8 +241,10 @@ export function push(): Promise<boolean> {
         d.pending.settings = null;
         writeDevice(d);
       }
-      writeMarker({ teamId: d.teamId, rev: d.rev, dirty: false, org: d.org, level: d.level });
-      set({ status: "saved", message: null });
+      const dirty = notePending(d) || hasPending(d);
+      writeDevice(d);
+      writeMarker({ teamId: d.teamId, rev: d.rev, dirty, org: d.org, level: d.level });
+      set({ status: dirty ? "pending" : "saved", message: null });
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) { await reread(d, e.message); return false; }

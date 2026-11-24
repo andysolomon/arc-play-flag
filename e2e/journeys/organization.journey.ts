@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { Designer } from "../support/designer";
 import { expectSaved, marker, panel, reloadedBy, runId, signIn, status, teamButton } from "../support/account";
-import { storedPlays } from "../support/fixtures";
+import { storedPlays, storedTeam } from "../support/fixtures";
 import { ago, applied, body, coach, createOrg, invite, join, listOrgs, moveTeam, names, ownTeam, poll, readOrg, readTeam, writePlay } from "../support/org";
 import { COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, play, playbook } from "../support/fixtures";
 import type { AccountResponse } from "../../lib/account/types";
@@ -31,6 +31,10 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *  - a save on an organization's team doesn't reach the organization, or another coach's save
  *    doesn't reach this device without a reload (rule 8, D2)                                       → "the screens"
  *  - the other coach's avatar and the play they are on don't show (rule 8)                        → "the screens"
+ *  - a settings edit made while a settings push is on the wire is taken for pushed and never
+ *    reaches the organization (D1)                                                                 → "a team rename"
+ *  - a settings edit made as a push lands is marked saved, so a reload before it goes up takes the
+ *    organization's copy over it (D1, D6)                                                          → "survives a reload"
  *  - a viewer can save, or isn't told why not; a send to another team doesn't land (rule 9, 10)    → "a viewer's screen"
  *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
@@ -308,6 +312,98 @@ test("the screens: an invite joins, the team button switches to the organization
   note("each coach sees the other", "both", { heronSees: await avatars.getByRole("listitem").first().getAttribute("aria-label") });
   await other.close();
   save(`${testInfo.project.name}-the-screens`);
+});
+
+test("the screens: a team rename made while a settings push is on its way still reaches the organization", async ({ page }, testInfo) => {
+  const run = runId();
+  const otter = await coach("otter", run);
+  const own = await ownTeam(otter, [SLANT_LEFT], [BOOK], OTTERS);
+  const org = await createOrg(otter, "Riverside Youth Flag");
+  const team = (await moveTeam(otter, org.id, own.id)).id;
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+
+  // the first settings push is held on the wire; the coach renames the team again before it lands
+  let release = (): void => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let puts = 0;
+  await page.route("**/api/orgs/*/teams/*/settings", async (route) => {
+    if (route.request().method() !== "PUT") { await route.continue(); return; }
+    puts++;
+    if (puts === 1) await held;
+    await route.continue();
+  });
+  const name = page.locator("#play-sidebar").getByRole("textbox", { name: "Team name" });
+  await name.fill("Riverside Otters Blue");
+  await expect.poll(() => puts, { timeout: 15_000 }).toBe(1);
+  await name.fill("Riverside Otters Gold");
+  release();
+
+  await expect.poll(async () => (await readTeam(otter, org.id, team)).team.name, { timeout: 20_000 }).toBe("Riverside Otters Gold");
+  await expectSaved(page);
+  await expect(name).toHaveValue("Riverside Otters Gold");
+  expect((await marker(page))?.dirty).toBe(false);
+  note("Otter renames the team twice, the second while the first push is held: the organization has the second", "otter", { puts, team: (await readTeam(otter, org.id, team)).team, marker: await marker(page) });
+  save(`${testInfo.project.name}-settings-in-flight`);
+});
+
+test("the screens: a team rename made as its settings push lands survives a reload straight after", async ({ page }, testInfo) => {
+  const run = runId();
+  const otter = await coach("otter", run);
+  const own = await ownTeam(otter, [SLANT_LEFT], [BOOK], OTTERS);
+  const org = await createOrg(otter, "Riverside Youth Flag");
+  const team = (await moveTeam(otter, org.id, own.id)).id;
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+  const before = (await marker(page))?.rev ?? 0;
+
+  // polls wait until the reload, so only the push moves the marker's rev
+  let releasePolls = (): void => undefined;
+  const pollsHeld = new Promise<void>((resolve) => { releasePolls = resolve; });
+  await page.route("**/api/orgs/*/teams/*/poll", async (route) => {
+    await pollsHeld;
+    await route.continue().catch(() => undefined);
+  });
+
+  // the first settings PUT reaches the server; its answer is held until the coach has renamed the team again
+  let release = (): void => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let puts = 0;
+  let answered = false;
+  await page.route("**/api/orgs/*/teams/*/settings", async (route) => {
+    if (route.request().method() !== "PUT" || ++puts > 1) { await route.continue(); return; }
+    const response = await route.fetch();
+    answered = true;
+    await held;
+    await route.fulfill({ response });
+  });
+  const name = page.locator("#play-sidebar").getByRole("textbox", { name: "Team name" });
+  await name.fill("Riverside Otters Blue");
+  await expect.poll(() => answered, { timeout: 15_000 }).toBe(true);
+  await name.fill("Riverside Otters Gold");
+  await expect.poll(async () => (await storedTeam(page))?.name).toBe("Riverside Otters Gold");
+  release();
+
+  // the push lands and writes the marker; the reload comes before the second rename's own push is due
+  await expect.poll(async () => (await marker(page))?.rev ?? 0, { intervals: [25] }).toBeGreaterThan(before);
+  const landed = await marker(page);
+  expect(puts, "the second rename went up before the reload, so the reload tested nothing").toBe(1);
+  await reloadedBy(page, async () => { await page.reload(); });
+  releasePolls();
+
+  await expect.poll(async () => (await readTeam(otter, org.id, team)).team.name, { timeout: 20_000 }).toBe("Riverside Otters Gold");
+  await d.tools();
+  await expect(name).toHaveValue("Riverside Otters Gold");
+  await expectSaved(page);
+  expect((await marker(page))?.dirty).toBe(false);
+  note("Otter renames the team as the first push lands and reloads at once: the organization and the field have the second name", "otter", { puts, landed, team: (await readTeam(otter, org.id, team)).team, marker: await marker(page) });
+  save(`${testInfo.project.name}-marker-after-push`);
 });
 
 test("a viewer's screen looks and can't save, a copy lands in another team, and an admin's removal takes the team away", async ({ page, browser }, testInfo) => {

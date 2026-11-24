@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   MAX_LATERALS, catchClamp, chainLinks, chainOf, clampCatch, defaultCatch, releasePoint, settleChain, startOf,
 } from "./lateral";
-import { LOS_GAP, PITCH_SET, X_MAX, X_MIN, Y_MAX, defaults } from "./routes";
+import { LOS_GAP, X_MAX, X_MIN, Y_MAX } from "./bounds";
+import { PITCH_SET, defaults } from "./routes";
 import type { Hop, Pair, Player, Route } from "./types";
 
 /** The default formation (C 15,1 · QB 15,5 · X 3,1 · Y 27,1 · Z 19,5) with routes on the named players. */

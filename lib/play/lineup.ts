@@ -82,7 +82,8 @@
  */
 
 import { MAX_DEPTH, MAX_NAME, cleanName, offFieldPositions, playerNames, renamedIn, sameName, withoutName } from "./roster";
-import { LOS_GAP, X_MAX, X_MIN, Y_MAX, Y_MIN, defaults } from "./routes";
+import { clampX, sideY } from "./bounds";
+import { defaults } from "./routes";
 import type { Lineup, Lineups, Player, Roster, Spot, Team } from "./types";
 
 export const MAIN_LINEUP = "main";
@@ -289,8 +290,8 @@ const sameSpot = (s: Spot, team: Team, tag: string): boolean => s.team === team 
 export function placedSpot(team: Team, tag: string, x: number, y: number): Spot | null {
   const home = HOME.find((p) => p.team === team && p.label === tag);
   if (!home) return null;
-  const sx = Math.max(X_MIN, Math.min(X_MAX, x));
-  const sy = team === "offense" ? Math.max(LOS_GAP, Math.min(Y_MAX, y)) : Math.max(Y_MIN, Math.min(-LOS_GAP, y));
+  const sx = clampX(x);
+  const sy = sideY(team, y);
   if (Math.abs(sx - home.x) < 0.01 && Math.abs(sy - home.y) < 0.01) return null;
   return { team, tag, x: sx, y: sy };
 }
