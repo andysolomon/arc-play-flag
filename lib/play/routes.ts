@@ -2,9 +2,6 @@ import { LOS_GAP, clampPoint, clampX, sideY } from "./bounds";
 import { DEEP_NAME, deepSplit } from "./deep";
 import type { DefenseRouteType, Hop, OffenseRouteType, Pair, Player, Route, RouteDef, RouteType, Team } from "./types";
 
-// the journeys in e2e/journeys still import these from here
-export { LOS_GAP, X_MIN } from "./bounds";
-
 export const OFF = "#e5675e";
 export const DEF = "#4a8fe0";
 
