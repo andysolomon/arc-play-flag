@@ -35,6 +35,21 @@ test("a direct demo mount prepares the shells, exact shared plays, and advertise
   await expect(page.getByRole("heading", { name: "Shared play unavailable offline" })).toBeVisible();
 });
 
+test("with the image optimizer down the shell still gets ready, and every sticker shown draws offline", async ({ context, page }) => {
+  // down for the page and the worker alike, so no optimized sticker ever reaches the HTTP cache
+  await context.route(/\/_next\/image\?/, (route) => route.abort());
+  await page.goto("/");
+  await expect(page.getByText("Offline ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+
+  await context.setOffline(true);
+  await page.reload();
+  const stickers = page.locator("img.sticker:visible");
+  await expect(stickers.first()).toBeVisible();
+  await expect.poll(() => stickers.evaluateAll((images) => (images as HTMLImageElement[])
+    .filter((image) => !image.complete || image.naturalWidth === 0)
+    .map((image) => image.currentSrc || image.src))).toEqual([]);
+});
+
 test("a direct playbooks mount keeps critical imports and exports usable after readiness", async ({ context, page }) => {
   const book = playbook("offline-book", "Offline Book", [WHEEL_RIGHT]);
   await page.addInitScript(([keys, savedPlay, savedBook]) => {
@@ -198,12 +213,18 @@ test("a first install says it is updating until the shell is verified, a broken 
       offered: await page.getByRole("region", { name: "Update ready" }).count(),
       hasBroken: caches.includes("ffpd-shell-broken"),
       controller: await controllerUrl(page),
+      // settled: the broken release is neither still installing nor waiting to take over
+      pending: await page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        return !!(registration?.installing ?? registration?.waiting);
+      }),
     };
   }, { timeout: 30_000 }).toEqual({
     ready: false,
     offered: 0,
     hasBroken: true,
     controller: expect.stringMatching(/\/sw\.js$/),
+    pending: false,
   });
   expect(await readyMarked(page, String(current))).toBe(true);
   await context.setOffline(true);

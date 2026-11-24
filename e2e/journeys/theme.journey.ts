@@ -8,6 +8,7 @@ const CHALK = "rgb(244, 239, 226)";
 const html = (page: Page) => page.locator("html");
 const picker = (page: Page) => page.getByRole("radiogroup", { name: "Theme" });
 const stored = (page: Page) => page.evaluate((key) => localStorage.getItem(key), THEME_KEY);
+const nextFrame = (page: Page) => page.evaluate(() => new Promise<void>((done) => { requestAnimationFrame(() => { done(); }); }));
 
 // every test starts on a device set to dark
 test.use({ colorScheme: "dark" });
@@ -29,6 +30,11 @@ test("a dark device gets the dark board; a coach's pick outlasts a reload, and A
   await expect(html(page)).toHaveAttribute("data-theme", "light");
   await d.unfold("Theme");
   await expect(picker(page).getByRole("radio", { name: "Light" })).toBeChecked();
+  // a picked theme holds while the device flips; media changes are reported before the next frame
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await nextFrame(page);
+  await expect(html(page)).toHaveAttribute("data-theme", "light");
 
   await picker(page).getByRole("radio", { name: "Auto" }).check();
   await expect(html(page)).toHaveAttribute("data-theme", "dark");
@@ -88,4 +94,40 @@ test("a theme picked in playbook settings redraws the designer open in another t
   await books.getByRole("dialog").getByRole("radio", { name: "Light" }).check();
   await expect(html(books)).toHaveAttribute("data-theme", "light");
   await expect(html(page)).toHaveAttribute("data-theme", "light");
+});
+
+test("a saved theme this release does not draw falls back to the device's board", async ({ page }) => {
+  await page.addInitScript((key) => { localStorage.setItem(key, "purple"); }, THEME_KEY);
+  const d = new Designer(page);
+  await d.goto();
+  await expect(html(page)).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#24221d");
+  await d.unfold("Theme");
+  await expect(picker(page).getByRole("radio", { name: "Auto" })).toBeChecked();
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(html(page)).toHaveAttribute("data-theme", "light");
+});
+
+test("with the saved theme unreadable the board follows the device, and a pick still applies for the visit", async ({ page }) => {
+  // a saved Light the browser refuses to hand back or overwrite, as private modes and blocked site data do
+  await page.addInitScript((key) => {
+    localStorage.setItem(key, "light");
+    const storage = Storage.prototype as unknown as Record<string, (this: Storage, ...args: string[]) => unknown>;
+    for (const name of ["getItem", "setItem", "removeItem"]) {
+      const original = storage[name];
+      storage[name] = function (this: Storage, ...args: string[]) {
+        if (args[0] === key) throw new DOMException("blocked", "SecurityError");
+        return original?.apply(this, args);
+      };
+    }
+  }, THEME_KEY);
+  const d = new Designer(page);
+  await d.goto();
+  await expect(html(page)).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#24221d");
+
+  await d.unfold("Theme");
+  await picker(page).getByRole("radio", { name: "Light" }).check();
+  await expect(html(page)).toHaveAttribute("data-theme", "light");
+  await expect(picker(page).getByRole("radio", { name: "Light" })).toBeChecked();
 });
