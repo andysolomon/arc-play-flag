@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:local": "bun run scripts/local-services.ts e2e",
     "db:migrate": "bun run scripts/migrate.ts",
+    "verify:models": "bun run scripts/verify-models.ts",
     "test:e2e:report": "playwright show-report",
     "demo:setup": "playwright install chromium",
     "demo:record": "bun run scripts/demo-recorder.ts",
