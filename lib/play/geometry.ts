@@ -1,11 +1,12 @@
 import { BLITZ_STOP, blitzAim, blitzTarget, containPath } from "./blitz";
+import { EDGE_MARGIN, LOS_GAP, X_MAX, X_MIN, Y_MAX, Y_MIN, clampX } from "./bounds";
 import { callOf, isRunCall } from "./call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, ROSTER_LOS, losLabel, toGo } from "./field";
 import { chainLinks, runsBefore, startOf } from "./lateral";
 import { quarterback } from "./roles";
 import { atSnap, motionPoints } from "./pre-snap";
 import {
-  DEF, DELAY, INK, PITCH_SET, ROUTES, SPEED, Y_MIN, bootLegs, inkFor, isQbAction, isRun, jetLegs, rolloutLegs, routeDef, runLegs,
+  DEF, DELAY, INK, PITCH_SET, ROUTES, SPEED, bootLegs, inkFor, isQbAction, isRun, jetLegs, rolloutLegs, routeDef, runLegs,
 } from "./routes";
 import type { Pair, Pane, Player, Pt, SnapMode, Team } from "./types";
 import type { ZoneMap } from "./zones";
@@ -50,12 +51,12 @@ export function snap(v: number, mode: SnapMode = "half"): number {
  * The line of scrimmage is a hard boundary: offense stays at/below it, defense at/above.
  * `gap` is how close to it the player may sit (see losGap): a blitzer keeps 7 yards back.
  */
-export function clamp(x: number, y: number, team: Team | null, top: number, gap = 0.9): Pt {
-  const lo = top + 1.2;
-  let y2 = Math.max(lo, Math.min(7.4, y));
+export function clamp(x: number, y: number, team: Team | null, top: number, gap = LOS_GAP): Pt {
+  const lo = top + EDGE_MARGIN;
+  let y2 = Math.max(lo, Math.min(Y_MAX, y));
   if (team === "offense") y2 = Math.max(gap, y2);
   else if (team === "defense") y2 = Math.min(-gap, y2);
-  return { x: Math.max(1.2, Math.min(28.8, x)), y: y2 };
+  return { x: clampX(x), y: y2 };
 }
 
 /**
@@ -79,11 +80,11 @@ export function depth(players: readonly Player[], pane: Pane | null, minDepth = 
   const aspect = pane && pane.pw > 0 && pane.ph > 0 ? (pane.ph / pane.pw) * FIELD_YARDS : MAX_DEPTH;
   // a waypoint gets a player's margin, rounded up to the half yard so the card's top never ends
   // up closer to it than a drag or nudge allows (see clamp), which would pull it back
-  const route = Math.ceil((8 - reach + 1.2) * 2) / 2;
-  const d = Math.max(aspect, 8 - need + 1.2, route);
+  const route = Math.ceil((8 - reach + EDGE_MARGIN) * 2) / 2;
+  const d = Math.max(aspect, 8 - need + EDGE_MARGIN, route);
   // from the own goal line the end line is 58 yards off, past the deepest card, so this stays 45
   // (FULL_DEPTH for Deep field) unless a player or waypoint already stands deeper, put there under Deep field
-  const max = Math.max(Math.min(maxDepth, 8 + GOAL_YARD + END_ZONE_YARDS - los), 8 - deepest + 1.2, route);
+  const max = Math.max(Math.min(maxDepth, 8 + GOAL_YARD + END_ZONE_YARDS - los), 8 - deepest + EDGE_MARGIN, route);
   return Math.round(Math.max(Math.min(minDepth, max), Math.min(max, d)) * 2) / 2;
 }
 
@@ -93,16 +94,13 @@ export function depth(players: readonly Player[], pane: Pane | null, minDepth = 
  */
 export function rosterDepth(players: readonly Player[]): number {
   const deepest = players.reduce((m, p) => Math.min(m, p.y), 8);
-  return Math.max(ROSTER_DEPTH, Math.ceil((8 - deepest + 1.2) * 2) / 2);
+  return Math.max(ROSTER_DEPTH, Math.ceil((8 - deepest + EDGE_MARGIN) * 2) / 2);
 }
 
 export function cardWidth(pane: Pane | null, depthYards: number): number | null {
   if (!pane || !(pane.pw > 0) || !(pane.ph > 0)) return null;
   return Math.min(pane.pw, (pane.ph * FIELD_YARDS) / depthYards, 1200);
 }
-
-/** How far across the field a preset route may run: 1.2 yards inside either sideline, where a player may stand (see clamp). */
-const ACROSS_MIN = 1.2, ACROSS_MAX = 28.8;
 
 /**
  * A route's waypoints in absolute yards, starting at the player's spot, or for the last carrier of a
@@ -125,7 +123,7 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
   }
   if (rt.type === "throw" && p.team === "offense") {
     // a step toward their own sideline, up (never back) to the set depth, and throw from there
-    const set: Pair = [Math.max(ACROSS_MIN, Math.min(ACROSS_MAX, p.x + sign * 1.5)), Math.min(p.y, PITCH_SET)];
+    const set: Pair = [clampX(p.x + sign * 1.5), Math.min(p.y, PITCH_SET)];
     return [[p.x, p.y], set];
   }
   if (rt.type === "blitz") {
@@ -171,10 +169,10 @@ export function routeYards(p: Player, players: readonly Player[], top: number): 
   }
   // across the field the route stops at the sideline and every point keeps its depth, so an Out from
   // a wide split still breaks at 5 yards and runs to the sideline (sidelineCut says what that cuts)
-  const lo = Math.min(0, ACROSS_MIN - p.x), hi = Math.max(0, ACROSS_MAX - p.x);
+  const lo = Math.min(0, X_MIN - p.x), hi = Math.max(0, X_MAX - p.x);
   const rel = (def.pts ?? ROUTES.go.pts ?? []).map((q) => [Math.max(lo, Math.min(hi, sign * q[0])), q[1]] as const);
   // up and down, the whole route shrinks uniformly to stay on the card, whose top can be the end line
-  const deep = top + 1.2;
+  const deep = top + EDGE_MARGIN;
   let k = 1;
   for (const q of rel) {
     if (q[1] > 0.001) k = Math.min(k, (7 - p.y) / q[1]);
@@ -316,7 +314,7 @@ export function sidelineCut(p: Player): SidelineCut | null {
     const dx = sign * q[0];
     if (Math.abs(dx) < 0.001) continue;
     const reach = Math.abs(dx);
-    const room = Math.max(0, dx > 0 ? ACROSS_MAX - p.x : p.x - ACROSS_MIN);
+    const room = Math.max(0, dx > 0 ? X_MAX - p.x : p.x - X_MIN);
     if (reach - room >= 0.5 && (!cut || reach - room > cut.reach - cut.room)) cut = { reach, room };
   }
   return cut;
@@ -364,6 +362,7 @@ export function geom(
     let t1 = 1 - Math.min(0.5, (zone.ry * S * 0.55) / L);
     if (t1 - t0 < 0.12) {
       t0 = Math.min(0.34, 27 / L);
+      // eslint-disable-next-line no-restricted-syntax -- a fraction of the drawn line, not yards
       t1 = Math.max(t0 + 0.14, 0.9);
     }
     const d =
@@ -415,6 +414,7 @@ export function geom(
       f1(b[0]) + "," + f1(b[1]) + " " +
       f1(bx - ny * w) + "," + f1(by + nx * w) + " " +
       f1(bx + ny * w) + "," + f1(by - nx * w);
+    // eslint-disable-next-line no-restricted-syntax -- a fraction of the last segment, not yards
     const inset = Math.min(s * 0.8, L * 0.9);
     pts[pts.length - 1] = [b[0] - nx * inset, b[1] - ny * inset];
   } else if (end === "set") {
