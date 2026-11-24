@@ -1,4 +1,4 @@
-const ATTRIBUTION = /^(co-authored-by|claude-session):|^\W*generated with\b/im;
+import { ATTRIBUTION } from "./scripts/attribution.js";
 
 const config = {
   extends: ["@commitlint/config-conventional"],
