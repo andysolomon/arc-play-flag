@@ -14,7 +14,7 @@ import { UNDER_CENTRE as BEHIND_C } from "../../lib/play/spacing";
  * The quarterback's rollout and boot (docs/adr/011-qb-rollout-and-boot.md): the QB takes the snap, carries
  * the ball across behind the line to a launch point and throws from there; on a boot they fake the handoff
  * first and go the other way. Each test leaves what it saw as `test-results/qb-actions-<device>-<test>.json`
- * with pictures beside it, uploaded as `qb-actions`.
+ * with pictures beside it, uploaded in the `journeys` artifact.
  */
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });

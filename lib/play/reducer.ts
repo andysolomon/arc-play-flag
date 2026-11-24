@@ -142,9 +142,23 @@ export function shadowing(side: Team, vis: Vis): boolean {
 }
 
 /** A defensive call opens with the shadow offense. An offensive play opens without the shadow defense. The same side keeps that choice. */
-function visFor(side: Team, prev?: Pick<PlayState, "side" | "vis">): Vis {
-  if (prev?.side === side && (prev.vis === side || prev.vis === "both")) return prev.vis;
+function visFor(side: Team, prev: Pick<PlayState, "side" | "vis">): Vis {
+  if (prev.side === side && (prev.vis === side || prev.vis === "both")) return prev.vis;
   return side === "defense" ? "both" : "offense";
+}
+
+/**
+ * What the board keeps when another play is opened: the ball's spot (lib/los.ts) and the coach's own
+ * shadow choice, with the side it was made for. The rest of PlayState is the play's own.
+ */
+interface Board {
+  los: number;
+  shadow: Pick<PlayState, "side" | "vis">;
+}
+
+function board(s: PlayState): Board {
+  // a shadow the pictures' choice put on the field was never the coach's own preference
+  return { los: s.los, shadow: { side: s.side, vis: s.shadowForArt ? s.side : s.vis } };
 }
 
 /**
@@ -163,22 +177,6 @@ function commit(s: PlayState): PlayState {
   return { ...s, ...push(s, s) };
 }
 
-/** Opening a play of the same side keeps the shadow preference; a different side uses that side's default. */
-function follow(s: PlayState, doc: Doc): Pick<PlayState, "vis"> {
-  return { vis: visFor(doc.side, s) };
-}
-
-/**
- * The incoming play's own pictures choice, never the one from the play you left. A play whose
- * pictures include the other team opens with it on the field, so the coach sees what prints.
- */
-function opened(s: PlayState, doc: Doc): Pick<PlayState, "artShadow" | "shadowForArt" | "vis"> {
-  const artShadow = doc.artShadow === true;
-  // a shadow the pictures' choice put on the field was never the coach's own preference
-  const base = follow(s.shadowForArt ? { ...s, vis: s.side } : s, doc).vis;
-  return { artShadow, shadowForArt: artShadow && base !== "both", vis: artShadow ? "both" : base };
-}
-
 /** The field's shadow shown or hidden; hiding it takes that player off the field, so stop editing them. */
 function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
   const picked = selected(s);
@@ -186,15 +184,23 @@ function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
   return { ...s, vis };
 }
 
-/** Replaces the whole document and drops undo and redo, which belong to the play you left. */
-/** A play put on the board whole. The ball stays where the board has it (lib/los.ts): a play's stored spot never moves it. */
-function openPlay(s: PlayState, doc: Doc): PlayState {
-  return { ...s, ...emptyHistory, ...doc, los: s.los, ...opened(s, doc), ...cleared };
+/**
+ * A play put on the board whole, built from the incoming play and what the board keeps, never from the
+ * play you left: a new PlayState key fails to compile here until it gets a fresh value or a place in Board.
+ * A play whose pictures include the other team opens with it on the field, so the coach sees what prints.
+ */
+function openPlay(b: Board, doc: Doc): PlayState {
+  const artShadow = doc.artShadow === true;
+  const vis = visFor(doc.side, b.shadow);
+  return {
+    ...doc, los: b.los, artShadow, ...emptyHistory, ...cleared,
+    shadowForArt: artShadow && vis !== "both", vis: artShadow ? "both" : vis,
+  };
 }
 
 /** A step back or forward through the history; the ball stays where the board has it, since the spot is no edit. */
 function step(s: PlayState, st: HistoryStep | null): PlayState {
-  return st ? { ...s, ...st.history, ...st.doc, los: s.los, ...follow(s, st.doc), ...cleared } : s;
+  return st ? { ...s, ...st.history, ...st.doc, los: s.los, ...cleared } : s;
 }
 
 /** A player with this route, where it lets them stand (legalSpot), clear of any teammate there (lib/play/spacing.ts, C10). */
@@ -531,9 +537,9 @@ function reduce(s: PlayState, a: Action): PlayState {
     case "redo":
       return step(s, redoStep(s, s));
     case "newPlay":
-      return openPlay(s, { id: null, name: "New play", notes: "", side: a.side, artShadow: false, los: LOS_YARD, players: defaults() });
+      return openPlay(board(s), { id: null, name: "New play", notes: "", side: a.side, artShadow: false, los: LOS_YARD, players: defaults() });
     case "load": {
-      const next = openPlay(s, {
+      const next = openPlay(board(s), {
         id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, los: readLos(a.los),
         players: a.players,
       });
@@ -545,8 +551,7 @@ function reduce(s: PlayState, a: Action): PlayState {
         id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, los: readLos(a.los),
         players: a.players,
       };
-      // the draft's spot is where the board was when it was written; the board's own setting stands (lib/los.ts)
-      return { ...s, ...doc, los: s.los, ...opened(s, doc) };
+      return openPlay(board(s), doc);
     }
     case "setName":
       return { ...s, name: a.name };

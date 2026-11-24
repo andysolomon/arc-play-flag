@@ -34,7 +34,7 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *  - a viewer can save, or isn't told why not; a send to another team doesn't land (rule 9, 10)    → "a viewer's screen"
  *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
- * test-results/, uploaded as `organization`.
+ * test-results/, uploaded in the `journeys` artifact.
  */
 
 test.beforeEach(({}, testInfo) => {

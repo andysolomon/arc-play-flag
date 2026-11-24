@@ -36,7 +36,7 @@ import { STAMP_PATH } from "../../scripts/demo-recorder/freshness";
  * first chapter's control, sign and clip after every tap and key) with a picture of that card
  * stopped and playing (`demo-tour-<device>-stopped.png`, `demo-tour-<device>-playing.png`) and, on
  * the desktop project, a frame from the middle of every clip (`demo-tour-chromium-<slug>.png`) in
- * test-results/, uploaded as `demo-tour`.
+ * test-results/, uploaded in the `journeys` artifact.
  */
 
 const DEMOS_DIR = new URL("../../public/demos/", import.meta.url);

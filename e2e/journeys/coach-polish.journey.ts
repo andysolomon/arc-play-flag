@@ -18,7 +18,7 @@ import { latin, pdfWords } from "../support/pdf";
  *
  * Leaves `coach-polish-<device>-*.json` (what each check measured), the share page, the toast and
  * the phone header as pictures, and the binders with their extracted words in `test-results/`,
- * uploaded as `coach-polish`.
+ * uploaded in the `journeys` artifact.
  */
 
 const MESH_NOTES = "Mesh at 5 yards: X under, Y over.\nC sits in the hole if they drop.";

@@ -24,7 +24,7 @@ import { KEYS, OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed, storedCurrentBoo
  *    behind on the first device, or a touch on the second device's board never reaches a device
  *    left open on the first, or signing out leaves the look behind (ADR 014, A19–A21, A28)      → "where they left off"
  * Leaves `account-<device>-<test>.json` (each step: what the panel said, what the device held, what
- * the account held) and pictures of the panel, the sign-in page and both boards in test-results/, uploaded as `account`.
+ * the account held) and pictures of the panel, the sign-in page and both boards in test-results/, uploaded in the `journeys` artifact.
  */
 
 test.beforeEach(() => {

@@ -25,7 +25,7 @@ import { PINNED, pngSize } from "../support/pptx";
  * - an empty roster → a picture that says so, and a sheet that is a blank depth chart to fill in by hand
  *
  * Each test leaves `depth-chart-<device>-*` in `test-results/`: the pictures, the sheet, a picture of every
- * sheet page as drawn, and a manifest, uploaded as `depth-chart`.
+ * sheet page as drawn, and a manifest, uploaded in the `journeys` artifact.
  */
 
 const panel = (page: Page) => page.locator("#route-sidebar");
