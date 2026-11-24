@@ -31,6 +31,8 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *  - a save on an organization's team doesn't reach the organization, or another coach's save
  *    doesn't reach this device without a reload (rule 8, D2)                                       → "the screens"
  *  - the other coach's avatar and the play they are on don't show (rule 8)                        → "the screens"
+ *  - a settings edit made while a settings push is on the wire is taken for pushed and never
+ *    reaches the organization (D1)                                                                 → "a team rename"
  *  - a viewer can save, or isn't told why not; a send to another team doesn't land (rule 9, 10)    → "a viewer's screen"
  *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
@@ -308,6 +310,42 @@ test("the screens: an invite joins, the team button switches to the organization
   note("each coach sees the other", "both", { heronSees: await avatars.getByRole("listitem").first().getAttribute("aria-label") });
   await other.close();
   save(`${testInfo.project.name}-the-screens`);
+});
+
+test("the screens: a team rename made while a settings push is on its way still reaches the organization", async ({ page }, testInfo) => {
+  const run = runId();
+  const otter = await coach("otter", run);
+  const own = await ownTeam(otter, [SLANT_LEFT], [BOOK], OTTERS);
+  const org = await createOrg(otter, "Riverside Youth Flag");
+  const team = (await moveTeam(otter, org.id, own.id)).id;
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+
+  // the first settings push is held on the wire; the coach renames the team again before it lands
+  let release = (): void => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let puts = 0;
+  await page.route("**/api/orgs/*/teams/*/settings", async (route) => {
+    if (route.request().method() !== "PUT") { await route.continue(); return; }
+    puts++;
+    if (puts === 1) await held;
+    await route.continue();
+  });
+  const name = page.locator("#play-sidebar").getByRole("textbox", { name: "Team name" });
+  await name.fill("Riverside Otters Blue");
+  await expect.poll(() => puts, { timeout: 15_000 }).toBe(1);
+  await name.fill("Riverside Otters Gold");
+  release();
+
+  await expect.poll(async () => (await readTeam(otter, org.id, team)).team.name, { timeout: 20_000 }).toBe("Riverside Otters Gold");
+  await expectSaved(page);
+  await expect(name).toHaveValue("Riverside Otters Gold");
+  expect((await marker(page))?.dirty).toBe(false);
+  note("Otter renames the team twice, the second while the first push is held: the organization has the second", "otter", { puts, team: (await readTeam(otter, org.id, team)).team, marker: await marker(page) });
+  save(`${testInfo.project.name}-settings-in-flight`);
 });
 
 test("a viewer's screen looks and can't save, a copy lands in another team, and an admin's removal takes the team away", async ({ page, browser }, testInfo) => {
