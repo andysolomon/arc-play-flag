@@ -136,3 +136,54 @@ test("undo keeps the last 60 edits and drops older ones", async ({ page }, info)
   await expect.poll(storedY).toBe(6);
   writeFileSync(`test-results/history-${info.project.name}-cap.json`, `${JSON.stringify({ edits: HISTORY_CAP + 5, cap: HISTORY_CAP, yAfter59Undos: 5, yAfter60Undos: after60 }, null, 2)}\n`);
 });
+
+test("Undo and Redo step the diagram only: a name and notes typed later stay, typing them or saving is no step, and a new edit after Undo drops Redo", async ({ page }, info) => {
+  const d = new Designer(page);
+  await d.goto();
+  const steps: Record<string, unknown>[] = [];
+  const x = d.player("X");
+  const notes = page.locator("#play-sidebar").getByRole("textbox", { name: "Coaching points" });
+  const draft = async (step: string) => {
+    const s = await storedDraft(page);
+    const at = s?.players.find((p) => p.id === "o3");
+    const row = { step, name: s?.name, notes: s?.notes, x: at?.x, y: at?.y, undo: await d.undo.isEnabled(), redo: await d.redo.isEnabled() };
+    steps.push(row);
+    return row;
+  };
+
+  // X steps back a yard, then the play is named and given notes
+  await x.press("ArrowDown");
+  await d.setName("Otter Sprint");
+  await d.clickTool("Notes");
+  await notes.fill("Sell the fake.");
+  await expect.poll(async () => (await draft("moved, named, noted")).notes).toBe("Sell the fake.");
+
+  // Undo takes back the step and nothing typed after it, and lets go of X; Redo puts the step back
+  await d.foldOverlays();
+  await d.undo.click();
+  await expect(x).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => draft("undone")).toMatchObject({ name: "Otter Sprint", notes: "Sell the fake.", y: 1, undo: false });
+  await d.redo.click();
+  await expect(x).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => draft("redone")).toMatchObject({ name: "Otter Sprint", notes: "Sell the fake.", y: 2, redo: false });
+
+  // in a new play, typing notes and saving are not steps: Undo stays off
+  await d.newPlay();
+  await d.tools();
+  if ((await notes.count()) === 0) await d.clickTool("Notes");
+  await notes.fill("Walk it first.");
+  await d.save();
+  await expect(d.toast).toHaveText("Saved");
+  await expect(d.undo).toBeDisabled();
+  await draft("new play noted and saved");
+
+  // a fresh edit after an Undo leaves nothing to redo
+  await x.press("ArrowDown");
+  await d.foldOverlays();
+  await d.undo.click();
+  await expect(d.redo).toBeEnabled();
+  await x.press("ArrowRight");
+  await expect(d.redo).toBeDisabled();
+  await expect.poll(() => draft("a new step after Undo")).toMatchObject({ x: 4, y: 1, undo: true, redo: false });
+  writeFileSync(`test-results/history-${info.project.name}-name-notes.json`, `${JSON.stringify({ steps }, null, 2)}\n`);
+});

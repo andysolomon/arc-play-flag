@@ -171,6 +171,13 @@ test("a play that was never saved keeps its dot through a reload, and so does on
   await expect((await d.tool("Save")).locator("span[aria-hidden]")).toHaveCount(0);
   await step(page, steps, "a blank new play, reloaded: no dot");
 
+  // a new defensive call is a choice the library doesn't hold yet, so it has something to save; a blank offensive play again has not
+  await d.newPlay("Defense");
+  await expect(dot(page)).toBeVisible();
+  await step(page, steps, "a blank new defensive call: a dot");
+  await d.newPlay("Offense");
+  await expect(dot(page)).toHaveCount(0);
+
   // a play opened from a share link is not in the library until it is saved
   await d.goto(`?p=${encodeShare({ name: "Otter Shared Slant", players: SLANT_LEFT.players })}`);
   await expect(page.getByRole("heading", { name: "Otter Shared Slant" })).toBeVisible();

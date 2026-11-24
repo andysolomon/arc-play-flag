@@ -264,6 +264,16 @@ test("a blitz backs a defender lined up closer than 7 yards off to the blitz lin
   await expectAt(d, "S", "Defense", 15, -11);
   expect(await stored("d5")).toMatchObject({ x: 15, y: -11 });
   await note("S blitzes from 11 yards off");
+
+  // stepped deeper, then Reset spots: the blitzer goes back to the blitz line, not to his 4 yards
+  await d.player("LB", "Defense").press("ArrowUp");
+  await d.player("LB", "Defense").press("ArrowUp");
+  await expectAt(d, "LB", "Defense", 11, -9);
+  await d.clickTool("Reset spots");
+  await expectAt(d, "LB", "Defense", 11, -7);
+  await expectAt(d, "S", "Defense", 15, -11);
+  await expect.poll(() => stored("d2")).toMatchObject({ x: 11, y: -7, route: { type: "blitz" } });
+  await note("Reset spots: LB back on the blitz line");
   await done();
 });
 

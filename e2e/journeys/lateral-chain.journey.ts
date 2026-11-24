@@ -488,3 +488,55 @@ test("from their 5 a chain that ends in a throw is a pass, never flagged, and on
   await expect(flag).toHaveCount(0);
   writeFileSync(`${out(info, "no-run")}.json`, `${JSON.stringify({ project: info.project.name, throwFlagged: false, keepFlagged: true, stored: await offense(page) }, null, 2)}\n`);
 });
+
+test("Flip carries each catch across, Lateral on a toss cuts the chain there and asks again, and Clear routes takes the chain off", async ({ page }, info) => {
+  const d = new Designer(page);
+  await seed(page, { plays: [TRICK] });
+  await d.openSaved(TRICK.name);
+  await expect(d.field.locator("[data-lateral]")).toHaveCount(2);
+  const steps: Record<string, unknown>[] = [];
+  const read = async (step: string): Promise<void> => { steps.push({ step, hops: await hops(page), offense: await offense(page) }); };
+  const path = (label: string): Locator => page.getByRole("list", { name: "Ball path" }).getByRole("button", { name: new RegExp(`^${label}, step`) });
+  const chain = [{ to: "o5", catch: [22, 6] }, { to: "o3", catch: [9, 6.5] }];
+
+  // Flip: each catch lands across the field, still as deep as it was
+  await d.clickTool("Flip play");
+  await expect.poll(() => hops(page)).toEqual([{ to: "o5", catch: [8, 6] }, { to: "o3", catch: [21, 6.5] }]);
+  await read("flipped");
+  await d.undo.click();
+  await expect.poll(() => hops(page)).toEqual(chain);
+
+  // Lateral on Z's toss: that toss comes off, Z has the ball with no job, and X no longer throws
+  await d.select("QB");
+  await path("Z").click();
+  await expect(page.getByRole("heading", { name: "Z has the ball" })).toBeVisible();
+  await d.pick("Lateral");
+  await expect.poll(() => hops(page)).toEqual([{ to: "o5", catch: [22, 6] }]);
+  await expect.poll(() => offense(page)).toMatchObject({ Z: null, X: null });
+  await expect(d.field.locator("[data-lateral]")).toHaveCount(1);
+  await read("Z's toss cut");
+  // tapped again, it asks who takes it, and Y does
+  await d.pick("Lateral");
+  await d.foldOverlays();
+  await takes(d, "Y").click();
+  await expect.poll(() => hops(page)).toEqual([{ to: "o5", catch: [22, 6] }, { to: "o4" }]);
+  await read("Z laterals to Y instead");
+
+  // Lateral on the QB's own toss takes the whole chain off
+  await d.select("QB");
+  await path("QB").first().click();
+  await d.pick("Lateral");
+  await expect.poll(() => hops(page)).toBeUndefined();
+  await expect(d.field.locator("[data-lateral]")).toHaveCount(0);
+  await read("QB's toss cut");
+
+  // back to the saved chain, then Clear routes clears the laterals with the routes
+  for (let i = 0; i < 3; i++) await d.undo.click();
+  await expect.poll(() => hops(page)).toEqual(chain);
+  await d.clickTool("Clear routes");
+  await expect.poll(() => hops(page)).toBeUndefined();
+  await expect(d.field.locator("[data-lateral]")).toHaveCount(0);
+  await expect.poll(() => offense(page)).toMatchObject({ QB: null, Z: null, X: null, Y: null });
+  await read("cleared");
+  writeFileSync(`${out(info, "cut")}.json`, `${JSON.stringify({ project: info.project.name, steps }, null, 2)}\n`);
+});
