@@ -241,8 +241,10 @@ export function push(): Promise<boolean> {
         d.pending.settings = null;
         writeDevice(d);
       }
-      writeMarker({ teamId: d.teamId, rev: d.rev, dirty: false, org: d.org, level: d.level });
-      set({ status: "saved", message: null });
+      const dirty = notePending(d) || hasPending(d);
+      writeDevice(d);
+      writeMarker({ teamId: d.teamId, rev: d.rev, dirty, org: d.org, level: d.level });
+      set({ status: dirty ? "pending" : "saved", message: null });
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) { await reread(d, e.message); return false; }
