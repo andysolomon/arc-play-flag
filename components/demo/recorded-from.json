@@ -6,10 +6,10 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "3e7b5c9acd4bea28fdca945f27cf91c41792f59310e1abe80702f00f20daad2d",
+    "components/App.tsx": "4656d493c52baac624fcbabbd9f2a81c9664c28f5a85107cb1740ee375402c13",
     "components/EditablePlayTitle.tsx": "e950bae2fb571cb67cfa1d4f11364b85d155c9fe6038389956769cb86eef43d3",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "7f7513fe0dc73746a56c618a3bfeefd6620e80cc3af7389e1578ec51ded0f4fe",
+    "components/Field.tsx": "cda84d318988cb91d6c3967bcaa0107ffb2491c1b361cbf3d6dd3fd858292725",
     "components/FirstUse.tsx": "b2e974561b95cfcbf2462e13977a11430fab08b7efdb8ce015ddb6597a426303",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "17e4dd308f798a51c6f4d937e6f845676de2a896d670ebc09fb539e747451df8",
@@ -80,10 +80,10 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "Playbook landing changes only selecting a current book and returning through Designer from its editor. None of the ten tour chapters uses either path; the editor link keeps the same text and appearance, and explicit play/share opens retain their behavior.",
+    "reason": "App.tsx and Field.tsx only import quarterback() from lib/play/roles.ts instead of lib/play/geometry.ts; the same function, nothing drawn changes",
     "files": [
       "components/App.tsx (changed)",
-      "components/playbooks/PlaybooksScreen.tsx (changed)"
+      "components/Field.tsx (changed)"
     ]
   }
 }
