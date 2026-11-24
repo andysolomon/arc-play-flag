@@ -15,6 +15,7 @@ import { KEYS, OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed, storedCurrentBoo
  *  - a new team doesn't start empty, a switch doesn't change what the device holds (A17)       → "several teams"
  *  - a deleted team stays listed, or its deletion takes another team's plays with it           → "several teams"
  *  - a push refused as changed elsewhere overwrites the other device's play, or loses its own   → "two devices"
+ *  - a save made while a push is on the wire is taken for pushed and never goes up (A7, A18)   → "on its way"
  *  - a write while offline is lost, or reported saved (A7)                                      → "offline"
  *  - signing out leaves the team on the device, or loses a change not yet pushed (A11)          → "signing out"
  *  - signed out, the panel offers no way in, or the account is written to                       → "signing out"
@@ -238,6 +239,38 @@ test("two devices' changes to one team merge instead of overwriting each other",
   await read(page, "first device, reloaded: both plays", await teamRecord(page.context(), teamId));
   await other.close();
   save(`${testInfo.project.name}-two-devices`);
+});
+
+test("a save made while a push is on its way still reaches the account", async ({ page, context }, testInfo) => {
+  const run = runId();
+  await seed(page, { plays: [SLANT_LEFT], team: OTTERS });
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expectSaved(page);
+  const view = await accountView(context);
+  if (!("teams" in view)) throw new Error("not signed in");
+  const teamId = view.teams[0]?.id ?? "";
+
+  let release = (): void => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let puts = 0;
+  await page.route("**/api/account/teams/*", async (route) => {
+    if (route.request().method() !== "PUT") { await route.continue(); return; }
+    puts++;
+    if (puts === 1) await held;
+    await route.continue();
+  });
+  await savePlay(page, "Otter Fade");
+  await expect.poll(() => puts, { timeout: 15_000 }).toBe(1);
+  await savePlay(page, "Otter Reverse");
+  release();
+
+  await expect.poll(() => teamPlayNames(context, teamId), { timeout: 20_000 }).toEqual(["Otter Slant Left", "Otter Fade", "Otter Reverse"]);
+  await expectSaved(page);
+  expect((await marker(page))?.dirty).toBe(false);
+  await read(page, "a save during a push: both plays in the account", await teamRecord(context, teamId));
+  save(`${testInfo.project.name}-in-flight`);
 });
 
 test("a write while offline stays on the device and goes up when the device is back", async ({ page, context }, testInfo) => {

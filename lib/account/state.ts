@@ -13,7 +13,6 @@ import {
 } from "@/lib/play/storage";
 import { SHARES_EVENT, SHARES_KEY, readShares } from "@/lib/sharing/shares";
 import { ApiError } from "./api";
-import { canonical } from "./data";
 import { applyPrefs, clearPrefs, devicePrefs } from "./prefs";
 import type { AccountMode, AccountUser, CoachPrefs, TeamData, TeamSummary } from "./types";
 import type { Level, OrgMode, OrgSummary, OrgTeamSummary, Presence } from "@/lib/org/types";
@@ -200,7 +199,6 @@ export function applyData(data: TeamWrite, clearDevice: boolean): void {
     if (clearDevice && data.currentBook === undefined) {
       try { localStorage.removeItem(CURRENT_BOOK_KEY); } catch { /* the pick is a convenience */ }
     }
-    lastSynced = canonical(deviceDesk());
     if (desk) reread(); else refresh();
     if (data.shares !== undefined) window.dispatchEvent(new Event(SHARES_EVENT));
   });
@@ -211,7 +209,6 @@ export function applyDesk(data: TeamData, prefs: CoachPrefs): void {
   applied(() => {
     applyData(data, false);
     applyPrefs(prefs);
-    lastSynced = canonical(deviceDesk());
   });
   pulled();
 }
@@ -220,7 +217,6 @@ export function applyDesk(data: TeamData, prefs: CoachPrefs): void {
 export function applyLook(prefs: CoachPrefs): void {
   applied(() => {
     applyPrefs(prefs);
-    lastSynced = canonical(deviceDesk());
   });
 }
 

@@ -48,6 +48,30 @@ jobs:
       - run: bun test
       - run: bun run build
 
+  models:
+    name: Model-check the sync protocols
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Refuse protocol changes that leave their model behind
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: bun run scripts/check-model-drift.ts
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/tla2tools
+          key: tla2tools-${{ hashFiles('scripts/verify-models.ts') }}
+      - run: bun run verify:models
+
   infrastructure:
     name: Validate infrastructure configuration
     runs-on: ubuntu-latest

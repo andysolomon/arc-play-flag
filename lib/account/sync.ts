@@ -116,11 +116,16 @@ let pushDue = Number.POSITIVE_INFINITY;
 let pushing: Promise<boolean> | null = null;
 let pushAgain = false;
 
-/** Records that the device and the account agree on the desk at `rev` and the look at `prefsRev`. */
-function synced(teamId: string, rev: number, prefsRev: number): void {
-  const c = canonical(deviceDesk());
+/**
+ * Records `account` as what the account holds at `rev` and the look at `prefsRev`. A device that holds
+ * anything else by now (a save while the request was out) stays dirty, so that save goes up next.
+ */
+function synced(teamId: string, rev: number, prefsRev: number, account: Desk): "saved" | "pending" {
+  const c = canonical(account);
+  const dirty = c !== canonical(deviceDesk());
   setLastSynced(c);
-  writeMarker({ teamId, rev, dirty: false, hash: hashOf(c), prefsRev });
+  writeMarker({ teamId, rev, dirty, hash: hashOf(c), prefsRev });
+  return dirty ? "pending" : "saved";
 }
 
 /** Marks the device as holding a write the account hasn't got; without a marker there is nothing to mark. */
@@ -187,17 +192,19 @@ export function push(): Promise<boolean> {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const written = await api.writeTeam(m.teamId, desk.data, rev, desk.prefs);
-          // the account may hold more touchdowns than this device counted (A25)
-          applyLook(devicePrefsOf(written.prefs));
-          synced(m.teamId, written.rev, written.prefs.rev);
-          set({ status: "saved", message: null, teams: state().teams.map((t) => (t.id === written.id ? summaryOf(written) : t)) });
+          // the account may hold more touchdowns than this device counted (A25); a look picked meanwhile goes up next
+          const lookKept = canonical(devicePrefs()) === canonical(desk.prefs);
+          if (lookKept) applyLook(devicePrefsOf(written.prefs));
+          const status = synced(m.teamId, written.rev, written.prefs.rev, { data: desk.data, prefs: lookKept ? devicePrefs() : desk.prefs });
+          set({ status, message: null, teams: state().teams.map((t) => (t.id === written.id ? summaryOf(written) : t)) });
           return true;
         } catch (e) {
           if (!(e instanceof ApiError) || e.status !== 409 || !e.record || attempt === 1) throw e;
-          // A8, A22: the account's copy comes in under this device's, and the whole goes up over its rev
-          desk = { data: mergeTeamData(desk.data, e.record.data), prefs: mergePrefs(desk.prefs, devicePrefsOf(e.record.prefs)) };
+          // A8, A22
+          const now = deviceDesk();
+          applyDesk(mergeTeamData(now.data, e.record.data), mergePrefs(now.prefs, devicePrefsOf(e.record.prefs)));
+          desk = deviceDesk();
           rev = e.record.rev;
-          applyDesk(desk.data, desk.prefs);
           writeMarker({ teamId: m.teamId, rev, dirty: true });
         }
       }
@@ -235,7 +242,7 @@ const summaryOf = (r: TeamSummary): TeamSummary => ({ id: r.id, name: r.name, co
 function adopt(record: TeamRecord, prefs: CoachPrefs = devicePrefsOf(record.prefs)): void {
   org.release();
   applyDesk(record.data, prefs);
-  synced(record.id, record.rev, record.prefs.rev);
+  synced(record.id, record.rev, record.prefs.rev, deviceDesk());
 }
 
 // ---- starting ----------------------------------------------------------------------------------
@@ -377,7 +384,7 @@ async function settleMirrored(marker: Marker, mine: TeamSummary, prefs: AccountP
   if (prefs.rev !== (marker.prefsRev ?? 0)) {
     // the look changed elsewhere, on this team or another (A19)
     applyLook(devicePrefsOf(prefs));
-    synced(mine.id, mine.rev, prefs.rev);
+    synced(mine.id, mine.rev, prefs.rev, deviceDesk());
     set({ status: "saved", message: null });
     return;
   }
