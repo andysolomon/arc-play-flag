@@ -1,5 +1,7 @@
 ---
 name: verify-account-push
+model: verification/account-push
+watches: lib/account/sync.ts lib/account/state.ts lib/account/store.ts
 description: Model-check how a device pushes a coach's team to the account (lib/account/sync.ts push, noteWrite, synced, the 409 merge) with TLA+. Use when changing lib/account/sync.ts or lib/account/state.ts, when a save goes missing between devices, or when the "Model-check the sync protocols" CI job fails.
 ---
 
@@ -12,7 +14,7 @@ description: Model-check how a device pushes a coach's team to the account (lib/
 ## Run it
 
 ```sh
-bun run verify:models verification/account-push   # needs Java 17+ on PATH; about 15s
+bun run verify:models verification/account-push   # about 15s
 ```
 
 Every line must start with `ok`. `AccountPush.cfg` checks the code as it is and must pass. Each `AccountPush.<variant>.cfg` replays a bug this code once had and must break the invariant on its `\* expect:` line. A variant that starts passing means the model lost the ability to catch that bug.
@@ -45,11 +47,4 @@ Never weaken an invariant or a bound to get a pass.
 
 ## Keeping it in step
 
-The model was last confirmed against the code at the commit that last changed this file:
-
-```sh
-git log -1 --format=%h -- .claude/skills/verify-account-push/SKILL.md
-git diff <that commit> -- lib/account/sync.ts lib/account/state.ts lib/account/store.ts
-```
-
-If those files changed since, walk the table again. Edit this file (which moves the commit) only after you confirm the model still describes the code. An intended protocol change goes into the model first, then the code, then a new `AccountPush.<variant>.cfg` for any bug it fixes.
+CI (`scripts/check-model-drift.ts`) refuses a PR that changes a file under `watches:` without touching `verification/account-push/` or this file. Walk the table again, then change the model, or touch this file to record that the model still describes the code. An intended protocol change goes into the model first, then the code, then a new `AccountPush.<variant>.cfg` for any bug it fixes.

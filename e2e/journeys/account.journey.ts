@@ -252,7 +252,6 @@ test("a save made while a push is on its way still reaches the account", async (
   if (!("teams" in view)) throw new Error("not signed in");
   const teamId = view.teams[0]?.id ?? "";
 
-  // the first push is held on the wire; the coach saves again before it lands
   let release = (): void => undefined;
   const held = new Promise<void>((resolve) => { release = resolve; });
   let puts = 0;

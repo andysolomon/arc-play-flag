@@ -6,16 +6,11 @@
 (*                                                                          *)
 (* A team is modelled as its set of plays; the account's PUT replaces it    *)
 (* whole, and `mergeTeamData` keeps both sides' plays, so a merge is a      *)
-(* union. Pulls on focus (`check`), sign-in, deletes, the 404 and 401 paths *)
-(* and the look (prefs) are outside the model.                              *)
+(* union. What is left out is listed in                                   *)
+(* .claude/skills/verify-account-push/SKILL.md.                             *)
 (*                                                                          *)
-(* `Variant` replays a past version of `push` so CI shows the model still   *)
-(* catches it:                                                              *)
-(*   "fixed"            the code as it is                                   *)
-(*   "syncedAfterAwait" `synced` read the device after the request came back*)
-(*                      and recorded it as what the account holds           *)
-(*   "mergeFromSnapshot" a 409 merged the account's copy into the desk read *)
-(*                      before the request and wrote that over the device   *)
+(* `Variant` replays a past version of `push`; each                         *)
+(* AccountPush.<variant>.cfg names the bug on its \* replays: line.         *)
 (***************************************************************************)
 EXTENDS Naturals, FiniteSets
 
@@ -28,7 +23,7 @@ ASSUME Variant \in {"fixed", "syncedAfterAwait", "mergeFromSnapshot"}
 
 VARIABLES
   device,   \* the plays in this device's storage
-  made,     \* the plays the coach saved here: none may ever be lost
+  made,     \* the plays the coach saved here
   server,   \* the account's copy: [rev, plays]
   marker,   \* the device's marker (MARKER_KEY): [rev, dirty]
   last,     \* getLastSynced(): what the device believes the account holds

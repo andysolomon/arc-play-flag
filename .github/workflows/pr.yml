@@ -47,7 +47,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
+      - name: Refuse protocol changes that leave their model behind
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: bun run scripts/check-model-drift.ts
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

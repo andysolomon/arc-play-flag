@@ -6,7 +6,7 @@
  *   bun run verify:models                        every model
  *   bun run verify:models verification/account-push
  *
- * Needs Java 17+ on PATH. tla2tools.jar is fetched once into ~/.cache/tla2tools and checked by hash.
+ * tla2tools.jar is fetched once into ~/.cache/tla2tools and checked by hash.
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -18,6 +18,9 @@ const TLA_SHA256 = "fdffef247f563ef6edbfd44958d2a82db79e7564e07cb673262d896353fa
 const JAR = join(homedir(), ".cache", "tla2tools", `tla2tools-${TLA_VERSION}.jar`);
 
 async function jar(): Promise<string> {
+  const java = Bun.which("java") ? Bun.spawnSync(["java", "-version"]) : null;
+  const major = Number(/version "(\d+)/.exec(java?.stderr.toString() ?? "")?.[1] ?? 0);
+  if (major < 17) throw new Error("TLC needs Java 17 or newer on PATH: mise use java@temurin-21, or install a JDK 21");
   if (!existsSync(JAR)) {
     mkdirSync(dirname(JAR), { recursive: true });
     const res = await fetch(`https://github.com/tlaplus/tlaplus/releases/download/v${TLA_VERSION}/tla2tools.jar`);

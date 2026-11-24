@@ -200,7 +200,7 @@ export function push(): Promise<boolean> {
           return true;
         } catch (e) {
           if (!(e instanceof ApiError) || e.status !== 409 || !e.record || attempt === 1) throw e;
-          // A8, A22: the account's copy comes in under the device's as it is now, and the whole goes up over its rev
+          // A8, A22
           const now = deviceDesk();
           applyDesk(mergeTeamData(now.data, e.record.data), mergePrefs(now.prefs, devicePrefsOf(e.record.prefs)));
           desk = deviceDesk();
