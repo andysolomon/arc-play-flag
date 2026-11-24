@@ -1,6 +1,7 @@
 import { LOS_YARD, losOf, readLos, withLos } from "./field";
+import { HOP_FIELDS, asStored, readFields } from "./routes";
 import { artShadow, cleanNotes, normalizePlayers, readSide, type DraftRecord } from "./storage";
-import type { Player, Team } from "./types";
+import type { Exhaustive, Player, SavedPlay, Team } from "./types";
 
 /** Share links carry the whole play as base64url JSON in the path: /p/<id>. No backend. */
 
@@ -22,23 +23,14 @@ function fromBase64Url(s: string): string | null {
   }
 }
 
-/** Only the fields the designer reads, so the id stays short. */
-function compact(p: Player): Player {
-  const out: Player = { id: p.id, team: p.team, label: p.label, x: p.x, y: p.y, route: null };
-  if (p.route) {
-    out.route = { type: p.route.type };
-    if (p.route.pts) out.route.pts = p.route.pts;
-    if (p.route.target) out.route.target = p.route.target;
-    if (p.route.aim) out.route.aim = p.route.aim;
-    if (p.route.split) out.route.split = p.route.split;
-    if (p.route.mirror) out.route.mirror = true;
-    if (p.route.primary) out.route.primary = true;
-  }
-  if (p.preSnap?.pts.length) out.preSnap = { pts: p.preSnap.pts };
-  // every lateral, with the catches the coach moved and the runs before a pitch; without them the
-  // recipient's tosses land at the defaults, from where each carrier stands
-  if (p.laterals?.length) out.laterals = p.laterals.map((h) => ({ to: h.to, ...(h.catch ? { catch: h.catch } : {}), ...(h.release ? { release: h.release } : {}) }));
-  return out;
+/** Only what storage reads back, so the id stays short. A field left undefined is not written. */
+function compact(p: Player): Exhaustive<Player> {
+  return {
+    id: p.id, team: p.team, label: p.label, x: p.x, y: p.y,
+    route: p.route && asStored(p.route),
+    preSnap: p.preSnap?.pts.length ? { pts: p.preSnap.pts } : undefined,
+    laterals: p.laterals?.length ? p.laterals.map((h) => ({ to: h.to, ...readFields(HOP_FIELDS, h) })) : undefined,
+  };
 }
 
 /** A decoded link: the whole play, including the other team kept for the designer. */
@@ -59,16 +51,18 @@ export interface SharedRecord extends DraftRecord {
  * carry every player.
  */
 export function encodeShare(rec: DraftRecord, noRunZones = true): string {
-  const payload: { name: string; players: Player[]; side?: Team; noRunZones?: false; artShadow?: true; los?: number; notes?: string } = {
-    name: rec.name, players: rec.players.map(compact),
-  };
   const notes = cleanNotes(rec.notes);
-  if (notes.trim()) payload.notes = notes;
-  if (rec.side === "defense") payload.side = "defense";
-  if (!noRunZones) payload.noRunZones = false;
-  if (rec.artShadow) payload.artShadow = true;
   const los = losOf(rec);
-  if (los !== LOS_YARD) payload.los = los;
+  // every field of a play but its id, which names no play on the recipient's device; undefined is not written
+  const payload: { [K in Exclude<keyof SavedPlay, "id">]: SavedPlay[K] | undefined } & { noRunZones: false | undefined } = {
+    name: rec.name,
+    players: rec.players.map(compact),
+    notes: notes.trim() ? notes : undefined,
+    side: rec.side === "defense" ? "defense" : undefined,
+    noRunZones: noRunZones ? undefined : false,
+    artShadow: rec.artShadow,
+    los: los === LOS_YARD ? undefined : los,
+  };
   return toBase64Url(JSON.stringify(payload));
 }
 

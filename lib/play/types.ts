@@ -221,5 +221,11 @@ export interface TeamSettings {
   noRunZones?: boolean;
 }
 
+/**
+ * T with its optional fields required but allowed to be undefined: an object literal of this type has
+ * to name every field, so a field added to T does not compile until the literal says what it does with it.
+ */
+export type Exhaustive<T> = { [K in keyof Required<T>]: T[K] };
+
 /** How much an export shows: simple is diagram only, detailed adds names, the read and notes. */
 export type Level = "simple" | "detailed";

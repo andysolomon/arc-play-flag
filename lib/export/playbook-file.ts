@@ -1,5 +1,4 @@
-import { losOf } from "@/lib/play/field";
-import { kebab, newId, normalizePlaybook, normalizeSavedPlay, normalizeTeam, primaryPlayId } from "@/lib/play/storage";
+import { kebab, newId, normalizePlaybook, normalizeSavedPlay, normalizeTeam, primaryPlayId, samePlay } from "@/lib/play/storage";
 import type { Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 
 /**
@@ -120,10 +119,6 @@ export interface ImportPlan {
   added: number;
 }
 
-const same = (a: SavedPlay, b: SavedPlay): boolean =>
-  a.name === b.name && a.notes === b.notes && a.side === b.side && (a.artShadow === true) === (b.artShadow === true) &&
-  losOf(a) === losOf(b) && JSON.stringify(a.players) === JSON.stringify(b.players);
-
 /**
  * Nothing on the device changes: a play whose id is here and identical is reused, one
  * that differs comes in as a copy under a new id, and the book points at whichever won.
@@ -136,8 +131,8 @@ export function planImport(file: PlaybookFile, library: readonly SavedPlay[], bo
   for (const p of file.plays) {
     const mine = local.get(p.id);
     if (!mine) { plays.push(p); map.set(p.id, p.id); added++; continue; }
-    if (same(mine, p)) { map.set(p.id, p.id); reused++; continue; }
-    const priorCopy = library.find((candidate) => same(candidate, p));
+    if (samePlay(mine, p)) { map.set(p.id, p.id); reused++; continue; }
+    const priorCopy = library.find((candidate) => samePlay(candidate, p));
     if (priorCopy) { map.set(p.id, priorCopy.id); reused++; continue; }
     const copy: SavedPlay = { ...p, id: newId() };
     plays.push(copy);
