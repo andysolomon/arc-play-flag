@@ -20,7 +20,7 @@ import type { TeamData } from "../../lib/account/types";
  *    send (S3)                                                                                      → "a differing play"
  *  - a team deleted meanwhile is reported sent to, or stays on the list (S4)                        → "a differing play"
  * Leaves `send-to-team-<device>-<test>.json` (each step: the toast, what the device held, what each
- * team held) and pictures of the send dialog in test-results/, uploaded as `send-to-team`.
+ * team held) and pictures of the send dialog in test-results/, uploaded in the `journeys` artifact.
  */
 
 test.beforeEach(() => {

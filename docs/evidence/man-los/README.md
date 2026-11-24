@@ -26,4 +26,4 @@ Validation:
 The tests hold man coverage through passes, retreating routes, play-action fakes and QB
 keepers, release after completed handoffs (including jet sweeps and pre-snap motion),
 and preserve downfield coverage and the assigned blitz. CI uploads all case traces and
-screenshots as the `man-los` artifact.
+screenshots in the `journeys` artifact.

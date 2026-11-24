@@ -9,7 +9,7 @@ import { OTTERS, jsonUpload, lateraled, play, seed, storageSnapshot, storedDraft
  * Lateral chains (docs/adr/004-lateral-chains.md, docs/adr/005-unlimited-laterals.md): the quarterback
  * laterals, each carrier laterals again (to anyone but themself, the QB again included), throws or keeps
  * it, every catch behind its release and the line. Each test leaves what it saw as
- * `test-results/lateral-chain-<device>-<test>.json` with pictures beside it, uploaded as `lateral-chain`.
+ * `test-results/lateral-chain-<device>-<test>.json` with pictures beside it, uploaded in the `journeys` artifact.
  */
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
