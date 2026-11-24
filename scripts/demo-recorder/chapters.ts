@@ -113,7 +113,7 @@ export class ChapterDriver {
 
   /** The ball in flight on ▶ (a lateral's own glyph on the whiteboard is also an image, but prints). */
   get ball(): Locator {
-    return this.field.locator("image[data-export='skip']");
+    return this.field.locator("image[data-ball]");
   }
 
   /** Wraps a failure with the chapter, beat and class unless it is already classified. */

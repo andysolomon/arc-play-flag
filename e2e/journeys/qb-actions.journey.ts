@@ -74,7 +74,7 @@ async function tokenAt(d: Designer, label: string): Promise<Pt> {
 
 /** The playback football, in yards (the arcs' footballs stay put, this one rides with the ball). */
 async function ballAt(d: Designer): Promise<Pt> {
-  const ball = d.field.locator("image[data-export='skip']");
+  const ball = d.field.locator("image[data-ball]");
   const transform = await ball.getAttribute("transform");
   const m = /translate\(([-\d.]+),([-\d.]+)\) scale\(([\d.]+)\)/.exec(transform ?? "");
   if (!m?.[1] || !m[2] || !m[3]) throw new Error("no playback football");

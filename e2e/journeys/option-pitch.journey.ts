@@ -37,7 +37,7 @@ async function playback(d: Designer): Promise<{ t: number; x: number; y: number 
   await d.page.clock.install();
   await d.page.clock.pauseAt(new Date());
   await d.page.getByRole("button", { name: "Run the play" }).click();
-  const ball = d.field.locator("image[data-export='skip']");
+  const ball = d.field.locator("image[data-ball]");
   const samples: { t: number; x: number; y: number }[] = [];
   for (let t = 0; t <= 8000; t += 50) {
     if ((await ball.count()) === 0) break;

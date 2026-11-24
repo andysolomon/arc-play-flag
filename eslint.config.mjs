@@ -35,6 +35,10 @@ const eslintConfig = defineConfig([
           selector: "BinaryExpression[operator=/^[!=]==?$/]:matches([left.property.name='id'], [left.name='id'])[right.value=/^o[12]$/]",
           message: "o1 and o2 are only the default centre and quarterback slots. Call centre() or quarterback() from lib/play/roles.ts, which owns that fallback.",
         },
+        {
+          selector: "JSXAttribute[name.name='data-export']",
+          message: "data-export has had no consumer since 239aca5; wrap screen-only UI in <ScreenOnly> so print hides it too",
+        },
       ],
     },
   },
