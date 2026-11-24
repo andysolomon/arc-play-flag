@@ -5,7 +5,7 @@
  *   BASE=<sha> HEAD=<sha> BODY="<pr body>" bun run scripts/check-attribution.ts
  */
 const AGENT_AUTHOR = /noreply@anthropic\.com|cursoragent@cursor\.com|^claude\b|^cursor agent\b/i;
-const ATTRIBUTION = /^(co-authored-by|claude-session):|generated with/im;
+const ATTRIBUTION = /^(co-authored-by|claude-session):|^\W*generated with\b/im;
 
 const { BASE, HEAD, BODY = "" } = process.env;
 if (!BASE || !HEAD) throw new Error("BASE and HEAD are required");

@@ -1,4 +1,4 @@
-const ATTRIBUTION = /^(co-authored-by|claude-session):|generated with/im;
+const ATTRIBUTION = /^(co-authored-by|claude-session):|^\W*generated with\b/im;
 
 const config = {
   extends: ["@commitlint/config-conventional"],
