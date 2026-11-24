@@ -1,9 +1,10 @@
-import { readLos, withLos } from "./field";
+import { losOf, readLos, withLos } from "./field";
+import type { Doc } from "./history";
 import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
 import { motionPoint } from "./pre-snap";
 import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, SECOND_LINEUP, defaultLineups, placedSpot, withNames } from "./lineup";
 import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
-import { MAX_ROUTE_POINTS, X_MAX, X_MIN, Y_MIN, clampPoint, isBallJob, isRun, routeDef } from "./routes";
+import { HOP_FIELDS, MAX_ROUTE_POINTS, X_MAX, X_MIN, Y_MIN, isBallJob, isRun, readFields, readRoute, routeDef, toPair } from "./routes";
 import type { Hop, Lineup, Lineups, Pair, Playbook, Player, Roster, RosterSlot, Route, RouteType, SavedPlay, Spot, Team, TeamSettings } from "./types";
 
 export const PLAYS_KEY = "ffpd.plays.v2";
@@ -90,18 +91,10 @@ export function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-2);
 }
 
-/** A finite waypoint pulled back onto the field; anything else (a string, 1e400, a lone number) is dropped. */
-function toPair(v: unknown): Pair | null {
-  if (!Array.isArray(v) || v.length < 2) return null;
-  const x: unknown = v[0], y: unknown = v[1];
-  if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return clampPoint([x, y]);
-}
-
 /** A route this team can run, or null: an offensive type on a defender (or the reverse) is no route at all. */
 function normalizeRoute(v: unknown, team: Team): Route | null {
   if (!isRecord(v) || typeof v.type !== "string" || !routeDef(team, v.type as RouteType)) return null;
-  return cleanRoute(v, v.type as RouteType);
+  return readRoute(v, v.type as RouteType);
 }
 
 /**
@@ -112,32 +105,13 @@ export type StoredRoute = Omit<Route, "type"> & { type: string; catch?: Pair };
 /** A player as some version stored them. */
 export type StoredPlayer = Omit<Player, "route"> & { route: StoredRoute | null };
 
-/** A route's fields as stored, for a type already known to be one. */
-function cleanRoute<T extends string>(v: Record<string, unknown>, type: T): Omit<Route, "type"> & { type: T } {
-  const r: Omit<Route, "type"> & { type: T } = { type };
-  if (Array.isArray(v.pts)) r.pts = v.pts.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null);
-  if (typeof v.target === "string") r.target = v.target.slice(0, 40);
-  // a blitz aimed at the backfield or containing the quarterback; one aimed at a player keeps only the player
-  else if (v.aim === "backfield" || v.aim === "contain") r.aim = v.aim;
-  // a deep zone called as a half or a third; on any other route, or as anything else, nothing (D1)
-  if (type === "zoneDeep" && (v.split === "half" || v.split === "third")) r.split = v.split;
-  if (v.mirror === true) r.mirror = true;
-  if (v.primary === true) r.primary = true;
-  return r;
-}
-
 /**
  * One lateral as stored: who takes it, the catch when the coach has moved it, and the release when
  * they pitch it on the run (ADR 007). Null for anything else.
  */
 function toHop(v: unknown): Hop | null {
   if (!isRecord(v) || typeof v.to !== "string" || !v.to) return null;
-  const c = v.catch === undefined ? null : toPair(v.catch);
-  const r = v.release === undefined ? null : toPair(v.release);
-  const hop: Hop = { to: v.to.slice(0, 40) };
-  if (c) hop.catch = c;
-  if (r) hop.release = r;
-  return hop;
+  return { to: v.to.slice(0, 40), ...readFields(HOP_FIELDS, v) };
 }
 
 /** A stored list of laterals, cut at the first entry that isn't one (each depends on the one before) and at the cap. */
@@ -272,7 +246,7 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
     const pitch = team === "offense" && isRecord(v.route) && v.route.type === "pitch";
     if (pitch && isRecord(v.route)) {
       pitches.push({ id, mirror: v.route.mirror === true, primary: v.route.primary === true });
-      pitchRoutes.set(id, cleanRoute(v.route, "pitch"));
+      pitchRoutes.set(id, readRoute(v.route, "pitch"));
     }
     // a lateral stored as this carrier's route, before laterals moved to the quarterback (ADR 004)
     const tossed = team === "offense" && isRecord(v.route) && v.route.type === "lateral"
@@ -281,7 +255,7 @@ function readPlayers(raw: unknown): { players: Player[]; stored: StoredPlayer[] 
     if (tossed && isRecord(v.route)) {
       carried.set(id, tossed);
       // as ADR 004 stored it, where a carrier tossing it on was never the read
-      const route: StoredRoute = cleanRoute(v.route, "lateral");
+      const route: StoredRoute = readRoute(v.route, "lateral");
       delete route.primary;
       lateralRoutes.set(id, tossed.catch ? { ...route, catch: tossed.catch } : route);
     }
@@ -371,6 +345,39 @@ export function normalizeSavedPlay(raw: unknown, fallbackId = newId()): SavedPla
  * the choice (or with it off) reads and writes byte for byte the same.
  */
 export const artShadow = (v: unknown): { artShadow?: true } => (v === true ? { artShadow: true } : {});
+
+type FlagKey<T> = T extends unknown ? { [K in keyof T]-?: NonNullable<T[K]> extends boolean ? K : never }[keyof T] : never;
+/**
+ * Flags stored only when they are on. A file from an older build could carry one as `false` (a preset
+ * mirrored back, a read unmarked); storage reads that as nothing, and so does `canonical`, so such a
+ * file is not sent back for repair (#113). Typed over every boolean field a play or playbook file
+ * holds, so a new one does not compile until it is listed. A team's no-run zones are stored the other
+ * way round, only when off, and stay a real difference.
+ */
+const FLAGS: Record<FlagKey<Route | Hop | Player | SavedPlay | Playbook>, true> = {
+  mirror: true, primary: true, artShadow: true,
+};
+const OFF_IS_ABSENT = new Set(Object.keys(FLAGS));
+
+/** Stored JSON compared irrespective of key order, without walking hostile deep input. */
+export function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) => {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      return Object.fromEntries(Object.entries(v).filter(([k, x]) => !(x === false && OFF_IS_ABSENT.has(k))).sort(([a], [b]) => a.localeCompare(b)));
+    }
+    return v;
+  });
+}
+
+/**
+ * Whether two versions of a play hold the same play: every field but the id, which names a copy.
+ * Typed over every field of a saved play, so a new one does not compile until it says how it compares.
+ */
+export function samePlay(a: Doc | SavedPlay, b: Doc | SavedPlay): boolean {
+  const content = (p: Doc | SavedPlay): Record<Exclude<keyof SavedPlay, "id">, unknown> =>
+    ({ name: p.name, players: p.players, notes: p.notes, side: p.side, artShadow: p.artShadow, los: losOf(p) });
+  return canonical(content(a)) === canonical(content(b));
+}
 
 function parse(storage: StorageLike | null, key: string): unknown {
   if (!storage) return null;

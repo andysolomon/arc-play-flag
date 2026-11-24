@@ -1,5 +1,5 @@
 import { DEEP_NAME, deepSplit } from "./deep";
-import type { DefenseRouteType, OffenseRouteType, Pair, Player, Route, RouteDef, RouteType, Team } from "./types";
+import type { DefenseRouteType, Hop, OffenseRouteType, Pair, Player, Route, RouteDef, RouteType, Team } from "./types";
 
 export const OFF = "#e5675e";
 export const DEF = "#4a8fe0";
@@ -232,32 +232,103 @@ export const MAX_ROUTE_POINTS = 60;
 
 export const clampPoint = (q: Pair): Pair => [Math.max(X_MIN, Math.min(X_MAX, q[0])), Math.max(Y_MIN, Math.min(Y_MAX, q[1]))];
 
+/** A finite waypoint pulled back onto the field; anything else (a string, 1e400, a lone number) is dropped. */
+export function toPair(v: unknown): Pair | null {
+  if (!Array.isArray(v) || v.length < 2) return null;
+  const x: unknown = v[0], y: unknown = v[1];
+  if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return clampPoint([x, y]);
+}
+
+type Reader<V> = (stored: Readonly<Record<string, unknown>>) => V | undefined;
 /**
- * The route with only the flags that are on. Storage reads `mirror: false` and `primary: false` as
- * nothing, so a play stored with either would not read back byte for byte, and the strict reader
- * behind Create link and the file import called it repaired (#113): a preset mirrored back, or a
- * read unmarked, could not be shared until the route was toggled off and on.
+ * How one stored field reads, fixed by its type. A flag is stored only when it is on. A point, or a
+ * list of points, is a spot on the field: clamped onto it as it reads, and turned with the field
+ * when a route is mirrored or the play flipped. Any other field names its own reader, which gives
+ * undefined when the field is not stored.
  */
-export function trimFlags(route: Route): Route {
-  const { mirror, primary, ...rest } = route;
-  return { ...rest, ...(mirror ? { mirror: true } : {}), ...(primary ? { primary: true } : {}) };
+export type FieldRule<V> =
+  [V] extends [boolean] ? "flag" : [V] extends [Pair] ? "point" : [V] extends [readonly Pair[]] ? "points" : Reader<V>;
+/**
+ * A rule for every field of T. Storage, share links, mirror and flip all walk one of these, so a
+ * field added to the record does not compile until its table says how it reads.
+ */
+export type Fields<T> = { [K in keyof T]-?: FieldRule<NonNullable<T[K]>> };
+
+export const ROUTE_FIELDS: Fields<Omit<Route, "type">> = {
+  pts: "points",
+  target: (v) => (typeof v.target === "string" ? v.target.slice(0, 40) : undefined),
+  // a blitz aimed at a player keeps only the player
+  aim: (v) => (typeof v.target !== "string" && (v.aim === "backfield" || v.aim === "contain") ? v.aim : undefined),
+  // on any other route, or as anything else, nothing (D1)
+  split: (v) => (v.type === "zoneDeep" && (v.split === "half" || v.split === "third") ? v.split : undefined),
+  mirror: "flag",
+  primary: "flag",
+};
+
+export const HOP_FIELDS: Fields<Omit<Hop, "to">> = { catch: "point", release: "point" };
+
+type Table = Readonly<Record<string, "flag" | "point" | "points" | Reader<unknown>>>;
+
+/** The fields a table keeps from a stored record, in the table's order, each only when it is stored. */
+export function readFields<T>(table: Fields<T>, stored: object): Partial<T> {
+  const v = stored as Readonly<Record<string, unknown>>;
+  const out: Partial<Record<keyof T, unknown>> = {};
+  for (const [key, rule] of Object.entries(table as Table)) {
+    const raw = v[key];
+    const x = rule === "flag" ? (raw === true ? true : undefined)
+      : rule === "point" ? toPair(raw) ?? undefined
+      : rule === "points" ? (Array.isArray(raw) ? raw.slice(0, MAX_ROUTE_POINTS).map(toPair).filter((q): q is Pair => q !== null) : undefined)
+      : rule(v);
+    if (x !== undefined) out[key as keyof T] = x;
+  }
+  return out as Partial<T>;
+}
+
+/** A route's stored fields, for a type already known to be one. */
+export function readRoute<T extends string>(stored: object, type: T): Omit<Route, "type"> & { type: T } {
+  return { type, ...readFields(ROUTE_FIELDS, stored) };
 }
 
 /**
- * The route mirrored left/right about x, keeping everything but its geometry: the
- * primary read, a man target, the mirror flag. Custom waypoints that would land off
- * the field are pulled back to its edge, and `clamped` says whether any were.
+ * The route as storage reads it back. Storage reads `mirror: false` and `primary: false` as nothing,
+ * so a play stored with either would not read back byte for byte, and the strict reader behind
+ * Create link and the file import called it repaired (#113): a preset mirrored back, or a read
+ * unmarked, could not be shared until the route was toggled off and on.
  */
-export function mirrorRoute(route: Route, x: number): { route: Route; clamped: boolean } {
-  if (route.type !== "custom") return { route: trimFlags({ ...route, mirror: !route.mirror }), clamped: false };
+export const asStored = (route: Route): Route => readRoute(route, route.type);
+
+/**
+ * The record mirrored left/right about x: every point its table names turned, and every other field
+ * kept. A point that would land off the field is pulled back to its edge, and `clamped` says whether
+ * any was.
+ */
+export function reflect<T extends object>(table: Table, rec: T, x: number): { value: T; clamped: boolean } {
   let clamped = false;
-  const pts = (route.pts ?? []).map((q): Pair => {
+  const turn = (q: Pair): Pair => {
     const raw: Pair = [2 * x - q[0], q[1]];
     const c = clampPoint(raw);
     if (c[0] !== raw[0]) clamped = true;
     return c;
-  });
-  return { route: { ...route, pts }, clamped };
+  };
+  const value = { ...rec } as Record<string, unknown>;
+  for (const [key, rule] of Object.entries(table)) {
+    const q = value[key];
+    if (rule === "point" && q) value[key] = turn(q as Pair);
+    if (rule === "points" && q) value[key] = (q as readonly Pair[]).map(turn);
+  }
+  return { value: value as T, clamped };
+}
+
+/**
+ * The route mirrored left/right about x, keeping everything but its geometry: the primary read, a
+ * man target, the mirror flag. Custom waypoints that would land off the field are pulled back to
+ * its edge, and `clamped` says whether any were.
+ */
+export function mirrorRoute(route: Route, x: number): { route: Route; clamped: boolean } {
+  if (route.type !== "custom") return { route: asStored({ ...route, mirror: !route.mirror }), clamped: false };
+  const { value, clamped } = reflect(ROUTE_FIELDS, route, x);
+  return { route: value, clamped };
 }
 
 /**
@@ -275,9 +346,11 @@ export function keepRead(prev: Route | null | undefined, next: Route): Route {
  * is never read off the spot (a quarterback at x = 15 would never flip), so it turns its mirror (Q11).
  */
 export function flipRoute(route: Route): Route {
-  if (route.type === "rollout") return trimFlags({ ...route, mirror: !route.mirror });
-  return route.pts ? { ...route, pts: route.pts.map((q) => clampPoint([FIELD_W - q[0], q[1]])) } : route;
+  if (route.type === "rollout") return asStored({ ...route, mirror: !route.mirror });
+  return reflect(ROUTE_FIELDS, route, FIELD_W / 2).value;
 }
+
+export const flipHop = (hop: Hop): Hop => reflect(HOP_FIELDS, hop, FIELD_W / 2).value;
 const FIELD_W = 30;
 
 /**

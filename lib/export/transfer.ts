@@ -1,4 +1,4 @@
-import { normalizeSavedPlay } from "@/lib/play/storage";
+import { canonical, normalizeSavedPlay } from "@/lib/play/storage";
 import type { Playbook, SavedPlay } from "@/lib/play/types";
 import { FILE_KIND, MAX_FILE_BYTES, planImport, readPlaybookFile, type ImportError, type PlaybookFile } from "./playbook-file";
 
@@ -6,24 +6,6 @@ export interface PlayFile { kind: "ffpd.play"; version: 1; play: SavedPlay }
 export type Transfer = PlayFile | PlaybookFile;
 export type TransferRead = { ok: true; file: Transfer; skipped: number; normalized: boolean } | { ok: false; error: ImportError };
 export const encodePlayFile = (play: SavedPlay): string => JSON.stringify({ kind: "ffpd.play", version: 1, play }, null, 2);
-
-/**
- * Flags the app stores only when they are on. A file from an older build could carry one as `false`
- * (a preset mirrored back, a read unmarked); storage reads that as nothing, and so does the
- * comparison behind "repaired", so such a file is not sent back for repair (#113). A team's no-run
- * zones are stored the other way round, only when off, and stay a real difference.
- */
-const OFF_IS_ABSENT = new Set(["mirror", "primary", "artShadow"]);
-
-// Compare JSON values irrespective of object key order, without walking hostile deep input.
-export function canonical(value: unknown): string {
-  return JSON.stringify(value, (_key, v: unknown) => {
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      return Object.fromEntries(Object.entries(v).filter(([k, x]) => !(x === false && OFF_IS_ABSENT.has(k))).sort(([a], [b]) => a.localeCompare(b)));
-    }
-    return v;
-  });
-}
 
 export function readTransfer(json: string): TransferRead {
   if (new TextEncoder().encode(json).byteLength > MAX_FILE_BYTES) return { ok: false, error: "tooLarge" };

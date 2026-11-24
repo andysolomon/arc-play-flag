@@ -1,14 +1,15 @@
 import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
 import { deepSplit, splitDeep, type DeepSplit } from "./deep";
-import { LOS_YARD, readLos } from "./field";
+import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import {
   canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
 } from "./lateral";
 import {
-  MAX_ROUTE_POINTS, clampPoint, defaults, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef, trimFlags,
+  MAX_ROUTE_POINTS, asStored, clampPoint, defaults, flipHop, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef,
 } from "./routes";
+import { samePlay } from "./storage";
 import { spaced } from "./spacing";
 import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
@@ -123,13 +124,11 @@ export function selected(s: PlayState): Player | null {
  * from the 5 and drawn from the 40 is as saved as it was.
  */
 export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
-  if (saved) {
-    return s.name !== saved.name || s.notes !== saved.notes || s.side !== saved.side || s.artShadow !== (saved.artShadow === true)
-      || JSON.stringify(s.players) !== JSON.stringify(saved.players);
-  }
-  // a restored draft or an opened share link has no history yet, so its players are compared as well
-  return s.past.length > 0 || s.notes !== "" || s.side !== "offense" || s.artShadow
-    || (s.name !== "New play" && s.name !== "") || JSON.stringify(s.players) !== JSON.stringify(defaults());
+  if (saved) return !samePlay({ ...s, los: losOf(saved) }, saved);
+  // a restored draft or an opened share link has no history yet, so its players are compared as well;
+  // a blank name is the new play's
+  const blank = initialState();
+  return s.past.length > 0 || !samePlay({ ...s, name: s.name || blank.name, los: blank.los }, blank);
 }
 
 /** Whether a player is drawn under the current Show filter. */
@@ -473,9 +472,9 @@ function reduce(s: PlayState, a: Action): PlayState {
         players: c.players.map((p) => {
           if (!p.route) return p;
           // a read taken off a player leaves no `primary: false` behind, so the play stores as it reads (#113)
-          if (p.id === sel.id) return { ...p, route: trimFlags({ ...p.route, primary: on }) };
+          if (p.id === sel.id) return { ...p, route: asStored({ ...p.route, primary: on }) };
           if (!p.route.primary) return p;
-          return { ...p, route: trimFlags({ ...p.route, primary: false }) };
+          return { ...p, route: asStored({ ...p.route, primary: false }) };
         }),
       };
     }
@@ -583,12 +582,7 @@ function reduce(s: PlayState, a: Action): PlayState {
 export function flipped(players: readonly Player[]): Player[] {
   return players.map((p) => ({ ...p, x: 30 - p.x, route: p.route ? flipRoute(p.route) : null,
     ...(p.preSnap ? { preSnap: { pts: p.preSnap.pts.map(q => [30 - q[0], q[1]] as const) } } : {}),
-    // every lateral's catch, and the run before a pitch, flip with the field (R13, P7)
-    ...(p.laterals ? { laterals: p.laterals.map((h): Hop => ({
-      ...h,
-      ...(h.catch ? { catch: [30 - h.catch[0], h.catch[1]] as const } : {}),
-      ...(h.release ? { release: [30 - h.release[0], h.release[1]] as const } : {}),
-    })) } : {}) }));
+    ...(p.laterals ? { laterals: p.laterals.map(flipHop) } : {}) }));
 }
 
 /** Route definition for the selected player's current route, if any. */
