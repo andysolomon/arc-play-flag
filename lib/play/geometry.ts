@@ -1,7 +1,8 @@
 import { BLITZ_STOP, blitzAim, blitzTarget, containPath } from "./blitz";
 import { callOf, isRunCall } from "./call";
 import { END_ZONE_YARDS, GOAL_YARD, LOS_YARD, MIDFIELD_YARD, NO_RUN_YARDS, ROSTER_LOS, losLabel, toGo } from "./field";
-import { chainLinks, quarterback, runsBefore, startOf } from "./lateral";
+import { chainLinks, runsBefore, startOf } from "./lateral";
+import { quarterback } from "./roles";
 import { atSnap, motionPoints } from "./pre-snap";
 import {
   DEF, DELAY, INK, PITCH_SET, ROUTES, SPEED, Y_MIN, bootLegs, inkFor, isQbAction, isRun, jetLegs, rolloutLegs, routeDef, runLegs,
@@ -320,8 +321,6 @@ export function sidelineCut(p: Player): SidelineCut | null {
   }
   return cut;
 }
-
-export { quarterback };
 
 export interface RouteGeom {
   color: string;

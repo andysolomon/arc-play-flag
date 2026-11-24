@@ -14,7 +14,8 @@ import { blitzAim, blitzTarget, containEdge, edgePath, nearestBack } from "@/lib
 import { deepSplit, type DeepSplit } from "@/lib/play/deep";
 import { NO_RUN_FLAG, runInNoRunZone } from "@/lib/play/call";
 import { ROSTER_LOS, inNoRunZone, withLos } from "@/lib/play/field";
-import { qbAction, quarterback, sidelineCut } from "@/lib/play/geometry";
+import { qbAction, sidelineCut } from "@/lib/play/geometry";
+import { quarterback } from "@/lib/play/roles";
 import { canJet, chainLinks, chainOf, runsBefore } from "@/lib/play/lateral";
 import { activeLineup, formationOf, rosterPositions, showsNames, withSlots, withSpot } from "@/lib/play/lineup";
 import { offFieldId, starters } from "@/lib/play/roster";

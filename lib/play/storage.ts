@@ -1,6 +1,7 @@
 import { losOf, readLos, withLos } from "./field";
 import type { Doc } from "./history";
-import { MAX_LATERALS, chainLinks, quarterback, settleChain } from "./lateral";
+import { MAX_LATERALS, chainLinks, settleChain } from "./lateral";
+import { quarterback } from "./roles";
 import { motionPoint } from "./pre-snap";
 import { MAIN_LINEUP, MAIN_NAME, MAX_LINEUPS, MAX_LINEUP_NAME, MAX_TEAM, SECOND_LINEUP, defaultLineups, placedSpot, withNames } from "./lineup";
 import { MAX_DEPTH, MAX_NAME, MAX_SLOTS, cleanName as rosterName, sameName } from "./roster";
@@ -168,6 +169,7 @@ function fromPitch(players: Player[], pitches: readonly Pitch[]): Player[] {
   const offense = players.filter((p) => p.team === "offense");
   const byLine = (a: Player, b: Player): number => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const runs = (p: Player): boolean => pitched.has(p.id) || (p.route !== null && isRun(p.route.type));
+  // eslint-disable-next-line no-restricted-syntax -- reads a stored Pitch as its words did before laterals: by tag
   const receivers = offense.filter((p) => p.route && !isRun(p.route.type) && !isBallJob(p.route.type) && p.label !== "QB" && !pitched.has(p.id));
   // the read, as the play's words found it: the first offensive player marked, a pitch included
   const read = offense.find((p) => pitched.get(p.id)?.primary === true || p.route?.primary === true);

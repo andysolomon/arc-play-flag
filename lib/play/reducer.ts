@@ -4,8 +4,9 @@ import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
 import { emptyHistory, push, redo as redoStep, undo as undoStep, type Doc, type History, type HistoryStep } from "./history";
 import {
-  canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, quarterback, runsBefore, settleChain, visits,
+  canJet, carriers, chainLinks, chainOf, clampCatch, clampRelease, defaultRelease, runsBefore, settleChain, visits,
 } from "./lateral";
+import { quarterback } from "./roles";
 import {
   MAX_ROUTE_POINTS, asStored, clampPoint, defaults, flipHop, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef,
 } from "./routes";
