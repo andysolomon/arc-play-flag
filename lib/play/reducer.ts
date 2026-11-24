@@ -1,4 +1,5 @@
 import { aimedBlitz, blitzAim, blitzAt } from "./blitz";
+import { clampPoint } from "./bounds";
 import { deepSplit, splitDeep, type DeepSplit } from "./deep";
 import { LOS_YARD, losOf, readLos } from "./field";
 import { atSnap, motionPoint, withoutMotion } from "./pre-snap";
@@ -8,7 +9,7 @@ import {
 } from "./lateral";
 import { quarterback } from "./roles";
 import {
-  MAX_ROUTE_POINTS, asStored, clampPoint, defaults, flipHop, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef,
+  MAX_ROUTE_POINTS, asStored, defaults, flipHop, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef,
 } from "./routes";
 import { samePlay } from "./storage";
 import { spaced } from "./spacing";

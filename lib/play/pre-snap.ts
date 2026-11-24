@@ -1,11 +1,9 @@
-import { MAX_ROUTE_POINTS, X_MAX, X_MIN } from "./routes";
+import { clampX, sideY } from "./bounds";
+import { MAX_ROUTE_POINTS } from "./routes";
 import type { Pair, Player } from "./types";
 
 /** Motion stays in the backfield, inside the same bounds as offensive tokens. */
-export const motionPoint = (p: Pair): Pair => [
-  Math.max(X_MIN, Math.min(X_MAX, p[0])),
-  Math.max(0.9, Math.min(7.4, p[1])),
-];
+export const motionPoint = (p: Pair): Pair => [clampX(p[0]), sideY("offense", p[1])];
 
 export function motionPoints(p: Player): Pair[] {
   return p.team === "offense" ? (p.preSnap?.pts ?? []).slice(0, MAX_ROUTE_POINTS).map(motionPoint) : [];

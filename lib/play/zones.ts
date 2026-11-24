@@ -41,6 +41,7 @@ export function zoneLayout(players: readonly Player[], top: number): ZoneMap {
     // never shallower than 12 yards, and only pulled in by the card as a fallback
     const deepest = deep.reduce((m, p) => Math.min(m, p.y), 0);
     const cy = cl(Math.min(-12, deepest - 4), top + ry + 0.6, -8);
+    // eslint-disable-next-line no-restricted-syntax -- the widest a deep zone bubble draws, not a field bound
     const bubble = (lo: number, hi: number): ZoneBubble => ({ cx: (lo + hi) / 2, cy, rx: Math.min((hi - lo) / 2 - 0.35, 7.4), ry });
     const taken: Span[] = [];
     for (const n of [2, 3] as const) {
@@ -73,6 +74,7 @@ export function zoneLayout(players: readonly Player[], top: number): ZoneMap {
       const toward = p.x < 15 ? -1 : 1;
       map[p.id] = {
         cx: cl(p.x + toward * 2.6, 0.4 + rx, 29.6 - rx),
+        // eslint-disable-next-line no-restricted-syntax -- a flat zone's shallowest centre, not a field bound
         cy: cl(p.y - 3.4, lo, -1.2 - ry * 0.2), rx, ry,
       };
     }
