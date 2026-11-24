@@ -1,6 +1,6 @@
 import { centre, quarterback } from "./roles";
 import { atSnap } from "./pre-snap";
-import { X_MAX, X_MIN } from "./routes";
+import { clampX } from "./bounds";
 import type { Pair, Player, Route } from "./types";
 
 /**
@@ -155,7 +155,7 @@ export function containEdge(rusher: Pick<Player, "x">, players: readonly Player[
 /** How that edge is contained (C1, C3, C5, C6), or null when the sideline leaves no edge outside the quarterback there (C4). */
 export function edgePath(edge: Edge, players: readonly Player[]): ContainPath | null {
   const qb = passer(players);
-  const lx = Math.max(X_MIN, Math.min(X_MAX, qb.x + edge * CONTAIN_WIDTH));
+  const lx = clampX(qb.x + edge * CONTAIN_WIDTH);
   const ly = qb.y - Math.max(0, Math.min(CONTAIN_LEAD, qb.y - CONTAIN_LINE));
   const dx = lx - qb.x, dy = ly - qb.y, L = Math.hypot(dx, dy);
   if (L - BLITZ_STOP < CONTAIN_TURN) return null;

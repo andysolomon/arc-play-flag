@@ -1,7 +1,8 @@
 import { fakeOf, routeYards } from "./geometry";
 import { chainLinks, runsBefore, type Link } from "./lateral";
 import { centre, quarterback } from "./roles";
-import { DELAY, LOS_GAP, SPEED, isBallJob, isQbAction, isRun } from "./routes";
+import { EDGE_MARGIN, LOS_GAP } from "./bounds";
+import { DELAY, SPEED, isBallJob, isQbAction, isRun } from "./routes";
 import { atSnap, motionPoints } from "./pre-snap";
 import type { Pair, Player, Pt } from "./types";
 import { zoneLayout } from "./zones";
@@ -561,7 +562,7 @@ export function positionsAt(m: Motion, players: readonly Player[], t: number): R
       const closing = tr.len > 0 ? cl((s * SPEED) / tr.len, 0, 1) : 1;
       // trailing a deep route, they stop where a drag would, short of the card's top (the end line near their goal)
       pos[p.id] = { x: here.x + (now.x - target.x) * closing,
-        y: Math.min(manLimit, Math.max(m.top + 1.2, here.y + (now.y - target.y) * closing)) };
+        y: Math.min(manLimit, Math.max(m.top + EDGE_MARGIN, here.y + (now.y - target.y) * closing)) };
     } else {
       pos[p.id] = here;
     }
