@@ -1,6 +1,8 @@
+import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { HISTORY_CAP } from "../../lib/play/history";
 import { Designer } from "../support/designer";
-import { SLANT_LEFT, WHEEL_RIGHT, seed, storedPlays } from "../support/fixtures";
+import { SLANT_LEFT, WHEEL_RIGHT, seed, storedDraft, storedPlays } from "../support/fixtures";
 
 test("editing A, saving, opening B, and checking storage leaves B alone and keeps A's diagram under A's id", async ({ page }) => {
   await seed(page, { plays: [SLANT_LEFT, WHEEL_RIGHT] });
@@ -83,4 +85,54 @@ test("Duplicate saves a copy, and later edits go to the copy, not the original",
   await page.goto("/playbooks");
   await expect(page.getByText("Otter Slant Left", { exact: true })).toBeVisible();
   await expect(page.getByText("Otter Slant Left v2", { exact: true })).toBeVisible();
+});
+
+test("a player's tag takes three capital letters, and the whole retag is one step of undo", async ({ page }, info) => {
+  const d = new Designer(page);
+  await d.goto();
+  await d.select("X");
+  const tag = page.locator("#route-sidebar").getByRole("textbox", { name: "Player tag" });
+  await expect(tag).toHaveValue("X");
+  await tag.fill("");
+  await tag.pressSequentially("cbxy");
+  await expect(tag).toHaveValue("CBX");
+  await expect(d.player("CBX")).toBeVisible();
+  await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o3")?.label).toBe("CBX");
+
+  // clearing the tag and typing four letters was one edit: one Undo puts X back, and there is nothing older
+  await d.foldOverlays();
+  await d.undo.click();
+  await expect(d.player("X")).toBeVisible();
+  await expect(d.undo).toBeDisabled();
+  await expect.poll(async () => (await storedDraft(page))?.players.find((p) => p.id === "o3")?.label).toBe("X");
+  await d.redo.click();
+  await expect(d.player("CBX")).toBeVisible();
+  writeFileSync(`test-results/history-${info.project.name}-tag.json`, `${JSON.stringify({ typed: "cbxy", shown: "CBX", undoSteps: 1 }, null, 2)}\n`);
+});
+
+test("undo keeps the last 60 edits and drops older ones", async ({ page }, info) => {
+  test.setTimeout(120_000);
+  const d = new Designer(page);
+  await d.goto();
+  const x = d.player("X");
+  const storedY = async (): Promise<number | undefined> => (await storedDraft(page))?.players.find((p) => p.id === "o3")?.y;
+  // 65 arrow steps, each its own edit: X steps back from the 1 to the 6, then up and back again 60 times
+  for (let i = 0; i < 5; i++) await x.press("ArrowDown");
+  for (let i = 0; i < HISTORY_CAP; i++) await x.press(i % 2 ? "ArrowDown" : "ArrowUp");
+  await expect.poll(storedY).toBe(6);
+
+  // 59 undos reach the board after the 6th step, a yard up; the 60th reaches the 5th step's and goes no further
+  await d.foldOverlays();
+  for (let i = 1; i < HISTORY_CAP; i++) await d.undo.click();
+  await expect.poll(storedY).toBe(5);
+  await d.undo.click();
+  await expect.poll(storedY).toBe(6);
+  await expect(d.undo).toBeDisabled();
+  const after60 = await storedY();
+
+  // and every one of them comes back
+  for (let i = 0; i < HISTORY_CAP; i++) await d.redo.click();
+  await expect(d.redo).toBeDisabled();
+  await expect.poll(storedY).toBe(6);
+  writeFileSync(`test-results/history-${info.project.name}-cap.json`, `${JSON.stringify({ edits: HISTORY_CAP + 5, cap: HISTORY_CAP, yAfter59Undos: 5, yAfter60Undos: after60 }, null, 2)}\n`);
 });

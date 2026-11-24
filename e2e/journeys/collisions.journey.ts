@@ -16,7 +16,8 @@ import { OTTERS, moved, play, seed, storedDraft, storedLineups, storedPlays } fr
  * with the edge of the field first, nowhere, and says which; a key held down walks the player up beside a
  * teammate and stops, shaking, until a fresh press steps past. The other side is never
  * in the way: the line of scrimmage keeps them apart already, so a defender steps to the line opposite the C.
- * A blitzer backed off to the blitz line onto a teammate standing there takes the nearest clear spot on it.
+ * A blitzer lined up closer than 7 yards backs off to the blitz line, and one lined up deeper stays where he
+ * stands; backed off onto a teammate standing there, he takes the nearest clear spot on it.
  * Roster mode's positions keep the same spacing, on the roster. A play stored with two players on top of
  * each other opens as stored, and either can still be stepped off. Dragged along a tight line onto the C,
  * a player stays in the notch it was drawn in; dragged back onto a teammate from beside them it stays put
@@ -237,6 +238,32 @@ test("the other side is never in the way, and a blitzer backed off onto a teamma
   await d.undo.click();
   await expectAt(d, "R", "Defense", 18, -4);
   await note("Undo: R back without the blitz");
+  await done();
+});
+
+test("a blitz backs a defender lined up closer than 7 yards off to the blitz line, and leaves a deeper one where he stands", async ({ page }, info) => {
+  await seed(page, { team: OTTERS });
+  const d = new Designer(page);
+  await d.goto();
+  await d.newPlay("Defense");
+  const { note, done } = journal(d, info.project.name, "blitz-depth");
+  const stored = async (id: string) => (await storedDraft(page))?.players.find((p) => p.id === id);
+
+  // the LB lines up 4 yards off; his blitz starts from the blitz line, 7 yards off, straight back
+  await expectAt(d, "LB", "Defense", 11, -4);
+  await d.select("LB", "Defense");
+  await d.pick("Blitz");
+  await expectAt(d, "LB", "Defense", 11, -7);
+  await expect.poll(() => stored("d2")).toMatchObject({ x: 11, y: -7, route: { type: "blitz" } });
+  await note("LB blitzes from 7 yards off");
+
+  // the S lines up 11 yards off, already behind the blitz line, so his blitz starts where he stands
+  await d.select("S", "Defense");
+  await d.pick("Blitz");
+  await expect.poll(() => stored("d5")).toMatchObject({ route: { type: "blitz" } });
+  await expectAt(d, "S", "Defense", 15, -11);
+  expect(await stored("d5")).toMatchObject({ x: 15, y: -11 });
+  await note("S blitzes from 11 yards off");
   await done();
 });
 

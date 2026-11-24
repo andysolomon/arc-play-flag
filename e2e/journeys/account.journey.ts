@@ -24,6 +24,8 @@ import { KEYS, OTTERS, SLANT_LEFT, WHEEL_RIGHT, playbook, seed, storedCurrentBoo
  *  - the sketch on the board, the picked playbook or the look (theme, end zone, Deep field) stays
  *    behind on the first device, or a touch on the second device's board never reaches a device
  *    left open on the first, or signing out leaves the look behind (ADR 014, A19–A21, A28)      → "where they left off"
+ *  - a board pulled from the other device keeps this device's undo, so Undo writes the board left
+ *    behind onto the pulled one (#177)                                                           → "where they left off"
  * Leaves `account-<device>-<test>.json` (each step: what the panel said, what the device held, what
  * the account held) and pictures of the panel, the sign-in page and both boards in test-results/, uploaded in the `journeys` artifact.
  */
@@ -432,6 +434,8 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   expect(left.data.currentBook).toBe("fx-scout");
   expect(left.prefs).toMatchObject({ theme: "dark", endZone: "synthwave", deepField: true, los: 30 });
   expect(left.data.draft?.los).toBe(30);
+  // X's Post is a step this device can undo, until another device's board comes down over it
+  await expect(d.undo).toBeEnabled();
   await page.screenshot({ path: `test-results/account-${testInfo.project.name}-left-off-first.png` });
   await read(page, "first device: a sketch on the board from the 10, Otter Scout picked, dark, Synthwave, Deep field", left);
 
@@ -467,6 +471,9 @@ test("a coach picks up exactly where they left off on another device", async ({ 
   await expect(d.nameInput).toHaveValue("Otter Sketch, Two", { timeout: 15_000 });
   await expectSaved(page);
   expect((await storedDraft(page))?.name).toBe("Otter Sketch, Two");
+  // the pulled board starts its own history: Undo can't put this device's last board under it
+  await expect(d.undo).toBeDisabled();
+  expect((await storedDraft(page))?.players.find((p) => p.id === "o3")?.route?.type).toBe("post");
   await read(page, "first device, focused, no reload: the second device's touch is on its board", await teamRecord(page.context(), teamId));
 
   // signing out clears the board and the look (A28); the next coach on the device starts from the defaults
