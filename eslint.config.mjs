@@ -20,6 +20,11 @@ const ROLES = [
   },
 ];
 
+const SCREEN = {
+  selector: "JSXAttribute[name.name='data-export']",
+  message: "data-export has had no consumer since 239aca5; wrap screen-only UI in <ScreenOnly> so print hides it too",
+};
+
 const FIELD_FILES = ["lib/play/**/*.{ts,tsx}", "lib/render/**/*.{ts,tsx}"];
 /** A retyped field bound: a sideline, the backfield, the deepest spot, the line-of-scrimmage gap, or the old -36 deep bound. */
 const BOUNDS = {
@@ -44,13 +49,13 @@ const eslintConfig = defineConfig([
   {
     files: ["lib/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
     ignores: ["lib/play/roles.ts", TESTS],
-    rules: { "no-restricted-syntax": ["error", ...ROLES] },
+    rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN] },
   },
-  // a later block's options replace an earlier one's, so this one repeats ROLES for its files
+  // a later block's options replace an earlier one's, so this one repeats ROLES and SCREEN for its files
   {
     files: FIELD_FILES,
     ignores: ["lib/play/bounds.ts", "lib/play/roles.ts", TESTS],
-    rules: { "no-restricted-syntax": ["error", ...ROLES, BOUNDS] },
+    rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN, BOUNDS] },
   },
   { files: ["lib/play/roles.ts"], rules: { "no-restricted-syntax": ["error", BOUNDS] } },
   { files: ["**/*.mjs", "**/*.js"], extends: [tseslint.configs.disableTypeChecked] },

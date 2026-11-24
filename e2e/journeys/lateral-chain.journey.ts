@@ -49,7 +49,7 @@ async function playback(d: Designer): Promise<{ t: number; x: number; y: number 
   await d.page.clock.pauseAt(new Date());
   await d.page.getByRole("button", { name: "Run the play" }).click();
   // the playback football (the arcs' footballs stay put), read back in yards from its transform
-  const ball = d.field.locator("image[data-export='skip']");
+  const ball = d.field.locator("image[data-ball]");
   const samples: { t: number; x: number; y: number }[] = [];
   for (let t = 0; t <= 8000; t += 50) {
     if ((await ball.count()) === 0) break;
@@ -313,6 +313,35 @@ test("a catch never goes forward or past the line, and follows its release when 
   steps.push({ link: "opened on a cleared device", catches: moved });
 
   writeFileSync(`${out(info, "clamp")}.json`, `${JSON.stringify({ project: info.project.name, steps }, null, 2)}\n`);
+});
+
+test("printing mid-edit gives the play without its handles: no waypoint, catch or release handle reaches paper", async ({ page }, info) => {
+  const d = new Designer(page);
+  const custom: SavedPlay = { ...TRICK, id: "fx-print", name: "Otter Print Lateral", players: TRICK.players.map((p) => (p.id === "o4" ? { ...p, route: { type: "custom", primary: true, pts: [[25, -4], [20, -10]] } } : p)) };
+  await seed(page, { plays: [custom] });
+  await d.openSaved(custom.name);
+  await d.select("Y");
+  const waypoints = d.field.getByRole("button", { name: /^Waypoint/, includeHidden: true });
+  const handles = d.field.locator("[data-catch], [data-release]");
+  await expect(waypoints).toHaveCount(2);
+  await expect(handle(d, 0)).toBeVisible();
+  await expect(waypoints.first()).toBeVisible();
+
+  await page.emulateMedia({ media: "print" });
+  // still on the page, so it is print that hides them, and the play itself still prints
+  await expect(waypoints).toHaveCount(2);
+  await expect(handle(d, 0)).toHaveCount(1);
+  const seen = { waypoints: await waypoints.count(), handles: await handles.count() };
+  for (const w of await waypoints.all()) await expect(w).toBeHidden();
+  for (const h of await handles.all()) await expect(h).toBeHidden();
+  await expect(d.field).toBeVisible();
+  await expect(d.field.locator("[data-lateral]").first()).toBeVisible();
+  await expect(d.routes.first()).toBeVisible();
+  await page.screenshot({ path: `${out(info, "print")}.png` });
+
+  await page.emulateMedia({ media: "screen" });
+  await expect(handle(d, 0)).toBeVisible();
+  writeFileSync(`${out(info, "print")}.json`, `${JSON.stringify({ project: info.project.name, ...seen, printedHandles: 0 }, null, 2)}\n`);
 });
 
 test("▶ tosses the ball back to each catch in turn, then throws it forward to the read", async ({ page }, info) => {

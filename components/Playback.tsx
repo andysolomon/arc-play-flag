@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { ScreenOnly } from "./ScreenOnly";
 
 interface ButtonProps {
   playing: boolean;
@@ -47,13 +48,15 @@ interface BallProps {
 function FootballImpl({ x, y, lift }: BallProps) {
   const k = 1 + lift * 0.6;
   return (
-    <image
-      href="/icons/football.png"
-      x={-16} y={-16} width={32} height={32}
-      transform={`translate(${x.toFixed(1)},${(y - lift * 16).toFixed(1)}) scale(${k.toFixed(2)})`}
-      className="pointer-events-none"
-      data-export="skip"
-    />
+    <ScreenOnly>
+      <image
+        href="/icons/football.png"
+        x={-16} y={-16} width={32} height={32}
+        transform={`translate(${x.toFixed(1)},${(y - lift * 16).toFixed(1)}) scale(${k.toFixed(2)})`}
+        className="pointer-events-none"
+        data-ball
+      />
+    </ScreenOnly>
   );
 }
 

@@ -4,6 +4,7 @@ import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent } from "
 import { VW, teamFill } from "@/lib/play/geometry";
 import type { Player } from "@/lib/play/types";
 import { FIELD, teamPaint } from "./fieldPaint";
+import { ScreenOnly } from "./ScreenOnly";
 
 interface Props {
   player: Player;
@@ -90,7 +91,9 @@ function PlayerTokenImpl({
           <circle r={snug ? DISC_R : TAP_R} fill="transparent" stroke="none" />
           {/* keyboard focus shows the same yellow ring as selection. Neither ring takes a tap, invisible or not: the
               tap circle above decides, and a ring reaches a QB-under-centre's C's label (lib/play/spacing.ts, U2) */}
-          <circle r={33} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={5} pointerEvents="none" className="opacity-0 group-focus-visible:opacity-100" data-export="skip" />
+          <ScreenOnly>
+            <circle r={33} fill="none" stroke="#f2b705" style={{ stroke: FIELD.ring }} strokeWidth={5} pointerEvents="none" className="opacity-0 group-focus-visible:opacity-100" />
+          </ScreenOnly>
           {ringR > 0 && (
             <circle
               r={ringR}
@@ -121,25 +124,26 @@ function PlayerTokenImpl({
       </g>
       {/* the name rides outside the selection scale, on a turf-coloured halo so it reads over a line; never in a picture or on paper */}
       {caption && (
-        <text
-          data-caption
-          x={captionX(x, caption.text)}
-          y={caption.above ? -CAPTION_GAP : CAPTION_GAP}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontFamily="var(--font-hand)"
-          fontSize={CAPTION_SIZE}
-          fill="#1b1a17"
-          stroke="#c1f0c1"
-          strokeWidth={5}
-          strokeLinejoin="round"
-          paintOrder="stroke"
-          style={{ fill: FIELD.line, stroke: FIELD.turf }}
-          className={`pointer-events-none select-none print:hidden ${caption.muted ? "opacity-55" : ""}`}
-          data-export="skip"
-        >
-          {caption.text}
-        </text>
+        <ScreenOnly>
+          <text
+            data-caption
+            x={captionX(x, caption.text)}
+            y={caption.above ? -CAPTION_GAP : CAPTION_GAP}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="var(--font-hand)"
+            fontSize={CAPTION_SIZE}
+            fill="#1b1a17"
+            stroke="#c1f0c1"
+            strokeWidth={5}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+            style={{ fill: FIELD.line, stroke: FIELD.turf }}
+            className={`pointer-events-none select-none ${caption.muted ? "opacity-55" : ""}`}
+          >
+            {caption.text}
+          </text>
+        </ScreenOnly>
       )}
     </g>
   );
