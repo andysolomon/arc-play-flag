@@ -12,7 +12,7 @@ import { SLANT_LEFT, storedPlays } from "../support/fixtures";
  *
  * Leaves `header-save-<device>-{save,refused,roster,never-saved,keys}.json` (each step: the field's status, the dot, the
  * key's title, whether Play tools was open and what was stored) and pictures of the header before and
- * after a save and of a refused save's warning in `test-results/`, uploaded as `header-save`.
+ * after a save and of a refused save's warning in `test-results/`, uploaded in the `journeys` artifact.
  */
 
 const out = (device: string, name: string): string => `test-results/header-save-${device}-${name}`;
