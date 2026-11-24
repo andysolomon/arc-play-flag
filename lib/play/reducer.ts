@@ -11,7 +11,7 @@ import {
 } from "./routes";
 import { samePlay } from "./storage";
 import { spaced } from "./spacing";
-import type { Draft, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
+import type { Draft, Exhaustive, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
 /** What a tap on a red player is waiting to answer: who a man defender covers, who a blitz comes for, or who takes a lateral. */
 export type Targeting = "man" | "blitz" | "lateral";
@@ -147,18 +147,15 @@ function visFor(side: Team, prev: Pick<PlayState, "side" | "vis">): Vis {
   return side === "defense" ? "both" : "offense";
 }
 
-/**
- * What the board keeps when another play is opened: the ball's spot (lib/los.ts) and the coach's own
- * shadow choice, with the side it was made for. The rest of PlayState is the play's own.
- */
+/** What the board keeps when another play is opened (the ball's spot, lib/los.ts); the rest of PlayState is the play's own. */
 interface Board {
   los: number;
   shadow: Pick<PlayState, "side" | "vis">;
 }
 
 function board(s: PlayState): Board {
-  // a shadow the pictures' choice put on the field was never the coach's own preference
-  return { los: s.los, shadow: { side: s.side, vis: s.shadowForArt ? s.side : s.vis } };
+  const coachVis = s.shadowForArt ? s.side : s.vis;
+  return { los: s.los, shadow: { side: s.side, vis: coachVis } };
 }
 
 /**
@@ -195,7 +192,7 @@ function openPlay(b: Board, doc: Doc): PlayState {
   return {
     ...doc, los: b.los, artShadow, ...emptyHistory, ...cleared,
     shadowForArt: artShadow && vis !== "both", vis: artShadow ? "both" : vis,
-  };
+  } satisfies Exhaustive<PlayState>;
 }
 
 /** A step back or forward through the history; the ball stays where the board has it, since the spot is no edit. */
