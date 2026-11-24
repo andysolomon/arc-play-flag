@@ -87,7 +87,8 @@ async function posterSize(page: Page, url: string): Promise<{ width: number; hei
 }
 
 test("every chapter's card matches the manifest, and its clip and poster are the committed files at the promised length", async ({ page }, testInfo) => {
-  test.setTimeout(90_000);
+  // each chapter fetches and hashes three files and seeks its clip; the budget grows with the tour
+  test.setTimeout(20_000 + DEMOS.length * 10_000);
   const device = testInfo.project.name;
   await page.goto("/demo");
   await expect(page.getByRole("heading", { name: `Learn the whole play designer in ${String(DEMOS.length)} short clips.` })).toBeVisible();
@@ -133,8 +134,11 @@ test("every chapter's card matches the manifest, and its clip and poster are the
     if (device === "chromium") {
       await video.scrollIntoViewIfNeeded();
       await video.evaluate(async (element: HTMLVideoElement) => {
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
           element.addEventListener("seeked", () => { resolve(); }, { once: true });
+          setTimeout(() => {
+            reject(new Error(`${element.currentSrc} never finished seeking to ${String(element.duration / 2)}s: readyState ${String(element.readyState)}, networkState ${String(element.networkState)}, error ${String(element.error?.code ?? "none")}`));
+          }, 8_000);
           element.currentTime = element.duration / 2;
         });
         // until the sought frame is on screen, or a second passes where a browser never says
