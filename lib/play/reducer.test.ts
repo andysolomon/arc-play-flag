@@ -250,6 +250,21 @@ describe("reducer", () => {
     expect(reducer(s, { type: "undo" })).toBe(s);
     expect(reducer(s, { type: "redo" })).toBe(s);
   });
+  test("a draft pulled from another device replaces the board, so undo cannot put the play you left on it", () => {
+    const pulled = defaults().map((p) => (p.id === "o4" ? { ...p, route: { type: "post" as const } } : p));
+    const s = run(
+      { type: "load", id: "play-a", name: "Play A", players: defaults() },
+      { type: "setRoute", id: "o3", route: { type: "go" } },
+      { type: "select", id: "o5" },
+      { type: "pick", key: "custom" },
+      { type: "hydrate", id: "play-b", name: "Play B", players: pulled },
+    );
+    expect(s.id).toBe("play-b");
+    expect(selected(s)).toBeNull();
+    expect(s.draft).toBeNull();
+    expect(reducer(s, { type: "undo" })).toBe(s);
+    expect(reducer(s, { type: "draftFinish" })).toBe(s);
+  });
   test("edits made in B undo and redo inside B", () => {
     let s = run(
       { type: "load", id: "play-a", name: "Play A", notes: "", players: defaults() },
