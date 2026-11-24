@@ -1,4 +1,6 @@
+import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { MAX_ROUTE_POINTS } from "../../lib/play/routes";
 import { Designer } from "../support/designer";
 import { storedDraft } from "../support/fixtures";
 
@@ -135,4 +137,20 @@ test("a custom route keeps its primary read through Mirror and Flip, all the way
   const url = await page.evaluate(() => navigator.clipboard.readText());
   await page.goto(url);
   await expect(page.getByRole("img", { name: "Play diagram" }).locator("path[stroke='#c2261a']")).toHaveCount(1);
+});
+
+test("a custom route stops taking waypoints at 60", async ({ page }, info) => {
+  test.setTimeout(120_000);
+  const d = new Designer(page);
+  await d.goto();
+  await d.select("X");
+  await d.pick("Custom");
+  // 62 taps up the left half of the field, two yards apart, row by row
+  const taps: [number, number][] = Array.from({ length: MAX_ROUTE_POINTS + 2 }, (_, i) => [4 + (i % 10) * 2, -2 - Math.floor(i / 10) * 2]);
+  for (const [x, y] of taps) await d.tapField(x, y);
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await expect.poll(async () => (await routeOf(page))?.pts?.length).toBe(MAX_ROUTE_POINTS);
+  const route = await routeOf(page);
+  expect(route?.pts).toEqual(taps.slice(0, MAX_ROUTE_POINTS));
+  writeFileSync(`test-results/custom-route-${info.project.name}-cap.json`, `${JSON.stringify({ tapped: taps.length, kept: route?.pts?.length, pts: route?.pts }, null, 2)}\n`);
 });
