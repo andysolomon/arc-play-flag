@@ -40,6 +40,7 @@ import { CALL_LABEL, callOf } from "./call";
 import { COVERAGE_WORDS, coverageOf } from "./coverage";
 import { qbAction, type QbAction } from "./geometry";
 import { carriers, chainLinks, chainOf, runsBefore, visits } from "./lateral";
+import { centre, quarterback } from "./roles";
 import { isQbAction, isRun, routeName } from "./routes";
 import type { Player, SavedPlay, Team } from "./types";
 
@@ -283,15 +284,17 @@ export function assignments(play: SavedPlay): Assignment[] {
   const who = namer(play);
   const chain = chainOf(play.players);
   const pr = primaryOf(play);
+  const qb = quarterback(play.players);
+  const c = centre(play.players);
   return play.players.filter((p) => p.team === play.side).sort(byLine).map((p) => {
     const offense = p.team === "offense";
     const held = offense ? carrierJob(p, chain, play, who) : null;
     let job = held?.job ?? routeJob(p, play, who);
     const missing = held?.missing ?? false;
     let idle = false;
-    if (job === null && offense && p.label === "QB") job = qbJob(play, who);
+    if (job === null && p.id === qb?.id) job = qbJob(play, who);
     if (job === null) {
-      if (offense && p.label === "C") job = "Snap";
+      if (p.id === c?.id) job = "Snap";
       else {
         job = offense ? "No route" : "No assignment";
         idle = true;

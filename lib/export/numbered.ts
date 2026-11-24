@@ -1,3 +1,4 @@
+import { quarterback } from "@/lib/play/roles";
 import type { Player, Playbook, SavedPlay, Team, Vis } from "@/lib/play/types";
 
 /**
@@ -36,9 +37,14 @@ export interface Position {
   label: string;
 }
 
-/** A player who gets a wristband insert of their own: tagged, on the play's own side, and not the quarterback. */
-const banded = (play: SavedPlay, p: Player): boolean =>
-  p.team === play.side && !!p.label && !(p.team === "offense" && p.label === "QB");
+/**
+ * A player who gets a wristband insert of their own: tagged, on the play's own side, and not holding
+ * the quarterback's tag. A position is a tag, so a second player tagged as the quarterback is too.
+ */
+const banded = (play: SavedPlay, p: Player): boolean => {
+  const qb = quarterback(play.players);
+  return p.team === play.side && !!p.label && !(qb && p.team === qb.team && p.label === qb.label);
+};
 
 /**
  * The positions across a set of plays, in order of first appearance. Each play gives the
