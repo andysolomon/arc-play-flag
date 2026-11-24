@@ -549,7 +549,7 @@ function reduce(s: PlayState, a: Action): PlayState {
         id: a.id ?? null, name: a.name, notes: a.notes ?? "", side: a.side ?? "offense", artShadow: a.artShadow === true, los: readLos(a.los),
         players: a.players,
       };
-      return { ...openPlay(board(s), doc), past: s.past, future: s.future, selectedId: s.selectedId };
+      return openPlay(board(s), doc);
     }
     case "setName":
       return { ...s, name: a.name };
