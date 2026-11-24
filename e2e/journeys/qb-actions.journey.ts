@@ -498,11 +498,13 @@ const BOOT = play("fx-boot-left", "Otter Boot Left", { o5: { type: "dive" }, o2:
 const BOOT_RUN = play("fx-boot-dive", "Otter Boot Dive", { o5: { type: "dive", primary: true }, o2: { type: "boot" }, o3: { type: "go" } });
 /** The jet is the read on the 5, Z steps up to the line: the QB boots left as a decoy through the corner the flag would sit in. */
 const JET_BOOT = { ...moved(play("fx-jet-boot", "Otter Jet Boot", { o3: { type: "jet", primary: true }, o2: { type: "boot" }, o4: { type: "go" } }), { o5: { x: 22, y: 1 } }), los: 35 };
-const BOOK = playbook("fx-boot-book", "Otter Boot Book", [SPRINT, BOOT, BOOT_RUN, JET_BOOT]);
+/** The sprint with Z tagged QB too: the quarterback is still the one playback finds, and Z has no route. */
+const TWO_QBS = moved(play("fx-two-qbs", "Otter Two QBs", { o2: { type: "rollout" }, o4: { type: "curl", primary: true }, o3: { type: "go" } }), { o5: { label: "QB" } });
+const BOOK = playbook("fx-boot-book", "Otter Boot Book", [SPRINT, BOOT, BOOT_RUN, JET_BOOT, TWO_QBS]);
 
 test("the slides say what the QB does: rolls out, boots off the fake, or hands off and boots as a decoy", async ({ page }, info) => {
   test.setTimeout(120_000);
-  await seed(page, { plays: [SPRINT, BOOT, BOOT_RUN, JET_BOOT], playbooks: [BOOK], team: OTTERS });
+  await seed(page, { plays: [SPRINT, BOOT, BOOT_RUN, JET_BOOT, TWO_QBS], playbooks: [BOOK], team: OTTERS });
   await page.goto("/playbooks?book=fx-boot-book");
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 60_000 }),
@@ -528,6 +530,9 @@ test("the slides say what the QB does: rolls out, boots off the fake, or hands o
     "4 · Otter Jet Boot":
       "4 · Otter Jet Boot · Run\n\nRun: X takes it (Jet sweep). QB hands off, then boots left as a decoy.\n\nFlagged: run in a no-run zone.\n\n" +
       "Left to right:\nX: Jet sweep (primary read)\nC: Snap\nQB: Hand off to X, then boot left as a decoy\nZ: No route\nY: Go",
+    "5 · Otter Two QBs":
+      "5 · Otter Two QBs · Pass\n\nPass: QB rolls out right and throws. Primary read: Y (Curl).\n\n" +
+      "Left to right:\nX: Go\nC: Snap\nQB: Roll out right, throw, look to Y first\nQB: No route\nY: Curl (primary read)",
   });
 
   // in the play's pictures the flag keeps off the decoy's path: the QB boots through the left corner, so it goes right
