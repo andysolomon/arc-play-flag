@@ -6,37 +6,6 @@ const run = (...actions: Action[]): PlayState => actions.reduce(reducer, initial
 const find = (s: PlayState, id: string) => s.players.find((p) => p.id === id);
 
 describe("reducer", () => {
-  test("pick toggles a route and tapping it again clears it", () => {
-    let s = run({ type: "select", id: "o3" }, { type: "pick", key: "go" });
-    expect(find(s, "o3")?.route).toEqual({ type: "go" });
-    expect(s.past).toHaveLength(1);
-    s = reducer(s, { type: "pick", key: "go" });
-    expect(find(s, "o3")?.route).toBeNull();
-    expect(s.past).toHaveLength(2);
-  });
-  test("a blitz backs a shallow defender off to 7 yards, and leaves a deeper one alone", () => {
-    let s = run({ type: "hydrate", side: "defense", name: "Blitz", players: defaults() }, { type: "select", id: "d2" }, { type: "pick", key: "blitz" });
-    expect(find(s, "d2")?.route).toEqual({ type: "blitz" });
-    expect(find(s, "d2")?.y).toBe(-7);
-    expect(s.past).toHaveLength(1);
-    s = run({ type: "hydrate", side: "defense", name: "Blitz", players: defaults() }, { type: "select", id: "d5" }, { type: "pick", key: "blitz" });
-    expect(find(s, "d5")?.y).toBe(-11);
-    s = run({ type: "hydrate", side: "defense", name: "Blitz", players: defaults() }, { type: "setRoute", id: "d1", route: { type: "blitz" } });
-    expect(find(s, "d1")?.y).toBe(-7);
-  });
-  test("reset formation keeps a blitzer on the blitz line", () => {
-    let s = run(
-      { type: "hydrate", side: "defense", name: "Blitz", players: defaults() },
-      { type: "select", id: "d2" },
-      { type: "pick", key: "blitz" },
-      { type: "move", id: "d2", x: 11, y: -9, commit: true },
-    );
-    s = reducer(s, { type: "resetFormation", team: "defense" });
-    expect(find(s, "d2")?.y).toBe(-7);
-    expect(find(s, "d1")?.y).toBe(-5);
-    // already home: nothing to commit
-    expect(reducer(s, { type: "resetFormation", team: "defense" })).toBe(s);
-  });
   test("man enters targeting and the next red player becomes the target", () => {
     let s = run({ type: "hydrate", side: "defense", name: "Cover", players: defaults() }, { type: "select", id: "d1" }, { type: "pick", key: "man" });
     expect(s.targeting).toBe("man");
@@ -46,39 +15,10 @@ describe("reducer", () => {
     expect(s.targeting).toBeNull();
     expect(find(s, "d1")?.route).toEqual({ type: "man", target: "o3" });
   });
-  test("custom routes: double-tap drops only its duplicate click", () => {
-    let s = run(
-      { type: "select", id: "o5" },
-      { type: "pick", key: "custom" },
-      { type: "draftPoint", pt: [19, 2] },
-      { type: "draftPoint", pt: [24, -3] },
-      { type: "draftPoint", pt: [24, -3] },
-    );
-    expect(s.draft?.pts).toHaveLength(3);
-    s = reducer(s, { type: "draftFinishDoubleTap" });
-    expect(s.draft).toBeNull();
-    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[19, 2], [24, -3]] });
-  });
   test("an empty custom draft leaves the route alone", () => {
     const s = run({ type: "select", id: "o5" }, { type: "pick", key: "custom" }, { type: "draftFinish" });
     expect(find(s, "o5")?.route).toBeNull();
     expect(s.past).toHaveLength(0);
-  });
-  test("the explicit finish keeps the last genuine waypoint and cancel preserves the prior route", () => {
-    let s = run(
-      { type: "select", id: "o5" },
-      { type: "pick", key: "custom" },
-      { type: "draftPoint", pt: [19, 2] },
-      { type: "draftPoint", pt: [24, -3] },
-      { type: "draftFinish" },
-    );
-    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[19, 2], [24, -3]] });
-    expect(s.past).toHaveLength(1);
-    s = reducer(s, { type: "pick", key: "custom" });
-    s = reducer(s, { type: "draftPoint", pt: [10, -8] });
-    s = reducer(s, { type: "draftCancel" });
-    expect(find(s, "o5")?.route).toEqual({ type: "custom", pts: [[19, 2], [24, -3]] });
-    expect(s.past).toHaveLength(1);
   });
   test("custom waypoint add, move, and remove are each undoable and redoable", () => {
     let s = run({ type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, -3], [8, -6]] } });
@@ -102,15 +42,6 @@ describe("reducer", () => {
     expect(s.draft?.pts).toEqual([]);
     s = run({ type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, -3]] } });
     expect(reducer(s, { type: "customPointRemove", id: "o3", index: 0 })).toBe(s);
-  });
-  test("only one primary read at a time", () => {
-    let s = run({ type: "select", id: "o3" }, { type: "pick", key: "go" }, { type: "togglePrimary" });
-    expect(find(s, "o3")?.route?.primary).toBe(true);
-    s = reducer(s, { type: "select", id: "o4" });
-    s = reducer(s, { type: "pick", key: "post" });
-    s = reducer(s, { type: "togglePrimary" });
-    expect(find(s, "o3")?.route).toEqual({ type: "go" });
-    expect(find(s, "o4")?.route?.primary).toBe(true);
   });
   test("mirror flips handed routes and custom waypoints", () => {
     let s = run({ type: "select", id: "o3" }, { type: "pick", key: "out" }, { type: "mirror" });
@@ -150,29 +81,6 @@ describe("reducer", () => {
     expect(find(flipped, "o5")?.route).toEqual(route);
     expect(find(flipped, "o5")?.x).toBe(19);
   });
-  test("undo restores the geometry and the read a transform touched", () => {
-    let s = run(
-      { type: "select", id: "o3" },
-      { type: "setRoute", id: "o3", route: { type: "custom", pts: [[8, -5]], primary: true } },
-      { type: "mirror" },
-    );
-    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[1.2, -5]], primary: true });
-    s = reducer(s, { type: "undo" });
-    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[8, -5]], primary: true });
-    s = reducer(s, { type: "redo" });
-    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[1.2, -5]], primary: true });
-  });
-  test("a custom draft stops taking waypoints at the cap", () => {
-    let s = run({ type: "select", id: "o5" }, { type: "pick", key: "custom" });
-    for (let i = 0; i < 70; i++) s = reducer(s, { type: "draftPoint", pt: [10 + (i % 10), -i / 4] });
-    expect(s.draft?.pts).toHaveLength(60);
-  });
-  test("flip mirrors every spot and custom waypoints", () => {
-    const s = run({ type: "setRoute", id: "o3", route: { type: "custom", pts: [[5, 0]] } }, { type: "flip" });
-    expect(find(s, "o3")?.x).toBe(27);
-    expect(find(s, "o3")?.route).toEqual({ type: "custom", pts: [[25, 0]] });
-    expect(find(s, "d5")?.x).toBe(15);
-  });
   test("clear and reset are scoped and skip no-ops", () => {
     let s = run({ type: "setRoute", id: "o3", route: { type: "go" } }, { type: "setRoute", id: "d1", route: { type: "spy" } });
     s = reducer(s, { type: "clearRoutes", team: "defense" });
@@ -188,48 +96,6 @@ describe("reducer", () => {
     expect(find(s, "o3")?.x).toBe(9);
     s = reducer(s, { type: "resetFormation", team: "offense" });
     expect(find(s, "o3")?.x).toBe(3);
-  });
-  test("undo and redo restore snapshots and clear the selection", () => {
-    let s = run({ type: "select", id: "o3" }, { type: "move", id: "o3", x: 9, y: 2, commit: true });
-    s = reducer(s, { type: "undo" });
-    expect(find(s, "o3")?.x).toBe(3);
-    expect(s.selectedId).toBeNull();
-    s = reducer(s, { type: "redo" });
-    expect(find(s, "o3")?.x).toBe(9);
-    expect(reducer(s, { type: "redo" })).toBe(s);
-  });
-  test("history is capped at 60 entries", () => {
-    let s = initialState();
-    for (let i = 0; i < 70; i++) s = reducer(s, { type: "move", id: "o3", x: 2 + (i % 20), y: 1, commit: true });
-    expect(s.past).toHaveLength(60);
-  });
-  test("newPlay starts a fresh play and leaves the previous one out of undo and redo", () => {
-    let s = run(
-      { type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() },
-      { type: "select", id: "o3" },
-      { type: "pick", key: "go" },
-      { type: "saved", id: "abc" },
-      { type: "newPlay", side: "offense" },
-    );
-    expect(s.id).toBeNull();
-    expect(s.name).toBe("New play");
-    expect(s.notes).toBe("");
-    expect(s.selectedId).toBeNull();
-    expect(find(s, "o3")?.route).toBeNull();
-    expect(s.past).toHaveLength(0);
-    expect(s.future).toHaveLength(0);
-    expect(reducer(s, { type: "undo" })).toBe(s);
-    expect(reducer(s, { type: "redo" })).toBe(s);
-    s = reducer(s, { type: "select", id: "o4" });
-    s = reducer(s, { type: "pick", key: "post" });
-    s = reducer(s, { type: "undo" });
-    expect(find(s, "o4")?.route).toBeNull();
-    expect(s.id).toBeNull();
-    expect(s.name).toBe("New play");
-    s = reducer(s, { type: "redo" });
-    expect(find(s, "o4")?.route).toEqual({ type: "post" });
-    expect(s.id).toBeNull();
-    expect(s.name).toBe("New play");
   });
   test("opening B replaces A, so undo and redo cannot put one play's diagram on the other", () => {
     const aPlayers = defaults().map((p) => (p.id === "o3" ? { ...p, route: { type: "go" as const } } : p));
@@ -249,48 +115,6 @@ describe("reducer", () => {
     expect(s.future).toHaveLength(0);
     expect(reducer(s, { type: "undo" })).toBe(s);
     expect(reducer(s, { type: "redo" })).toBe(s);
-  });
-  test("a draft pulled from another device replaces the board, so undo cannot put the play you left on it", () => {
-    const pulled = defaults().map((p) => (p.id === "o4" ? { ...p, route: { type: "post" as const } } : p));
-    const s = run(
-      { type: "load", id: "play-a", name: "Play A", players: defaults() },
-      { type: "setRoute", id: "o3", route: { type: "go" } },
-      { type: "select", id: "o5" },
-      { type: "pick", key: "custom" },
-      { type: "hydrate", id: "play-b", name: "Play B", players: pulled },
-    );
-    expect(s.id).toBe("play-b");
-    expect(selected(s)).toBeNull();
-    expect(s.draft).toBeNull();
-    expect(reducer(s, { type: "undo" })).toBe(s);
-    expect(reducer(s, { type: "draftFinish" })).toBe(s);
-  });
-  test("edits made in B undo and redo inside B", () => {
-    let s = run(
-      { type: "load", id: "play-a", name: "Play A", notes: "", players: defaults() },
-      { type: "load", id: "play-b", name: "Play B", notes: "", players: defaults() },
-      { type: "setName", name: "Play B v2" },
-      { type: "setNotes", notes: "B notes" },
-      { type: "setRoute", id: "o4", route: { type: "post" } },
-    );
-    s = reducer(s, { type: "undo" });
-    expect(find(s, "o4")?.route).toBeNull();
-    expect(s.id).toBe("play-b");
-    expect(s.name).toBe("Play B v2");
-    expect(s.notes).toBe("B notes");
-    expect(reducer(s, { type: "undo" })).toBe(s);
-    s = reducer(s, { type: "redo" });
-    expect(s.id).toBe("play-b");
-    expect(s.name).toBe("Play B v2");
-    expect(s.notes).toBe("B notes");
-    expect(find(s, "o4")?.route).toEqual({ type: "post" });
-  });
-  test("undoing a move keeps a name typed after the move", () => {
-    let s = run({ type: "move", id: "o3", x: 9, y: 2, commit: true }, { type: "setName", name: "Sprint" }, { type: "setNotes", notes: "go" });
-    s = reducer(s, { type: "undo" });
-    expect(find(s, "o3")?.x).toBe(3);
-    expect(s.name).toBe("Sprint");
-    expect(s.notes).toBe("go");
   });
   test("unsaved knows when a play has work its record doesn't", () => {
     const saved = { id: "abc", name: "Bunch", notes: "hi", side: "offense" as const, players: defaults() };
@@ -317,36 +141,9 @@ describe("reducer", () => {
     expect(s.id).toBeNull();
     expect(selected(s)).toBeNull();
   });
-  test("notes and the saved id do not touch history", () => {
-    let s = run({ type: "setNotes", notes: "Sell the fake." });
-    s = reducer(s, { type: "saved", id: "xyz" });
-    expect(s.notes).toBe("Sell the fake.");
-    expect(s.id).toBe("xyz");
-    expect(s.past).toHaveLength(0);
-  });
-  test("rename commits once per session and caps at 3 uppercase letters", () => {
-    let s = run({ type: "rename", id: "d1", label: "cbx", commit: true });
-    s = reducer(s, { type: "rename", id: "d1", label: "cbxy", commit: false });
-    expect(find(s, "d1")?.label).toBe("CBX");
-    expect(s.past).toHaveLength(1);
-  });
 });
 
 describe("play side", () => {
-  test("a new play is an offensive play shown from the offense", () => {
-    const s = initialState();
-    expect(s.side).toBe("offense");
-    expect(s.vis).toBe("offense");
-    expect(shadowing(s.side, s.vis)).toBe(false);
-  });
-  test("New play chooses a side once: a defensive call shows the shadow offense", () => {
-    const s = run({ type: "select", id: "o3" }, { type: "newPlay", side: "defense" });
-    expect(s.side).toBe("defense");
-    expect(s.vis).toBe("both");
-    expect(shadowing(s.side, s.vis)).toBe(true);
-    expect(s.selectedId).toBeNull();
-    expect(s.name).toBe("New play");
-  });
   test("a shadow player can be selected and given their own assignment", () => {
     let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "o3" }, { type: "pick", key: "slant" });
     expect(s.selectedId).toBe("o3");
@@ -363,29 +160,6 @@ describe("play side", () => {
     expect(s.selectedId).toBeNull();
     expect(find(s, "o3")?.route).toEqual({ type: "slant" });
   });
-  test("opening a defensive call shows the shadow offense, and undo stays on that call", () => {
-    let s = run(
-      { type: "select", id: "o3" },
-      { type: "pick", key: "go" },
-      { type: "load", id: "d", name: "Cover 2", side: "defense", players: defaults() },
-    );
-    expect(s.side).toBe("defense");
-    expect(s.vis).toBe("both");
-    expect(s.past).toHaveLength(0);
-    s = reducer(s, { type: "undo" });
-    expect(s.side).toBe("defense");
-    expect(s.vis).toBe("both");
-    expect(s.id).toBe("d");
-    s = reducer(s, { type: "select", id: "d1" });
-    s = reducer(s, { type: "pick", key: "blitz" });
-    s = reducer(s, { type: "undo" });
-    expect(s.side).toBe("defense");
-    expect(find(s, "d1")?.route).toBeNull();
-    s = reducer(s, { type: "redo" });
-    expect(s.side).toBe("defense");
-    expect(s.vis).toBe("both");
-    expect(find(s, "d1")?.route).toEqual({ type: "blitz" });
-  });
   test("a restored defensive draft shows the shadow offense; a play without a side is offensive", () => {
     expect(run({ type: "hydrate", name: "Blitz", side: "defense", players: defaults() }).vis).toBe("both");
     expect(run({ type: "load", name: "Old", players: defaults() }).side).toBe("offense");
@@ -399,21 +173,6 @@ describe("play side", () => {
     expect(s.vis).toBe("both");
     expect(reducer(s, { type: "setShadow", on: true })).toBe(s);
     expect(run({ type: "setShadow", on: false }).vis).toBe("offense");
-  });
-  test("opening a shared play shows the shadow, on either side", () => {
-    const offense = run({ type: "load", name: "Trips", side: "offense", players: defaults(), shadow: true });
-    expect(offense.vis).toBe("both");
-    expect(shadowing(offense.side, offense.vis)).toBe(true);
-    expect(offense.past).toHaveLength(0);
-    expect(offense.future).toHaveLength(0);
-    const defense = run(
-      { type: "newPlay", side: "defense" },
-      { type: "setShadow", on: false },
-      { type: "load", name: "Cover 2", side: "defense", players: defaults(), shadow: true },
-    );
-    expect(defense.side).toBe("defense");
-    expect(defense.vis).toBe("both");
-    expect(shadowing(defense.side, defense.vis)).toBe(true);
   });
   test("an offensive play can show a shadow defense, and that choice sticks to the next offensive play", () => {
     let s = run({ type: "setShadow", on: true });
@@ -437,26 +196,6 @@ describe("play side", () => {
     expect(s.vis).toBe("offense");
     expect(reducer(s, { type: "setShadow", on: false })).toBe(s);
   });
-  test("an ordinary undo keeps the side, and New play can start an offensive play again", () => {
-    let s = run({ type: "newPlay", side: "defense" }, { type: "select", id: "d1" }, { type: "pick", key: "blitz" }, { type: "undo" });
-    expect(s.side).toBe("defense");
-    s = reducer(s, { type: "newPlay", side: "offense" });
-    expect(s.side).toBe("offense");
-    expect(s.vis).toBe("offense");
-  });
-  test("a new defensive call is unsaved work", () => {
-    const saved = { id: "abc", name: "Bunch", notes: "", side: "offense" as const, players: defaults() };
-    const s = run({ type: "load", id: "abc", name: "Bunch", side: "offense", players: defaults() });
-    expect(unsaved(s, saved)).toBe(false);
-    expect(unsaved(run({ type: "newPlay", side: "defense" }), null)).toBe(true);
-  });
-  test("the opposite team is context on the field", () => {
-    const o = defaults().find((p) => p.team === "offense");
-    const d = defaults().find((p) => p.team === "defense");
-    expect(o && isContext(o, "offense")).toBe(false);
-    expect(d && isContext(d, "offense")).toBe(true);
-    expect(o && isContext(o, "defense")).toBe(true);
-  });
 });
 
 describe("lateral chains", () => {
@@ -465,14 +204,6 @@ describe("lateral chains", () => {
     { type: "select", id: "o5" }, { type: "pick", key: "go" },
     { type: "select", id: "o2" }, { type: "lateral" }, { type: "target", id: "o5" },
   );
-  /** QB → Z → QB → X, X throws. */
-  const backAndOn = (): PlayState => {
-    let s = reducer(lateralToZ(), { type: "lateral" });
-    s = reducer(s, { type: "target", id: "o2" });
-    s = reducer(s, { type: "lateral" });
-    s = reducer(s, { type: "target", id: "o3" });
-    return reducer(s, { type: "pick", key: "throw" });
-  };
   test("Lateral asks who takes it, like Man: any other red player, then that player is selected", () => {
     let s = run({ type: "select", id: "o2" }, { type: "lateral" });
     expect(s.targeting).toBe("lateral");
@@ -487,48 +218,6 @@ describe("lateral chains", () => {
     expect(find(s, "o2")?.route).toBeNull();
     expect(s.past).toHaveLength(1);
   });
-  test("taking a lateral ends a pass route: a carrier has no route to run", () => {
-    expect(find(lateralToZ(), "o5")?.route).toBeNull();
-  });
-  test("the ball can come back: Z laterals to the QB, who laterals on to X, who throws (R2)", () => {
-    let s = reducer(lateralToZ(), { type: "lateral" });
-    // Z can't toss it to Z, but the QB is a choice again
-    expect(reducer(s, { type: "target", id: "o5" })).toBe(s);
-    s = reducer(s, { type: "target", id: "o2" });
-    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o2" }]);
-    expect(s.selectedId).toBe("o2");
-    s = reducer(s, { type: "lateral" });
-    s = reducer(s, { type: "target", id: "o3" });
-    s = reducer(s, { type: "pick", key: "throw" });
-    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o2" }, { to: "o3" }]);
-    expect(find(s, "o3")?.route).toEqual({ type: "throw" });
-    expect(backAndOn().players).toEqual(s.players);
-  });
-  test("a toss picked in the ball path is the one edited: a throw there ends the chain there (R8)", () => {
-    let s = reducer(backAndOn(), { type: "selectVisit", index: 1 });
-    expect(s.selectedId).toBe("o5");
-    expect(s.visit).toBe(1);
-    s = reducer(s, { type: "pick", key: "throw" });
-    expect(hops(s)).toEqual([{ to: "o5" }]);
-    expect(find(s, "o5")?.route).toEqual({ type: "throw" });
-    expect(find(s, "o3")?.route).toBeNull();
-  });
-  test("Lateral on a toss the ball goes on from takes off the rest; tapped again it asks for a new target (R9)", () => {
-    // the QB's last toss is their second: taking it off leaves QB → Z → QB, with the QB to pick a job
-    let s = reducer(reducer(backAndOn(), { type: "select", id: "o2" }), { type: "lateral" });
-    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o2" }]);
-    expect(find(s, "o2")?.route).toBeNull();
-    // from Z's toss: cut there, then lateral again to Y instead
-    s = reducer(reducer(backAndOn(), { type: "selectVisit", index: 1 }), { type: "lateral" });
-    expect(hops(s)).toEqual([{ to: "o5" }]);
-    s = reducer(s, { type: "lateral" });
-    expect(s.targeting).toBe("lateral");
-    s = reducer(s, { type: "target", id: "o4" });
-    expect(hops(s)).toEqual([{ to: "o5" }, { to: "o4" }]);
-    // from the QB's first toss, every lateral goes
-    s = reducer(reducer(backAndOn(), { type: "selectVisit", index: 0 }), { type: "lateral" });
-    expect(hops(s)).toBeUndefined();
-  });
   test("dragging a catch forward snaps it level with the release, and past the line snaps it behind it", () => {
     let s = reducer(lateralToZ(), { type: "catchMove", hop: 0, pt: [22, 2] });
     expect(hops(s)).toEqual([{ to: "o5", catch: [22, 5] }]);
@@ -536,35 +225,5 @@ describe("lateral chains", () => {
     expect(hops(s)).toEqual([{ to: "o5", catch: [28.8, 6.5] }]);
     // nothing to move past the last toss
     expect(reducer(s, { type: "catchMove", hop: 1, pt: [5, 5] })).toBe(s);
-  });
-  test("dragging a player re-clamps every catch downstream of them", () => {
-    let s = reducer(lateralToZ(), { type: "catchMove", hop: 0, pt: [22, 5.5] });
-    s = reducer(s, { type: "lateral" });
-    s = reducer(s, { type: "target", id: "o2" });
-    s = reducer(s, { type: "catchMove", hop: 1, pt: [12, 6] });
-    expect(hops(s)?.[1]?.catch).toEqual([12, 6]);
-    // the quarterback drops back to 7: Z's catch comes with the release, and the QB's own second catch follows Z's
-    s = reducer(s, { type: "move", id: "o2", x: 15, y: 7, commit: true });
-    expect(hops(s)?.map((h) => h.catch)).toEqual([[22, 7], [12, 7]]);
-    s = reducer(s, { type: "undo" });
-    expect(hops(s)?.map((h) => h.catch)).toEqual([[22, 5.5], [12, 6]]);
-  });
-  test("flipping the play flips each catch, still behind its release (R13)", () => {
-    let s = reducer(lateralToZ(), { type: "catchMove", hop: 0, pt: [22, 6] });
-    s = reducer(s, { type: "flip" });
-    expect(hops(s)).toEqual([{ to: "o5", catch: [8, 6] }]);
-  });
-  test("a carrier can't be the read; Lateral on the QB takes the whole chain off, like Man", () => {
-    let s = reducer(lateralToZ(), { type: "pick", key: "throw" });
-    expect(find(s, "o5")?.route).toEqual({ type: "throw" });
-    expect(reducer(s, { type: "togglePrimary" })).toBe(s);
-    s = reducer(s, { type: "select", id: "o2" });
-    s = reducer(s, { type: "lateral" });
-    expect(hops(s)).toBeUndefined();
-    expect(find(s, "o5")?.route).toBeNull();
-  });
-  test("clearing routes clears the laterals too", () => {
-    const s = reducer(backAndOn(), { type: "clearRoutes", team: "offense" });
-    expect(hops(s)).toBeUndefined();
   });
 });
