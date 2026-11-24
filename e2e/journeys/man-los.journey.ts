@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { S } from "../../lib/play/geometry";
 import { buildMotion, simulationPlayback } from "../../lib/play/motion";
-import { LOS_GAP } from "../../lib/play/routes";
+import { LOS_GAP } from "../../lib/play/bounds";
 import type { SavedPlay } from "../../lib/play/types";
 import { Designer } from "../support/designer";
 import { moved, play, seed } from "../support/fixtures";
