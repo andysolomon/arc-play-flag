@@ -60,7 +60,8 @@ The development-only recorder in `scripts/demo-recorder/` is the canonical way t
 | `scripts/demo-recorder/runtime.ts` | Disposable profile, capture, encoding, verification, publishing into the output directory |
 | `scripts/demo-recorder/media.ts` | The frame (576×720, the app at 384 CSS pixels zoomed 1.5×, the 52-pixel band), the frame rates, and the asset contract as pure checks over `ffprobe` output |
 | `scripts/demo-recorder/freshness.ts` | The fingerprint of the UI a recording shows, written as `recorded-from.json`, and the check against it |
-| `scripts/demo-restamp.ts` | The `bun run demo:restamp` entry point, for a UI change no clip shows |
+| `scripts/demo-recorder/compare.ts` | Whether a fresh take of a chapter shows what its published clip shows |
+| `scripts/demo-restamp.ts` | The `bun run demo:restamp` entry point: moves the stamp on only when a take of every chapter matches its published clip |
 | `scripts/demo-recorder/*.test.ts` | Unit tests for arguments, fixtures, manifest alignment, cleanup, freshness, and the contract |
 
 ### Privacy and isolation
@@ -190,13 +191,15 @@ The coverage check proves each chapter did what its card promises when it was re
 When it fails, either:
 
 - **re-record** the whole tour against a build of the checkout and publish the set with its stamp, as above; or
-- if you have watched every clip and the change does not show in any of them (a refactor, a print-only style, a screen no chapter opens), **restamp** instead, and say why:
+- if you expect no clip to show the change (a refactor, a print-only style, a screen no chapter opens), **restamp**, and say what changed:
 
   ```sh
-  bun run demo:restamp --reason "the binder's print colours changed; no clip prints"
+  bun run demo:restamp --reason "the binder's print colours changed"
   ```
 
-  The stamp then carries the reason and the files it waved through, so the reviewer sees both in the diff. A restamp refuses without a reason, when nothing has changed, and without a recorded stamp to move on.
+  A restamp does not take your word for it. It builds this checkout, serves it on a free port, plays every chapter again (up to three takes each, not held to the promised length) and compares each take with its published WebM (`scripts/demo-recorder/compare.ts`). The takes are paired frame by frame in order, so a beat that lands later still meets its match. The caption band is left out, and a chapter differs when more than 15% of one 64-pixel block of the app stays different for 0.7 seconds of both clips. If any chapter differs in every take, it writes nothing, leaves the take, the published frame and their difference side by side in `test-results/demo-restamp/<slug>.png`, and you re-record. Otherwise the stamp carries the reason, the files it waved through and what it compared: the tolerance and, for each chapter, its WebM's sha256 and the worst block's share. `bun test` fails when a restamp's comparison does not cover the WebMs the tour serves, so replacing a clip, or a restamp written by hand, is caught. It takes about three minutes; a restamp also refuses without a reason, when nothing has changed, and without a recorded stamp to move on.
+
+  On the measured runs, a take of a UI no clip shows differently never held more than 9% of a block against its published clip, and replaying 61f6640 in reverse (roster mode's card framed like a play's) held 57.8% in the roster chapter.
 
 ### Extending coverage
 

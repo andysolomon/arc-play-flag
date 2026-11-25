@@ -507,7 +507,7 @@ export class ChapterDriver {
    * exists, every feature the tour advertises was demonstrated, and the captions were the
    * manifest's.
    */
-  async finish(targetSeconds: number): Promise<number> {
+  async finish(targetSeconds: number, strictLength = true): Promise<number> {
     const unproven = this.ledger.problem();
     if (unproven) throw new ChapterBeatError(this.slug, "cover the advertised features", "coverage", new Error(unproven));
     const promised = DEMOS.find((demo) => demo.slug === this.slug)?.captions ?? [];
@@ -520,13 +520,13 @@ export class ChapterDriver {
     // encoding trims every clip to the promised length, so a chapter that runs over would
     // lose its last beats, and with them things its card promises, without a word
     const over = this.elapsed() - targetSeconds;
-    if (over > OVERRUN_SECONDS) {
+    if (strictLength && over > OVERRUN_SECONDS) {
       throw new ChapterBeatError(this.slug, "fit the promised length", "recording", new Error(
         `the beats took ${this.elapsed().toFixed(2)}s but the tour promises ${String(targetSeconds)}s, so the clip would cut them off; shorten the holds (--trace shows where the time goes) or lengthen the chapter`,
       ));
     }
     const remaining = targetSeconds - this.elapsed();
-    if (remaining > MAX_TAIL_SECONDS) {
+    if (strictLength && remaining > MAX_TAIL_SECONDS) {
       throw new ChapterBeatError(this.slug, "end on the payoff", "recording", new Error(
         `the beats took ${this.elapsed().toFixed(2)}s of the ${String(targetSeconds)}s promised: ${remaining.toFixed(1)}s of a held last frame is dead time; set the chapter's time to ${String(Math.ceil(this.elapsed() + 0.6))}s or show more`,
       ));
@@ -940,13 +940,17 @@ export interface ChapterRun {
   leadIn: number;
 }
 
-/** Plays a chapter's beats on an already-seeded page and returns its poster frame. */
-export async function recordChapterActions(slug: ChapterSlug, page: Page, app: Frame, baseUrl: string, videoT0: number, trace?: (line: string) => void): Promise<ChapterRun> {
+/**
+ * Plays a chapter's beats on an already-seeded page and returns its poster frame. With
+ * `strictLength` off the take is only compared with the published clip, never published, so a
+ * loaded machine stretching the beats must not stop it.
+ */
+export async function recordChapterActions(slug: ChapterSlug, page: Page, app: Frame, baseUrl: string, videoT0: number, trace?: (line: string) => void, strictLength = true): Promise<ChapterRun> {
   const definition = CHAPTERS[slug];
   const captured: { poster: Buffer | null } = { poster: null };
   const driver = new ChapterDriver(slug, page, app, baseUrl, (png) => { captured.poster = png; }, trace);
   await definition.run(driver);
-  const seconds = await driver.finish(definition.targetSeconds);
+  const seconds = await driver.finish(definition.targetSeconds, strictLength);
   trace?.(`[${slug} ${seconds.toFixed(2)}s] finished (target ${String(definition.targetSeconds)}s, ${String(definition.fps ?? DEFAULT_FPS)} fps)`);
   if (!captured.poster) throw new ChapterBeatError(slug, "capture poster frame", "recording", new Error("no poster frame was captured"));
   if (driver.clockStart === null) throw new ChapterBeatError(slug, "open the first screen", "recording", new Error("the chapter never opened a screen"));

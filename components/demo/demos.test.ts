@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { fingerprint, freshnessProblem, STAMP_PATH } from "../../scripts/demo-recorder/freshness";
+import { fingerprint, freshnessProblem, publishedClips, STAMP_PATH } from "../../scripts/demo-recorder/freshness";
 import { MAX_SET_BYTES } from "../../scripts/demo-recorder/media";
 import { COVERED_FEATURES, DEMOS, HERO, TOUR_SECONDS } from "./demos";
 
@@ -66,7 +66,7 @@ describe("demo tour", () => {
     const root = join(import.meta.dir, "../..");
     let stamp: string | null = null;
     try { stamp = readFileSync(join(root, STAMP_PATH), "utf8"); } catch { /* missing: reported below */ }
-    const problem = freshnessProblem(stamp, await fingerprint(root));
+    const problem = freshnessProblem(stamp, await fingerprint(root), await publishedClips(root));
     if (problem) throw new Error(problem);
   });
 });
