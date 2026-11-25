@@ -7,6 +7,7 @@ import { Designer, armSabotage, downloadBytes, sabotage } from "../support/desig
 import { OTTERS, SLANT_LEFT, seed, storedLineups } from "../support/fixtures";
 import { latin, pdfPageCount, pdfWords } from "../support/pdf";
 import { PINNED, pngSize } from "../support/pptx";
+import { forgetPages, recordPages, recorded } from "../support/record";
 
 /**
  * The roster's own picture and sheet (docs/adr/010-roster-exports.md): from roster mode's panel a coach saves
@@ -57,26 +58,6 @@ const lineups = (slots: Roster): Lineups => ({ active: "main", lineups: [{ id: "
 const names = (side: "offense" | "defense"): string[] => [...new Set(ROSTER.filter((s) => s.team === side).flatMap((s) => s.depth))].sort();
 /** Players on one side's charts only: one of them on the other side's picture would be the wrong side. */
 const only = (side: "offense" | "defense"): string[] => names(side).filter((n) => !names(side === "offense" ? "defense" : "offense").includes(n));
-
-/** Records the markup of every SVG page the app rasterises, exactly as it draws it (as wristbands.journey.ts does). */
-async function recordPages(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __ffpdPages?: string[] };
-    const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with .call below
-    const set = src?.set;
-    if (!src || !set) return;
-    Object.defineProperty(HTMLImageElement.prototype, "src", {
-      ...src,
-      set(this: HTMLImageElement, v: string) {
-        if (v.startsWith("data:image/svg+xml")) (w.__ffpdPages ??= []).push(decodeURIComponent(v.slice(v.indexOf(",") + 1)));
-        set.call(this, v);
-      },
-    });
-  });
-}
-const forgetPages = (page: Page) => page.evaluate(() => { (window as unknown as { __ffpdPages?: string[] }).__ffpdPages = []; });
-const recorded = (page: Page): Promise<string[]> => page.evaluate(() => (window as unknown as { __ffpdPages?: string[] }).__ffpdPages ?? []);
 
 /** Every word a recorded page draws, in order, a name wrapped at its hyphen joined back up. */
 const words = (svg: string): string =>
