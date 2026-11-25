@@ -51,6 +51,8 @@ interface Device {
   rev: number;
   level: Level;
   hashes: { plays: Record<string, string>; books: Record<string, string>; settings: string };
+  /** the settings rev `hashes.settings` came from: a poll's older settings never land over it */
+  settingsRev: number;
   /** pending changes, by id, with the time the coach made them (D1) */
   pending: { plays: Record<string, string>; books: Record<string, string>; settings: string | null };
   stamps: { plays: Record<string, Stamp>; books: Record<string, Stamp> };
@@ -73,6 +75,7 @@ function readDevice(): Device | null {
     device = {
       org: d.org, orgName: typeof d.orgName === "string" ? d.orgName : "the organization", teamId: d.teamId, rev: d.rev, level: levelOf(d.level),
       hashes: { plays: { ...d.hashes?.plays }, books: { ...d.hashes?.books }, settings: typeof d.hashes?.settings === "string" ? d.hashes.settings : "" },
+      settingsRev: typeof d.settingsRev === "number" ? d.settingsRev : 0,
       pending: { plays: { ...d.pending?.plays }, books: { ...d.pending?.books }, settings: typeof d.pending?.settings === "string" ? d.pending.settings : null },
       stamps: { plays: { ...d.stamps?.plays }, books: { ...d.stamps?.books } },
     };
@@ -121,6 +124,7 @@ export function adopt(record: OrgTeamRecord, orgName: string, clear: boolean): v
       books: Object.fromEntries(playbooks.map((b) => [b.id, hashRecord(b)])),
       settings: hashRecord({ team: record.team, lineups: record.lineups }),
     },
+    settingsRev: record.settingsRev,
     pending: { plays: {}, books: {}, settings: null },
     stamps: {
       plays: Object.fromEntries(record.plays.map((p) => [p.id, p.changed])),
@@ -232,6 +236,7 @@ export function push(): Promise<boolean> {
           const w = await api.writeSettings(d.org, d.teamId, sent.team, sent.lineups);
           d.rev = Math.max(d.rev, w.rev);
           d.hashes.settings = hashRecord(sent);
+          d.settingsRev = w.rev;
         } catch (e) {
           if (!(e instanceof ApiError) || e.status !== 403) throw e;
           // D5: the settings are the head coach's; the organization's come back
@@ -353,11 +358,13 @@ export async function poll(): Promise<void> {
   try {
     const c = await api.poll(d.org, d.teamId, d.rev, presencePlay);
     const touched: string[] = [];
+    // a change kept over what the poll brought holds the rev, so the next poll brings what the server decided
+    let kept = false;
     if (c.plays.length || c.playbooks.length || c.settings) {
       applied(() => {
         const plays = readAll();
         for (const p of c.plays) {
-          if (d.pending.plays[p.id]) continue; // D2
+          if (d.pending.plays[p.id]) { kept = true; continue; } // D2
           if ("deleted" in p) { drop(plays, p.id); drop(d.hashes.plays, p.id); drop(d.stamps.plays, p.id); }
           else { const v = plain(p); plays[p.id] = v; d.hashes.plays[p.id] = hashRecord(v); d.stamps.plays[p.id] = p.changed; }
           if (p.changed.by !== s.user?.id && p.id === presencePlay) touched.push(`${p.changed.name} changed “${"deleted" in p ? "this play" : p.name}” just now`);
@@ -365,20 +372,22 @@ export async function poll(): Promise<void> {
         const books = readPlaybooks();
         const ids = new Set(Object.keys(plays));
         for (const b of c.playbooks) {
-          if (d.pending.books[b.id]) continue;
+          if (d.pending.books[b.id]) { kept = true; continue; }
           if ("deleted" in b) { drop(books, b.id); drop(d.hashes.books, b.id); drop(d.stamps.books, b.id); }
           else { const v = plainBook(b); books[b.id] = settleBook({ ...v, plays: v.plays.filter((id) => ids.has(id)) }); d.hashes.books[b.id] = hashRecord(v); d.stamps.books[b.id] = b.changed; }
         }
         const entries: (readonly [string, unknown])[] = [[PLAYS_KEY, plays], [PLAYBOOKS_KEY, books]];
-        if (c.settings && !d.pending.settings) {
+        if (c.settings && d.pending.settings) kept = true;
+        else if (c.settings && c.settings.rev > d.settingsRev) {
           entries.push([TEAM_KEY, c.settings.team], [LINEUPS_KEY, c.settings.lineups]);
           d.hashes.settings = hashRecord({ team: c.settings.team, lineups: c.settings.lineups });
+          d.settingsRev = c.settings.rev;
         }
         writeMany(entries);
         refresh();
       });
     }
-    d.rev = Math.max(d.rev, c.rev);
+    if (!kept) d.rev = Math.max(d.rev, c.rev);
     const levelChanged = d.level !== c.level;
     d.level = c.level;
     writeDevice(d);
@@ -415,7 +424,7 @@ export async function settle(marker: { teamId: string; org: string; level?: Leve
   let d = readDevice();
   if (!d || d.teamId !== marker.teamId) {
     // D12: nothing of the team's records here; the whole difference goes up, then the team is read whole
-    d = { org: marker.org, orgName, teamId: marker.teamId, rev: 0, level: marker.level ?? 0, hashes: { plays: {}, books: {}, settings: "" }, pending: { plays: {}, books: {}, settings: null }, stamps: { plays: {}, books: {} } };
+    d = { org: marker.org, orgName, teamId: marker.teamId, rev: 0, level: marker.level ?? 0, hashes: { plays: {}, books: {}, settings: "" }, settingsRev: 0, pending: { plays: {}, books: {}, settings: null }, stamps: { plays: {}, books: {} } };
   }
   d.orgName = orgName;
   set({ teamId: marker.teamId, org: marker.org, level: d.level });
@@ -423,16 +432,15 @@ export async function settle(marker: { teamId: string; org: string; level?: Leve
   d.level = team.level;
   writeDevice(d);
   guardFor(d.level, orgName);
-  if (marker.dirty || hasPending(d)) {
+  const pushed = marker.dirty || hasPending(d);
+  if (pushed) {
     notePending(d);
     writeDevice(d);
     if (!(await push())) return;
   }
-  if (d.rev === 0) {
-    adopt(await api.readTeam(d.org, d.teamId), orgName, false);
-  } else {
-    set({ status: "saved", message: null });
-  }
+  if (d.rev === 0) adopt(await api.readTeam(d.org, d.teamId), orgName, false);
+  // the push said saved or pending itself, and an edit made while it was out is still pending
+  else if (!pushed) set({ status: "saved", message: null });
   startPolling();
 }
 
