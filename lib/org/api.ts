@@ -1,7 +1,7 @@
 import { ApiError } from "@/lib/account/api";
 import type { Lineups, Playbook, SavedPlay, TeamSettings } from "@/lib/play/types";
 import type {
-  BookWrite, Changes, Grants, Invite, InvitePreview, Level, Membership, OrgDetail, OrgPlay, OrgPlaybook, OrgSummary, OrgTeamRecord, OrgTeamSummary, OrgsResponse, PlayWrite,
+  BookChange, BookWrite, Changes, Grants, Invite, InvitePreview, Level, Membership, OrgDetail, OrgPlay, OrgPlaybook, OrgSummary, OrgTeamRecord, OrgTeamSummary, OrgsResponse, PlayChange, PlayWrite,
 } from "./types";
 
 /** The organization's API as the device calls it (docs/adr/013-organizations.md); every failure is an ApiError the panel can read. */
@@ -53,11 +53,11 @@ export const poll = (org: string, team: string, since: number, play: string | nu
   call(`/api/orgs/${q(org)}/teams/${q(team)}/poll`, json("POST", { since, play }));
 export const writePlay = (org: string, team: string, play: SavedPlay, at: string): Promise<PlayWrite> =>
   call(`/api/orgs/${q(org)}/teams/${q(team)}/plays/${q(play.id)}`, json("PUT", { play, at }));
-export const deletePlay = (org: string, team: string, id: string, at: string): Promise<{ rev: number }> =>
+export const deletePlay = (org: string, team: string, id: string, at: string): Promise<{ rev: number; play: PlayChange | null }> =>
   call(`/api/orgs/${q(org)}/teams/${q(team)}/plays/${q(id)}?at=${q(at)}`, { method: "DELETE" });
 export const writeBook = (org: string, team: string, book: Playbook, at: string): Promise<BookWrite> =>
   call(`/api/orgs/${q(org)}/teams/${q(team)}/books/${q(book.id)}`, json("PUT", { book, at }));
-export const deleteBook = (org: string, team: string, id: string, at: string): Promise<{ rev: number }> =>
+export const deleteBook = (org: string, team: string, id: string, at: string): Promise<{ rev: number; book: BookChange | null }> =>
   call(`/api/orgs/${q(org)}/teams/${q(team)}/books/${q(id)}?at=${q(at)}`, { method: "DELETE" });
 export const writeSettings = (org: string, team: string, settings: TeamSettings, lineups: Lineups): Promise<{ rev: number }> =>
   call(`/api/orgs/${q(org)}/teams/${q(team)}/settings`, json("PUT", { team: settings, lineups }));
