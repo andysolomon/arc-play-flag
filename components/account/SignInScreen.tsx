@@ -45,6 +45,7 @@ export function SignInScreen({ up = false }: { up?: boolean }) {
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
         <Link href="/" className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ Designer</Link>
         <Sticker icon="roster" size={26} className="flex-none" priority />
+        {/* eslint-disable-next-line no-restricted-syntax -- the screen's own title, not a coach's name */}
         <h1 className="min-w-0 truncate text-header font-normal">{up ? "Create an account" : "Sign in"}</h1>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">

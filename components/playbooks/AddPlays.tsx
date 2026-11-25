@@ -13,6 +13,7 @@ import { card, input, pill, pillDark } from "../ui";
 import type { Say } from "./PlaybooksScreen";
 import { PreviewModal } from "./PreviewModal";
 import { TypeFilter } from "./TypeFilter";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -74,7 +75,7 @@ function PlayToggle({ play: p, added, onToggle }: { play: SavedPlay; added: bool
       className={`${card} flex cursor-pointer flex-col gap-2 text-left transition-transform duration-[120ms] hover:-translate-y-0.5 hover:bg-yellow-soft aria-pressed:bg-yellow-soft motion-reduce:transition-none`}
     >
       <PlayThumb players={p.players} name={p.name} side={p.side} artShadow={p.artShadow} los={p.los} />
-      <span className="truncate text-base">{p.name}</span>
+      <NameText oneLine className="text-base">{p.name}</NameText>
       <span className="text-caption text-ink-muted">{added ? "✓ In playbook" : "+ Add"}</span>
     </button>
   );
@@ -103,7 +104,7 @@ export function AddToPlaybookModal({ play, onClose, say }: { play: SavedPlay; on
               aria-label={b.name}
               className={`${pill} flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left aria-pressed:bg-yellow-soft`}
             >
-              <span className="min-w-0 flex-1 truncate text-base">{b.name}</span>
+              <NameText className="flex-1 text-base">{b.name}</NameText>
               <span className="text-caption text-ink-muted">{b.plays.length ? plural(b.plays.length, "play") : "Empty"}</span>
               <span className="w-[92px] text-right text-small">{added ? "✓ Added" : "+ Add"}</span>
             </button>

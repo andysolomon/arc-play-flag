@@ -34,6 +34,7 @@ import { ManTagLayer } from "./ManTagLayer";
 import { RouteLayer } from "./RouteLayer";
 import { ScreenOnly } from "./ScreenOnly";
 import { pillMd, pillSm } from "./ui";
+import { NameText } from "./NameText";
 
 interface Props {
   players: readonly Player[];
@@ -819,11 +820,10 @@ function FieldImpl({
           <div ref={titleRowRef} id={FIELD_TITLE_ID} className="relative mb-0.5 flex min-w-0 items-baseline justify-center gap-2 px-1 leading-tight print:mb-2">
             <h1
               ref={titleRef}
-              className="min-w-0 truncate text-header font-normal text-ink focus-visible:relative focus-visible:z-[1] data-quiet-focus:outline-none print:outline-none"
-              title={title}
+              className="min-w-0 text-header font-normal text-ink focus-visible:relative focus-visible:z-[1] data-quiet-focus:outline-none print:outline-none"
               aria-label={titleControl ? title : undefined}
             >
-              {titleControl ?? title}
+              {titleControl ?? <NameText oneLine>{title}</NameText>}
             </h1>
             {!roster && <span className="sr-only">{side === "defense" ? "Defensive call" : "Offensive play"}</span>}
             {switcher}

@@ -60,7 +60,7 @@ export function Menu({ id, label, root, trigger, onClose, className = "", childr
 
 /** A heading row inside a menu, for the thing the rows belong to. */
 export function MenuHeading({ children }: { children: ReactNode }) {
-  return <span role="presentation" className="truncate px-3 pb-0.5 pt-1.5 text-eyebrow tracking-eyebrow text-ink-muted">{children}</span>;
+  return <span role="presentation" className="whitespace-normal wrap-anywhere px-3 pb-0.5 pt-1.5 text-eyebrow tracking-eyebrow text-ink-muted">{children}</span>;
 }
 
 /** A line of words inside a menu, when there is nothing to pick. */

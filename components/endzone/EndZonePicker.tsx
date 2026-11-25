@@ -100,6 +100,7 @@ export function EndZonePicker({ className = "" }: { className?: string }) {
                   </span>
                 )}
               </span>
+              {/* eslint-disable-next-line no-restricted-syntax -- an end zone design's name is ours, not a coach's */}
               <span className="truncate border-t-2 border-divider bg-cream px-2 pb-1.5 pt-1 text-small leading-tight text-ink">{z.name}</span>
             </label>
           );

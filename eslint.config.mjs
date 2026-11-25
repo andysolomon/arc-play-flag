@@ -32,6 +32,19 @@ const BOUNDS = {
   message: "Field bounds live in lib/play/bounds.ts (6a94d46 missed a -36 literal)",
 };
 
+/** A name cut short by hand: an ellipsis, a line clamp, or hidden overflow on text that will not wrap. */
+const CLIPPED = {
+  selector: [
+    "Literal[value=/\\b(truncate|text-ellipsis|text-clip|line-clamp-\\d+)\\b|(?=.*\\boverflow-(x-)?hidden\\b)(?=.*\\bwhitespace-nowrap\\b)/]",
+    "TemplateElement[value.raw=/\\b(truncate|text-ellipsis|text-clip|line-clamp-\\d+)\\b|(?=.*\\boverflow-(x-)?hidden\\b)(?=.*\\bwhitespace-nowrap\\b)/]",
+    "Property[key.name=/^(textOverflow|WebkitLineClamp)$/]",
+  ].join(", "),
+  message:
+    "A coach's name cut short with no way to read it whole is how two lineups both read 'Saturday vs Falcons - Rot…' (22ec4c9). " +
+    "Render a name with <NameText> from components/NameText.tsx: it wraps, or with oneLine keeps the whole name in its title. " +
+    "For words that are not a coach's name, disable this line and say what they are.",
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -49,15 +62,17 @@ const eslintConfig = defineConfig([
   {
     files: ["lib/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
     ignores: ["lib/play/roles.ts", TESTS],
-    rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN] },
+    rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN, CLIPPED] },
   },
-  // a later block's options replace an earlier one's, so this one repeats ROLES and SCREEN for its files
+  // the one component that decides how a name shrinks
+  { files: ["components/NameText.tsx"], rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN] } },
+  // a later block's options replace an earlier one's, so this one repeats ROLES, SCREEN and CLIPPED for its files
   {
     files: FIELD_FILES,
     ignores: ["lib/play/bounds.ts", "lib/play/roles.ts", TESTS],
-    rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN, BOUNDS] },
+    rules: { "no-restricted-syntax": ["error", ...ROLES, SCREEN, BOUNDS, CLIPPED] },
   },
-  { files: ["lib/play/roles.ts"], rules: { "no-restricted-syntax": ["error", BOUNDS] } },
+  { files: ["lib/play/roles.ts"], rules: { "no-restricted-syntax": ["error", BOUNDS, CLIPPED] } },
   { files: ["**/*.mjs", "**/*.js"], extends: [tseslint.configs.disableTypeChecked] },
   globalIgnores(["playwright-report/**", "test-results/**", "blob-report/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "design/**", "node_modules/**"]),
 ]);

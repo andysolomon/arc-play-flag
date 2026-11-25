@@ -10,6 +10,7 @@ import { getAccountState, getServerAccountState, subscribeAccount } from "@/lib/
 import { Menu, MenuHeading, MenuNote } from "./Menu";
 import { SideBadge } from "./SideBadge";
 import { chip, menuChoice, menuItem } from "./ui";
+import { NameText } from "./NameText";
 
 /**
  * The current playbook as the designer's menus see it: the book, its plays numbered as it numbers
@@ -77,7 +78,7 @@ export function PlaysMenu({ id, label, root, trigger, onClose, className, name, 
             >
               <span className="w-6 flex-none text-caption text-ink-muted">{it.n}.</span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate">{it.play.name}</span>
+                <NameText>{it.play.name}</NameText>
                 <SideBadge side={it.play.side} />
               </span>
               {it.play.id === primaryId && <span className={chip}>Primary</span>}
@@ -88,7 +89,7 @@ export function PlaysMenu({ id, label, root, trigger, onClose, className, name, 
             <>
               <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
               <button type="button" role="menuitem" onClick={add} className={menuItem}>
-                <span className="min-w-0 truncate">+ Add “{name.trim() || "Untitled play"}” to this playbook</span>
+                <NameText>{`+ Add “${name.trim() || "Untitled play"}” to this playbook`}</NameText>
               </button>
             </>
           )}

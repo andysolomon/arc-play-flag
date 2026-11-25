@@ -7,6 +7,7 @@ import type { Player, Team } from "@/lib/play/types";
 import { Field } from "./Field";
 import { pillSm } from "./ui";
 import { Sticker } from "./Sticker";
+import { NameText } from "./NameText";
 
 interface Props {
   id: string;
@@ -37,7 +38,8 @@ export function SharedPlay({ id, name, players, side, noRunZones, artShadow = fa
     <div className="app-root flex h-full flex-col overflow-hidden">
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5 print:hidden">
         <Sticker icon="football" size={26} className="flex-none" priority />
-        <h1 className="min-w-0 truncate text-header font-normal">{name}</h1>
+        <h1 className="min-w-0 text-header font-normal"><NameText>{name}</NameText></h1>
+        {/* eslint-disable-next-line no-restricted-syntax -- the kind of play and its coverage, in our words; the play's name is the h1 */}
         <span className="min-w-0 shrink-[100] truncate whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">{kind} · Snapshot</span>
         <span className="flex-1" />
         <Link href={`/?p=${id}`} className={`${pillSm} inline-flex items-center !text-ink no-underline`}>

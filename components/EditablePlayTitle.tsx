@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { NameText } from "./NameText";
 
 /** Rename in place above the field; Enter or leaving the input keeps it, Escape cancels. */
 export function EditablePlayTitle({ name, onName }: { name: string; onName: (name: string) => void }) {
@@ -36,7 +37,7 @@ export function EditablePlayTitle({ name, onName }: { name: string; onName: (nam
           onClick={() => { setOriginal(name); }}
           className="flex min-h-11 max-w-full cursor-pointer items-center gap-1.5 rounded-note px-1 text-left hover:bg-yellow-soft print:hidden"
         >
-          <span className="truncate">{name || "Untitled play"}</span>
+          <NameText oneLine>{name || "Untitled play"}</NameText>
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" className="shrink-0">
             <path d="m10.5 2.5 3 3M2 14l1-4L11.5 1.5a1 1 0 0 1 1.5 0L14.5 3a1 1 0 0 1 0 1.5L6 13Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

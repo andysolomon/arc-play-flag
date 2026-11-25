@@ -11,7 +11,7 @@ export function DemoScreen() {
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
         <Link href="/" className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ Designer</Link>
         <Sticker icon="demo" size={26} className="flex-none" priority />
-        <h1 className="min-w-0 truncate text-header font-normal">Demo</h1>
+        <h1 className="min-w-0 text-header font-normal">Demo</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">Complete tour</span>
       </header>
       <main className="min-h-0 flex-1 overflow-y-auto">

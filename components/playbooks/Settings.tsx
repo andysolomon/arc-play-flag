@@ -14,6 +14,7 @@ import { AccountPanel, TeamNote } from "../account/AccountPanel";
 import { ThemePicker } from "../ThemePicker";
 import { card, divider, eyebrow, pill, pillDark } from "../ui";
 import { PreviewModal } from "./PreviewModal";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -29,7 +30,7 @@ export function SettingsButton() {
       <button type="button" onClick={() => { setOpen(true); }}
         className={`${pill} inline-flex min-h-11 max-w-[220px] items-center gap-2 px-3 text-small`}>
         <span aria-hidden className="h-4 w-4 flex-none rounded-full border-2 border-ink" style={{ background: team.color }} />
-        <span className="truncate">{team.name || "Team"}</span>
+        <NameText oneLine>{team.name || "Team"}</NameText>
         <span className="sr-only"> · account, team, theme &amp; backup settings</span>
         <span aria-hidden className="text-ink-muted">⚙</span>
       </button>
