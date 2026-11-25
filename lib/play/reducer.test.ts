@@ -91,7 +91,7 @@ describe("reducer", () => {
     expect(s.past).toHaveLength(before);
     s = reducer(s, { type: "resetFormation", team: null });
     expect(s.past).toHaveLength(before);
-    s = reducer(s, { type: "move", id: "o3", x: 9, y: 2, commit: true });
+    s = reducer(s, { type: "move", id: "o3", x: 9, y: 2 });
     s = reducer(s, { type: "resetFormation", team: "defense" });
     expect(find(s, "o3")?.x).toBe(9);
     s = reducer(s, { type: "resetFormation", team: "offense" });
@@ -121,15 +121,15 @@ describe("reducer", () => {
     let s = run({ type: "load", id: "abc", name: "Bunch", notes: "hi", players: defaults() });
     expect(unsaved(s, saved)).toBe(false);
     expect(unsaved(reducer(s, { type: "setNotes", notes: "changed" }), saved)).toBe(true);
-    expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2, commit: true }), saved)).toBe(true);
+    expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2 }), saved)).toBe(true);
     s = initialState();
     expect(unsaved(s, null)).toBe(false);
     expect(unsaved(reducer(s, { type: "setName", name: "Mine" }), null)).toBe(true);
-    expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2, commit: true }), null)).toBe(true);
+    expect(unsaved(reducer(s, { type: "move", id: "o3", x: 9, y: 2 }), null)).toBe(true);
   });
   test("load replaces the document and clears history; hydrate does not push any", () => {
     const players = defaults().map((p) => ({ ...p, x: 15 }));
-    let s = run({ type: "move", id: "o3", x: 9, y: 2, commit: true }, { type: "load", id: "abc", name: "Bunch", notes: "hi", players });
+    let s = run({ type: "move", id: "o3", x: 9, y: 2 }, { type: "load", id: "abc", name: "Bunch", notes: "hi", players });
     expect(s.name).toBe("Bunch");
     expect(s.id).toBe("abc");
     expect(s.notes).toBe("hi");

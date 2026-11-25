@@ -6,10 +6,10 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "4656d493c52baac624fcbabbd9f2a81c9664c28f5a85107cb1740ee375402c13",
+    "components/App.tsx": "84a2cf7004fbf1f07a11bddd33d5b424d4fe8ba198a7c19f646b4e7eed1194ef",
     "components/EditablePlayTitle.tsx": "9f4c49c5346e9ffc12572b8cefb3e40d6968150116b2b1150c63d02e0e558dc6",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "cbc4c5fd4993434e98375e6255e3038a091e0fb0eb3e7282635fcf2f55bb17fa",
+    "components/Field.tsx": "38119d94caaa523b092b39da818cba867cc4d039df6e6cee4a50fa255eb87987",
     "components/FirstUse.tsx": "b2e974561b95cfcbf2462e13977a11430fab08b7efdb8ce015ddb6597a426303",
     "components/Fold.tsx": "3400bd2f7bc401225e72c1972a3751064befdef32e215dcd4b530c0fed631d11",
     "components/Header.tsx": "17e4dd308f798a51c6f4d937e6f845676de2a896d670ebc09fb539e747451df8",
@@ -31,7 +31,7 @@
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "c24d91da13f20a380af601db4cd3bf37615450154ef5b8dcd787a00e761d0051",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "70dbe66680bec6ac59f262807a12ddfdcacd6df14b426b35937fe45554117a3b",
+    "components/RouteSidebar.tsx": "52870ea5989914d41c2d07edd5e70d297facf9d1554c9cf3c6253450566897a4",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/ScreenOnly.tsx": "9e67763272238d36766e04ba91a513e31a9e0324b9ba66fbc50a5af780b2f79c",
     "components/SharedPlay.tsx": "7c5c86ed9b762c1adf5bd69810c8f02439f9aaa150b021579bbbec96ed42c058",
@@ -82,7 +82,7 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "names now shrink through NameText (wrap, or one line with a title) instead of hand-rolled truncate; every name a clip shows fits on its line, so it draws the same",
+    "reason": "names now shrink through NameText (wrap, or one line with a title) instead of hand-rolled truncate, and only the reducer's action shapes and no-op undo steps changed; every name a clip shows fits on its line and no chapter uses Undo, Redo or the tag field, so it draws the same",
     "files": [
       "components/EditablePlayTitle.tsx (changed)",
       "components/Field.tsx (changed)",

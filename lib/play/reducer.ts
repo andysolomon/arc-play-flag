@@ -11,7 +11,7 @@ import { quarterback } from "./roles";
 import {
   MAX_ROUTE_POINTS, asStored, defaults, flipHop, flipRoute, isQbAction, isRun, keepRead, legalSpot, losGap, mirrorRoute, mirrorable, routeDef,
 } from "./routes";
-import { samePlay } from "./storage";
+import { canonical, samePlay } from "./storage";
 import { spaced } from "./spacing";
 import type { Draft, Exhaustive, Hop, Pair, Player, Route, RouteType, SavedPlay, Team, Vis } from "./types";
 
@@ -36,7 +36,7 @@ export interface PlayState extends Doc, History {
 }
 
 export type Action =
-  | { type: "move"; id: string; x: number; y: number; commit: boolean }
+  | { type: "move"; id: string; x: number; y: number }
   | { type: "select"; id: string | null }
   | { type: "cancelTargeting" }
   | { type: "pick"; key: RouteType }
@@ -76,7 +76,9 @@ export type Action =
   | { type: "customPointRemove"; id: string; index: number }
   | { type: "togglePrimary" }
   | { type: "mirror" }
-  | { type: "rename"; id: string; label: string; commit: boolean }
+  /** a player's tag typed: the first letter of a retag, then each letter after it (renameMore) */
+  | { type: "rename"; id: string; label: string }
+  | { type: "renameMore"; id: string; label: string }
   | { type: "flip" }
   | { type: "clearRoutes"; team: Team | null }
   | { type: "resetFormation"; team: Team | null }
@@ -123,14 +125,14 @@ export function selected(s: PlayState): Player | null {
 /**
  * Whether the document holds work its saved record doesn't (or, never saved, anything past a blank new
  * play). The ball's spot is the board's, not the play's (lib/los.ts), so it never counts: a play stored
- * from the 5 and drawn from the 40 is as saved as it was.
+ * from the 5 and drawn from the 40 is as saved as it was. It reads the document alone, never Undo or
+ * Redo, so an action changes it only by changing what Save would write.
  */
-export function unsaved(s: PlayState, saved: SavedPlay | null): boolean {
-  if (saved) return !samePlay({ ...s, los: losOf(saved) }, saved);
-  // a restored draft or an opened share link has no history yet, so its players are compared as well;
+export function unsaved(doc: Doc, saved: SavedPlay | null): boolean {
+  if (saved) return !samePlay({ ...doc, los: losOf(saved) }, saved);
   // a blank name is the new play's
   const blank = initialState();
-  return s.past.length > 0 || !samePlay({ ...s, name: s.name || blank.name, los: blank.los }, blank);
+  return !samePlay({ ...doc, name: doc.name || blank.name, los: blank.los }, blank);
 }
 
 /** Whether a player is drawn under the current Show filter. */
@@ -172,10 +174,6 @@ function patch(players: readonly Player[], id: string, upd: Partial<Player>): re
   return players.map((p) => (p.id === id ? { ...p, ...upd } : p));
 }
 
-function commit(s: PlayState): PlayState {
-  return { ...s, ...push(s, s) };
-}
-
 /** The field's shadow shown or hidden; hiding it takes that player off the field, so stop editing them. */
 function withVis(s: PlayState, vis: PlayState["vis"]): PlayState {
   const picked = selected(s);
@@ -210,8 +208,7 @@ function routed(players: readonly Player[], p: Player, route: Route | null): Pla
 
 /** Sets a route, and backs a new blitzer off to the blitz line if they were lined up closer, beside a teammate there. */
 function setRoute(s: PlayState, id: string, route: Route | null): PlayState {
-  const c = commit(s);
-  return { ...c, players: c.players.map((p) => (p.id === id ? routed(c.players, p, route) : p)) };
+  return { ...s, players: s.players.map((p) => (p.id === id ? routed(s.players, p, route) : p)) };
 }
 
 function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
@@ -225,8 +222,7 @@ function finishDraft(s: PlayState, dropDuplicate: boolean): PlayState {
   let next = s;
   if (pts.length) {
     if (d.kind === "motion") {
-      const c = commit(s);
-      next = { ...c, players: c.players.map(p => p.id === d.id && p.team === "offense"
+      next = { ...s, players: s.players.map(p => p.id === d.id && p.team === "offense"
         ? { ...p, preSnap: { pts: pts.map(motionPoint) } } : withoutMotion(p)) };
     } else {
       // a custom route drawn over X's Out (or over an earlier custom route) is still X's route: the read stays (#109)
@@ -268,23 +264,50 @@ function withHops(players: readonly Player[], hops: readonly Hop[]): Player[] {
 }
 
 /**
+ * What an action does to Undo and Redo. Only the reducer below writes a step, so no action can push one
+ * of its own.
+ * - "step": the players before it are one step of Undo, if it changed them. One that changed nothing (a
+ *   drop back on its own spot, a tag retyped as it reads) is no step and keeps Redo.
+ * - "none": never a step: what is selected or being drawn, the play's name, notes and ball spot, the
+ *   rest of a retag after its first letter (whose step takes the whole retag back), and Undo and Redo.
+ * - "open": a play put on the board whole, with no Undo or Redo from the play left.
+ */
+type HistoryRule = "step" | "none" | "open";
+
+/** Every action type's rule: a new action fails to compile until it has one. */
+const HISTORY: Record<Action["type"], HistoryRule> = {
+  move: "step", pick: "step", removeMotion: "step", target: "step", blitzAim: "step", deepSplit: "step", lateral: "step",
+  catchMove: "step", releaseMove: "step", runBefore: "step", setRoute: "step", draftFinish: "step", draftFinishDoubleTap: "step",
+  customPointAdd: "step", customPointMove: "step", customPointRemove: "step", togglePrimary: "step", mirror: "step", rename: "step",
+  flip: "step", clearRoutes: "step", resetFormation: "step",
+  select: "none", cancelTargeting: "none", drawMotion: "none", blitzTarget: "none", selectVisit: "none", draftPoint: "none",
+  draftPointRemove: "none", draftCancel: "none", renameMore: "none", undo: "none", redo: "none", setName: "none", setNotes: "none",
+  setLos: "none", saved: "none", setShadow: "none", setArtShadow: "none",
+  load: "open", newPlay: "open", hydrate: "open",
+};
+
+/**
  * Every edit lands with its lateral chain settled (lib/play/lateral.ts): a move of a player or the ball,
  * a catch dragged, a lateral retargeted, a formation reset or flipped each re-clamp every catch in
  * chain order, since each catch depends on the one before it. A play with nothing to settle is untouched.
+ * Then the action's HISTORY rule decides what Undo and Redo hold.
  */
 export function reducer(s: PlayState, a: Action): PlayState {
-  const next = reduce(s, a);
-  if (next.players === s.players) return next;
-  const players = settleChain(next.players);
-  return players === next.players ? next : { ...next, players };
+  let next = reduce(s, a);
+  if (next.players !== s.players) {
+    const players = settleChain(next.players);
+    if (players !== next.players) next = { ...next, players };
+  }
+  const rule = HISTORY[a.type];
+  if (rule === "open") return { ...next, ...emptyHistory };
+  if (rule === "none" || next.players === s.players || canonical(next.players) === canonical(s.players)) return next;
+  return { ...next, ...push(s, s) };
 }
 
 function reduce(s: PlayState, a: Action): PlayState {
   switch (a.type) {
-    case "move": {
-      const base = a.commit ? commit(s) : s;
-      return { ...base, players: patch(base.players, a.id, { x: a.x, y: a.y }) };
-    }
+    case "move":
+      return { ...s, players: patch(s.players, a.id, { x: a.x, y: a.y }) };
     case "select": {
       if (a.id === null) return { ...s, selectedId: null, visit: null, targeting: null, draft: null };
       const picked = s.players.find((p) => p.id === a.id);
@@ -305,8 +328,7 @@ function reduce(s: PlayState, a: Action): PlayState {
     case "removeMotion": {
       const p = selected(s);
       if (!p?.preSnap) return s;
-      const c = commit(s);
-      return { ...c, draft: null, players: c.players.map(q => q.id === p.id ? withoutMotion(q) : q) };
+      return { ...s, draft: null, players: s.players.map(q => q.id === p.id ? withoutMotion(q) : q) };
     }
     case "pick": {
       const p = selected(s);
@@ -317,10 +339,9 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (isQbAction(a.key) && (p.id !== quarterback(s.players)?.id || at !== 0)) return s;
       if (at !== null && at < chain.length - 1 && a.key !== "man") {
         // a job for a time the ball goes on from them ends the chain there, with that job
-        const c = commit(s);
-        const cut = withHops(c.players, hopsUpTo(c.players, at));
-        if (a.key === "custom") return { ...c, players: patch(cut, p.id, { route: null }), visit: at, draft: { id: p.id, pts: [] }, targeting: null };
-        return { ...c, players: cut.map((q) => (q.id === p.id ? routed(cut, q, { type: a.key }) : q)), visit: at };
+        const cut = withHops(s.players, hopsUpTo(s.players, at));
+        if (a.key === "custom") return { ...s, players: patch(cut, p.id, { route: null }), visit: at, draft: { id: p.id, pts: [] }, targeting: null };
+        return { ...s, players: cut.map((q) => (q.id === p.id ? routed(cut, q, { type: a.key }) : q)), visit: at };
       }
       if (p.route && p.route.type === a.key && a.key !== "custom") return setRoute(s, p.id, null);
       // a jet sweep is a handoff at the snap: not for the quarterback, the centre or a lateral carrier (J8)
@@ -338,8 +359,7 @@ function reduce(s: PlayState, a: Action): PlayState {
       // the last time they have it: like Man, ask who takes it
       if (at === chain.length - 1) return { ...s, visit: at, targeting: "lateral", draft: null };
       // a time they toss it on: that lateral and every one after come off, and they have no job yet
-      const c = commit(s);
-      return { ...c, visit: at, targeting: null, players: patch(withHops(c.players, hopsUpTo(c.players, at)), p.id, { route: null }) };
+      return { ...s, visit: at, targeting: null, players: patch(withHops(s.players, hopsUpTo(s.players, at)), p.id, { route: null }) };
     }
     case "target": {
       const def = selected(s);
@@ -352,12 +372,11 @@ function reduce(s: PlayState, a: Action): PlayState {
         const chain = chainOf(s.players);
         const at = editedVisit(s, chain);
         if (!def || at === null || chain[at]?.id === t.id) return s;
-        const c = commit(s);
-        const players = withHops(c.players, [...hopsUpTo(c.players, at), { to: t.id }]).map((p) => {
+        const players = withHops(s.players, [...hopsUpTo(s.players, at), { to: t.id }]).map((p) => {
           if (p.id === t.id && p.route && !isRun(p.route.type)) return { ...p, route: null };
           return p;
         });
-        return { ...c, targeting: null, selectedId: t.id, visit: at + 1, players };
+        return { ...s, targeting: null, selectedId: t.id, visit: at + 1, players };
       }
       if (s.targeting === "blitz") {
         // the blitzer comes for this player; picking the quarterback is the default again (B8)
@@ -391,8 +410,7 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (!link || !hop) return s;
       const pt = clampCatch(a.pt, link.release);
       if (hop.catch?.[0] === pt[0] && hop.catch[1] === pt[1]) return s;
-      const c = commit(s);
-      return { ...c, players: withHops(c.players, hops.map((h, i) => (i === a.hop ? { ...h, catch: pt } : h))) };
+      return { ...s, players: withHops(s.players, hops.map((h, i) => (i === a.hop ? { ...h, catch: pt } : h))) };
     }
     case "releaseMove": {
       const link = chainLinks(s.players)[a.hop];
@@ -401,8 +419,7 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (!link || !hop) return s;
       const pt = clampRelease(a.pt);
       if (hop.release?.[0] === pt[0] && hop.release[1] === pt[1]) return s;
-      const c = commit(s);
-      return { ...c, players: withHops(c.players, hops.map((h, i) => (i === a.hop ? { ...h, release: pt } : h))) };
+      return { ...s, players: withHops(s.players, hops.map((h, i) => (i === a.hop ? { ...h, release: pt } : h))) };
     }
     case "runBefore": {
       const p = selected(s);
@@ -413,7 +430,6 @@ function reduce(s: PlayState, a: Action): PlayState {
       const hops = hopsUpTo(s.players, Infinity);
       const hop = at === null ? undefined : hops[at];
       if (!p || p.team !== "offense" || at === null || !link || !hop || link.from.id !== p.id) return s;
-      const c = commit(s);
       const next = hops.map((h, i): Hop => {
         if (i !== at) return h;
         // a release dragged onto the carrier's own spot is no run (P3): the tile reads off, and starts one again
@@ -424,7 +440,7 @@ function reduce(s: PlayState, a: Action): PlayState {
         }
         return { ...h, release: defaultRelease(link.start, link.catch) };
       });
-      return { ...c, visit: at, players: withHops(c.players, next) };
+      return { ...s, visit: at, players: withHops(s.players, next) };
     }
     case "setRoute":
       return setRoute(s, a.id, a.route);
@@ -443,8 +459,7 @@ function reduce(s: PlayState, a: Action): PlayState {
     case "customPointAdd": {
       const route = customRoute(s, a.id);
       if (!route || (route.pts?.length ?? 0) >= MAX_ROUTE_POINTS) return s;
-      const c = commit(s);
-      return { ...c, players: patch(c.players, a.id, { route: { ...route, pts: [...(route.pts ?? []), clampPoint(a.pt)] } }) };
+      return { ...s, players: patch(s.players, a.id, { route: { ...route, pts: [...(route.pts ?? []), clampPoint(a.pt)] } }) };
     }
     case "customPointMove": {
       const route = customRoute(s, a.id);
@@ -452,18 +467,16 @@ function reduce(s: PlayState, a: Action): PlayState {
       if (!route || !pts?.[a.index]) return s;
       const pt = clampPoint(a.pt);
       if (pts[a.index]?.[0] === pt[0] && pts[a.index]?.[1] === pt[1]) return s;
-      const c = commit(s);
       return {
-        ...c,
-        players: patch(c.players, a.id, { route: { ...route, pts: pts.map((q, i) => (i === a.index ? pt : q)) } }),
+        ...s,
+        players: patch(s.players, a.id, { route: { ...route, pts: pts.map((q, i) => (i === a.index ? pt : q)) } }),
       };
     }
     case "customPointRemove": {
       const route = customRoute(s, a.id);
       const pts = route?.pts;
       if (!route || !pts?.[a.index] || pts.length <= 1) return s;
-      const c = commit(s);
-      return { ...c, players: patch(c.players, a.id, { route: { ...route, pts: pts.filter((_, i) => i !== a.index) } }) };
+      return { ...s, players: patch(s.players, a.id, { route: { ...route, pts: pts.filter((_, i) => i !== a.index) } }) };
     }
     case "togglePrimary": {
       const sel = selected(s);
@@ -471,10 +484,9 @@ function reduce(s: PlayState, a: Action): PlayState {
       // quarterback on a rollout or boot, who throws it (Q12)
       if (!sel || sel.team !== "offense" || !sel.route || carriers(s.players).has(sel.id) || isQbAction(sel.route.type)) return s;
       const on = !sel.route.primary;
-      const c = commit(s);
       return {
-        ...c,
-        players: c.players.map((p) => {
+        ...s,
+        players: s.players.map((p) => {
           if (!p.route) return p;
           // a read taken off a player leaves no `primary: false` behind, so the play stores as it reads (#113)
           if (p.id === sel.id) return { ...p, route: asStored({ ...p.route, primary: on }) };
@@ -486,29 +498,24 @@ function reduce(s: PlayState, a: Action): PlayState {
     case "mirror": {
       const sel = selected(s);
       if (!sel?.route || !mirrorable(sel)) return s;
-      const c = commit(s);
-      return { ...c, players: patch(c.players, sel.id, { route: mirrorRoute(sel.route, atSnap(sel).x).route }) };
+      return { ...s, players: patch(s.players, sel.id, { route: mirrorRoute(sel.route, atSnap(sel).x).route }) };
     }
-    case "rename": {
-      const base = a.commit ? commit(s) : s;
-      return { ...base, players: patch(base.players, a.id, { label: a.label.slice(0, 3).toUpperCase() }) };
-    }
-    case "flip": {
-      const c = commit(s);
-      return { ...c, players: flipped(c.players) };
-    }
+    case "rename":
+    case "renameMore":
+      return { ...s, players: patch(s.players, a.id, { label: a.label.slice(0, 3).toUpperCase() }) };
+    case "flip":
+      return { ...s, players: flipped(s.players) };
     case "clearRoutes": {
       const inScope = (p: Player): boolean => !a.team || p.team === a.team;
       if (!s.players.some((p) => (p.route || p.preSnap || p.laterals) && inScope(p))) return s;
-      const c = commit(s);
       const clear = (p: Player): Player => {
         const out = { ...withoutMotion(p), route: null };
         delete out.laterals;
         return out;
       };
       return {
-        ...c,
-        players: c.players.map((p) => (inScope(p) ? clear(p) : p)),
+        ...s,
+        players: s.players.map((p) => (inScope(p) ? clear(p) : p)),
         draft: null,
         targeting: null,
       };
@@ -528,8 +535,7 @@ function reduce(s: PlayState, a: Action): PlayState {
         return h.x !== p.x || h.y !== p.y;
       });
       if (!moved) return s;
-      const c = commit(s);
-      return { ...c, players: c.players.map((p) => (inScope(p) ? home(p) : p)) };
+      return { ...s, players: s.players.map((p) => (inScope(p) ? home(p) : p)) };
     }
     case "undo":
       return step(s, undoStep(s, s));

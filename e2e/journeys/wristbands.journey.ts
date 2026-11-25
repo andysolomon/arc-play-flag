@@ -3,12 +3,15 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import type { SavedPlay } from "../../lib/play/types";
 import { Designer, downloadBytes } from "../support/designer";
-import { COVER_ONE_D, OTTERS, SLANT_LEFT, WHEEL_RIGHT, ZONE_D, moved, playbook, seed, storedPlays } from "../support/fixtures";
+import { COVER_ONE_D, OTTERS, SLANT_LEFT, WHEEL_RIGHT, ZONE_D, moved, play, playbook, seed, storedPlays } from "../support/fixtures";
+import { forgetPages, recordPages } from "../support/record";
 
 /**
  * Wristbands follow each play's own side (issue #104). A defensive book prints one insert per
  * defender, titled with that defender's tag and with their coverage bold, never the offense's
  * C, X, Y and Z; a book with both sides bolds, on each play, the player of that play's side.
+ * A book longer than an insert's grid carries on to a second insert per position, numbered past
+ * any play deleted from the library, and the quarterback gets no insert whatever their tag.
  * Every page the app hands the rasteriser is recorded as it goes into the PDF, and read back:
  * each insert's title, and in each of its cells who is ringed and which assignments are drawn
  * bold or faded. Each test leaves the PDF, a picture of every page and a manifest
@@ -17,24 +20,6 @@ import { COVER_ONE_D, OTTERS, SLANT_LEFT, WHEEL_RIGHT, ZONE_D, moved, playbook, 
 
 const toast = (page: Page) => page.locator("div[role='status']");
 const blurb = (page: Page) => page.getByLabel("Export playbook").getByText(/^One insert per/);
-
-/** Records the markup of every SVG page the app rasterises, exactly as it draws it. */
-async function recordPages(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __ffpdPages?: string[] };
-    const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with .call below
-    const set = src?.set;
-    if (!src || !set) return;
-    Object.defineProperty(HTMLImageElement.prototype, "src", {
-      ...src,
-      set(this: HTMLImageElement, v: string) {
-        if (v.startsWith("data:image/svg+xml")) (w.__ffpdPages ??= []).push(decodeURIComponent(v.slice(v.indexOf(",") + 1)));
-        set.call(this, v);
-      },
-    });
-  });
-}
 
 /** One play on an insert: who is ringed, and how many assignments (routes and man tags) are drawn full or faded. */
 interface Cell {
@@ -102,7 +87,7 @@ interface Printed {
 
 /** Downloads the book's wristbands and reads back what was printed. */
 async function downloadWristbands(page: Page, filename: string): Promise<Printed> {
-  await page.evaluate(() => { (window as unknown as { __ffpdPages?: string[] }).__ffpdPages = []; });
+  await forgetPages(page);
   const [file] = await Promise.all([
     page.waitForEvent("download", { timeout: 60_000 }),
     page.getByRole("button", { name: "Download wristbands PDF" }).click(),
@@ -256,4 +241,31 @@ test("an offensive book keeps its inserts, and a two-way book bolds each play's 
 
   await keep(page, `test-results/wristbands-${testInfo.project.name}-offense`, offensive, { device: testInfo.project.name, book: "Otter Offense" });
   await keep(page, `test-results/wristbands-${testInfo.project.name}-two-way`, twoWayPrinted, { device: testInfo.project.name, book: "Otter Two-Way" });
+});
+
+test("a book longer than one insert carries on to a second, numbered past a deleted play, and the quarterback gets none", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await recordPages(page);
+  // seven plays, one more than a youth slim insert's six cells; the coach retagged the first play's quarterback "Q1"
+  const plays = Array.from({ length: 7 }, (_, i) => play(`fx-band-${String(i + 1)}`, `Otter Band ${String(i + 1)}`, { o3: { type: "go" } }));
+  const [first, ...rest] = plays;
+  if (!first) throw new Error("no plays");
+  const q1 = moved(first, { o2: { label: "Q1" } });
+  // the second play in the book was deleted from the library after it went in
+  const book = { ...playbook("fx-seven", "Otter Seven", []), plays: [q1.id, "fx-deleted", ...rest.map((p) => p.id)] };
+  await seed(page, { plays: [q1, ...rest], playbooks: [book], team: OTTERS });
+
+  await page.goto("/playbooks?book=fx-seven");
+  const printed = await downloadWristbands(page, "otter-seven-wristbands.pdf");
+
+  // each position fills an insert with plays 1 to 6 and starts a second for play 7; Q1 gets no insert
+  const cells = (from: number, to: number) => plays.slice(from - 1, to).map((p, i) => ({ n: from + i, name: p.name }));
+  const inserts = ["C", "X", "Y", "Z", "Everyone"].flatMap((title) => [
+    { caption: `${title} · Otter Seven · 1 of 2`, cells: cells(1, 6) },
+    { caption: `${title} · Otter Seven · 2 of 2`, cells: cells(7, 7) },
+  ]);
+  expect(printed.inserts.map((ins) => ({ caption: ins.caption, cells: ins.cells.map((c) => ({ n: c.n, name: c.name })) }))).toEqual(inserts);
+  expect(printed.pages).toHaveLength(pagesFor(inserts.length));
+  expect(printed.pdfPages).toBe(printed.pages.length);
+  await keep(page, `test-results/wristbands-${testInfo.project.name}-seven`, printed, { device: testInfo.project.name, book: "Otter Seven" });
 });
