@@ -110,6 +110,25 @@ test("a player's tag takes three capital letters, and the whole retag is one ste
   writeFileSync(`test-results/history-${info.project.name}-tag.json`, `${JSON.stringify({ typed: "cbxy", shown: "CBX", undoSteps: 1 }, null, 2)}\n`);
 });
 
+test("an edit that changes nothing is no step of undo, so Redo still waits", async ({ page }, info) => {
+  const d = new Designer(page);
+  await d.goto();
+  const x = d.player("X");
+  await x.press("ArrowDown");
+  await d.foldOverlays();
+  await d.undo.click();
+  await expect(d.redo).toBeEnabled();
+
+  // retyping X's tag as it reads ("x" is "X") changes nothing on the play
+  await d.select("X");
+  const tag = page.locator("#route-sidebar").getByRole("textbox", { name: "Player tag" });
+  await tag.fill("x");
+  await expect(tag).toHaveValue("X");
+  await expect(d.undo).toBeDisabled();
+  await expect(d.redo).toBeEnabled();
+  writeFileSync(`test-results/history-${info.project.name}-no-op.json`, `${JSON.stringify({ retyped: "x", shown: "X", undo: false, redo: true }, null, 2)}\n`);
+});
+
 test("undo keeps the last 60 edits and drops older ones", async ({ page }, info) => {
   test.setTimeout(120_000);
   const d = new Designer(page);

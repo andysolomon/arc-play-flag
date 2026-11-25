@@ -219,7 +219,7 @@ export function App() {
   }, [s.players, say]);
   // a player dragged or stepped with the arrow keys can take their route to the sideline
   const fieldDispatch = useCallback((a: Action) => {
-    if (a.type === "move" && a.commit) watchCut(a.id);
+    if (a.type === "move") watchCut(a.id);
     dispatch(a);
   }, [watchCut]);
   // on a phone/tablet the palette covers the field, so it folds away once a route is chosen
@@ -490,7 +490,7 @@ export function App() {
   // chart: at once and never undone. The play's own history never hears of it (lib/play/lineup.ts, F6, F7)
   const rosterDispatch = useCallback((a: Action) => {
     if (a.type === "select") setRosterPick(a.id);
-    if (a.type !== "move" || !a.commit) return;
+    if (a.type !== "move") return;
     const p = formation.find((q) => q.id === a.id);
     if (p) onLineups(withSpot(lineups, p.team, p.label, a.x, a.y));
   }, [formation, lineups, onLineups]);
@@ -751,7 +751,7 @@ export function App() {
             onDone={() => { dispatch({ type: "select", id: null }); }}
             onPrimary={onPrimary}
             onMirror={onMirror}
-            onRename={(id, label, commit) => { dispatch({ type: "rename", id, label, commit }); }}
+            onRename={(id, label, first) => { dispatch({ type: first ? "rename" : "renameMore", id, label }); }}
             noRunZone={s.side === "offense" && noRunZones && inNoRunZone(s.los)}
           />
           )}

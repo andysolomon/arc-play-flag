@@ -427,9 +427,9 @@ function FieldImpl({
       setLive(null);
       if (!s) return;
       tellCrowded(dr, clamp(snap(c.x, snapMode), snap(c.y, snapMode), dr.team, topRef.current, dr.gap), s);
-      // held back to where it started: nothing moved, so nothing to undo and Redo is kept
+      // held back to where it started: nothing moved, so no landing bounce (the reducer adds no Undo step for it either)
       if (s.x === dr.x0 && s.y === dr.y0) return;
-      dispatch({ type: "move", id: dr.id, x: s.x, y: s.y, commit: true });
+      dispatch({ type: "move", id: dr.id, x: s.x, y: s.y });
       setBoingId(dr.id);
       window.setTimeout(() => { setBoingId((b) => (b === dr.id ? null : b)); }, 380);
       return;
@@ -652,7 +652,7 @@ function FieldImpl({
         // a QB already under centre is not 2 yards off the C: there is just no room past him (spacing.ts, U4)
         onNote?.(crowdNote(who, mate, inSlot(p, mates) ? "stuck" : "kept"));
       }
-      if (r.to) dispatch({ type: "move", id, x: r.to.x, y: r.to.y, commit: true });
+      if (r.to) dispatch({ type: "move", id, x: r.to.x, y: r.to.y });
       else if (r.past) shakePlayer(id, !e.repeat);
       if (selectedId !== id) onSelect(id);
     } else if (e.key === "Enter" || e.key === " ") {
