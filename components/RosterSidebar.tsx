@@ -18,6 +18,7 @@ import { VIEW } from "./Header";
 import { Chevron, Menu, MenuHeading } from "./Menu";
 import { Sticker } from "./Sticker";
 import { crumb, eyebrow, input, menuChoice, menuItemDanger, pill, segment, segmentInput, segmented } from "./ui";
+import { NameText } from "./NameText";
 
 /** The views in the order the header's badge goes through them. */
 const VIEWS: readonly Vis[] = ["offense", "defense", "both"];
@@ -343,14 +344,14 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                     onClick={() => { pick(l.id); }}
                     className={menuChoice}
                   >
-                    <span className="min-w-0 flex-1 break-words py-2 leading-tight">{lineupName(l)}</span>
+                    <NameText className="flex-1 py-2 leading-tight">{lineupName(l)}</NameText>
                   </button>
                 ))}
                 {lineup.id !== MAIN_LINEUP && !made && (
                   <>
                     <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
                     <button type="button" role="menuitem" onClick={askDelete} className={menuItemDanger}>
-                      <span className="min-w-0 break-words py-2 leading-tight">Delete “{lineupName(lineup)}”</span>
+                      <NameText className="py-2 leading-tight">{`Delete “${lineupName(lineup)}”`}</NameText>
                     </button>
                   </>
                 )}
@@ -408,7 +409,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                   <li key={`${st.team}-${st.tag}`}>
                     <button type="button" onClick={() => { goTo(st.team, st.tag); }} className={row}>
                       <Dot team={st.team} />
-                      <span className="min-w-0 flex-1 truncate">{st.tag} · {depthWord(st.depth)}</span>
+                      <NameText className="flex-1">{`${st.tag} · ${depthWord(st.depth)}`}</NameText>
                     </button>
                   </li>
                 ))}
@@ -439,7 +440,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                       >
                         <Dot team={p.team} />
                         <span className="w-7 flex-none">{p.label}</span>
-                        <span className={`min-w-0 flex-1 truncate ${line.startsWith("Unassigned") ? "text-ink-muted" : ""}`}>{line}</span>
+                        <NameText className={`flex-1 ${line.startsWith("Unassigned") ? "text-ink-muted" : ""}`}>{line}</NameText>
                       </button>
                     </li>
                   );
@@ -516,9 +517,9 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                         onClick={() => { openPage(name); }}
                         aria-label={`${depthWord(i)} at ${sel.label}: ${name}`}
                         title={`${name}'s positions`}
-                        className={`${pill} min-h-11 min-w-0 flex-1 truncate px-3 text-left text-base`}
+                        className={`${pill} min-h-11 min-w-0 flex-1 px-3 text-left text-base`}
                       >
-                        {name}
+                        <NameText>{name}</NameText>
                       </button>
                       {!made && (
                         <>
@@ -563,8 +564,8 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                       {candidates.map((name) => (
                         <li key={name}>
                           <button type="button" onClick={() => { addToChart(name); }} aria-label={`Add ${name} at ${sel.label}`} className={row}>
-                            <span className="min-w-0 flex-1 truncate">{name}</span>
-                            <span className="min-w-0 max-w-[55%] truncate text-caption text-ink-muted">{sits(name)}</span>
+                            <NameText className="flex-1">{name}</NameText>
+                            <NameText className="max-w-[55%] text-caption text-ink-muted">{sits(name)}</NameText>
                           </button>
                         </li>
                       ))}
@@ -626,8 +627,8 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
               {names.map((name) => (
                 <li key={name}>
                   <button type="button" onClick={() => { openPage(name); }} aria-label={name} className={row}>
-                    <span className="min-w-0 flex-1 truncate">{name}</span>
-                    <span className="min-w-0 max-w-[55%] truncate text-caption text-ink-muted">{sits(name)}</span>
+                    <NameText className="flex-1">{name}</NameText>
+                    <NameText className="max-w-[55%] text-caption text-ink-muted">{sits(name)}</NameText>
                   </button>
                 </li>
               ))}
@@ -760,7 +761,7 @@ function RosterSidebarImpl({ lineups, onLineups, roster, onRoster, selected: sel
                     >
                       <Dot team={p.team} />
                       <span className="w-7 flex-none">{p.label || "·"}</span>
-                      <span className={`min-w-0 flex-1 truncate ${line.startsWith("Unassigned") || line === "No tag" ? "text-ink-muted" : ""}`}>{line}</span>
+                      <NameText className={`flex-1 ${line.startsWith("Unassigned") || line === "No tag" ? "text-ink-muted" : ""}`}>{line}</NameText>
                     </button>
                   </li>
                 );

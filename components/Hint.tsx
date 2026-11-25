@@ -37,6 +37,7 @@ export function Hint({ text, below, flag = false }: { text: string | null; below
       className={
         "pointer-events-none fixed left-1/2 top-[58px] z-[15] max-w-[calc(100%-24px)] -translate-x-1/2 px-4 py-1.5 text-base shadow-toast " +
         // a flag note says why something was snapped back, so it wraps whole rather than cutting off
+        // eslint-disable-next-line no-restricted-syntax -- a passing status line; any name it quotes is shown whole where it lives
         (flag ? "w-max rounded-note border-2 border-ink bg-yellow text-center leading-note on-yellow" : "truncate rounded-pill bg-ink text-cream")
       }
     >

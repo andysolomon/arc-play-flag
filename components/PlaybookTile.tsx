@@ -6,6 +6,7 @@ import { getCurrentBookId, getPlaybooks, getServerCurrentBookId, getServerPlaybo
 import { IconTile } from "./IconTile";
 import { Menu, MenuHeading, MenuNote } from "./Menu";
 import { menuChoice, menuItem } from "./ui";
+import { NameText } from "./NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -63,7 +64,7 @@ export function PlaybookTile({ onSwitchBook, root }: Props) {
                   onClick={() => { pick(b.id); }}
                   className={menuChoice}
                 >
-                  <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                  <NameText className="flex-1">{b.name}</NameText>
                   <span className="flex-none text-caption text-ink-muted">{b.plays.length ? plural(b.plays.length, "play") : "Empty"}</span>
                 </button>
               ))}
@@ -72,7 +73,7 @@ export function PlaybookTile({ onSwitchBook, root }: Props) {
           <span className="mx-2 my-0.5 h-0.5 bg-divider" aria-hidden />
           {current && (
             <Link href={`/playbooks?book=${encodeURIComponent(current.id)}`} role="menuitem" className={`${menuItem} !text-ink no-underline`}>
-              <span className="min-w-0 truncate">Edit “{current.name}” ›</span>
+              <NameText>{`Edit “${current.name}” ›`}</NameText>
             </Link>
           )}
           <Link href="/playbooks" role="menuitem" className={`${menuItem} !text-ink no-underline`}>All playbooks ›</Link>

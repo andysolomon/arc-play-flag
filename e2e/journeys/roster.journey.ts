@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { DEEP_FIELD_KEY } from "../../lib/deepfield";
 import type { Lineups, Roster, SavedPlay, Spot } from "../../lib/play/types";
+import { expectNoClippedText } from "../support/clipped";
 import { Designer, armSabotage, downloadText, sabotage } from "../support/designer";
 import { OTTERS, SLANT_LEFT, jsonUpload, play, seed, storedLineups } from "../support/fixtures";
 
@@ -955,16 +956,11 @@ test("a long lineup name is shown whole in the lineups menu, so two that differ 
   await d.openSaved(SLANT_LEFT.name);
   await d.roster();
   await d.rosterPanel();
-  /** The words in the open menu that are drawn cut off, and whether the menu itself scrolls sideways. */
-  const cutOff = () => lineupMenu(page).evaluate((menu) => ({
-    words: [...menu.querySelectorAll("[role^='menuitem'] span")].filter((s) => s.scrollWidth > s.clientWidth + 1).map((s) => s.textContent),
-    sideways: menu.scrollWidth > menu.clientWidth + 1,
-  }));
 
   await lineupsButton(page).click();
   const rows = lineupMenu(page).getByRole("menuitemradio");
   await expect(rows).toHaveText(["Starting Lineup", "Secondary Lineup", rotA, rotB]);
-  expect(await cutOff()).toEqual({ words: [], sideways: false });
+  await expectNoClippedText(lineupMenu(page));
   // a name too long for one line wraps, and its row grows past the 44px a row starts at
   const one = await rows.first().boundingBox(), long = await rows.nth(3).boundingBox();
   expect(one && long).toBeTruthy();
@@ -978,9 +974,11 @@ test("a long lineup name is shown whole in the lineups menu, so two that differ 
   await rows.nth(3).click();
   await expect(lineupName(page)).toHaveValue(rotB);
   await expect(page.locator("#field-title")).toContainText(rotB);
+  await expectNoClippedText(page.locator("#field-title"));
+  await expectNoClippedText(panel(page));
   await lineupsButton(page).click();
   await expect(lineupMenu(page).getByRole("menuitem")).toHaveText([`Delete “${rotB}”`]);
-  expect(await cutOff()).toEqual({ words: [], sideways: false });
+  await expectNoClippedText(lineupMenu(page));
 });
 
 test("names stay off a play until turned on, follow the lineup picked in Play tools, and go off with the last name on the roster", async ({ page }, info) => {

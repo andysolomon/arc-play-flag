@@ -8,6 +8,7 @@ import { useAccount } from "../account/AccountPanel";
 import { menuItem, pill, pillDark } from "../ui";
 import type { Say } from "./PlaybooksScreen";
 import { PreviewModal } from "./PreviewModal";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -80,7 +81,7 @@ export function SendToTeamModal({ transfer, say, onClose }: { transfer: Transfer
               className={`${pill} flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left`}
             >
               <span aria-hidden className="h-4 w-4 flex-none rounded-full border-2 border-ink" style={{ background: t.color }} />
-              <span className="min-w-0 flex-1 truncate text-base">{t.name}</span>
+              <NameText className="flex-1 text-base">{t.name}</NameText>
               <span className="text-caption text-ink-muted">{plural(t.plays, "play")} · {plural(t.playbooks, "playbook")}</span>
               <span className="w-[72px] text-right text-small">{sending === t.id ? "Sending…" : "Send"}</span>
             </button>
@@ -97,7 +98,7 @@ export function SendToTeamModal({ transfer, say, onClose }: { transfer: Transfer
                 onClick={() => { void sendToOrg(t); }}
                 className={`${pill} flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left`}
               >
-                <span className="min-w-0 flex-1 truncate text-base">{t.label}</span>
+                <NameText className="flex-1 text-base">{t.label}</NameText>
                 <span className="w-[72px] text-right text-small">{sending === t.target.team ? "Sending…" : "Send"}</span>
               </button>
             ))}

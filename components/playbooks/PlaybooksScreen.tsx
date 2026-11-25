@@ -38,7 +38,7 @@ export function PlaybooksScreen() {
       <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
         <Link href={mounted && bookId ? `/?book=${encodeURIComponent(bookId)}` : "/"} className={`${pillSm} inline-flex items-center !text-ink no-underline`}>‹ Designer</Link>
         <Sticker icon="playbook" size={26} className="flex-none" priority />
-        <h1 className="min-w-0 truncate text-header font-normal">Playbooks</h1>
+        <h1 className="min-w-0 text-header font-normal">Playbooks</h1>
         <span className="whitespace-nowrap text-caption text-ink-muted max-[479px]:hidden">5v5 flag</span>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">

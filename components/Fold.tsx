@@ -22,6 +22,7 @@ export function Fold({ label, says, children }: { label: string; says: ReactNode
         className="flex min-h-11 flex-none cursor-pointer items-center gap-2 rounded-note text-left hover:bg-yellow-soft"
       >
         <span className={`${eyebrow} uppercase`}>{label}</span>
+        {/* eslint-disable-next-line no-restricted-syntax -- a setting's summary in our words (a color, theme or end zone name), not a coach's name */}
         <span className="min-w-0 flex-1 truncate text-right text-small text-ink">{says}</span>
         <svg
           aria-hidden viewBox="0 0 16 16" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"

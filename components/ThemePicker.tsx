@@ -96,6 +96,7 @@ export function ThemePicker({ className = "", unlockHref }: { className?: string
                     {choice === t.id && <span className="ml-auto text-small leading-tight">✓</span>}
                     {locked && <span className="ml-auto text-ink-muted"><Lock /></span>}
                   </span>
+                  {/* eslint-disable-next-line no-restricted-syntax -- a theme's name is ours, not a coach's */}
                   <span className="truncate border-t-2 border-divider bg-cream px-2 pb-1.5 pt-1 text-small leading-tight">{t.name}</span>
                 </span>
               </label>

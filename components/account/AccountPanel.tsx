@@ -11,6 +11,7 @@ import { HEAD } from "@/lib/org/types";
 import { Chevron, Menu, MenuHeading } from "../Menu";
 import { chip, eyebrow, input, menuChoice, menuItem, menuItemDanger, pill, pillDark } from "../ui";
 import { OrgSection, levelWords } from "./OrgPanel";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -108,7 +109,7 @@ function SignedIn({ s }: { s: AccountState }) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-small">Signed in as <strong className="font-normal text-ink">{s.user?.name}</strong></span>
+        <span className="min-w-0 flex-1 text-small">Signed in as <strong className="font-normal text-ink"><NameText>{s.user?.name ?? ""}</NameText></strong></span>
         {canOpenProfile() && <button type="button" onClick={openProfile} className={`${pill} min-h-11 px-3 text-small`}>Manage account</button>}
         <button type="button" disabled={busy} onClick={() => { void signOut(); }} className={`${pill} min-h-11 px-3 text-small`}>Sign out</button>
       </div>
@@ -119,7 +120,7 @@ function SignedIn({ s }: { s: AccountState }) {
           className={`${pill} flex min-h-11 w-full items-center gap-2 px-3 text-left text-small`}
         >
           <span aria-hidden className="h-4 w-4 flex-none rounded-full border-2 border-ink" style={{ background: team?.color ?? "#f2b705" }} />
-          <span className="min-w-0 flex-1 truncate">{team?.name ?? "Opening your team…"}</span>
+          <NameText className="flex-1">{team?.name ?? "Opening your team…"}</NameText>
           {orgTeam && <span className={chip} data-level={s.level}>{levelWords(s.level ?? 0)}</span>}
           <span className="text-caption text-ink-muted">{plural(teamCount, "team")}</span>
           <Chevron open={open} />
@@ -131,7 +132,7 @@ function SignedIn({ s }: { s: AccountState }) {
               <button key={t.id} type="button" role="menuitemradio" aria-checked={t.id === s.teamId} className={menuChoice}
                 onClick={() => { close(); void switchTeam(t.id); }}>
                 <span aria-hidden className="h-3.5 w-3.5 flex-none rounded-full border-2 border-ink" style={{ background: t.color }} />
-                <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                <NameText className="flex-1">{t.name}</NameText>
                 <span className="text-caption text-ink-muted">{plural(t.plays, "play")}</span>
               </button>
             ))}
@@ -143,7 +144,7 @@ function SignedIn({ s }: { s: AccountState }) {
                   <button key={t.id} type="button" role="menuitemradio" aria-checked={t.id === s.teamId && o.id === s.org} className={menuChoice}
                     onClick={() => { close(); void switchTeam(t.id, o.id); }}>
                     <span aria-hidden className="h-3.5 w-3.5 flex-none rounded-full border-2 border-ink" style={{ background: t.color }} />
-                    <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                    <NameText className="flex-1">{t.name}</NameText>
                     <span className="text-caption text-ink-muted">{levelWords(t.level)} · {plural(t.plays, "play")}</span>
                   </button>
                 ))}

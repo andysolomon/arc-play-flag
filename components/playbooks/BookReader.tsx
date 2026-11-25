@@ -13,6 +13,7 @@ import type { SavedPlay } from "@/lib/play/types";
 import { Field } from "../Field";
 import { SideBadge } from "../SideBadge";
 import { chip, flagChip, input, pill, pillSm } from "../ui";
+import { NameText } from "../NameText";
 
 const noop = (): void => undefined;
 
@@ -146,7 +147,7 @@ export function BookReader({ id, read }: { id: string; read: string }) {
       {!full && (
         <header className="flex flex-none items-center gap-[10px] border-b-2 border-ink bg-cream px-3 py-1.5">
           {back}
-          <h1 className="min-w-0 truncate text-header font-normal">{book.name}</h1>
+          <h1 className="min-w-0 text-header font-normal"><NameText>{book.name}</NameText></h1>
           <span className="whitespace-nowrap text-caption text-ink-muted max-[599px]:hidden">Game-day reader</span>
           <span className="flex-1" />
           <button type="button" onClick={enter} aria-pressed={false} className={`${pillSm} flex-none`}>Full screen</button>
@@ -178,7 +179,7 @@ export function BookReader({ id, read }: { id: string; read: string }) {
                         className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-pill px-2 text-left text-base hover:bg-yellow-soft"
                       >
                         <span className="inline-flex h-7 min-w-7 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow px-1 text-small">{it.n}</span>{" "}
-                        <span className="min-w-0 truncate">{it.play.name}</span>
+                        <NameText>{it.play.name}</NameText>
                       </button>
                     </li>
                   ))}

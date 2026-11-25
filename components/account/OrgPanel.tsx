@@ -7,6 +7,7 @@ import { HEAD, type Grants, type Invite, type Level, type Membership, type OrgDe
 import { PreviewModal } from "../playbooks/PreviewModal";
 import { TwoStep } from "../playbooks/TwoStep";
 import { divider, eyebrow, input, pill, pillDark, select } from "../ui";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${n === 1 ? one : one === "coach" ? "coaches" : `${one}s`}`;
 
@@ -43,7 +44,7 @@ export function OrgSection({ s }: { s: AccountState }) {
       {s.orgs.map((o) => (
         <div key={o.id} role="group" aria-label={o.name} className="flex flex-col gap-1.5 rounded-tile border-2 border-ink bg-white p-2.5">
           <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-small">{o.name}</span>
+            <NameText className="flex-1 text-small">{o.name}</NameText>
             <span className="text-caption text-ink-muted">{levelWords(0, o.role) === "No access" ? "Member" : levelWords(0, o.role)} · {plural(o.members, "coach")}</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -107,7 +108,7 @@ function GrantsEditor({ teams, draft, onChange, label }: { teams: OrgTeamSummary
             <input type="checkbox" checked={draft.all || draft.teams.has(t.id)} disabled={draft.all}
               onChange={(e) => { const next = new Set(draft.teams); if (e.target.checked) next.add(t.id); else next.delete(t.id); onChange({ ...draft, teams: next }); }}
               className="h-4 w-4 accent-ink" />
-            <span className="truncate">{t.name}</span>
+            <NameText>{t.name}</NameText>
           </label>
           <select aria-label={`Role on ${t.name}`} value={draft.roles[t.id] ?? "view"} className={`${select} min-h-9 py-0.5 text-small`}
             onChange={(e) => { const roles = { ...draft.roles }; if (e.target.value === "view") Reflect.deleteProperty(roles, t.id); else roles[t.id] = e.target.value as "head" | "assist"; onChange({ ...draft, roles }); }}>
@@ -145,7 +146,7 @@ function MembersModal({ org, onClose }: { org: OrgSummary; onClose: () => void }
           <span className={eyebrow}>INVITES</span>
           {(detail.invites ?? []).map((i) => (
             <div key={i.token} className="flex flex-wrap items-center gap-2 text-small">
-              <span className="min-w-0 flex-1 truncate">{i.email ?? "Link"} · until {new Date(i.expires).toLocaleDateString()}</span>
+              <NameText className="flex-1">{`${i.email ?? "Link"} · until ${new Date(i.expires).toLocaleDateString()}`}</NameText>
               {!i.email && <button type="button" className={`${pill} min-h-9 px-3 text-small`} onClick={() => { void navigator.clipboard?.writeText(inviteUrl(i.token)); setLink(i); }}>Copy link</button>}
               <button type="button" className={`${pill} min-h-9 px-3 text-small`} onClick={() => { void run(() => api.revokeInvite(org.id, i.token), "Invite revoked"); }}>Revoke</button>
             </div>
@@ -171,7 +172,7 @@ function MemberRow({ m, teams, isMe, owner, run, org }: { m: Membership; teams: 
   return (
     <div role="group" aria-label={m.name} className="flex flex-col gap-1.5 rounded-tile border-2 border-ink bg-white p-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-small">{m.name}{isMe ? " (you)" : ""}</span>
+        <NameText className="flex-1 text-small">{`${m.name}${isMe ? " (you)" : ""}`}</NameText>
         <span className="text-caption text-ink-muted">{levelWords(0, m.role) === "No access" ? "Member" : levelWords(0, m.role)} · sees {sees} · heads {m.heads.length} · assists {m.assists.length}</span>
       </div>
       {!isMe && m.role !== "owner" && (

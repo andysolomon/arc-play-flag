@@ -20,6 +20,7 @@ import { TwoStep } from "./TwoStep";
 import { ago, usePresenceOn } from "../account/Presence";
 import { useAccount } from "../account/AccountPanel";
 import { stampOf } from "@/lib/org/sync";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
@@ -40,7 +41,7 @@ export function PlayCard({ play: p, say }: { play: SavedPlay; say: Say }) {
       <Link href={`/?open=${p.id}`} aria-label={`Open ${p.name} in the designer`} className="group flex flex-col gap-2 !text-ink no-underline">
         <PlayThumb players={p.players} name={p.name} side={p.side} artShadow={p.artShadow} los={p.los} framed
           className="transition-transform duration-[120ms] group-hover:-translate-y-0.5 motion-reduce:transition-none" />
-        <span className="truncate text-title leading-tight" title={p.name}>{p.name}</span>
+        <NameText oneLine className="text-title leading-tight">{p.name}</NameText>
       </Link>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <SideBadge side={p.side} />

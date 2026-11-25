@@ -18,6 +18,7 @@ import { TwoStep } from "./TwoStep";
 import { ago } from "../account/Presence";
 import { useAccount } from "../account/AccountPanel";
 import { stampOf } from "@/lib/org/sync";
+import { NameText } from "../NameText";
 
 const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 /** the two pages peeking out behind the cover, like a stack of play cards */
@@ -56,7 +57,7 @@ export function BookCard({ book: b, plays, team, say }: Props) {
           )}
         </div>
         <span className="flex flex-col gap-0.5">
-          <span className="truncate text-title leading-tight" title={b.name}>{b.name}</span>
+          <NameText oneLine className="text-title leading-tight">{b.name}</NameText>
           <span className="text-caption text-ink-muted">{b.plays.length ? plural(b.plays.length, "play") : "No plays yet"}</span>
         </span>
       </Link>

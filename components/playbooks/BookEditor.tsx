@@ -20,6 +20,7 @@ import { ShareBook } from "./ShareBook";
 import { ExportPanel } from "./ExportPanel";
 import type { Say } from "./PlaybooksScreen";
 import { TwoStep } from "./TwoStep";
+import { NameText } from "../NameText";
 
 export function BookEditor({ id, say }: { id: string; say: Say }) {
   const router = useRouter();
@@ -113,7 +114,7 @@ export function BookEditor({ id, say }: { id: string; say: Say }) {
                 <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border-2 border-ink bg-yellow on-yellow text-base" aria-label={`Play ${String(it.n)}`}>
                   {it.n}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-title leading-tight" title={it.play.name}>{it.play.name}</span>
+                <NameText oneLine className="flex-1 text-title leading-tight">{it.play.name}</NameText>
                 <button type="button" onClick={() => { setPlays(book.plays.filter((playId) => playId !== it.play.id)); }} aria-label={`Remove ${it.play.name}`} className={`${pill} h-11 w-11 flex-none p-0 text-small`}>✕</button>
               </div>
               <button
