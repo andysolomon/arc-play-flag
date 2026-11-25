@@ -5,6 +5,7 @@ import { expectSaved, marker, panel, reloadedBy, runId, signIn, status, teamButt
 import { storedPlays, storedTeam } from "../support/fixtures";
 import { ago, applied, body, coach, createOrg, invite, join, listOrgs, moveTeam, names, ownTeam, poll, readOrg, readTeam, writePlay } from "../support/org";
 import { COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, play, playbook } from "../support/fixtures";
+import { ORG_KEY } from "../../lib/account/sync";
 import type { AccountResponse } from "../../lib/account/types";
 import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
 
@@ -246,6 +247,9 @@ async function savePlay(page: Page, name: string): Promise<void> {
   await d.save();
 }
 const deviceNames = async (page: Page): Promise<string[]> => Object.values(await storedPlays(page)).map((p) => p.name).sort();
+/** The settings rev the device last took from the organization: a settings push that lands moves it. */
+const settingsRev = (page: Page): Promise<number> =>
+  page.evaluate((k) => (JSON.parse(localStorage.getItem(k) ?? "null") as { settingsRev?: number } | null)?.settingsRev ?? 0, ORG_KEY);
 
 test("the screens: an invite joins, the team button switches to the organization's team, saves cross between coaches, and avatars show who is where", async ({ page, browser }, testInfo) => {
   const run = runId();
@@ -365,9 +369,9 @@ test("the screens: a team rename made as its settings push lands survives a relo
   await d.tools();
   await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
   await expectSaved(page);
-  const before = (await marker(page))?.rev ?? 0;
+  const before = await settingsRev(page);
 
-  // polls wait until the reload, so only the push moves the marker's rev
+  // polls wait until the reload, so the second rename can only go up by its own push
   let releasePolls = (): void => undefined;
   const pollsHeld = new Promise<void>((resolve) => { releasePolls = resolve; });
   await page.route("**/api/orgs/*/teams/*/poll", async (route) => {
@@ -394,8 +398,8 @@ test("the screens: a team rename made as its settings push lands survives a relo
   await expect.poll(async () => (await storedTeam(page))?.name).toBe("Riverside Otters Gold");
   release();
 
-  // the push lands and writes the marker; the reload comes before the second rename's own push is due
-  await expect.poll(async () => (await marker(page))?.rev ?? 0, { intervals: [25] }).toBeGreaterThan(before);
+  // the push lands and writes the device and the marker; the reload comes before the second rename's own push is due
+  await expect.poll(() => settingsRev(page), { intervals: [25] }).toBeGreaterThan(before);
   const landed = await marker(page);
   expect(puts, "the second rename went up before the reload, so the reload tested nothing").toBe(1);
   await reloadedBy(page, async () => { await page.reload(); });
@@ -419,6 +423,7 @@ test("the screens: a play saved while a poll is on its way back keeps the save, 
   await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
   await expectSaved(page);
   await d.openSaved("Otter Slant Left");
+  await d.tools();
   await expectSaved(page);
 
   // the next poll waits until Heron has changed the slant, the server answers it, and its answer waits for Otter's save
@@ -446,6 +451,7 @@ test("the screens: a play saved while a poll is on its way back keeps the save, 
   await d.setName("Otter Slant Gold");
   await d.save();
   const otterSlant = (await (await put).json()) as PlayWrite;
+  await d.tools();
   await expectSaved(page);
   release();
 
@@ -467,6 +473,7 @@ test("the screens: a play renamed again while its save is set aside as a sidelin
   await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
   await expectSaved(page);
   await d.openSaved("Otter Slant Left");
+  await d.tools();
   await expectSaved(page);
 
   // Otter's save waits until Heron has changed the slant, so the server sets it aside; its answer waits for Otter's next rename
@@ -497,6 +504,7 @@ test("the screens: a play renamed again while its save is set aside as a sidelin
 
   const all = ["Otter Slant A (your sideline version)", "Otter Slant B", "Otter Wheel Right"];
   await expect.poll(() => deviceNames(page), { timeout: 20_000 }).toEqual(all);
+  await d.tools();
   await expectSaved(page);
   expect(names(await readTeam(otter, org, team))).toEqual(all);
   note("Otter's save of the slant is set aside behind Heron's change; Otter renames it again before the answer lands", "both", { puts, device: await deviceNames(page) });
