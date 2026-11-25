@@ -35,6 +35,8 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *    reaches the organization (D1)                                                                 → "a team rename"
  *  - a settings edit made as a push lands is marked saved, so a reload before it goes up takes the
  *    organization's copy over it (D1, D6)                                                          → "survives a reload"
+ *  - a poll answered before a play's save lands after it and puts the other coach's older play
+ *    back, or the save moves the device's rev past a play another coach wrote meanwhile (D2)      → "a poll on its way back"
  *  - a viewer can save, or isn't told why not; a send to another team doesn't land (rule 9, 10)    → "a viewer's screen"
  *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
@@ -404,6 +406,54 @@ test("the screens: a team rename made as its settings push lands survives a relo
   expect((await marker(page))?.dirty).toBe(false);
   note("Otter renames the team as the first push lands and reloads at once: the organization and the field have the second name", "otter", { puts, landed, team: (await readTeam(otter, org.id, team)).team, marker: await marker(page) });
   save(`${testInfo.project.name}-marker-after-push`);
+});
+
+test("the screens: a play saved while a poll is on its way back keeps the save, and a play another coach wrote meanwhile still arrives", async ({ page }, testInfo) => {
+  const run = runId();
+  const { otter, heron, org, team } = await program(run);
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+  await d.openSaved("Otter Slant Left");
+  await expectSaved(page);
+
+  // the next poll waits until Heron has changed the slant, the server answers it, and its answer waits for Otter's save
+  let arm = (): void => undefined;
+  const armed = new Promise<void>((resolve) => { arm = resolve; });
+  let release = (): void => undefined;
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  let polls = 0;
+  let answered = false;
+  await page.route("**/api/orgs/*/teams/*/poll", async (route) => {
+    if (++polls > 1) { await route.continue().catch(() => undefined); return; }
+    await armed;
+    const response = await route.fetch();
+    answered = true;
+    await released;
+    await route.fulfill({ response }).catch(() => undefined);
+  });
+  await expect.poll(() => polls, { timeout: 15_000 }).toBe(1);
+  const heronSlant = await body<PlayWrite>(await writePlay(heron, org, team, { ...SLANT_LEFT, name: "Heron Slant Left" }, ago(0)), 200, "heron's slant");
+  arm();
+  await expect.poll(() => answered, { timeout: 15_000 }).toBe(true);
+  const heronPost = await body<PlayWrite>(await writePlay(heron, org, team, play("fx-heron-post", "Heron Post"), ago(0)), 200, "heron's post");
+
+  const put = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().includes(`/plays/${SLANT_LEFT.id}`));
+  await d.setName("Otter Slant Gold");
+  await d.save();
+  const otterSlant = (await (await put).json()) as PlayWrite;
+  await expectSaved(page);
+  release();
+
+  const all = ["Heron Post", "Otter Slant Gold", "Otter Wheel Right"];
+  await expect.poll(() => deviceNames(page), { timeout: 20_000 }).toEqual(all);
+  expect(names(await readTeam(otter, org, team))).toEqual(all);
+  note("Heron changes the slant and writes a post while Otter's poll is held; Otter saves the slant; the poll lands after the save", "both", {
+    revs: { heronSlant: heronSlant.rev, heronPost: heronPost.rev, otterSlant: otterSlant.rev }, polls, device: await deviceNames(page), marker: await marker(page),
+  });
+  save(`${testInfo.project.name}-poll-on-its-way-back`);
 });
 
 test("a viewer's screen looks and can't save, a copy lands in another team, and an admin's removal takes the team away", async ({ page, browser }, testInfo) => {
