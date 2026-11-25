@@ -54,7 +54,8 @@ interface Props {
   onDone: () => void;
   onPrimary: () => void;
   onMirror: () => void;
-  onRename: (id: string, label: string, commit: boolean) => void;
+  /** `first`: the first letter typed since the tag was focused, which starts a step of Undo */
+  onRename: (id: string, label: string, first: boolean) => void;
   /**
    * an offensive play's ball is in a no-run zone and the league plays with them: a run from here is
    * flagged. Never on a defensive call, whose shadow offense is the other team's and never flagged.
@@ -216,9 +217,9 @@ function RouteSidebarImpl({
               title="Player tag (up to 3 letters)"
               onFocus={() => { renaming.current = null; }}
               onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                const commit = renaming.current !== sel.id;
+                const first = renaming.current !== sel.id;
                 renaming.current = sel.id;
-                onRename(sel.id, e.target.value, commit);
+                onRename(sel.id, e.target.value, first);
               }}
               // 16px is the smallest text a phone browser will focus without zooming the page
               className="h-[42px] w-[42px] flex-none rounded-full border-[2.5px] border-ink p-0 text-center text-base text-ink placeholder:text-ink/60"
