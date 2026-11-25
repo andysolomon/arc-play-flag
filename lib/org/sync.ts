@@ -41,7 +41,7 @@ import { refresh, setGuard } from "@/lib/play/library";
 import { LINEUPS_KEY, PLAYBOOKS_KEY, PLAYS_KEY, TEAM_KEY, newId, normalizePlaybook, normalizeSavedPlay, readAll, readLineups, readPlaybooks, readTeam, settleBook, writeMany } from "@/lib/play/storage";
 import type { Playbook, SavedPlay } from "@/lib/play/types";
 import * as api from "./api";
-import { ASSIST, HEAD, VIEW, type Level, type OrgPlay, type OrgPlaybook, type OrgTeamRecord, type Stamp } from "./types";
+import { ASSIST, HEAD, VIEW, type BookChange, type Level, type OrgPlay, type OrgPlaybook, type OrgTeamRecord, type PlayChange, type Stamp } from "./types";
 
 /** The device's record of the organization's team: what the organization last had of each record, what is pending here, and who touched what. */
 interface Device {
@@ -53,6 +53,8 @@ interface Device {
   hashes: { plays: Record<string, string>; books: Record<string, string>; settings: string };
   /** the settings rev `hashes.settings` came from: a poll's older settings never land over it */
   settingsRev: number;
+  /** the row rev each record's hash came from, kept for tombstones: a poll's older row never lands over it */
+  revs: { plays: Record<string, number>; books: Record<string, number> };
   /** pending changes, by id, with the time the coach made them (D1) */
   pending: { plays: Record<string, string>; books: Record<string, string>; settings: string | null };
   stamps: { plays: Record<string, Stamp>; books: Record<string, Stamp> };
@@ -76,6 +78,7 @@ function readDevice(): Device | null {
       org: d.org, orgName: typeof d.orgName === "string" ? d.orgName : "the organization", teamId: d.teamId, rev: d.rev, level: levelOf(d.level),
       hashes: { plays: { ...d.hashes?.plays }, books: { ...d.hashes?.books }, settings: typeof d.hashes?.settings === "string" ? d.hashes.settings : "" },
       settingsRev: typeof d.settingsRev === "number" ? d.settingsRev : 0,
+      revs: { plays: { ...d.revs?.plays }, books: { ...d.revs?.books } },
       pending: { plays: { ...d.pending?.plays }, books: { ...d.pending?.books }, settings: typeof d.pending?.settings === "string" ? d.pending.settings : null },
       stamps: { plays: { ...d.stamps?.plays }, books: { ...d.stamps?.books } },
     };
@@ -125,6 +128,10 @@ export function adopt(record: OrgTeamRecord, orgName: string, clear: boolean): v
       settings: hashRecord({ team: record.team, lineups: record.lineups }),
     },
     settingsRev: record.settingsRev,
+    revs: {
+      plays: Object.fromEntries(record.plays.map((p) => [p.id, p.rev])),
+      books: Object.fromEntries(record.playbooks.map((b) => [b.id, b.rev])),
+    },
     pending: { plays: {}, books: {}, settings: null },
     stamps: {
       plays: Object.fromEntries(record.plays.map((p) => [p.id, p.changed])),
@@ -207,11 +214,9 @@ export function push(): Promise<boolean> {
         const p = plays[id];
         if (p) {
           const w = await api.writePlay(d.org, d.teamId, p, at);
-          land(d, "plays", id, w.rev, "deleted" in w.play ? null : w.play, w.sideline ?? null, p.name);
+          land(d, "plays", id, hashRecord(p), w.play, w.sideline ?? null, p.name);
         } else {
-          const w = await api.deletePlay(d.org, d.teamId, id, at);
-          drop(d.hashes.plays, id); drop(d.stamps.plays, id);
-          d.rev = Math.max(d.rev, w.rev);
+          land(d, "plays", id, null, (await api.deletePlay(d.org, d.teamId, id, at)).play, null, "");
         }
         drop(d.pending.plays, id);
         writeDevice(d);
@@ -221,11 +226,9 @@ export function push(): Promise<boolean> {
         const b = books[id];
         if (b) {
           const w = await api.writeBook(d.org, d.teamId, b, at);
-          land(d, "books", id, w.rev, "deleted" in w.book ? null : w.book, w.sideline ?? null, b.name);
+          land(d, "books", id, hashRecord(b), w.book, w.sideline ?? null, b.name);
         } else {
-          const w = await api.deleteBook(d.org, d.teamId, id, at);
-          drop(d.hashes.books, id); drop(d.stamps.books, id);
-          d.rev = Math.max(d.rev, w.rev);
+          land(d, "books", id, null, (await api.deleteBook(d.org, d.teamId, id, at)).book, null, "");
         }
         drop(d.pending.books, id);
         writeDevice(d);
@@ -234,7 +237,6 @@ export function push(): Promise<boolean> {
         try {
           const sent = { team: readTeam(), lineups: readLineups() };
           const w = await api.writeSettings(d.org, d.teamId, sent.team, sent.lineups);
-          d.rev = Math.max(d.rev, w.rev);
           d.hashes.settings = hashRecord(sent);
           d.settingsRev = w.rev;
         } catch (e) {
@@ -268,38 +270,43 @@ export function push(): Promise<boolean> {
   return pushing;
 }
 
-/** A record's write came back: the organization's version lands (the device's, or the newer one that stood), and a sideline version beside it (D1). */
-function land(d: Device, kind: "plays" | "books", id: string, rev: number, stood: OrgPlay | OrgPlaybook | null, sideline: OrgPlay | OrgPlaybook | null, name: string): void {
-  d.rev = Math.max(d.rev, rev);
-  const stamps = d.stamps[kind];
-  const hashes = d.hashes[kind];
-  if (sideline) {
+/**
+ * A record's write came back with the version that stood (the device's, the newer one, or a tombstone), and maybe a
+ * sideline version beside it (D1). Only a poll moves `d.rev`: this write's rev may be past another coach's write the
+ * device has not read. What stood goes into storage only while storage still holds what was sent (`sent`, null for a
+ * delete): an edit made during the write stays, and goes up next.
+ */
+function land(d: Device, kind: "plays" | "books", id: string, sent: string | null, change: PlayChange | BookChange | null, sideline: OrgPlay | OrgPlaybook | null, name: string): void {
+  const toPlain = (r: OrgPlay | OrgPlaybook): SavedPlay | Playbook => (kind === "plays" ? plain(r as OrgPlay) : plainBook(r as OrgPlaybook));
+  const live = change && !("deleted" in change) ? change : null;
+  const stood = live ? toPlain(live) : null;
+  const stoodHash = stood ? hashRecord(stood) : null;
+  const records: Record<string, SavedPlay | Playbook> = kind === "plays" ? readAll() : readPlaybooks();
+  const now = records[id];
+  const put = stoodHash !== sent && (sent === null ? !now : !!now && hashRecord(now) === sent);
+  if (sideline || put) {
     applied(() => {
-      if (kind === "plays") {
-        const plays = readAll();
-        const side = plain(sideline as OrgPlay);
-        plays[side.id] = side;
-        if (stood) plays[id] = plain(stood as OrgPlay); else drop(plays, id);
-        writeMany([[PLAYS_KEY, plays]]);
-      } else {
-        const books = readPlaybooks();
-        const side = plainBook(sideline as OrgPlaybook);
-        books[side.id] = side;
-        if (stood) books[id] = plainBook(stood as OrgPlaybook); else drop(books, id);
-        writeMany([[PLAYBOOKS_KEY, books]]);
-      }
+      if (sideline) records[sideline.id] = toPlain(sideline);
+      if (put) { if (stood) records[id] = stood; else drop(records, id); }
+      writeMany([[kind === "plays" ? PLAYS_KEY : PLAYBOOKS_KEY, records]]);
       refresh();
     });
-    hashes[sideline.id] = hashRecord(kind === "plays" ? plain(sideline as OrgPlay) : plainBook(sideline as OrgPlaybook));
-    stamps[sideline.id] = sideline.changed;
-    const who = stood?.changed.name ?? "Another coach";
-    set({ notice: `${who} changed “${name}” after you. Your version is kept as “${sideline.name}”.` });
   }
-  if (stood) {
-    hashes[id] = hashRecord(kind === "plays" ? plain(stood as OrgPlay) : plainBook(stood as OrgPlaybook));
-    stamps[id] = stood.changed;
+  const who = change?.changed.name ?? "Another coach";
+  if (sideline) {
+    d.hashes[kind][sideline.id] = hashRecord(toPlain(sideline));
+    d.stamps[kind][sideline.id] = sideline.changed;
+    d.revs[kind][sideline.id] = sideline.rev;
+    set({ notice: `${who} changed “${name}” after you. Your version is kept as “${sideline.name}”.` });
+  } else if (put && stood && sent === null) {
+    set({ notice: `${who} changed “${stood.name}” after you deleted it, so it stays.` });
+  }
+  if (change) d.revs[kind][id] = change.rev;
+  if (live && stoodHash) {
+    d.hashes[kind][id] = stoodHash;
+    d.stamps[kind][id] = live.changed;
   } else {
-    drop(hashes, id); drop(stamps, id);
+    drop(d.hashes[kind], id); drop(d.stamps[kind], id);
   }
 }
 
@@ -365,6 +372,9 @@ export async function poll(): Promise<void> {
         const plays = readAll();
         for (const p of c.plays) {
           if (d.pending.plays[p.id]) { kept = true; continue; } // D2
+          // a poll answered before this device's write of the play, landing after it: the newer one stays
+          if (p.rev <= (d.revs.plays[p.id] ?? 0)) continue;
+          d.revs.plays[p.id] = p.rev;
           if ("deleted" in p) { drop(plays, p.id); drop(d.hashes.plays, p.id); drop(d.stamps.plays, p.id); }
           else { const v = plain(p); plays[p.id] = v; d.hashes.plays[p.id] = hashRecord(v); d.stamps.plays[p.id] = p.changed; }
           if (p.changed.by !== s.user?.id && p.id === presencePlay) touched.push(`${p.changed.name} changed “${"deleted" in p ? "this play" : p.name}” just now`);
@@ -373,6 +383,8 @@ export async function poll(): Promise<void> {
         const ids = new Set(Object.keys(plays));
         for (const b of c.playbooks) {
           if (d.pending.books[b.id]) { kept = true; continue; }
+          if (b.rev <= (d.revs.books[b.id] ?? 0)) continue;
+          d.revs.books[b.id] = b.rev;
           if ("deleted" in b) { drop(books, b.id); drop(d.hashes.books, b.id); drop(d.stamps.books, b.id); }
           else { const v = plainBook(b); books[b.id] = settleBook({ ...v, plays: v.plays.filter((id) => ids.has(id)) }); d.hashes.books[b.id] = hashRecord(v); d.stamps.books[b.id] = b.changed; }
         }
@@ -424,7 +436,7 @@ export async function settle(marker: { teamId: string; org: string; level?: Leve
   let d = readDevice();
   if (!d || d.teamId !== marker.teamId) {
     // D12: nothing of the team's records here; the whole difference goes up, then the team is read whole
-    d = { org: marker.org, orgName, teamId: marker.teamId, rev: 0, level: marker.level ?? 0, hashes: { plays: {}, books: {}, settings: "" }, settingsRev: 0, pending: { plays: {}, books: {}, settings: null }, stamps: { plays: {}, books: {} } };
+    d = { org: marker.org, orgName, teamId: marker.teamId, rev: 0, level: marker.level ?? 0, hashes: { plays: {}, books: {}, settings: "" }, settingsRev: 0, revs: { plays: {}, books: {} }, pending: { plays: {}, books: {}, settings: null }, stamps: { plays: {}, books: {} } };
   }
   d.orgName = orgName;
   set({ teamId: marker.teamId, org: marker.org, level: d.level });

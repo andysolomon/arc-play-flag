@@ -5,6 +5,7 @@ import { expectSaved, marker, panel, reloadedBy, runId, signIn, status, teamButt
 import { storedPlays, storedTeam } from "../support/fixtures";
 import { ago, applied, body, coach, createOrg, invite, join, listOrgs, moveTeam, names, ownTeam, poll, readOrg, readTeam, writePlay } from "../support/org";
 import { COVER_TWO, OTTERS, SLANT_LEFT, WHEEL_RIGHT, play, playbook } from "../support/fixtures";
+import { ORG_KEY } from "../../lib/account/sync";
 import type { AccountResponse } from "../../lib/account/types";
 import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
 
@@ -35,6 +36,10 @@ import type { OrgTeamSummary, PlayWrite } from "../../lib/org/types";
  *    reaches the organization (D1)                                                                 → "a team rename"
  *  - a settings edit made as a push lands is marked saved, so a reload before it goes up takes the
  *    organization's copy over it (D1, D6)                                                          → "survives a reload"
+ *  - a poll answered before a play's save lands after it and puts the other coach's older play
+ *    back, or the save moves the device's rev past a play another coach wrote meanwhile (D2)      → "a poll is on its way back"
+ *  - a play renamed again while its save is set aside as a sideline version loses the rename (D1)  → "keeps the rename"
+ *  - a delete another coach's later change overrules still drops their play here (T5)              → "puts their play back"
  *  - a viewer can save, or isn't told why not; a send to another team doesn't land (rule 9, 10)    → "a viewer's screen"
  *  - a coach removed by an admin keeps reading the team as if nothing happened (O1)                → "a viewer's screen"
  * Leaves `organization-<test>.json` (each step: who did what, and what the server answered) in
@@ -242,6 +247,9 @@ async function savePlay(page: Page, name: string): Promise<void> {
   await d.save();
 }
 const deviceNames = async (page: Page): Promise<string[]> => Object.values(await storedPlays(page)).map((p) => p.name).sort();
+/** The settings rev the device last took from the organization: a settings push that lands moves it. */
+const settingsRev = (page: Page): Promise<number> =>
+  page.evaluate((k) => (JSON.parse(localStorage.getItem(k) ?? "null") as { settingsRev?: number } | null)?.settingsRev ?? 0, ORG_KEY);
 
 test("the screens: an invite joins, the team button switches to the organization's team, saves cross between coaches, and avatars show who is where", async ({ page, browser }, testInfo) => {
   const run = runId();
@@ -361,9 +369,9 @@ test("the screens: a team rename made as its settings push lands survives a relo
   await d.tools();
   await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
   await expectSaved(page);
-  const before = (await marker(page))?.rev ?? 0;
+  const before = await settingsRev(page);
 
-  // polls wait until the reload, so only the push moves the marker's rev
+  // polls wait until the reload, so the second rename can only go up by its own push
   let releasePolls = (): void => undefined;
   const pollsHeld = new Promise<void>((resolve) => { releasePolls = resolve; });
   await page.route("**/api/orgs/*/teams/*/poll", async (route) => {
@@ -390,8 +398,8 @@ test("the screens: a team rename made as its settings push lands survives a relo
   await expect.poll(async () => (await storedTeam(page))?.name).toBe("Riverside Otters Gold");
   release();
 
-  // the push lands and writes the marker; the reload comes before the second rename's own push is due
-  await expect.poll(async () => (await marker(page))?.rev ?? 0, { intervals: [25] }).toBeGreaterThan(before);
+  // the push lands and writes the device and the marker; the reload comes before the second rename's own push is due
+  await expect.poll(() => settingsRev(page), { intervals: [25] }).toBeGreaterThan(before);
   const landed = await marker(page);
   expect(puts, "the second rename went up before the reload, so the reload tested nothing").toBe(1);
   await reloadedBy(page, async () => { await page.reload(); });
@@ -404,6 +412,136 @@ test("the screens: a team rename made as its settings push lands survives a relo
   expect((await marker(page))?.dirty).toBe(false);
   note("Otter renames the team as the first push lands and reloads at once: the organization and the field have the second name", "otter", { puts, landed, team: (await readTeam(otter, org.id, team)).team, marker: await marker(page) });
   save(`${testInfo.project.name}-marker-after-push`);
+});
+
+test("the screens: a play saved while a poll is on its way back keeps the save, and a play another coach wrote meanwhile still arrives", async ({ page }, testInfo) => {
+  const run = runId();
+  const { otter, heron, org, team } = await program(run);
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+  await d.openSaved("Otter Slant Left");
+  await d.tools();
+  await expectSaved(page);
+
+  // the next poll waits until Heron has changed the slant, the server answers it, and its answer waits for Otter's save
+  let arm = (): void => undefined;
+  const armed = new Promise<void>((resolve) => { arm = resolve; });
+  let release = (): void => undefined;
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  let polls = 0;
+  let answered = false;
+  await page.route("**/api/orgs/*/teams/*/poll", async (route) => {
+    if (++polls > 1) { await route.continue().catch(() => undefined); return; }
+    await armed;
+    const response = await route.fetch();
+    answered = true;
+    await released;
+    await route.fulfill({ response }).catch(() => undefined);
+  });
+  await expect.poll(() => polls, { timeout: 15_000 }).toBe(1);
+  const heronSlant = await body<PlayWrite>(await writePlay(heron, org, team, { ...SLANT_LEFT, name: "Heron Slant Left" }, ago(0)), 200, "heron's slant");
+  arm();
+  await expect.poll(() => answered, { timeout: 15_000 }).toBe(true);
+  const heronPost = await body<PlayWrite>(await writePlay(heron, org, team, play("fx-heron-post", "Heron Post"), ago(0)), 200, "heron's post");
+
+  const put = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().includes(`/plays/${SLANT_LEFT.id}`));
+  await d.setName("Otter Slant Gold");
+  await d.save();
+  const otterSlant = (await (await put).json()) as PlayWrite;
+  await d.tools();
+  await expectSaved(page);
+  release();
+
+  const all = ["Heron Post", "Otter Slant Gold", "Otter Wheel Right"];
+  await expect.poll(() => deviceNames(page), { timeout: 20_000 }).toEqual(all);
+  expect(names(await readTeam(otter, org, team))).toEqual(all);
+  note("Heron changes the slant and writes a post while Otter's poll is held; Otter saves the slant; the poll lands after the save", "both", {
+    revs: { heronSlant: heronSlant.rev, heronPost: heronPost.rev, otterSlant: otterSlant.rev }, polls, device: await deviceNames(page), marker: await marker(page),
+  });
+  save(`${testInfo.project.name}-poll-on-its-way-back`);
+});
+
+test("the screens: a play renamed again while its save is set aside as a sideline version keeps the rename", async ({ page }, testInfo) => {
+  const run = runId();
+  const { otter, heron, org, team } = await program(run);
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+  await d.openSaved("Otter Slant Left");
+  await d.tools();
+  await expectSaved(page);
+
+  // Otter's save waits until Heron has changed the slant, so the server sets it aside; its answer waits for Otter's next rename
+  let letGo = (): void => undefined;
+  const go = new Promise<void>((resolve) => { letGo = resolve; });
+  let land = (): void => undefined;
+  const landing = new Promise<void>((resolve) => { land = resolve; });
+  let puts = 0;
+  let answered = false;
+  await page.route(`**/api/orgs/*/teams/*/plays/${SLANT_LEFT.id}`, async (route) => {
+    if (route.request().method() !== "PUT" || ++puts > 1) { await route.continue(); return; }
+    await go;
+    const response = await route.fetch();
+    answered = true;
+    await landing;
+    await route.fulfill({ response });
+  });
+  await d.setName("Otter Slant A");
+  await d.save();
+  await expect.poll(() => puts, { timeout: 15_000 }).toBe(1);
+  await body<PlayWrite>(await writePlay(heron, org, team, { ...SLANT_LEFT, name: "Heron Slant Left" }, ago(0)), 200, "heron's slant");
+  letGo();
+  await expect.poll(() => answered, { timeout: 15_000 }).toBe(true);
+  await d.setName("Otter Slant B");
+  await d.save();
+  await expect.poll(async () => (await storedPlays(page))[SLANT_LEFT.id]?.name).toBe("Otter Slant B");
+  land();
+
+  const all = ["Otter Slant A (your sideline version)", "Otter Slant B", "Otter Wheel Right"];
+  await expect.poll(() => deviceNames(page), { timeout: 20_000 }).toEqual(all);
+  await d.tools();
+  await expectSaved(page);
+  expect(names(await readTeam(otter, org, team))).toEqual(all);
+  note("Otter's save of the slant is set aside behind Heron's change; Otter renames it again before the answer lands", "both", { puts, device: await deviceNames(page) });
+  save(`${testInfo.project.name}-rename-during-sideline`);
+});
+
+test("the screens: a delete another coach's later change overrules puts their play back", async ({ page }, testInfo) => {
+  const run = runId();
+  const { otter, heron, org, team } = await program(run);
+  await signIn(page, "Coach Otter", run);
+  const d = new Designer(page);
+  await d.tools();
+  await expect(teamButton(page)).toContainText("Riverside Otters", { timeout: 15_000 });
+  await expectSaved(page);
+  await page.goto("/playbooks");
+
+  // Otter's delete waits until Heron has changed the wheel, so it goes up older than Heron's change (T5)
+  let letGo = (): void => undefined;
+  const go = new Promise<void>((resolve) => { letGo = resolve; });
+  let deletes = 0;
+  await page.route(`**/api/orgs/*/teams/*/plays/${WHEEL_RIGHT.id}*`, async (route) => {
+    if (route.request().method() !== "DELETE" || ++deletes > 1) { await route.continue(); return; }
+    await go;
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "More actions for Otter Wheel Right" }).click();
+  await page.getByRole("button", { name: "Delete play" }).click();
+  await page.getByRole("button", { name: "Tap again to delete" }).click();
+  await expect.poll(() => deletes, { timeout: 15_000 }).toBe(1);
+  await body<PlayWrite>(await writePlay(heron, org, team, { ...WHEEL_RIGHT, name: "Heron Wheel Right" }, ago(0)), 200, "heron's wheel");
+  letGo();
+
+  const all = ["Heron Wheel Right", "Otter Slant Left"];
+  await expect.poll(() => deviceNames(page), { timeout: 20_000 }).toEqual(all);
+  expect(names(await readTeam(otter, org, team))).toEqual(all);
+  note("Otter deletes the wheel; Heron changes it before the delete reaches the server, which keeps Heron's", "both", { deletes, device: await deviceNames(page) });
+  save(`${testInfo.project.name}-delete-overruled`);
 });
 
 test("a viewer's screen looks and can't save, a copy lands in another team, and an admin's removal takes the team away", async ({ page, browser }, testInfo) => {

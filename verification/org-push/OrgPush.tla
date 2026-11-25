@@ -22,7 +22,8 @@ CONSTANTS
 
 None == "none"
 S0 == "s0"
-ASSUME Variant \in {"fixed", "hashAfterAwait", "cleanAfterPush", "staleSettingsPoll", "skipAdvancesRev", "settleSaysSaved"}
+ASSUME Variant \in {"fixed", "hashAfterAwait", "cleanAfterPush", "staleSettingsPoll", "skipAdvancesRev", "settleSaysSaved",
+                    "writeAdvancesRev"}
 
 VARIABLES
   dev,      \* the settings in this device's storage (TEAM_KEY, LINEUPS_KEY)
@@ -37,16 +38,18 @@ VARIABLES
   req,      \* the push in flight
   orphan,   \* a push sent before a reload, still on its way to the server
   poller,   \* the poll in flight
-  server,   \* org_teams: [rev, val, srev], srev being settings_rev
+  server,   \* org_teams: [rev, val, srev, prow]: srev is settings_rev, prow the newest other play row
   held,     \* every value the server has held
   made,     \* the settings the coach has made here
   last,     \* the latest of them
-  plays     \* the play writes other coaches have made
+  plays,    \* the play writes other coaches have made
+  pread,    \* the newest of their play rows the device has read
+  top       \* the newest settings rev the device has applied, from a push or a poll
 
-vars == <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, poller, server, held, made, last, plays>>
+vars == <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, poller, server, held, made, last, plays, pread, top>>
 
 IdlePush == [phase |-> "idle", sent |-> None, rev |-> 0, settle |-> FALSE]
-IdlePoll == [phase |-> "idle", since |-> 0, rev |-> 0, val |-> None, srev |-> 0]
+IdlePoll == [phase |-> "idle", since |-> 0, rev |-> 0, val |-> None, srev |-> 0, prow |-> 0]
 Max(a, b) == IF a > b THEN a ELSE b
 
 Init ==
@@ -54,9 +57,9 @@ Init ==
   /\ marker = FALSE /\ status = "saved"
   /\ timer = FALSE /\ again = FALSE
   /\ req = IdlePush /\ orphan = None /\ poller = IdlePoll
-  /\ server = [rev |-> 1, val |-> S0, srev |-> 1]
+  /\ server = [rev |-> 1, val |-> S0, srev |-> 1, prow |-> 1]
   /\ held = {S0}
-  /\ made = {} /\ last = None /\ plays = 0
+  /\ made = {} /\ last = None /\ plays = 0 /\ pread = 1 /\ top = 1
 
 (* push(): one in flight only asks for another go; else notePending, then send the settings as read now. *)
 StartPush(bySettle) ==
@@ -82,22 +85,22 @@ Edit(e) ==
   /\ marker' = TRUE
   /\ status' = "pending"
   /\ timer' = TRUE
-  /\ UNCHANGED <<hash, seen, drev, again, req, orphan, poller, server, held, plays>>
+  /\ UNCHANGED <<hash, seen, drev, again, req, orphan, poller, server, held, plays, pread, top>>
 
 TimerFires ==
   /\ timer
   /\ timer' = FALSE
   /\ StartPush(FALSE)
-  /\ UNCHANGED <<dev, hash, seen, drev, marker, orphan, poller, server, held, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, seen, drev, marker, orphan, poller, server, held, made, last, plays, pread, top>>
 
 (* online, focus, visibilitychange in wire(): a dirty marker pushes. *)
 Resume ==
   /\ marker
   /\ StartPush(FALSE)
-  /\ UNCHANGED <<dev, hash, seen, drev, marker, orphan, poller, server, held, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, seen, drev, marker, orphan, poller, server, held, made, last, plays, pread, top>>
 
 Write(v) ==
-  /\ server' = [rev |-> server.rev + 1, val |-> v, srev |-> server.rev + 1]
+  /\ server' = [server EXCEPT !.rev = server.rev + 1, !.val = v, !.srev = server.rev + 1]
   /\ held' = held \cup {v}
 
 (* PUT .../settings: the last write wins outright. *)
@@ -105,29 +108,29 @@ ServerTakesPush ==
   /\ req.phase = "out"
   /\ Write(req.sent)
   /\ req' = [req EXCEPT !.phase = "ok", !.rev = server.rev + 1]
-  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, orphan, poller, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, orphan, poller, made, last, plays, pread, top>>
 
 ServerTakesOrphan ==
   /\ orphan # None
   /\ Write(orphan)
   /\ orphan' = None
-  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, poller, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, poller, made, last, plays, pread, top>>
 
 OrphanLost ==
   /\ orphan # None
   /\ orphan' = None
-  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, poller, server, held, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, poller, server, held, made, last, plays, pread, top>>
 
 OtherCoach(o) ==
   /\ o \notin held
   /\ Write(o)
-  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, poller, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, poller, made, last, plays, pread, top>>
 
 OtherPlay ==
   /\ plays < Bumps
   /\ plays' = plays + 1
-  /\ server' = [server EXCEPT !.rev = server.rev + 1]
-  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, poller, held, made, last>>
+  /\ server' = [server EXCEPT !.rev = server.rev + 1, !.prow = server.rev + 1]
+  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, poller, held, made, last, pread, top>>
 
 (* writeSettings resolved: the rest of push() runs to its end and its `finally`. *)
 PushLands ==
@@ -136,7 +139,9 @@ PushLands ==
          dirty == IF Variant = "cleanAfterPush" THEN FALSE ELSE dev # h
      IN /\ hash' = h
         /\ seen' = req.rev
-        /\ drev' = Max(drev, req.rev)
+        /\ top' = Max(top, req.rev)
+        \* only a poll moves d.rev: a write's rev may be past other coaches' writes not yet read
+        /\ drev' = IF Variant = "writeAdvancesRev" THEN Max(drev, req.rev) ELSE drev
         /\ pend' = dirty
         /\ marker' = dirty
         /\ status' = IF req.settle /\ Variant = "settleSaysSaved" THEN "saved"
@@ -144,7 +149,7 @@ PushLands ==
   /\ req' = IdlePush
   \* finally: `void push()` again when asked; nothing the coach does fits between, so the timer stands in
   /\ IF again THEN again' = FALSE /\ timer' = TRUE ELSE UNCHANGED <<again, timer>>
-  /\ UNCHANGED <<dev, orphan, poller, server, held, made, last, plays>>
+  /\ UNCHANGED <<dev, orphan, poller, server, held, made, last, plays, pread>>
 
 (* poll(): with a change pending and no push out, it pushes instead; else it asks what changed since drev. *)
 PollTicks ==
@@ -154,15 +159,16 @@ PollTicks ==
           /\ UNCHANGED poller
      ELSE /\ poller' = [IdlePoll EXCEPT !.phase = "out", !.since = drev]
           /\ UNCHANGED <<pend, status, timer, again, req>>
-  /\ UNCHANGED <<dev, hash, seen, drev, marker, orphan, server, held, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, seen, drev, marker, orphan, server, held, made, last, plays, pread, top>>
 
 (* changesSince: the settings come back when settings_rev > since. *)
 ServerAnswersPoll ==
   /\ poller.phase = "out"
   /\ poller' = [poller EXCEPT !.phase = "back", !.rev = server.rev,
                   !.val = IF server.srev > poller.since THEN server.val ELSE None,
-                  !.srev = IF server.srev > poller.since THEN server.srev ELSE 0]
-  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, server, held, made, last, plays>>
+                  !.srev = IF server.srev > poller.since THEN server.srev ELSE 0,
+                  !.prow = IF server.prow > poller.since THEN server.prow ELSE 0]
+  /\ UNCHANGED <<dev, hash, pend, seen, drev, marker, status, timer, again, req, orphan, server, held, made, last, plays, pread, top>>
 
 (* The poll's answer lands: a pending change is kept over what it brought (D2). *)
 PollLands ==
@@ -173,7 +179,9 @@ PollLands ==
      IN /\ dev' = IF take THEN poller.val ELSE dev
         /\ hash' = IF take THEN poller.val ELSE hash
         /\ seen' = IF take THEN poller.srev ELSE seen
+        /\ top' = IF take THEN Max(top, poller.srev) ELSE top
         /\ drev' = IF kept /\ Variant # "skipAdvancesRev" THEN drev ELSE Max(drev, poller.rev)
+  /\ pread' = Max(pread, poller.prow)
   /\ marker' = pend
   /\ poller' = IdlePoll
   /\ UNCHANGED <<pend, status, timer, again, req, orphan, server, held, made, last, plays>>
@@ -196,7 +204,7 @@ Reload ==
           /\ UNCHANGED pend
   /\ timer' = FALSE
   /\ again' = FALSE
-  /\ UNCHANGED <<dev, hash, seen, drev, marker, server, held, made, last, plays>>
+  /\ UNCHANGED <<dev, hash, seen, drev, marker, server, held, made, last, plays, pread, top>>
 
 Next ==
   \/ \E e \in Edits : Edit(e)
@@ -228,12 +236,15 @@ NoLostEdit == last # None => last \in {dev} \cup held
 (* Neither the panel nor the marker says saved over settings the server never had. *)
 HonestSaved == (status = "saved" \/ ~marker) => dev \in held
 
+(* The device never puts older settings over newer ones it already had from the server. *)
+NoStaleTake == seen = top
+
 (* Nothing pending, in flight or scheduled, and every write read: device, server and marker agree. *)
 Quiet ==
   /\ req.phase = "idle" /\ orphan = None /\ poller.phase = "idle"
   /\ ~timer /\ ~again /\ ~pend
   /\ drev = server.rev
-QuietAgrees == Quiet => dev = server.val /\ ~marker
+QuietAgrees == Quiet => dev = server.val /\ pread = server.prow /\ ~marker
 
 (* Reloads resend, so writes are bounded only by this. *)
 RevBound == server.rev <= 2 * Cardinality(Edits) + Cardinality(Others) + Bumps + 2
