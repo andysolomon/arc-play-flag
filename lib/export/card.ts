@@ -5,7 +5,7 @@ import { artDepth, type ArtOptions } from "@/lib/render/play-svg";
 import { MIN_DEPTH, ybv } from "@/lib/play/geometry";
 import { hasNoRunZones } from "@/lib/play/storage";
 import { fitField } from "./binder";
-import { INK, MUTED, appMark, badge, field, page, pill, text, type SvgPage } from "./pages";
+import { INK, MUTED, appMark, badge, field, pill, text } from "./pages";
 import { measure } from "./raster";
 import { fit } from "./wristband";
 
@@ -37,7 +37,7 @@ export function cardField(players: readonly Player[], vis: Vis = "both", los = L
   return { ...f, top: ybv(artDepth(players, { pw: f.w, ph: f.h }, vis, MIN_DEPTH, los)) };
 }
 
-/** The card's own markup, in its 1080 x 1350 space, so a page can also nest it in a slot. */
+/** The card's own markup, in its 1080 x 1350 space, for a page to nest in a slot. */
 export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): string {
   const W = CARD_W, H = CARD_H, m = 60;
   const out: string[] = [];
@@ -82,8 +82,4 @@ export function cardBody(o: CardOptions, frame: Pick<ArtOptions, "positions" | "
   out.push(appMark(W - m, H - m + 10, 20));
   out.push(text(m, H - m + 10, 20, "5v5 flag", { fill: MUTED }));
   return out.join("");
-}
-
-export function cardSvg(o: CardOptions, frame: Pick<ArtOptions, "positions" | "ball" | "footballHref"> = {}): SvgPage {
-  return page(CARD_W, CARD_H, cardBody(o, frame));
 }
