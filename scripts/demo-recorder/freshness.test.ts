@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fingerprint, freshnessProblem, restamp, stampFor } from "./freshness";
+import { fingerprint, freshnessProblem, restamp, restampDrift, stampFor } from "./freshness";
 
 /*
  * The clips show the UI as it was when they were recorded; `components/demo/recorded-from.json`
@@ -19,7 +19,9 @@ import { fingerprint, freshnessProblem, restamp, stampFor } from "./freshness";
  *    instead of saying how to make one                                       → "a missing or garbled stamp"
  *  - the failure doesn't name the files or the two ways out                  → "a changed file"
  *  - a restamp goes through with no reason, with nothing to restamp, or
- *    leaves no trace of what it waved through                                → "restamping"
+ *    leaves no trace of what it waved through or what it compared            → "restamping"
+ *  - a restamp passes once a clip it compared is replaced, or one that
+ *    compared nothing passes                                                 → "restamping", "compared no clips"
  */
 
 const temporary: string[] = [];
@@ -43,28 +45,31 @@ const UI = {
   "app/globals.css": ":root { --ink: #1b1a17; }\n",
 };
 
+const CLIPS = { "first-play": "a".repeat(64), roster: "c".repeat(64) };
+const COMPARED = { tolerance: { blockShare: 0.15 }, clips: { "first-play": { webm: CLIPS["first-play"], worst: 0.02 }, roster: { webm: CLIPS.roster, worst: 0.04 } } };
+
 describe("demo clip freshness", () => {
   test("an unchanged tree matches its stamp, whatever its line endings and read order", async () => {
     const recorded = JSON.stringify(stampFor(await fingerprint(await tree(UI))));
     const crlf = Object.fromEntries(Object.entries(UI).reverse().map(([path, body]) => [path, body.replace(/\n/g, "\r\n")]));
-    expect(freshnessProblem(recorded, await fingerprint(await tree(crlf)))).toBeNull();
+    expect(freshnessProblem(recorded, await fingerprint(await tree(crlf)), CLIPS)).toBeNull();
   });
 
   test("a changed file fails, naming it and the two ways out", async () => {
     const recorded = JSON.stringify(stampFor(await fingerprint(await tree(UI))));
-    const problem = freshnessProblem(recorded, await fingerprint(await tree({ ...UI, "components/App.tsx": "export const App = 2;\n" })));
+    const problem = freshnessProblem(recorded, await fingerprint(await tree({ ...UI, "components/App.tsx": "export const App = 2;\n" })), CLIPS);
     expect(problem).toContain("components/App.tsx (changed)");
     expect(problem).toContain("bun run demo:record --chapter all");
-    expect(problem).toContain(`publish the whole set, its recorded-from.json to components/demo/recorded-from.json. If you have watched every clip`);
-    expect(problem).toContain('say so instead: `bun run demo:restamp --reason "<why the clips still match>"`.');
+    expect(problem).toContain("publish the whole set, its recorded-from.json to components/demo/recorded-from.json.");
+    expect(problem).toContain('`bun run demo:restamp --reason "<what changed>"` builds this checkout, takes every chapter again');
   });
 
   test("an added, removed or renamed file fails", async () => {
     const recorded = JSON.stringify(stampFor(await fingerprint(await tree(UI))));
-    expect(freshnessProblem(recorded, await fingerprint(await tree({ ...UI, "components/Fold.tsx": "fold\n" })))).toContain("components/Fold.tsx (added)");
+    expect(freshnessProblem(recorded, await fingerprint(await tree({ ...UI, "components/Fold.tsx": "fold\n" })), CLIPS)).toContain("components/Fold.tsx (added)");
     const { "components/App.tsx": app, ...rest } = UI;
-    expect(freshnessProblem(recorded, await fingerprint(await tree(rest)))).toContain("components/App.tsx (removed)");
-    const renamed = freshnessProblem(recorded, await fingerprint(await tree({ ...rest, "components/Main.tsx": app })));
+    expect(freshnessProblem(recorded, await fingerprint(await tree(rest)), CLIPS)).toContain("components/App.tsx (removed)");
+    const renamed = freshnessProblem(recorded, await fingerprint(await tree({ ...rest, "components/Main.tsx": app })), CLIPS);
     expect(renamed).toContain("components/App.tsx (removed)");
     expect(renamed).toContain("components/Main.tsx (added)");
   });
@@ -85,20 +90,29 @@ describe("demo clip freshness", () => {
   test("a missing or garbled stamp fails and says how to make one", async () => {
     const current = await fingerprint(await tree(UI));
     for (const stamp of [null, "", "{", "[]", JSON.stringify({ files: "nope" }), JSON.stringify({ files: { "components/App.tsx": 3 } })]) {
-      expect(freshnessProblem(stamp, current)).toContain("bun run demo:record --chapter all");
+      expect(freshnessProblem(stamp, current, CLIPS)).toContain("bun run demo:record --chapter all");
     }
   });
 
-  test("restamping needs a reason and a drift, and records both", async () => {
+  test("restamping needs a reason, a drift and a comparison of the clips served, and records all three", async () => {
     const recorded = JSON.stringify(stampFor(await fingerprint(await tree(UI))));
     const current = await fingerprint(await tree({ ...UI, "app/globals.css": ":root { --ink: #000; }\n" }));
-    expect(() => restamp(recorded, current, "  ")).toThrow(/reason/);
+    expect(() => restamp(recorded, current, "  ", COMPARED)).toThrow(/reason/);
     const unchanged = await fingerprint(await tree(UI));
-    expect(() => restamp(recorded, unchanged, "a comment")).toThrow(/nothing to restamp/);
-    const next = restamp(recorded, current, "only print colours changed; no clip shows print");
-    expect(next.restamped).toEqual({ reason: "only print colours changed; no clip shows print", files: ["app/globals.css (changed)"] });
-    expect(freshnessProblem(JSON.stringify(next), current)).toBeNull();
+    expect(() => restamp(recorded, unchanged, "a comment", COMPARED)).toThrow(/nothing to restamp/);
+    const next = restamp(recorded, current, "only print colours changed", COMPARED);
+    expect(next.restamped).toEqual({ reason: "only print colours changed", files: ["app/globals.css (changed)"], compared: COMPARED });
+    expect(freshnessProblem(JSON.stringify(next), current, CLIPS)).toBeNull();
+    // a clip replaced after the comparison is one it never saw
+    expect(freshnessProblem(JSON.stringify(next), current, { ...CLIPS, roster: "b".repeat(64) })).toContain("restamped without comparing these published clips with a take of this UI: roster");
     // a fresh recording carries no restamp note
     expect(stampFor(current).restamped).toBeUndefined();
+  });
+
+  test("a restamp that compared no clips fails, and the next restamp covers what it waved through", async () => {
+    const current = await fingerprint(await tree(UI));
+    const unchecked = JSON.stringify({ ...stampFor(current), restamped: { reason: "trust me", files: ["components/App.tsx (changed)"] } });
+    expect(freshnessProblem(unchecked, current, CLIPS)).toContain("restamped without comparing these published clips with a take of this UI: first-play, roster");
+    expect(restampDrift(unchecked, current)).toEqual(["components/App.tsx (changed)"]);
   });
 });
