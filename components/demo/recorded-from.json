@@ -6,10 +6,10 @@
   ],
   "files": {
     "app/globals.css": "f100ccc3bc87ad6f9e443f54d63e8f1d86b1e555efdb7db26a885effc43b5319",
-    "components/App.tsx": "4656d493c52baac624fcbabbd9f2a81c9664c28f5a85107cb1740ee375402c13",
+    "components/App.tsx": "84a2cf7004fbf1f07a11bddd33d5b424d4fe8ba198a7c19f646b4e7eed1194ef",
     "components/EditablePlayTitle.tsx": "e950bae2fb571cb67cfa1d4f11364b85d155c9fe6038389956769cb86eef43d3",
     "components/ErrorRecovery.tsx": "52b565ef9e628c5aebeda33c0c4ba97c0cf9ad7d3112635c33a735150a8c48ad",
-    "components/Field.tsx": "16c6a4b4e64d600c35f58dcf77b65412e34d3d05b5e5fdb852a4a3d8424574de",
+    "components/Field.tsx": "70916dfd87c194bd1ce2942a83b26d4b89311bdbbf15156b4f78707aebeab2df",
     "components/FirstUse.tsx": "b2e974561b95cfcbf2462e13977a11430fab08b7efdb8ce015ddb6597a426303",
     "components/Fold.tsx": "865b4b6e5540caa4c6e21899087f3afc0720e7deecc2f00e3bf66658fa6dcdc2",
     "components/Header.tsx": "17e4dd308f798a51c6f4d937e6f845676de2a896d670ebc09fb539e747451df8",
@@ -30,7 +30,7 @@
     "components/Repainting.tsx": "0ec6fd08ba37ab1276cdeae7659d7421b2b7fc7950198afa48415cb1e4a97317",
     "components/RosterSidebar.tsx": "19f61a3ac6c4675e5f47318ed9c145dc6684b24a4765c5b291b777c2c60e22ff",
     "components/RouteLayer.tsx": "f6519f6680f62eeaa15c61ccef42497a3b07a827282dcea3aade652e79b59c66",
-    "components/RouteSidebar.tsx": "70dbe66680bec6ac59f262807a12ddfdcacd6df14b426b35937fe45554117a3b",
+    "components/RouteSidebar.tsx": "52870ea5989914d41c2d07edd5e70d297facf9d1554c9cf3c6253450566897a4",
     "components/SaveFailure.tsx": "9143d88bf982dfbc584843462bc3d8dd3a1ad2aa4a019b28ac6965ccec22088e",
     "components/ScreenOnly.tsx": "9e67763272238d36766e04ba91a513e31a9e0324b9ba66fbc50a5af780b2f79c",
     "components/SharedPlay.tsx": "6217d99c6670d37a8dfd7f40e47c66fd82e86e1a85549cd9ae2f55a2f625db03",
@@ -81,13 +81,11 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "screen-only marks (waypoint, catch and release handles, focus ring, caption, playback ball) now sit in a print:hidden <ScreenOnly> group; nothing changes on screen and no clip prints",
+    "reason": "only the reducer's action shapes and no-op undo steps changed; no chapter uses Undo, Redo or the tag field",
     "files": [
+      "components/App.tsx (changed)",
       "components/Field.tsx (changed)",
-      "components/LateralLayer.tsx (changed)",
-      "components/Playback.tsx (changed)",
-      "components/PlayerToken.tsx (changed)",
-      "components/ScreenOnly.tsx (added)"
+      "components/RouteSidebar.tsx (changed)"
     ]
   }
 }
