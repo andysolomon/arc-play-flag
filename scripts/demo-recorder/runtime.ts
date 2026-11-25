@@ -144,7 +144,7 @@ const ON_CAMERA_CSS = "[data-offline-state]{display:none!important}#play-sidebar
  * The browser is the video's size, 576×720, and films a harness page (./harness.ts) that owns
  * the caption band and zooms the app's frame 1.5×, so the app is in its phone layout.
  */
-async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<RawCapture> {
+export async function rawCapture(slug: ChapterSlug, options: RecorderOptions, strictLength = true): Promise<RawCapture> {
   return usingDisposableDirectory("arc-demo-profile-", async (profileDir) => usingDisposableDirectory("arc-demo-video-", async (videoDir) => {
     const context = await chromium.launchPersistentContext(profileDir, {
       executablePath: chromiumExecutable(),
@@ -199,7 +199,7 @@ async function rawCapture(slug: ChapterSlug, options: RecorderOptions): Promise<
         await page.goto(`${origin}${HARNESS_PATH}`, { waitUntil: "load" });
         const app = page.frame({ name: "app" });
         if (!app) throw new Error("the harness page has no app frame");
-        run = await recordChapterActions(slug, page, app, options.baseUrl, videoT0, options.trace ? (line) => { console.error(line); } : undefined);
+        run = await recordChapterActions(slug, page, app, options.baseUrl, videoT0, options.trace ? (line) => { console.error(line); } : undefined, strictLength);
       } catch (error) {
         // a screenshot of the failed beat is the most useful thing to leave behind
         const shot = join(options.outputDir, `${slug}.failure.png`);
@@ -237,8 +237,8 @@ const H264_CRF = 38;
  * The lead-in (the browser launching and the first screen loading behind the cover) is cut
  * from the front, so a clip starts where the chapter does.
  */
-export function chapterVideoFilter(slug: ChapterSlug, leadInSeconds = 0): string {
-  const duration = CHAPTERS[slug].targetSeconds.toFixed(3);
+export function chapterVideoFilter(slug: ChapterSlug, leadInSeconds = 0, seconds = CHAPTERS[slug].targetSeconds): string {
+  const duration = seconds.toFixed(3);
   const fps = CHAPTERS[slug].fps ?? DEFAULT_FPS;
   const start = Math.max(0, leadInSeconds).toFixed(3);
   return `trim=start=${start}:duration=${duration},setpts=PTS-STARTPTS,fps=${String(fps)},scale=${String(VIDEO_SIZE.width)}:${String(VIDEO_SIZE.height)}:flags=lanczos`;

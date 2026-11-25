@@ -82,7 +82,7 @@
     "components/ui.ts": "dbc757b61a2066498ed5a8634ac75734ca0f0a109d53fa37ae4622c6ac6272de"
   },
   "restamped": {
-    "reason": "names now shrink through NameText (wrap, or one line with a title) instead of hand-rolled truncate, and only the reducer's action shapes and no-op undo steps changed; every name a clip shows fits on its line and no chapter uses Undo, Redo or the tag field, so it draws the same",
+    "reason": "names shrink through NameText instead of hand-rolled truncate (#191); the reducer's action shapes and no-op undo steps changed (#189)",
     "files": [
       "components/EditablePlayTitle.tsx (changed)",
       "components/Field.tsx (changed)",
@@ -107,6 +107,55 @@
       "components/playbooks/PlaybooksScreen.tsx (changed)",
       "components/playbooks/SendToTeam.tsx (changed)",
       "components/playbooks/Settings.tsx (changed)"
-    ]
+    ],
+    "compared": {
+      "tolerance": {
+        "pixelDelta": 24,
+        "seconds": 0.7,
+        "blockShare": 0.15
+      },
+      "clips": {
+        "first-play": {
+          "webm": "e4b0b3b742a20b2572e4869c552d7802810a75fda4d4353deddc4fa471299be9",
+          "worst": 0.039
+        },
+        "roster": {
+          "webm": "3cc28993d35825a0887865d0502fae90f9fef2b4dc35d48b95c93c224c2e2efd",
+          "worst": 0.027
+        },
+        "league-rules": {
+          "webm": "d5f62a6f52b74bd3845d91880984e81f46a7c1a6db32072c5fa8123e53fbf32a",
+          "worst": 0.016
+        },
+        "run-game": {
+          "webm": "245b76564b0411c95ba766e290d210e0ca036633b0e631970c87f78453f70fae",
+          "worst": 0.016
+        },
+        "defense": {
+          "webm": "d8d90e6259f047a19c677ef2955c96fa1e6e2ecfad5b5e4a8948ac2450129db1",
+          "worst": 0.012
+        },
+        "game-day": {
+          "webm": "512f03216d5b2f1c430a487fd4b3ed20d4b6a024883f094d7debdf82b43a47aa",
+          "worst": 0.016
+        },
+        "wristbands": {
+          "webm": "ed5b94d728c320f1bfc8705627e22b2b164bac3ce8e0036cb630400c55fb0965",
+          "worst": 0.035
+        },
+        "share": {
+          "webm": "84484e698a457d19f6824401865076c7e3e0d806e2f834904ad8413b3a34746f",
+          "worst": 0.02
+        },
+        "touchdown": {
+          "webm": "b5bb5570d7402ad8ede32b057aa20a017a56fe184af7759556ec00e5915da80b",
+          "worst": 0.047
+        },
+        "trick-plays": {
+          "webm": "b859c155440ab435e8faa7aa8b18774c873019382a9bf052900cda753e3c164f",
+          "worst": 0.016
+        }
+      }
+    }
   }
 }
